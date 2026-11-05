@@ -44,7 +44,9 @@
   "drums": {
     "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
-      "RolandTR909"
+      "RolandTR909",
+      "KorgM1",
+      "RolandTR707"
     ],
     "grooves": [
       "trance",
@@ -103,7 +105,8 @@
     "waves": [
       "supersaw",
       "gm_piano",
-      "gm_lead_2_sawtooth"
+      "gm_lead_2_sawtooth",
+      "gm_lead_4_chiff"
     ],
     "modes": [
       "minor"
@@ -119,7 +122,8 @@
     "waves": [
       "gm_piano",
       "supersaw",
-      "gm_string_ensemble_1"
+      "gm_string_ensemble_1",
+      "gm_pad_warm"
     ]
   },
   "riser": {},

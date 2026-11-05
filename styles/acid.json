@@ -43,7 +43,8 @@
     "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
       "RolandTR909",
-      "RolandTR808"
+      "RolandTR808",
+      "RolandTR606"
     ],
     "grooves": [
       "techno",
@@ -63,7 +64,8 @@
       "rumble"
     ],
     "waves": [
-      "sawtooth"
+      "sawtooth",
+      "square"
     ],
     "settings": {
       "cutoff": [

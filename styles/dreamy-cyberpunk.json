@@ -45,7 +45,9 @@
     "kits": [
       "LinnDrum",
       "EmuSP12",
-      "AkaiMPC60"
+      "AkaiMPC60",
+      "RolandTR808",
+      "RolandTR626"
     ],
     "grooves": [
       "halftime",
@@ -110,7 +112,8 @@
     "waves": [
       "gm_vibraphone",
       "gm_celesta",
-      "sawtooth"
+      "sawtooth",
+      "gm_fx_crystal"
     ],
     "modes": [
       "dorian",
@@ -126,7 +129,9 @@
     "waves": [
       "gm_pad_warm",
       "supersaw",
-      "gm_choir_aahs"
+      "gm_choir_aahs",
+      "gm_pad_halo",
+      "gm_epiano2"
     ]
   },
   "texture": {

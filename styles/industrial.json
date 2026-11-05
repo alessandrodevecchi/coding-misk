@@ -43,7 +43,9 @@
     "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "euclid"] },
     "kits": [
       "RolandTR909",
-      "OberheimDMX"
+      "OberheimDMX",
+      "RolandTR606",
+      "BossDR110"
     ],
     "grooves": [
       "hard",
@@ -69,7 +71,8 @@
     ],
     "waves": [
       "sawtooth",
-      "square"
+      "square",
+      "gm_synth_bass_2"
     ],
     "settings": {
       "drive": [
@@ -87,7 +90,8 @@
     ],
     "waves": [
       "square",
-      "sawtooth"
+      "sawtooth",
+      "gm_orchestra_hit"
     ],
     "modes": [
       "chromatic",

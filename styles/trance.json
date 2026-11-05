@@ -37,7 +37,9 @@
   "drums": {
     "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
-      "RolandTR909"
+      "RolandTR909",
+      "RolandMC303",
+      "RolandTR808"
     ],
     "grooves": [
       "trance",
@@ -116,7 +118,9 @@
     ],
     "waves": [
       "supersaw",
-      "gm_pad_warm"
+      "gm_pad_warm",
+      "gm_synth_strings_1",
+      "gm_pad_halo"
     ],
     "settings": {
       "cutoff": [

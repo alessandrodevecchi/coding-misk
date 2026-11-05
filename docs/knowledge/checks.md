@@ -113,6 +113,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-invent.mjs` | `npm run check:invent` | Node | Checks for the style maker (invented-styles, #51): invented styles are valid, coherent, not copies, well named, in the asked genre, repeatable (seed fixtures), and play in the director without moving any other draw. No… |
 | `tools/check-invented-chip.cjs` |  | dev server, Chrome | Browser check for the invented style's chip (radio-invented-style-chip, #82): with the compilation on and "invented styles", the same chip and hint in Now playing and in On air, STYLES (live, outside the set-aside… |
 | `tools/check-invented.cjs` |  | dev server, Chrome | Browser checks for invented styles (invented-styles, #51): the radio's invent die and trial chip, three invented styles played two songs each (no evalError, the output below clipping), Ancora, ×, a reload during a trial… |
+| `tools/check-kit-rows.mjs` | `npm run check:kit-rows` | Node | Drum rows of every kit (varied-openings D6): every drum machine a style recipe lists has a sample for each row its grooves play, and every kit of the hand-pick list (KITS) for the six song rows, unless KIT_MISSING… |
 | `tools/check-knowledge.mjs` | `npm run check:knowledge` | Node | Checks the knowledge base in docs/knowledge/ (knowledge-base, #74, design D5). No browser. |
 | `tools/check-levels.cjs` |  | dev server, Chrome | Plays every scene of the given tracks and prints errors, per-instrument peak levels and the peak of the master output. The output peak (out=) is the hard limit: above 1.0 it clips and the run fails. in= is the level… |
 | `tools/check-library.cjs` |  | dev server, Chrome | Browser checks for the Styles and Artists tabs (#35). |
@@ -190,7 +191,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 ## Fixtures and versions
 
 <!-- generated:fixtures -->
-Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/endless-v14.json`, `tests/snapshots/endless.json`, `tests/snapshots/invented-styles.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`.
+Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/endless-v14.json`, `tests/snapshots/endless.json`, `tests/snapshots/invented-styles.json`, `tests/snapshots/kit-rows.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`.
 <!-- /generated -->
 
 | Fixture | Guards | Rewrite only when | Then |

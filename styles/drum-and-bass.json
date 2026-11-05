@@ -38,7 +38,9 @@
     "kits": [
       "AkaiMPC60",
       "EmuSP12",
-      "RolandTR909"
+      "RolandTR909",
+      "RolandTR808",
+      "KorgM1"
     ],
     "grooves": [
       "dnb",
@@ -89,7 +91,8 @@
     ],
     "waves": [
       "square",
-      "gm_vibraphone"
+      "gm_vibraphone",
+      "gm_epiano1"
     ],
     "modes": [
       "minor",
@@ -106,7 +109,9 @@
     "waves": [
       "supersaw",
       "gm_synth_strings_1",
-      "gm_choir_aahs"
+      "gm_choir_aahs",
+      "gm_pad_sweep",
+      "gm_pad_warm"
     ]
   },
   "texture": {

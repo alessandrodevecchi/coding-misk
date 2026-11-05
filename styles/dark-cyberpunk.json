@@ -45,7 +45,9 @@
     "kits": [
       "OberheimDMX",
       "LinnDrum",
-      "RolandTR909"
+      "RolandTR909",
+      "RolandTR808",
+      "RolandTR626"
     ],
     "grooves": [
       "synthwave",
@@ -109,7 +111,8 @@
     "waves": [
       "sawtooth",
       "square",
-      "gm_lead_2_sawtooth"
+      "gm_lead_2_sawtooth",
+      "gm_lead_7_fifths"
     ],
     "modes": [
       "phrygian",
@@ -126,7 +129,8 @@
     ],
     "waves": [
       "supersaw",
-      "gm_synth_brass_1"
+      "gm_synth_brass_1",
+      "gm_pad_metallic"
     ],
     "weight": 0.7
   },

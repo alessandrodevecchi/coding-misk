@@ -34,7 +34,9 @@
   "phrase": 8,
   "drums": {
     "kits": [
-      "RolandTR808"
+      "RolandTR808",
+      "EmuSP12",
+      "AkaiMPC60"
     ],
     "grooves": [
       "phonk"
@@ -73,7 +75,8 @@
     ],
     "waves": [
       "cowbell",
-      "square"
+      "square",
+      "gm_piano"
     ],
     "modes": [
       "phrygian",
@@ -88,7 +91,8 @@
     ],
     "waves": [
       "gm_choir_aahs",
-      "supersaw"
+      "supersaw",
+      "gm_pad_choir"
     ],
     "weight": 0.4
   },

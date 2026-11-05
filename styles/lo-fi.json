@@ -54,7 +54,9 @@
     "kits": [
       "AkaiMPC60",
       "EmuSP12",
-      "AkaiXR10"
+      "AkaiXR10",
+      "RolandTR808",
+      "MPC1000"
     ],
     "grooves": [
       "boombap",
@@ -77,7 +79,8 @@
     "waves": [
       "gm_electric_bass_finger",
       "gm_acoustic_bass",
-      "sine"
+      "sine",
+      "gm_fretless_bass"
     ]
   },
   "hook": {
@@ -90,7 +93,8 @@
     "waves": [
       "gm_vibraphone",
       "gm_epiano1",
-      "gm_flute"
+      "gm_flute",
+      "gm_muted_trumpet"
     ],
     "modes": [
       "dorian",
@@ -106,7 +110,8 @@
     ],
     "waves": [
       "gm_epiano1",
-      "gm_piano"
+      "gm_piano",
+      "gm_electric_guitar_jazz"
     ]
   },
   "texture": {

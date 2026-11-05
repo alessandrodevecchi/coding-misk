@@ -20,6 +20,7 @@
     "check:phrases": "node --no-warnings tools/check-phrases.mjs",
     "endless": "node --no-warnings tools/endless.mjs",
     "check:styles": "node --no-warnings tools/style.mjs validate",
+    "check:kit-rows": "node --no-warnings tools/check-kit-rows.mjs",
     "check:song-filter": "node --no-warnings tools/check-song-filter.mjs",
     "check:playlists": "node --no-warnings tools/check-playlists.mjs",
     "check:trash": "node --no-warnings tools/check-trash.mjs",

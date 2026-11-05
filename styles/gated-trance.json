@@ -42,7 +42,8 @@
   "drums": {
     "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
-      "RolandTR909"
+      "RolandTR909",
+      "RolandTR707"
     ],
     "grooves": [
       "trance",
@@ -131,7 +132,9 @@
       "pump"
     ],
     "waves": [
-      "supersaw"
+      "supersaw",
+      "gm_synth_strings_1",
+      "gm_pad_poly"
     ],
     "weight": 0.4,
     "settings": {

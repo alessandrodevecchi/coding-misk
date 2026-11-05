@@ -44,7 +44,9 @@
     "kits": [
       "RolandR8",
       "AlesisHR16",
-      "LinnDrum"
+      "LinnDrum",
+      "AlesisSR16",
+      "YamahaRY30"
     ],
     "grooves": [
       "metal",
@@ -72,7 +74,8 @@
     ],
     "waves": [
       "gm_distortion_guitar",
-      "gm_lead_2_sawtooth"
+      "gm_lead_2_sawtooth",
+      "gm_violin"
     ],
     "modes": [
       "minor",
@@ -87,7 +90,9 @@
     ],
     "waves": [
       "gm_choir_aahs",
-      "gm_string_ensemble_1"
+      "gm_string_ensemble_1",
+      "gm_synth_strings_1",
+      "gm_church_organ"
     ],
     "weight": 0.6
   },

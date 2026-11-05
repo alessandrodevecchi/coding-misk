@@ -37,7 +37,9 @@
     "kits": [
       "LinnDrum",
       "RolandR8",
-      "AkaiXR10"
+      "AkaiXR10",
+      "YamahaRY30",
+      "AlesisSR16"
     ],
     "grooves": [
       "rock",
@@ -65,7 +67,8 @@
     ],
     "waves": [
       "gm_overdriven_guitar",
-      "gm_lead_2_sawtooth"
+      "gm_lead_2_sawtooth",
+      "gm_electric_guitar_clean"
     ],
     "modes": [
       "dorian",
@@ -81,7 +84,8 @@
     ],
     "waves": [
       "gm_rock_organ",
-      "gm_drawbar_organ"
+      "gm_drawbar_organ",
+      "gm_piano"
     ],
     "weight": 0.6
   },

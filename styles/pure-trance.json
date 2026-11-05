@@ -40,7 +40,8 @@
   "drums": {
     "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
-      "RolandTR909"
+      "RolandTR909",
+      "RolandMC303"
     ],
     "grooves": [
       "trance",
@@ -84,7 +85,8 @@
     ],
     "waves": [
       "supersaw",
-      "square"
+      "square",
+      "gm_lead_2_sawtooth"
     ],
     "modes": [
       "minor"
@@ -104,7 +106,9 @@
       "pump"
     ],
     "waves": [
-      "supersaw"
+      "supersaw",
+      "gm_pad_halo",
+      "gm_synth_choir"
     ],
     "weight": 0.4,
     "settings": {

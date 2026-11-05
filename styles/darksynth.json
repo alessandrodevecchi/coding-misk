@@ -45,7 +45,8 @@
     "kits": [
       "LinnDrum",
       "OberheimDMX",
-      "RolandTR909"
+      "RolandTR909",
+      "RolandTR707"
     ],
     "grooves": [
       "synthwave",
@@ -69,7 +70,8 @@
     ],
     "waves": [
       "sawtooth",
-      "square"
+      "square",
+      "gm_synth_bass_2"
     ],
     "settings": {
       "cutoff": [
@@ -107,7 +109,8 @@
     ],
     "waves": [
       "gm_lead_2_sawtooth",
-      "sawtooth"
+      "sawtooth",
+      "gm_lead_8_bass_lead"
     ],
     "modes": [
       "minor",
@@ -123,7 +126,8 @@
     ],
     "waves": [
       "supersaw",
-      "gm_synth_brass_1"
+      "gm_synth_brass_1",
+      "gm_synth_choir"
     ]
   },
   "guitar": {

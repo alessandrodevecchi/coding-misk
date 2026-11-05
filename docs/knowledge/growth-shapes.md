@@ -44,7 +44,7 @@ Shapes apply only with the Live coder profile and its natural growth. Classic an
 
 | Value | Name | Default weight |
 | --- | --- | --- |
-| `slow` | Slow (it: Lenta) | 2 |
+| `slow` | Slow (it: Lenta) | 1 |
 | `full-kick` | full kick (it: cassa intera) | 1 |
 | `typed` | from silence (it: dal silenzio) | 1 |
 | `broken` | broken beat (it: ritmo spezzato) | 1 |
@@ -54,6 +54,9 @@ Shapes apply only with the Live coder profile and its natural growth. Classic an
 | `voice` | voice track (it: voce traccia) | 0.5 |
 | `muted-base` | muted base (it: base muta) | 1 |
 | `mid-set` | mid-set (it: a metà set) | 1 |
+| `bass` |  | 1 |
+| `chord` |  | 1 |
+| `top` |  | 1 |
 
 **Pace (it: Velocità)** (`pace`): How many changes in the first minute. Slow: as before, sparse steps and long pauses. Medium: a step every 10 to 15 seconds. Fast: a step about every 8 seconds, small moves. With medium and fast the kick is whole within the first minute. The typing never rushes: a step that takes long to type comes later.
 

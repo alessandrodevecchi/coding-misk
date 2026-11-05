@@ -38,7 +38,9 @@
     "kits": [
       "LinnDrum",
       "OberheimDMX",
-      "RolandTR707"
+      "RolandTR707",
+      "AkaiLinn",
+      "RolandTR505"
     ],
     "grooves": [
       "synthwave",
@@ -55,7 +57,8 @@
     ],
     "waves": [
       "sawtooth",
-      "square"
+      "square",
+      "gm_synth_bass_1"
     ],
     "settings": {
       "cutoff": [
@@ -109,7 +112,9 @@
     "waves": [
       "supersaw",
       "gm_synth_strings_1",
-      "gm_synth_brass_1"
+      "gm_synth_brass_1",
+      "gm_epiano2",
+      "gm_pad_poly"
     ]
   },
   "riser": {},

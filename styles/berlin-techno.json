@@ -44,7 +44,9 @@
     "material": { "source": "mix", "share": 0.3, "families": ["four-floor"] },
     "kits": [
       "RolandTR909",
-      "OberheimDMX"
+      "OberheimDMX",
+      "RolandTR808",
+      "RolandTR606"
     ],
     "grooves": [
       "techno",
@@ -68,7 +70,8 @@
     ],
     "waves": [
       "sawtooth",
-      "square"
+      "square",
+      "gm_synth_bass_2"
     ],
     "settings": {
       "cutoff": [
@@ -138,7 +141,8 @@
     ],
     "waves": [
       "supersaw",
-      "gm_synth_strings_1"
+      "gm_synth_strings_1",
+      "gm_pad_metallic"
     ],
     "weight": 0.5,
     "settings": {
