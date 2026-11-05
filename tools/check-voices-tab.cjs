@@ -6,9 +6,10 @@
 // of samples while a song plays (the code's sample numbers follow the new manifest), the Settings card, English, the
 // hardware and light themes and 400 px (no sideways scroll). phrase-any-voice: the five options of Chi la dice, the tag
 // field hidden for several kinds and back on Any when narrowed, the row and the kind chips, the merge with Annulla, and
-// a delete that counts the files of two speakers; a sample made while the edit form is open; the test bench's line on
-// allowed voice style pairs (voice-style-combos), in Italian and English. With shots-dir: pictures of the tab, the
-// phrase editor, the Settings card and the Chiedi notice in neon, hardware and light, at desktop and 400 px.
+// a delete that counts the files of two speakers; a sample made or the phrases changed elsewhere while the edit form is
+// open, and a save with a slow helper; the test bench's line on allowed voice style pairs (voice-style-combos), in
+// Italian and English. With shots-dir: pictures of the tab, the phrase editor, the Settings card and the Chiedi notice
+// in neon, hardware and light, at desktop and 400 px.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voices-tab.cjs [shots-dir]
 //   (dev server on PORT, default 5173, with the voice helper: macOS `say` and ffmpeg; samples in public/samples)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -16,8 +17,12 @@ const fs = require('node:fs'), path = require('node:path');
 const PORT = process.env.PORT || 5173, URL = `http://localhost:${PORT}/`;
 const shots = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
 const SAMPLES = path.join(__dirname, '..', 'public', 'samples');
-// a click through the element (the sticky top bar never takes it)
-const tap = (page, sel) => page.$eval(sel, el => el.click());
+// a click through the element (the sticky top bar never takes it), found and clicked in one step: the tab draws itself
+// again when a sample is made, and page.$eval could click a button that drawing had just replaced (lost click)
+const tap = (page, sel) => page.evaluate(s => { const el = document.querySelector(s); if (!el) throw new Error(`no element matches ${s}`); el.click(); }, sel);
+// the combos table the page uses (voice-style-combos): the module at the URL the page loaded (Vite adds ?t= to a file
+// changed since the server started; another URL would be another copy of the module)
+const setCombos = (page, table) => page.evaluate(async t => { const url = performance.getEntriesByType('resource').map(e => e.name).filter(n => n.includes('/src/voices/combos.js')).pop() || '/src/voices/combos.js'; (await import(url)).setCombos(t); }, table);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, ms = 8000, step = 100) => { const t = Date.now(); for (;;) { let v = null; try { v = await fn(); } catch (e) { v = null; } if (v || Date.now() - t > ms) return v; await sleep(step); } };
 const slug = x => x.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48);
@@ -144,7 +149,26 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   await page.selectOption('[data-ph-f="tag"]', 'drop'); await sleep(1800);
   await tap(page, '[data-ph-save]'); await sleep(300);
   check((await items(page)).find(p => p.id === corsa.id).tag === 'drop', 'Modifica: a sample made while the form is open keeps the moment picked');
-  await page.evaluate(id => globalThis.codingMiskPhrases.phr.remove(id), corsa.id); await page.unroute('**/voice/say'); await sleep(300);
+  // the phrases changed by the app while the form is open (main.js draws the tab again, on a timer of its own): the text
+  // typed and the moment picked stay
+  await tap(page, `[data-ph-edit="${corsa.id}"]`); await sleep(100);
+  await page.selectOption('[data-ph-f="tag"]', 'bass'); await page.fill('[data-ph-f="text"]', 'corsa contro il vento');
+  await page.evaluate(() => globalThis.codingMiskPhrases.phr.add({ text: 'una frase da fuori', lang: 'it', kind: 'voice', tag: null, styles: [], source: 'tab' })); await sleep(600);
+  const kept = await page.evaluate(() => ({ form: !!document.querySelector('[data-ph-form]'), tag: (document.querySelector('[data-ph-f="tag"]') || {}).value, text: (document.querySelector('[data-ph-f="text"]') || {}).value }));
+  await tap(page, '[data-ph-save]'); await sleep(300);
+  const corsa2 = (await items(page)).find(p => p.id === corsa.id);
+  check(kept.form && kept.tag === 'bass' && kept.text === 'corsa contro il vento' && corsa2.tag === 'bass' && corsa2.text === 'corsa contro il vento', 'Modifica: the phrases changed elsewhere while the form is open keep the text and moment', JSON.stringify({ kept, corsa2 }));
+  // a slow helper (the samples' list takes 800 ms): Salva applies the edit and closes the form at once, and the next
+  // form opened stays open
+  await page.route('**/voice/usage', async r => { await sleep(800); await r.continue().catch(() => {}); });
+  await tap(page, `[data-ph-edit="${corsa.id}"]`); await sleep(100);
+  await page.selectOption('[data-ph-f="tag"]', 'drums'); await tap(page, '[data-ph-save]'); await sleep(200);
+  const slowTag = (await items(page)).find(p => p.id === corsa.id).tag;
+  await tap(page, '[data-ph-new]'); await sleep(1200);
+  const stillOpen = !!(await page.$('[data-ph-save]'));
+  check(slowTag === 'drums' && stillOpen, 'Modifica with a slow helper: saved at once, the next form stays open', JSON.stringify({ slowTag, stillOpen }));
+  await tap(page, '[data-ph-cancel]').catch(() => {}); await page.unroute('**/voice/usage'); await sleep(200);
+  await page.evaluate(id => { const P = globalThis.codingMiskPhrases.phr; P.remove(id); const o = P.items.find(x => x.text === 'una frase da fuori'); if (o) P.remove(o.id); }, corsa.id); await page.unroute('**/voice/say'); await sleep(300);
   // copy a vocabulary entry: kind voice, tag night, source copy (spec: copy)
   await tap(page, '[data-vt-sub="vocab"]'); await sleep(300);
   await tap(page, '[data-vt-group="voice-night"]'); await sleep(200);
@@ -227,8 +251,9 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   const askTwo = await page.textContent('.ph-confirm'), nTwo = +((/(\d+) file/.exec(askTwo) || [])[1] || 0);
   // (the default voice's English sample may still be on its way: 2 or 3 files)
   check(madeBass && nTwo >= 2 && nTwo <= 3, 'a phrase of all three said by two speakers: the confirmation counts the default voice\'s file and Kathy\'s (spec: delete)', askTwo.trim().slice(0, 90));
-  await tap(page, '[data-ph-confirm-yes]'); await sleep(1200);
-  check(!fs.existsSync(own) && !fs.existsSync(kathy), 'both files deleted');
+  await tap(page, '[data-ph-confirm-yes]');
+  const gone = await until(() => !fs.existsSync(own) && !fs.existsSync(kathy), 6000);
+  check(gone, 'both files deleted', [own, kathy].filter(f => fs.existsSync(f)).map(f => path.relative(SAMPLES, f)).join());
   for (const f of [own, kathy, enFile]) try { fs.unlinkSync(f); } catch (e) { /* gone */ }
 
   // ---------- 4. voices and the test bench ----------
@@ -244,15 +269,18 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   // (voice-style-combos D9: the bench says whether the pair is in src/voices/combos.json, for the voice heard; still playable)
   const status = () => page.$eval('[data-vt-bench-status]', el => el.textContent);
   check(/Abbinamento consentito per Alice/.test(await status()), 'banco: the shipped file allows the pair', await status());
-  await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos({ format: 1, it: { default: ['clear', 'radio'] } }));
+  await setCombos(page, { format: 1, it: { default: ['clear', 'radio'] } });
   await page.selectOption('[data-vt-bench="speaker"]', 'albert'); await page.selectOption('[data-vt-bench="style"]', 'robot'); await sleep(150);
   check(/Non tra gli stili consentiti per Alice \(si può ascoltare lo stesso\)/.test(await status()), 'banco: Albert in Italian is Alice, robot not allowed, still playable', await status());
-  const asked = page.waitForRequest(r => r.url().includes('/voice/say'), { timeout: 8000 }).then(() => true).catch(() => false);
+  // (played: superdough gets the line with the robot style, whether its sample was made now or already there)
+  await page.evaluate(() => { const sd = globalThis.superdough; globalThis.__heard = []; globalThis.superdough = (v, ...a) => { globalThis.__heard.push(v); return sd(v, ...a); }; globalThis.__sd = sd; });
   await page.fill('[data-vt-bench="text"]', 'il robot non è in lista'); await tap(page, '[data-vt-bench-hear]');
-  check(await asked, 'banco: Ascolta still plays a pair that is not allowed');
+  const heard = await until(() => page.evaluate(() => globalThis.__heard.find(v => v.distort === 3.5) || null), 10000);
+  await page.evaluate(() => { globalThis.superdough = globalThis.__sd; });
+  check(!!heard, 'banco: Ascolta still plays a pair that is not allowed (robot)', JSON.stringify(heard));
   await page.selectOption('[data-vt-bench="style"]', 'radio'); await sleep(150);
   check(/Abbinamento consentito per Alice/.test(await status()), 'banco: radio allowed', await status());
-  await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos(null)); await sleep(1500);
+  await setCombos(page, null); await sleep(1500);
   await shot(page, 'voices-neon');
 
   // ---------- 5. a delete during playback: the code follows the new manifest ----------
@@ -327,14 +355,14 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   await openTab(page, 'voices'); await sleep(2500);
   { const k = await page.$eval('.vt-speaker[data-vt-speaker="kathy"]', el => el.textContent.replace(/\s+/g, ' '));
     check(/English Kathy/.test(k) && /does not speak Italian: Alice speaks instead/.test(k) && !/not installed/.test(k), 'Voices and sounds in English: Kathy\'s system voice for English, Alice speaks instead in Italian', k.slice(0, 160)); }
-  { await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos({ format: 1, en: { albert: ['clear', 'deep'] } }));
+  { await setCombos(page, { format: 1, en: { albert: ['clear', 'deep'] } });
     const st = () => page.$eval('[data-vt-bench-status]', el => el.textContent);
     await page.selectOption('[data-vt-bench="speaker"]', 'albert'); await page.selectOption('[data-vt-bench="style"]', 'robot'); await sleep(150);
     const no = await st();
     await page.selectOption('[data-vt-bench="style"]', 'deep'); await sleep(150);
     const yes = await st();
     check(no === 'Not in the allowed set for Albert (still playable)' && yes === 'Allowed for Albert', 'bench in English: robot not allowed for Albert, deep allowed', `${no} | ${yes}`);
-    await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos(null)); }
+    await setCombos(page, null); }
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `\n${failed} failed` : '\nall passed');
