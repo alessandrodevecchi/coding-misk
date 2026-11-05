@@ -24,6 +24,11 @@
 - **WHEN** `npm run check:samples -- --speaker junior` runs after `node tools/voice.mjs`
 - **THEN** it reports only the `say_en_junior` bank, with 0 missing narrator lines
 
+#### Scenario: Strict run with narrator gaps
+
+- **WHEN** `npm run check:samples -- --strict` runs and the only missing samples are speakers' samples of narrator lines
+- **THEN** it reports them and exits 0
+
 ### Requirement: Narrator lines spoken by the drawn speaker
 
 A built-in narrator line in a radio song SHALL be spoken with the sample of the speaker drawn for the song's narrator. Until that sample exists, the default voice SHALL say the line, with the existing fallback note. The songs of a seed SHALL NOT change.
@@ -48,9 +53,9 @@ A built-in narrator line in a radio song SHALL be spoken with the sample of the 
 - **WHEN** the same seed is generated before and after this change
 - **THEN** the songs, their lines, their speakers and their sounds are the same, and `npm run check:endless` passes without new fixtures
 
-### Requirement: Narrator speaker samples asked ahead
+### Requirement: Speaker samples asked ahead in the radio
 
-When the speaker's sample of a built-in narrator line is missing and the voice helper runs, the radio SHALL ask the helper for it, also when the default voice has the text, the next song first. A sample that arrives after the next song was preloaded SHALL be loaded before that song's first bar. Voice-track lines, vocabulary and Compose SHALL keep their current rule.
+When the speaker's sample of a built-in line (a narrator line, a voice-track line or a vocabulary entry) is missing and the voice helper runs, the radio SHALL ask the helper for it, also when the default voice has the text, the next song first. A sample that arrives after the next song was preloaded SHALL be loaded before that song's first bar. A sample asked once SHALL NOT be asked again in the same page. Compose SHALL keep its current rule.
 
 #### Scenario: Speaker sample missing, helper on
 
@@ -59,8 +64,13 @@ When the speaker's sample of a built-in narrator line is missing and the voice h
 
 #### Scenario: Voice-track line and vocabulary
 
-- **WHEN** a built-in voice-track line or vocabulary entry said by speaker X has no X sample and the default voice has it
-- **THEN** the default voice says it and the radio does not ask for X's sample, as before
+- **WHEN** a built-in voice-track line or vocabulary entry said by speaker X has no X sample, the default voice has it and the voice helper runs
+- **THEN** the radio asks the helper for X's sample, and the default voice says the line until the sample arrives
+
+#### Scenario: Asked once
+
+- **WHEN** the helper was asked for a speaker's sample and the sample still does not exist (the copy guard deleted it)
+- **THEN** the radio does not ask for it again in the same page
 
 #### Scenario: Compose unchanged
 
