@@ -5475,6 +5475,9 @@ radio = createRadio({
     start: (p, bar, o) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio', { voices: o && o.voices }); },
     // the next song's voice samples, as it will be written on air (#82)
     preloadVoices: list => queueVoices(list),
+    // a typed line's sample loaded and decoded at once ({ s, n }): resolves once its buffer is ready, so the line is
+    // put on a bar only then (#82: a sample still decoding on its bar was skipped, the line lost)
+    loadVoice: v => { const k = voicePath(v); if (voiceDone.has(k)) return Promise.resolve(); voiceQueued.add(k); return warmOne(v).then(() => { voiceQueued.delete(k); }); },
     // resume after a pause: by hand, the user's code goes on
     resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),
     // a new window while the radio plays: the code on air does not change, the steps to come do

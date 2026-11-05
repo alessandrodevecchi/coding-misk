@@ -89,6 +89,28 @@ const slug = t => t.replace(/[“”]/g, '').normalize('NFD').replace(/[̀-ͯ]/g
       check(!!hit, 'typed line: its sample starts on its bar (fx3)', hit ? `bar ${(hit.bar + 1).toFixed(2)}` : `starts: ${starts.filter(x => !x.warm).map(x => `${x.file} ${x.bar.toFixed(2)}`).join(', ') || 'none'}`);
     }
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    // #82: a typed line whose sample arrives late (its file held back 4 s, decoded after the bar Say now aimed at) is
+    // never lost: the line goes on a later bar, once its sample is decoded, and starts there
+    const late = 'a slow tape rolls in the rain', file = `${slug(late)}.wav`;
+    await page.evaluate(async t => { const s = globalThis.codingMiskRadio.steering, sp = s.song.tracks.find(x => x.type === 'spoken'), { speakerOf } = await import('/src/song/spoken.js'); await fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, lang: 'en', speaker: speakerOf(s.song, sp) }) }); }, late);
+    let released = null;
+    const held = u => u.pathname.endsWith(`/${file}`);
+    await page.route(held, async route => { await sleep(4000); released = await rel(); await route.continue(); });
+    const from2 = Math.floor(await rel()) + 1;
+    while ((await rel()) < from2 + 0.3) await sleep(30);
+    await page.evaluate(() => { window.__starts = []; });
+    await page.fill('#radio-steer [data-sv-line]', late); await page.click('#radio-steer [data-sv-say="now"]');
+    const asked2 = await rel();
+    let clip2 = null;
+    for (let k = 0; k < 400 && !clip2; k++) { await sleep(50); clip2 = await page.evaluate(t => { const s = globalThis.codingMiskRadio.steering, sp = s.song.tracks.find(x => x.type === 'spoken'), k = sp && Object.keys(sp.patterns).find(q => sp.patterns[q].text && Object.values(sp.patterns[q].text).includes(t)); return k ? { ...sp.clips.find(c => c.pattern === k), seen: window.__rel() } : null; }, late); }
+    check(!!clip2, 'late sample: the typed line is on the song on air', clip2 ? `asked on ${asked2.toFixed(2)}, sample arrived on ${released === null ? '?' : released.toFixed(2)}, its bar ${clip2.start + 1}` : '');
+    if (clip2) {
+      check(released !== null && clip2.start > released, 'late sample: its bar comes after the sample arrived (moved on, not dropped)', `bar ${clip2.start + 1}, sample on ${released === null ? '?' : (released + 1).toFixed(2)}`);
+      while ((await rel()) < clip2.start + 1.5) await sleep(100);
+      const starts = await page.evaluate(() => window.__starts), hit = heardOf(starts, late, clip2.start);
+      check(!!hit, 'late sample: its sample starts on its bar (#82)', hit ? `bar ${(hit.bar + 1).toFixed(2)}` : `starts: ${starts.filter(x => !x.warm).map(x => `${x.file} ${x.bar.toFixed(2)}`).join(', ') || 'none'}`);
+    }
+    await page.unroute(held).catch(() => {});
   }
   check(!errors.length, 'no page errors', errors.slice(0, 2).join(' | '));
   await page.click('#radio-start').catch(() => {});
