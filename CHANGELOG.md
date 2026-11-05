@@ -69,6 +69,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - An unsaved change in the phrase editor of the Voices tab is no longer lost when the tab redraws in the background.
 - Saving a phrase edit in the Voices tab no longer closes the next phrase form when the voice helper is slow.
 - Radio: Keep on a style invented by the compilation saves it with one click while Now playing is redrawn.
+- Radio: a line typed in the console is no longer lost when its sample decodes late; it plays on a later bar.
+- Shorter main-thread pause on the bar where a live build step changes the code (Classic Say now included).
+- Radio: Now playing is redrawn only when what it shows changes; the position marks move in place.
 
 ### Removed
 
