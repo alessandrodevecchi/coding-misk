@@ -13,9 +13,13 @@
 //   once with a highlight); a page kept busy enters after the 30 s bound with "[radio] entered under load"; an
 //   11-track song takes "+ arp" and "− bass" without a skipped window; the song steered away from the page is
 //   JSON-equal to the page's steering, and a replay of the recipe gives the same song.
+// - locks (D8): a lock and then an unlock of an instrument late in the song take the same path (the button's pending
+//   ring within 100 ms, no task over the budget, recorded as lock-part and unlock-part on the entry bar); a lock pressed
+//   with a "+" enters in the same batch, "+" first; a lock then an unlock before the entry cancel out and record nothing;
+//   a mixer lock waits on its button and locks its track on the entry bar.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-add-lag.cjs [--budget 100] [--profiles classic,crescendo,switch] [--rate 4] [--style berlin-techno] [--standing n] [--quick]
 // --standing n: the commands standing before the late cases (default 8 in Classic, 3 on a grown song)
-// --quick: only the late "+", the burst and the net counts, at normal CPU speed
+// --quick: only the late "+", the burst, the net counts and the locks, at normal CPU speed
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
@@ -35,8 +39,9 @@ const table = [];
     window.__lt = []; window.__late = [];
     // (the badge's time from the click, in the page: the first press's click and the first badge added after it)
     window.__badge = { click: null, shown: null };
-    addEventListener('click', e => { if (e.target.closest && e.target.closest('.arr-pm') && window.__badge.click === null) window.__badge.click = performance.now(); }, true);
-    new MutationObserver(() => { const b = window.__badge; if (b.click !== null && b.shown === null && document.querySelector('#radio-steer .arr-pend')) b.shown = performance.now(); }).observe(document, { subtree: true, childList: true });
+    // (a lock's pending state is its ring: the data-pend-s attribute on the button)
+    addEventListener('click', e => { if (e.target.closest && e.target.closest('.arr-pm, .arr-lock, [data-mix-lock]') && window.__badge.click === null) window.__badge.click = performance.now(); }, true);
+    new MutationObserver(() => { const b = window.__badge; if (b.click !== null && b.shown === null && document.querySelector('#radio-steer .arr-pend, #radio-steer [data-pend-s]')) b.shown = performance.now(); }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-pend-s'] });
     try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push({ s: e.startTime, d: e.duration }); }).observe({ type: 'longtask', buffered: true }); } catch (e) {}
   });
   const page = await ctx.newPage();
@@ -54,6 +59,11 @@ const table = [];
   const badges = () => R(() => Object.fromEntries([...document.querySelectorAll('#radio-steer .arr-pend')].map(x => [x.closest('.arr-inst').dataset.arr, { text: x.querySelector('.arr-pend-t').textContent, tip: x.title, flash: x.classList.contains('flash') }])));
   const rows = () => R(() => [...document.querySelectorAll('#radio-steer [data-pend-row]')].map(x => ({ id: x.dataset.pendRow, text: x.textContent.trim() })));
   const playing = (part, bar) => R(async ([p, b]) => { const { stateAt } = await import('/src/song/build.js'), { instrumentOf } = await import('/src/endless/steering.js'), s = globalThis.codingMiskRadio.steering; return stateAt(s.song, b).song.tracks.filter(t => !t.mute && instrumentOf(t) === p && t.clips.some(c => c.start <= b && c.start + c.bars > b)).length; }, [part, bar]);
+  // a press: "+" or "−" of an instrument, the Arrangement lock of an instrument ('lock'), a mixer lock ('mixlock')
+  const pressSel = (kind, part) => kind === 'lock' ? `#radio-steer [data-lock-part="${part}"]` : kind === 'mixlock' ? `#radio-steer [data-mix-lock="${part}"]` : `#radio-steer [data-cmd="${kind}"][data-inst="${part}"]`;
+  const lockRing = sel => R(q => { const b = document.querySelector(q); return b ? { s: b.dataset.pendS || null, tip: b.title } : null; }, sel);
+  const lockedParts = () => R(() => (globalThis.codingMiskRadio.steering.plan.lockedParts || []).slice());
+  const lockPart = on => (on.find(x => x.p === 'bass') || on.find(x => x.less) || on[0] || {}).p;
   const instOn = async () => R(() => [...document.querySelectorAll('#radio-steer .arr-inst[data-arr]')].map(x => ({ p: x.dataset.arr, more: !x.querySelector('[data-cmd="more"]').disabled, less: !x.querySelector('[data-cmd="less"]').disabled })));
   const waitReady = async () => { for (let k = 0; k < 300; k++) { if (await R(() => { const s = globalThis.codingMiskRadio.state, it = s && s.stream[s.onAir]; return !!it && !it.growing && (it.grown || it.profile === 'classic'); })) return true; await sleep(250); } return false; };
   // waits until no batch is pending (entered or dropped), at most ms
@@ -69,7 +79,7 @@ const table = [];
     const c0 = Date.now();
     await R(() => { window.__badge = { click: null, shown: null }; });
     for (const [kind, part, gap] of presses) {
-      await page.click(`#radio-steer [data-cmd="${kind}"][data-inst="${part}"]`);
+      await page.click(pressSel(kind, part));
       if (gap) await sleep(gap);
     }
     await sleep(50);
@@ -153,6 +163,25 @@ const table = [];
     }
     // (the next cases on a fresh session, from its first phrases: the song above is near its end)
     const fresh = async seed => { await page.click('#radio-start'); await sleep(800); await page.fill('#radio-seed', seed); await page.click('#radio-start'); check(await waitReady(), `${name}: session ${seed} is ready`); await sleep(2000); await freshPhrase(2 * s0.phrase); };
+    // 1b. a lock and then an unlock of an instrument late in the song (D8): the same path as "+"; on a session of its
+    // own with the same standing commands (the song above has no room left for two more entries)
+    await fresh(`add-ahead-${profile}-k`);
+    for (let k = 0; k < standing; k++) { await R(b => globalThis.codingMiskRadio.seek(b), k * s0.phrase + 1.5); await sleep(400); await R(c => globalThis.codingMiskRadio.command(c), { kind: k % 2 ? 'energy-up' : 'energy-down' }); await sleep(400); }
+    await sleep(2500);
+    for (const kind of ['lock-part', 'unlock-part']) {
+      await freshPhrase(kind === 'lock-part' ? lateBar : (await rel()) + 1);
+      const on = await instOn(), part = lockPart(on);
+      const was = (await lockedParts()).includes(part);
+      if ((kind === 'lock-part') === was) { check(false, `${name}: the ${part} lock is ${was ? 'closed' : 'open'} before "${kind}"`); continue; }
+      const before = (await steering()).commands.length;
+      const m = await measure([['lock', part, 0]]);
+      report(`${name}, "${kind} ${part}" late in the song`, m);
+      check(clickTask(m) <= CLICK_BUDGET, `${name}: the lock click's own work stays under ${CLICK_BUDGET} ms`, `${clickTask(m)} ms`);
+      check(m.first.length === 1 && m.first[0].locks && m.first[0].locks[`p.${part}`] === kind, `${name}: the lock is pending in a batch`, JSON.stringify(m.first.map(x => x.locks)));
+      const got = (await steering()).commands.slice(before), now = (await lockedParts()).includes(part);
+      check(got.length === 1 && got[0].kind === kind && got[0].part === part && got[0].at === m.at, `${name}: one "${kind} ${part}" recorded on its entry bar`, JSON.stringify(got.map(c => `${c.kind}:${c.part}@${c.at}`)));
+      check(now === (kind === 'lock-part'), `${name}: the ${part} is ${kind === 'lock-part' ? 'locked' : 'open'} after the entry`);
+    }
     await fresh(`add-ahead-${profile}-b`);
     // 4. the CPU slowed 4 times: no task over the budget from the press until the batch is ready
     if (!QUICK) {
@@ -209,6 +238,49 @@ const table = [];
       const got = (await steering()).commands.slice(before), net = {};
       for (const c of got) net[c.part] = (net[c.part] || 0) + (c.kind === 'more' ? 1 : -1);
       check(JSON.stringify(Object.keys(net).sort().map(k => [k, net[k]])) === JSON.stringify(Object.keys(want).sort().map(k => [k, want[k]])), `${name}: the record holds the net counts only`, `${JSON.stringify(net)} for ${JSON.stringify(want)}`);
+    }
+    // 10. locks on a fresh session (D8): with a "+" in one batch, lock then unlock cancels, a mixer lock
+    await fresh(`add-ahead-${profile}-l`);
+    {
+      await freshPhrase((await rel()) + 1);
+      const on = await instOn(), part = lockPart(on), a = (on.find(x => x.more && x.p !== part) || {}).p;
+      if (!a || !part) { check(false, `${name}: a "+" and a lock for the lock burst`, JSON.stringify(on)); }
+      else {
+        const before = (await steering()).commands.length;
+        const m = await measure([['more', a, 300], ['lock', part, 0]]);
+        report(`${name}, "+ ${a}" and the ${part} lock in a burst`, m);
+        const got = (await steering()).commands.slice(before);
+        check(m.first.length === 1 && m.first[0].parts[a] === 1 && m.first[0].locks[`p.${part}`] === 'lock-part', `${name}: "+ ${a}" and the ${part} lock are one batch`, JSON.stringify(m.first.map(x => ({ parts: x.parts, locks: x.locks }))));
+        check(got.length === 2 && got[0].kind === 'more' && got[1].kind === 'lock-part' && got[1].part === part && got.every(x => x.at === got[0].at), `${name}: they enter together on one bar, "+" first`, JSON.stringify(got.map(x => `${x.kind}:${x.part}@${x.at}`)));
+        check(m.q0.length === 2, `${name}: one queue row for the "+" and one for the lock`, JSON.stringify(m.q0.map(x => x.text)));
+      }
+    }
+    {
+      await freshPhrase((await rel()) + 1);
+      const on = await instOn(), part = lockPart(on);
+      const was = (await lockedParts()).includes(part), before = (await steering()).commands.length;
+      await page.click(pressSel('lock', part)); await sleep(150);
+      const r0 = await lockRing(pressSel('lock', part)), p0 = await pending();
+      await page.click(pressSel('lock', part)); await sleep(150);
+      const r1 = await lockRing(pressSel('lock', part)), p1 = await pending(), q1 = await rows();
+      check(!!(r0 && r0.s) && p0.length === 1 && /^(Locks|Unlocks) on bar \d+ · in \d+ s$/.test(r0.tip), `${name}: the lock shows its ring, seconds and bar`, JSON.stringify(r0));
+      check(!p1.length && r1 && !r1.s && !q1.length, `${name}: a lock then an unlock of the ${part} before the entry cancel out`, JSON.stringify({ p1, r1, q1 }));
+      await sleep(9000);
+      check((await steering()).commands.length === before && (await lockedParts()).includes(part) === was, `${name}: the cancelled lock records nothing`);
+    }
+    {
+      await freshPhrase((await rel()) + 1);
+      const id = await R(() => { const b = document.querySelector('#radio-steer [data-mix-lock][aria-pressed="false"]'); return b && b.dataset.mixLock; });
+      if (!id) check(false, `${name}: an open mixer lock`);
+      else {
+        const before = (await steering()).commands.length;
+        const m = await measure([['mixlock', id, 0]]);
+        report(`${name}, the mixer lock of ${id}`, m);
+        check(m.first.length === 1 && m.first[0].locks[`t.${id}`] === 'lock', `${name}: the mixer lock is pending`, JSON.stringify(m.first.map(x => x.locks)));
+        const got = (await steering()).commands.slice(before);
+        const locked = await R(async t => { const { lockedIds } = await import('/src/endless/steering.js'); return lockedIds(globalThis.codingMiskRadio.steering.plan).includes(t); }, id);
+        check(got.length === 1 && got[0].kind === 'lock' && got[0].track === id && got[0].at === m.at && locked, `${name}: "lock ${id}" recorded on its entry bar and the track locked`, JSON.stringify(got.map(c => `${c.kind}:${c.track}@${c.at}`)));
+      }
     }
     if (profile === 'classic' && !QUICK) {
       // 5. the steering away from the page is the page's own, and a replay gives the same song

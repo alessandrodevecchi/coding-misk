@@ -36,10 +36,10 @@
 - 2.3: the new tracks' sounds are warmed one per task (`warmTracks`); the whole-window `soundCode()` compile of `swap` is unchanged (it runs only when the window's title changes).
 - 5.1: the CPU-4× budget is checked on the batches' own main-thread work (`addCost`); the page alone with nothing pressed already runs tasks of 60 to 180 ms at that rate on this machine, so the longest task is compared with that.
 
-## 6. Locks (proposed, waiting for the owner's review: no code before it)
+## 6. Locks (option A, approved by the owner on 5 November)
 
-- [ ] 6.1 The Arrangement locks (`lock-part`, `unlock-part`) and the mixer locks (`lock`, `unlock`) record a pending change in the batch of their boundary instead of calling `command` (D8); a lock and an unlock of the same instrument or track cancel out; the batch writes them after "−" and "+".
-- [ ] 6.2 The lock button's pending state (a ring and the tooltip "Locks on bar N · in 6 s"), the queue row, the strings in English and Italian, the radio console card in `src/guide.js`.
-- [ ] 6.3 `tools/check-add-lag.cjs`: a lock and an unlock late in a Classic and a Live coder song within the budget, lock plus "+" in one batch, lock then unlock cancels; `tools/check-steering.cjs --lock` and `tools/check-arrangement-levels.cjs --scenario` still pass.
+- [x] 6.1 The Arrangement locks (`lock-part`, `unlock-part`) and the mixer locks (`lock`, `unlock`) record a pending change in the batch of their boundary instead of calling `command` (D8); a lock and an unlock of the same instrument or track cancel out; the batch writes them after "−" and "+".
+- [x] 6.2 The lock button's pending state (a ring and the tooltip "Locks on bar N · in 6 s"), the queue row, the strings in English and Italian, the radio console card in `src/guide.js`.
+- [x] 6.3 `tools/check-add-lag.cjs`: a lock and an unlock late in a Classic and a Live coder song within the budget, lock plus "+" in one batch, lock then unlock cancels; `tools/check-steering.cjs --lock` and `tools/check-arrangement-levels.cjs --scenario` still pass.
 
 Total: about 11 agent hours (was 9: the load monitor, later entries on a half phrase and the live countdown add about 2 h).

@@ -145,7 +145,7 @@ A batch is recorded when it commits, as today's commands: `|n|` commands of kind
 
 Before: 112 to 583 ms per press on the click. The badge shows within 5 ms of the click in every case; the press itself costs at most 4 ms with the CPU slowed 4 times.
 
-### D8. Locks (proposed, 4 November, waiting for the owner)
+### D8. Locks (option A, approved by the owner on 5 November)
 
 The owner reported that a press on a lock of the console lags too. Measured (Classic, `berlin-techno`, bar 75, six commands standing, CPU not slowed): a lock click ran one task of 125 ms, an unlock 147 ms with one "skip query: too late". The cause is the one of "+" and "−": the lock button calls `command({ kind: 'lock-part' | 'unlock-part' })` (the mixer's lock `lock` or `unlock`), which rewrites the whole song on the main thread (`resteer` → `steerSong` → `stateAt` from bar 0; a grown song also `airView` before the worker). A lock applies at the next phrase start (`applyBar`, as "+" and "−"): it keeps the director out of the instrument's tracks from there.
 
@@ -156,6 +156,8 @@ The owner reported that a press on a lock of the console lags too. Measured (Cla
 | C keep today's path | The lag stays |
 
 Option A needs no new mechanism: the batch holds signed counts for "+" and "−" and a last state (locked or open) for each lock, written as today's commands.
+
+Implemented (5 November): `pendLock` in `src/radio/radio.js` keeps the locks of a batch by key (`p.<part>` for the Arrangement, `t.<track id>` for the mixer) with the command each press means on the song as it is. A second press of a key whose lock has not started to enter takes it back; after one that is entering, the press means the opposite of it and joins the next batch. `batchCommands` writes the locks after "−" and "+", in the order pressed; a mixer lock never takes the session scope. The button keeps its icon and shows a ring with the seconds left (`data-pend-s`), the tooltip "Locks on bar N · in 6 s" or "Unlocks…", and a queue row "bass: locked · 6 s" with ✕. Measured with `tools/check-add-lag.cjs` (CPU not slowed, late in the song with standing commands): a lock or an unlock shows its ring within 1 ms, its click and the batch's own work stay under 10 ms, and no main-thread task passed 100 ms in Classic, Crescendo and Live coder (before: 125 ms and 147 ms on the click in Classic).
 
 ## Risks / Trade-offs
 
