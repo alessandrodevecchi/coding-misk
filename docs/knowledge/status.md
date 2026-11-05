@@ -48,7 +48,7 @@ OpenSpec changes not archived: 110. With open tasks: 34. All tasks ticked, waiti
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [track-to-code](../../openspec/changes/track-to-code/tasks.md) | 11 | 42 |
 | [varied-openings](../../openspec/changes/varied-openings/tasks.md) | 28 | 28 |
-| [voice-combos-ui](../../openspec/changes/voice-combos-ui/tasks.md) | 13 | 13 |
+| [voice-combos-ui](../../openspec/changes/voice-combos-ui/tasks.md) | 1 | 13 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
 | [voice-style-combos](../../openspec/changes/voice-style-combos/tasks.md) | 1 | 12 |
 | [widget-render-styles](../../openspec/changes/widget-render-styles/tasks.md) | 2 | 21 |

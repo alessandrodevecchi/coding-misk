@@ -442,6 +442,35 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     }
     check(changes >= 1, `long run: ${changes} song changes in ${long} minutes without errors`);
   }
+  // the allowed voice styles of a session (voice-combos-ui D5): a session started with overrides records the table,
+  // Replay after the overrides change gives the same songs, a new session records the new table, none: no field
+  {
+    const C = (fn, ...a) => page.evaluate(([f, x]) => globalThis.codingMiskPhrases.combos[f](...x), [fn, a]);
+    const songs = rec => page.evaluate(r => JSON.stringify(globalThis.codingMiskRadio.rebuild(r, 4).map(x => x.song)), rec);
+    if ((await R()).on) { await page.click('#radio-start'); await sleep(500); }
+    await C('set', '', ['clear']);
+    await pick(['dark-cyberpunk', 'ambient']); await page.fill('#radio-seed', 'combos-replay'); await page.click('#radio-start'); await sleep(5000);
+    let r = await R();
+    const rec = r.state.recipe, ids = r.state.stream.slice(0, 2).map(x => x.id);
+    check(rec.combos && JSON.stringify(rec.combos.it.default) === '["clear"]' && JSON.stringify(rec.combos.en.default) === '["clear"]', 'combos: a session started with overrides records the effective table', JSON.stringify(rec.combos));
+    const heard = await songs(rec), plain = await songs({ ...rec, combos: undefined });
+    check(heard !== plain, 'combos: the recorded table changes the voices of the session (the test proves something)');
+    // the user changes the overrides on air: the session keeps its table, Replay gives the same songs
+    await C('reset', ''); await C('set', 'kathy', ['clear', 'echo']);
+    await page.click('#radio-skip'); await sleep(3000);
+    await page.click('#radio-replay'); await sleep(5000);
+    r = await R();
+    check(JSON.stringify(r.state.recipe.combos) === JSON.stringify(rec.combos) && await songs(r.state.recipe) === heard && r.state.stream[0].id === ids[0], 'combos: Replay after the overrides changed gives the same songs (recorded table)', `${r.state.stream[0].id} vs ${ids[0]}`);
+    // a new session: the new table; with no overrides: nothing recorded
+    await page.click('#radio-start'); await sleep(500); await page.click('#radio-start'); await sleep(4000);
+    r = await R();
+    check(r.state.recipe.combos && JSON.stringify(r.state.recipe.combos.en.kathy) === '["clear","echo"]' && JSON.stringify(r.state.recipe.combos.it.default) !== '["clear"]', 'combos: a new session records the new table', JSON.stringify(r.state.recipe.combos));
+    await C('reset', 'kathy');
+    await page.click('#radio-start'); await sleep(500); await page.click('#radio-start'); await sleep(4000);
+    r = await R();
+    check(!('combos' in r.state.recipe), 'combos: a session with no overrides records nothing');
+    await page.click('#radio-start'); await sleep(300);
+  }
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `${failed} failed` : 'all passed');

@@ -47,7 +47,7 @@ import { stream } from '../src/endless/random.js';
 import { captionFrame, captionSettings } from '../src/captions/captions.js';
 import { SPEAKER_KINDS, kindOf, outranks, applyExclusive, captionRows } from '../src/song/speakers.js';
 import { barSeconds } from '../src/song/spoken.js';
-import { setCombos } from '../src/voices/combos.js';
+import { setCombos, COMBOS_FILE, effectiveCombos } from '../src/voices/combos.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const read = f => JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -1431,18 +1431,49 @@ const CHECKS = {
   },
   'voice combos (2.4): Crescendo and Live coder radio songs grown on air add no draw of their own'() {
     const T = { format: 1, en: Object.fromEntries(['default', ...SPEAKERS].map(s => [s, VOICE_STYLE_IDS.filter(x => x !== 'robot' && x !== 'dirty')])) };
-    const grown = profile => COMBO_STYLES.flatMap(style => [0, 1].flatMap(i => {
-      const rec = { seed: `combos-${profile}-${i}`, options: { styles: [style], chaos: 0.8, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile, voice: { presence: 'always' } }, changes: [], growth: GROWTH_ON_AIR };
+    // (voice-combos-ui D5: a radio session draws with the table its recipe recorded, never the module's)
+    const grown = (profile, combos = null) => COMBO_STYLES.flatMap(style => [0, 1].flatMap(i => {
+      const rec = { seed: `combos-${profile}-${i}`, options: { styles: [style], chaos: 0.8, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile, voice: { presence: 'always' } }, changes: [], growth: GROWTH_ON_AIR, ...(combos ? { combos } : {}) };
       return sessionItems(RADIO_RECIPES, rec, 3).map(it => it.song);
     }));
     let n = 0, freeHit = 0;
     for (const profile of ['crescendo', 'switch']) {
-      const lim = voiceTracks(withCombos(T, () => grown(profile))), free = voiceTracks(grown(profile));
+      const lim = voiceTracks(grown(profile, T)), free = voiceTracks(grown(profile));
       n += lim.length; freeHit += free.filter(t => hasChar(t.settings, 'robot') || hasChar(t.settings, 'dirty')).length;
       assert(lim.length && lim.every(t => !hasChar(t.settings, 'robot') && !hasChar(t.settings, 'dirty')), `${profile}: a robot or dirty voice with them not allowed`);
     }
     assert(freeHit > 0, 'no robot or dirty voice without the file (the test proves nothing)');
     console.log(`      ${n} voice tracks in grown songs, ${freeHit} robot or dirty without the file`);
+  },
+  'voice combos UI (3.1): opts.combos bounds the narrator and the voice instrument over 300 songs; the committed table given draws the songs of none'() {
+    const T = { format: 1, en: { fred: ['clear', 'deep'] } };
+    const lim = comboSongs({ combos: T, voice: { presence: 'always' } }), free = comboSongs({ voice: { presence: 'always' } });
+    const fred = lim.entries.filter(e => e.voice.speaker === 'fred');
+    assert(fred.length >= 10 && fred.every(e => e.voice.character === null || e.voice.character === 'deep'), `fred narrators: ${fred.length}, ${[...new Set(fred.map(e => e.voice.character))]}`);
+    const spoken = voiceTracks(lim.songs).filter(t => t.settings.speaker === 'fred');
+    assert(spoken.length && spoken.every(t => charsOf(t.settings).every(c => c === 'deep')), 'a Fred voice track with another character');
+    assert(voiceTracks(free.songs).some(t => t.settings.speaker === 'fred' && charsOf(t.settings).some(c => c !== 'deep')), 'the free draw never gives Fred another character (the test proves nothing)');
+    // (the module table narrowed does not reach a draw given the committed table: the browser's overrides stay out)
+    assert(JSON.stringify(withCombos({ format: 1, en: { fred: ['clear'] } }, () => comboSongs({ combos: COMBOS_FILE }, 60).songs)) === JSON.stringify(comboSongs({}, 60).songs), 'opts.combos with the committed table moved the songs');
+    console.log(`      ${lim.songs.length} songs, ${fred.length} with Fred narrating, ${spoken.length} Fred voice tracks`);
+  },
+  'voice combos UI (3.2): a radio recipe draws with its recorded table; none recorded: the committed table, whatever the module table'() {
+    const only = { format: 1, en: { fred: ['clear'] } }, base = { options: { styles: COMBO_STYLES, chaos: 0.8, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile: 'classic', voice: { presence: 'always' } }, changes: [], growth: GROWTH_ON_AIR };
+    const songs = (rec, n = 6) => sessionItems(RADIO_RECIPES, rec, n).map(it => it.song);
+    let fredFree = 0, fredLim = 0;
+    for (let i = 0; i < 12; i++) {
+      const rec = { ...base, seed: `combos-ui-${i}` }, recorded = { ...rec, combos: effectiveCombos(COMBOS_FILE, only) };
+      const a = JSON.stringify(songs(recorded)), b = JSON.stringify(withCombos({}, () => songs(recorded))), c = JSON.stringify(withCombos(only, () => songs(rec)));
+      // Replay after the user changes the overrides: the same songs
+      assert(a === b, `${rec.seed}: a recorded session moved with the module table`);
+      // a session recorded before (or without overrides): the committed table, not the module's
+      assert(c === JSON.stringify(songs(rec)), `${rec.seed}: a session without a table followed the module table`);
+      const fred = voiceTracks(songs(recorded)).filter(t => t.settings.speaker === 'fred');
+      fredLim += fred.length;
+      assert(fred.every(t => !charsOf(t.settings).length), `${rec.seed}: Fred with a character in a session limited to clear`);
+      fredFree += voiceTracks(songs(rec)).filter(t => t.settings.speaker === 'fred' && charsOf(t.settings).length).length;
+    }
+    assert(fredLim > 0 && fredFree > 0, `the test proves nothing: ${fredLim} Fred tracks limited, ${fredFree} with a character free`);
   },
   'speaker registry (spoken-text-on-stage D11): N and T mapped to kinds, the voice track outranks the narrator, one narrator line per bar; a fake third kind is captioned with no other change, exclusive quiets the lower ranks, multiCaption adds a row'() {
     assert(kindOf('N') === 'narrator' && kindOf('T') === 'voice' && SPEAKER_KINDS.singing.future && outranks('voice', 'narrator') && !outranks('narrator', 'voice'), 'registry');

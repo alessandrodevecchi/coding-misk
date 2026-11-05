@@ -7,6 +7,7 @@ import { DRAFTS_KEY, mergeDrafts } from '../library/pattern-drafts.js';
 import { mergeUses } from '../library/patterns.js';
 import { PHRASES_KEY, mergePhrases } from '../voices/phrases.js';
 import { DECODES_KEY, mergeDecodes, plainRecord } from '../decode/store.js';
+import { COMBOS_KEY, normalizeOverrides, COMBO_LANGS } from '../voices/combos.js';
 
 export const BACKUP_FORMAT = 'coding-misk/backup';
 export const PREFIX = 'coding-misk-';
@@ -82,6 +83,13 @@ export function mergeBackup(backup, get) {
       // the owner's presets of the New song panel (new-song-panel D6) by name: the backup's wins, the others stay
       const cur = get(k) && typeof get(k) === 'object' && !Array.isArray(get(k)) ? get(k) : {};
       values[k] = { ...cur, ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}) };
+      counts.settings++;
+    } else if (k === COMBOS_KEY) {
+      // the allowed voice styles the user changed (voice-combos-ui D6): per language and speaker the backup's list wins,
+      // the other speakers stay; invalid parts of either side are dropped; a backup with nothing valid changes nothing
+      const cur = normalizeOverrides(get(k)), add = normalizeOverrides(v), out = { format: cur.format };
+      for (const l of COMBO_LANGS) if (cur[l] || add[l]) out[l] = { ...(cur[l] || {}), ...(add[l] || {}) };
+      values[k] = out;
       counts.settings++;
     } else if (k === DECODES_KEY) {
       // decoded tracks (track-to-code D3) by fingerprint: the one used last wins; the import writes them to IndexedDB

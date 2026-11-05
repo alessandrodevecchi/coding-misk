@@ -100,6 +100,7 @@ import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
 import { textIn } from './voices/phrases.js';
 import { createVoicesTab } from './voices/voices-tab.js';
+import { createCombosStore } from './voices/combos-store.js';
 import { narratorPick } from './voices/mine.js';
 import { setNarratorMine } from './song/build.js';
 import { PHRASES_MOMENT } from './voices/moments.js';
@@ -132,6 +133,8 @@ const store = {
   remove(k) { try { localStorage.removeItem(k); } catch (e) {} },
 };
 setLang(getLang());
+// the allowed voice styles (voice-combos-ui): the user's overrides over src/voices/combos.json, read before any draw
+const combosStore = createCombosStore(store);
 // my phrases (my-phrases D4): the narrator of the song in Compose may say phrases of the collection in place of lines
 // from the built-in pools, never the song's own written lines; a radio song draws from the snapshot it carries
 let phr = null;
@@ -5278,6 +5281,7 @@ RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable()));
 // in Compose (marked changed, not saved)
 // the Voci tab (my-phrases D9)
 voicesTab = createVoicesTab({ root: $('#tab-voci'), phr, store, t, tx, esc, getLang, toast, helper: () => !!voiceHelper, files: () => customFiles,
+  combos: combosStore, radioOn: () => !!(radio && radio.on),
   recipes: RECIPES, songs: BUILTIN, library: () => librarySongs(), keys: except => sampleKeys(except), hear: x => hearLine(x),
   samplesChanged: async () => { await refreshSamples(); if (radio && radio.samplesArrived) radio.samplesArrived(); } });
 patternsTab = createPatternsTab({ root: $('#patterns'), t, tx, esc, store, toast, recipes: () => RECIPES,
@@ -5297,7 +5301,7 @@ patternsTab = createPatternsTab({ root: $('#patterns'), t, tx, esc, store, toast
 // for the browser checks (tools/check-patterns.cjs): the song open in Compose
 globalThis.codingMiskPatterns = { tab: patternsTab, compose: () => ({ T: JSON.parse(JSON.stringify(T)), sel, dirty }) };
 // for the browser check of my phrases (tools/check-voices-tab.cjs)
-globalThis.codingMiskPhrases = { phr, tab: voicesTab, code: () => (ed && ed.code) || '', manifest: () => customFiles, reload: () => refreshSamples(), keys: () => { const k = sampleKeys(); return { builtin: k.builtin.size, mine: [...k.mine], songs: k.songs.size }; } };
+globalThis.codingMiskPhrases = { phr, tab: voicesTab, combos: combosStore, code: () => (ed && ed.code) || '', manifest: () => customFiles, reload: () => refreshSamples(), keys: () => { const k = sampleKeys(); return { builtin: k.builtin.size, mine: [...k.mine], songs: k.songs.size }; } };
 // artists from artists/ plus the user's (Artists tab)
 const BUILTIN_ARTISTS = Object.values(import.meta.glob('../artists/*.json', { eager: true, import: 'default' })).sort((a, b) => a.name.localeCompare(b.name));
 artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onCompose: a => newSongFromArtist(a), onChange: () => { if (radio) radio.render(); renderArtistPick(); } });

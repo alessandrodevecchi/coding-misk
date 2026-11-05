@@ -257,8 +257,8 @@ export function planSong({ parts, byId, prev, opts, rng, index, recent = null })
   // (voice-style-combos D5: a chosen style with no fixed speaker, on a drawn speaker that does not allow it: the speaker
   // again among those that do, from a stream of its own, only then; the style stays; none allows it: as drawn)
   const narChosen = cleanSound(opts.narratorSound);
-  if (narChosen.style !== 'auto' && narChosen.style !== 'custom' && !narChosen.speaker && !allowedForDraw(voice.settings.speaker).includes(narChosen.style)) {
-    const ok = ['', ...SPEAKERS].filter(s => allowedForDraw(s).includes(narChosen.style));
+  if (narChosen.style !== 'auto' && narChosen.style !== 'custom' && !narChosen.speaker && !allowedForDraw(voice.settings.speaker, opts.combos || undefined).includes(narChosen.style)) {
+    const ok = ['', ...SPEAKERS].filter(s => allowedForDraw(s, opts.combos || undefined).includes(narChosen.style));
     if (ok.length) voice.settings = { ...voice.settings, speaker: rng.voice.fork(`combos/${index}`).pick(ok) };
   }
   // (voice-controls: the options' extra draws come from a stream of their own, so the default draws as before)
@@ -329,9 +329,10 @@ export function voiceFor(R, opts, rng, index = 0) {
   let character = null;
   const chance = opts.voiceChance ?? 0.4 + 0.4 * opts.chaos;
   // (voice-style-combos D3: only the characters src/voices/combos.json allows for the speaker heard, the narrator's
+  // (voice-combos-ui D4: the table is opts.combos when the session recorded one, else the module's table)
   // fixed speaker when one is set; one random value either way, so nothing else moves; none allowed: no character)
   if (rng.chance(chance)) {
-    const names = allowedCharacters(cleanSound(opts.narratorSound).speaker ?? base.speaker);
+    const names = allowedCharacters(cleanSound(opts.narratorSound).speaker ?? base.speaker, opts.combos || undefined);
     const taste = opts.voiceCharacters && Object.values(opts.voiceCharacters).some(w => w > 0);
     character = (taste ? pickWeighted(rng, opts.voiceCharacters, names) : names.length ? rng.pick(names) : null) || (rng.next(), null);
     if (character) Object.assign(base, VOICE_CHARACTERS[character]);
@@ -425,7 +426,7 @@ export function spokenFor(R, opts, voice, rng, more = null, speakers = [], recen
   // a character now and then (more often on a chop, which may go further)
   // (only the characters the combos file allows for the speaker heard, D3 point 2; none: the plain voice)
   if (rng.chance(way === 'chop' ? 0.6 : 0.25 + 0.3 * (opts.chaos ?? 0.3))) {
-    const ok = allowedCharacters((V && cleanSound(V.sound).speaker) || speaker), list = (way === 'chop' ? ['robot', 'radio', 'dirty', 'echo'] : ['radio', 'deep', 'cathedral', 'echo', 'slow']).filter(c => ok.includes(c));
+    const ok = allowedCharacters((V && cleanSound(V.sound).speaker) || speaker, opts.combos || undefined), list = (way === 'chop' ? ['robot', 'radio', 'dirty', 'echo'] : ['radio', 'deep', 'cathedral', 'echo', 'slow']).filter(c => ok.includes(c));
     if (list.length) Object.assign(settings, VOICE_CHARACTERS[rng.pick(list)]); else rng.next();
   }
   const pat = { way, text, ...extrasFor(way, rng) };
