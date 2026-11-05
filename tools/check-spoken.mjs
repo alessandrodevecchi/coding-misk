@@ -759,16 +759,17 @@ const CHECKS = {
     assert(VS.sayBank('en', 'kathy') === 'say_en_kathy' && VS.sayBank('en', '') === 'say_en' && VS.MAX_WORDS === 12, 'banks');
   },
   'real voices (D1, D2): the speaker table, the language rule of sayBank, the same in tools/voice-sample.mjs'() {
-    assert(SPEAKERS.join() === 'albert,fred,junior,kathy' && SPEAKERS.every(s => SPEAKER_LANGS[s].join() === 'en'), `speakers ${SPEAKERS}`);
-    assert(sayBank('it', 'kathy') === 'say_it' && sayBank('en', 'kathy') === 'say_en_kathy' && sayBank('en', 'reed') === 'say_en' && sayBank('it', '') === 'say_it', 'sayBank');
+    assert(SPEAKERS.join() === 'albert,fred,junior,kathy,siri4' && SPEAKERS.every(s => SPEAKER_LANGS[s].join() === (s === 'siri4' ? 'it' : 'en')), `speakers ${SPEAKERS}`);
+    assert(sayBank('it', 'kathy') === 'say_it' && sayBank('en', 'kathy') === 'say_en_kathy' && sayBank('en', 'reed') === 'say_en' && sayBank('it', '') === 'say_it' && sayBank('it', 'siri4') === 'say_it_siri4' && sayBank('en', 'siri4') === 'say_en', 'sayBank');
     assert(JSON.stringify(VS.SPEAKER_LANGS) === JSON.stringify(SPEAKER_LANGS) && VS.SPEAKERS.join() === SPEAKERS.join(), 'the two speaker tables differ');
     for (const lang of ['en', 'it', 'es']) for (const s of ['', ...SPEAKERS, ...REMOVED_SPEAKERS, 'nobody']) {
       assert(VS.sayBank(lang, s) === sayBank(lang, s), `sayBank ${lang} ${s}: ${VS.sayBank(lang, s)} against ${sayBank(lang, s)}`);
       assert(VS.speaks(lang, s) === speaks(lang, s), `speaks ${lang} ${s}`);
     }
     assert(SPEAKERS.every(s => speakerId(s) === s) && REMOVED_SPEAKERS.every(s => speakerId(s) === '') && speakerId(undefined) === '', 'speakerId');
-    // (in Italian nobody but the default voice: a speaker's line is asked from say_it, never say_it_<speaker>)
-    assert(['', ...SPEAKERS].filter(s => !s || speaks('it', s)).join() === '', 'Italian speakers');
+    // (in Italian only siri4 besides the default voice (#82): an English speaker's line is asked from say_it, never
+    // say_it_<speaker>)
+    assert(SPEAKERS.filter(s => speaks('it', s)).join() === 'siri4', 'Italian speakers');
   },
   'real voices (D3): a removed speaker reads as the default voice: an old song, a user style, validation'() {
     const keep = { ...spokenContext };
@@ -791,7 +792,7 @@ const CHECKS = {
         const files = { [`say_${lang}`]: ['/samples/x/the_city.wav'], [`say_${lang}_reed`]: ['/samples/x/the_city.wav'] };
         const got = lineSample(nar, lang, files, 'the city');
         assert(got.bank === `say_${lang}` && got.n === 0, `${lang}: ${JSON.stringify(got)}`);
-        assert(voiceSamples(old, lang, files).every(x => x.s === `say_${lang}` || /^say_[a-z]{2}_(albert|fred|junior|kathy)$/.test(x.s)), `${lang}: a removed bank asked`);
+        assert(voiceSamples(old, lang, files).every(x => x.s === `say_${lang}` || /^say_[a-z]{2}_(albert|fred|junior|kathy|siri4)$/.test(x.s)), `${lang}: a removed bank asked`);
       }
       // an old frozen radio song with flo and grandpa: every bank of its lines is a default or listed one
       const frozen = { ...clone(EXAMPLE), tracks: clone(EXAMPLE).tracks.map(t => (t.type === 'voice' ? { ...t, settings: { ...t.settings, speaker: 'flo' } } : t.type === 'spoken' ? { ...t, settings: { ...t.settings, speaker: 'grandpa' } } : t)) };

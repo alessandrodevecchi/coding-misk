@@ -22,6 +22,8 @@
 // and a speaker sample that came out as a copy of the default voice's is deleted.
 // --prune: list the banks of removed speakers and of languages a speaker does not speak, with their size; --prune
 // --yes: delete exactly those banks (real-voices D7). Nothing else deletes banks.
+// A speaker in SYSTEM_SPEAKERS (tools/voice-sample.mjs, siri4: #82) speaks with the macOS system voice (`say` without
+// -v), for the voices `say -v` cannot name: set that voice as the system voice before running this, and keep it.
 // Needs macOS (`say`) and ffmpeg; the per-line part is tools/voice-sample.mjs (voice-full-controls).
 import fs from 'node:fs';
 import os from 'node:os';
@@ -32,11 +34,11 @@ import { CRESCENDO_PHRASES } from '../src/song/crescendo.js';
 import { loadStyles } from './styles-dir.mjs';
 import { allPhrases } from '../src/endless/phrases.js';
 import { INTERLUDE_SAY } from '../src/endless/transitions.js';
-import { SPEAKERS } from '../src/song/build.js';
+import { SPEAKERS, SPEAKER_LANGS } from '../src/song/build.js';
 import { lineOf, lineTexts, speakerOf, setSpokenContext } from '../src/song/spoken.js';
 import { vocabularyTexts, poeticTexts } from '../src/song/vocabulary.js';
 
-import { systemVoice, realVoice, makeSampleAsync, writeLengths, readTemp, writeTemp } from './voice-sample.mjs';
+import { systemVoice, realVoice, makeSampleAsync, writeLengths, readTemp, writeTemp, SYSTEM_SPEAKERS } from './voice-sample.mjs';
 
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const DEFAULT_VOICE = { en: opt('en', 'Samantha'), it: opt('it', 'Alice') }, force = args.includes('--force'), listOnly = args.includes('--list') || args.includes('--list-narrator'), narratorOnly = args.includes('--list-narrator');
@@ -48,7 +50,7 @@ if (args.includes('--prune')) {
   const yes = args.includes('--yes'), banks = [];
   const dirSize = d => fs.readdirSync(d).reduce((a, f) => { const st = fs.statSync(path.join(d, f)); return { n: a.n + (st.isFile() ? 1 : 0), b: a.b + (st.isFile() ? st.size : 0) }; }, { n: 0, b: 0 });
   for (const d of fs.existsSync(ROOT) ? fs.readdirSync(ROOT).sort() : []) {
-    const m = /^say_([a-z]{2})_([a-z]+)$/.exec(d);
+    const m = /^say_([a-z]{2})_([a-z0-9]+)$/.exec(d);
     if (!m || speaks(m[1], m[2]) || !fs.statSync(path.join(ROOT, d)).isDirectory()) continue;
     banks.push({ bank: d, ...dirSize(path.join(ROOT, d)) });
   }
@@ -123,6 +125,9 @@ const poetic = [...poeticTexts(), ...songsAll.flatMap(s => (s.narrator && typeof
   ...recipes.flatMap(r => (r.narrator && typeof r.narrator === 'object' && r.narrator.lines ? Object.values(r.narrator.lines).flat() : []))];
 for (const sp of narratorSpeakers) poetic.forEach(p => addSay(p, sp, true));
 
+// a speaker of the system voice (SYSTEM_SPEAKERS, #82): every text of the default voice of its languages too, so a voice
+// track or a live build that names it never falls back; its samples are made in one run, while the system voice is set
+for (const sp of SYSTEM_SPEAKERS) for (const lang of SPEAKER_LANGS[sp] || []) for (const text of phrases.get(`${lang}|`) || []) addSay({ [lang]: text }, sp, !notNarrator.has(`${lang}||${text}`));
 // --default-only: every text with the default voice only; the app falls back to it for any speaker
 if (args.includes('--default-only')) for (const [key, set] of [...phrases]) {
   const [lang, speaker] = key.split('|');

@@ -99,7 +99,7 @@ export function speakerOf(song, track) {
 function sampleOf(text, bank, virtual) {
   const slug = saySlug(text);
   if (spokenContext.files === null) { const list = virtual.get(bank) || []; const n = list.indexOf(slug); return n >= 0 ? { bank, n } : null; }
-  for (const b of [bank, bank.replace(/_[a-z]+$/, '')]) {
+  for (const b of [bank, bank.replace(/_[a-z0-9]+$/, '')]) {
     const list = (spokenContext.files || {})[b] || [];
     const n = slugAt(list, slug);
     if (n >= 0) return { bank: b, n };

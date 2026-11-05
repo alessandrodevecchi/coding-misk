@@ -8,6 +8,7 @@
     "kathy": ["clear", "radio", "distant", "robot", "deep", "bright", "cathedral", "echo", "dirty", "slow"]
   },
   "it": {
-    "default": ["clear", "radio", "distant", "robot", "deep", "bright", "cathedral", "echo", "dirty", "slow"]
+    "default": ["clear", "radio", "distant", "robot", "deep", "bright", "cathedral", "echo", "dirty", "slow"],
+    "siri4": ["clear", "radio", "distant", "robot", "deep", "bright", "cathedral", "echo", "dirty", "slow"]
   }
 }

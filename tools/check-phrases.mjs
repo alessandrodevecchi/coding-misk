@@ -342,7 +342,7 @@ const ANY_VOICE = {
     assert(got.some(x => x.text === p.text && x.bank === `say_en_${X}`), 'the phrase of mine is asked in its speaker\'s bank');
     assert(!got.some(x => x.text === built.text), 'the built-in line the default voice has is not asked');
     // no phrases of mine (Never): the radio's filter before this change
-    const any = (bank, slug) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], slug) >= 0);
+    const any = (bank, slug) => [bank, bank.replace(/_[a-z0-9]+$/, '')].some(b => slugAt(files[b], slug) >= 0);
     const old = list.filter(x => !x.has).filter(x => !any(x.bank, saySlug(x.text)) && x.text.split(/\s+/).length <= 12);
     for (const none of [new Set(), null]) assert(JSON.stringify(missingNeeds(list, files, none)) === JSON.stringify(old), 'without phrases of mine the list changed');
     assert(!old.some(x => x.text === p.text), 'the old filter dropped the phrase');
@@ -377,7 +377,7 @@ const ANY_VOICE = {
     const vf = { say_en: [`/samples/say_en/${saySlug(vocab.text)}.wav`] };
     assert(missingNeeds([vocab], vf, null, { speakers: true }).length === 1 && !missingNeeds([vocab], vf, null).length, 'a vocabulary entry');
     // without the option: the old filter (Compose), none of them is asked
-    const any = (bank, slug) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], slug) >= 0);
+    const any = (bank, slug) => [bank, bank.replace(/_[a-z0-9]+$/, '')].some(b => slugAt(files[b], slug) >= 0);
     const old = list.filter(x => !x.has).filter(x => !any(x.bank, saySlug(x.text)) && x.text.split(/\s+/).length <= 12);
     for (const o of [undefined, {}, { speakers: false }]) assert(JSON.stringify(missingNeeds(list, files, null, o)) === JSON.stringify(old), 'without the option the list changed');
     assert(!old.length, `the old filter asked ${old.length}`);

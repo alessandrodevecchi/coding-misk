@@ -19,12 +19,14 @@ export const cutToRange = c => Math.round(Math.log(c / 100) / Math.log(200) * 10
 export const rangeToCut = v => Math.round(100 * Math.pow(200, v / 100));
 export const soundText = (k, v) => (k === 'cutoff' ? (v >= 18000 ? '∞' : `${v} Hz`) : SOUND_CONTROLS.find(c => c[0] === k)[5] === 'pct' ? `${Math.round(v * 100)}%` : String(v));
 const cap = s => s[0].toUpperCase() + s.slice(1);
-export const speakerName = s => (s ? cap(s) : '');
+// (a speaker whose name is not its id with a capital: siri4, #82)
+const NAMES = { siri4: 'Siri 4' };
+export const speakerName = s => (s ? NAMES[s] || cap(s) : '');
 // the default voice of a language (the system voice tools/voice-sample.mjs uses)
 export const DEFAULT_VOICE_NAME = { en: 'Samantha', it: 'Alice' };
 // a speaker's name in a picker; in a language it does not speak, with the note that the default voice speaks for it
 // (real-voices: every speaker stays selectable in every language)
-export const speakerLabel = (s, lang, t) => (!s || speaks(lang, s) ? speakerName(s) : t('speakerOtherLang', { name: speakerName(s), voice: DEFAULT_VOICE_NAME[lang] || '' }));
+export const speakerLabel = (s, lang, t) => (!s || speaks(lang, s) ? speakerName(s) : t(speaks('en', s) ? 'speakerOtherLang' : 'speakerOtherLangIt', { name: speakerName(s), voice: DEFAULT_VOICE_NAME[lang] || '' }));
 
 // A style that is not in the allowed set of the voice (voice-style-combos D6): the option stays selectable, with a
 // trailing mark and a tip. any: the speaker is drawn (no speaker set on the radio or the voice instrument), so only a
