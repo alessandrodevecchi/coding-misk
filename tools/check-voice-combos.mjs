@@ -1,12 +1,14 @@
 // Allowed speaker and voice style pairs (voice-style-combos, #82): validates src/voices/combos.json (or the file given)
 // and tests src/voices/combos.js: a missing entry allows all, "clear" is always allowed, an English-only speaker is
 // also bound by it.default, the voice draw over 300 seeds never gives a character outside the list, an empty list gives
-// no character, an all-allowed file draws the same voices as no file. No browser.
+// no character, an all-allowed file draws the same voices as no file; the user's overrides (voice-combos-ui): unknown ids
+// ignored, clear added, an entry equal to the default dropped, an English-only speaker under it rejected, the effective
+// table, the table a session records, and a draw given opts.combos follows it, never the module table. No browser.
 //   npm run check:voice-combos [-- <file>]     exit 1 on an error in the file or a failed test; warnings are printed
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { combosErrors, allowedStyles, allowedForDraw, allowedCharacters, isAllowed, setCombos, COMBOS_FILE } from '../src/voices/combos.js';
+import { combosErrors, allowedStyles, allowedForDraw, allowedCharacters, isAllowed, setCombos, COMBOS_FILE, normalizeOverrides, effectiveCombos, overridesErrors, combosRecord, combos } from '../src/voices/combos.js';
 import { VOICE_STYLE_IDS, VOICE_CHARACTERS } from '../src/song/format.js';
 import { SPEAKERS } from '../src/song/build.js';
 import { voiceFor } from '../src/endless/director.js';
@@ -94,6 +96,33 @@ const CHECKS = {
     // a narrowed file changes only the character picked, never the rest of the voice (same count of random values)
     const narrow = withTable({ format: 1, it: { default: ['clear'] } }, () => voices()), wide = voices();
     assert(narrow.every((v, i) => same(v.rack, wide[i].rack) && v.settings.speaker === wide[i].settings.speaker && v.settings.gain === wide[i].settings.gain), 'a narrowed file moved the speaker, the volume or the rack');
+  },
+  // ---------- user overrides (voice-combos-ui 1.1) ----------
+  'overrides: an unknown id is ignored, clear always present, the order of the ids, no throw on bad values': () => {
+    const o = normalizeOverrides({ format: 1, en: { albert: ['deep', 'bogus', 'radio', 'deep', 7] } });
+    assert(same(o.en.albert, ['clear', 'radio', 'deep']), `albert: ${JSON.stringify(o)}`);
+    for (const bad of [null, 'x', [], 3, { en: 'x' }, { en: { albert: 'deep' } }, { fr: { default: ['deep'] } }]) assert(same(normalizeOverrides(bad), { format: 1 }), `bad value kept: ${JSON.stringify(bad)}`);
+  },
+  'overrides: an entry equal to the default is dropped, an English-only speaker under it is rejected': () => {
+    const o = normalizeOverrides({ format: 1, en: { fred: COMBOS_FILE.en.fred.slice().reverse(), kathy: ['clear', 'echo'] }, it: { albert: ['clear'], default: ['radio'] } });
+    assert(!o.en.fred && same(o.en.kathy, ['clear', 'echo']), `fred equal to the file kept: ${JSON.stringify(o)}`);
+    assert(!o.it.albert && same(o.it.default, ['clear', 'radio']), `it.albert kept: ${JSON.stringify(o)}`);
+    assert(overridesErrors({ format: 1, it: { albert: ['clear'] } }).some(e => /albert does not speak/.test(e)) && !overridesErrors(o).length, 'overridesErrors');
+  },
+  'effective table: the file with each overridden entry replaced, the others as in the file': () => {
+    const file = { format: 1, en: { albert: ['clear', 'deep'], fred: ['clear', 'echo'] }, it: { default: ['clear', 'radio', 'deep'] } };
+    const e = effectiveCombos(file, { format: 1, en: { albert: ['clear', 'deep', 'radio'] } });
+    assert(same(e.en.albert, ['clear', 'radio', 'deep']), `spec scenario: ${e.en.albert}`);
+    assert(same(e.en.fred, file.en.fred) && same(e.it, file.it) && same(file.en.albert, ['clear', 'deep']), 'other speakers or the file changed');
+    assert(same(effectiveCombos(COMBOS_FILE, null), COMBOS_FILE) && combosRecord() === null, 'no overrides: the file, nothing recorded');
+    const old = setCombos(effectiveCombos(COMBOS_FILE, { format: 1, en: { fred: ['clear', 'deep'] } }));
+    try { const r = combosRecord(); assert(r && same(r.en.fred, ['clear', 'deep']) && r !== combos(), `record: ${JSON.stringify(r)}`); } finally { setCombos(old); }
+  },
+  'voice draw with opts.combos: the table given, never the module one': () => {
+    const t = { format: 1, en: { fred: ['clear', 'deep'] } };
+    const got = voices({ combos: t }), fred = got.filter(v => v.settings.speaker === 'fred');
+    assert(fred.length > 10 && fred.every(v => v.character === null || v.character === 'deep'), `fred characters: ${[...new Set(fred.map(v => v.character))]}`);
+    assert(JSON.stringify(withTable({ format: 1, en: { fred: ['clear'] } }, () => voices({ combos: COMBOS_FILE }))) === JSON.stringify(voices()), 'opts.combos did not win over the module table');
   },
   'every character has a style of the same name': () => {
     for (const c of Object.keys(VOICE_CHARACTERS)) assert(ALL.includes(c), `${c} has no style`);

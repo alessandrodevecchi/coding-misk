@@ -9,7 +9,8 @@ import { overlapOf, extraOf } from '../endless/transitions.js';
 import { steerSong, sayAir, applyBar, whyNot, COMMANDS, VARY_TYPES, varyTracks, songCurves, densityMax, extendIndex, extendSeconds, INSTRUMENTS, RECOMMENDED, TRACK_CAP, RISER_BARS, RISER_SOUNDS, instrumentOf, lockedIds, moreWarning, partHas, fitsAir, unfitReason, patternPart, TREATMENTS, KEY_MOVES, keyTo, SESSION_KINDS, biasSong } from '../endless/steering.js';
 import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
-import { withMine, sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir, airChooserOf, holdsGrown, extraStylesOf } from '../endless/items.js';
+import { combosRecord } from '../voices/combos.js';
+import { withMine, withCombos, sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir, airChooserOf, holdsGrown, extraStylesOf } from '../endless/items.js';
 import { steerOnAir, airBoundaries, airOffset, directorView, AIR_CHOOSER, chooserOf } from '../endless/waypoints.js';
 import { PROFILE_CHOICES, RADIO_CHOICES, RADIO_PROFILES, CUSTOM_DEFAULT, customControls, profileOptions, savedSongProfile } from '../endless/profile.js';
 import { growOnAir, airControls, leadOnAir, shapeSearchSetting, searchOf, playedOf } from '../endless/growth.js';
@@ -86,6 +87,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // my phrases (my-phrases D4): a new session records the snapshot of the collection (never with Mai), so its songs,
   // Replay and a saved session draw the same phrases after the collection changes
   const mineRecord = () => { const m = mine(); return m ? { mine: m } : {}; };
+  // the allowed voice styles (voice-combos-ui D5): a new session records the effective table when the user's overrides
+  // change it, so its songs, Replay and its export draw with it after the overrides change; none: the committed file
+  const comboRecord = () => { const c = combosRecord(); return c ? { combos: c } : {}; };
   const chooserRecord = () => { const c = chooserOf(store.get('coding-misk-air-chooser', null)); return c === AIR_CHOOSER ? {} : { chooser: c }; };
   const artistOf = id => options.artistOf(id);
   // with an artist, its whole taste goes to the director (and into the session recipe); the controls only show its centre
@@ -132,7 +136,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       return item;
     }
     const raw = optionsFor(n), comp = raw.compilation;
-    const g0 = S.session.next(withMine(comp ? compilationOptions(S.recipe.seed, n, comp, recipes, howOf(raw)) : raw, S.recipe));
+    const g0 = S.session.next(withCombos(withMine(comp ? compilationOptions(S.recipe.seed, n, comp, recipes, howOf(raw)) : raw, S.recipe), S.recipe));
     // the session's choices (radio-arrangement D10) on the director's song: the base the listener's commands steer; the
     // director's own stays as base0, so a choice given later can be put on again
     const { song, entry, plan, opts: used } = biasSong(S.recipe, n, g0);
@@ -308,7 +312,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const session = createSession(recipes, s, { ...(le ? { lead: le } : {}), extra });
     // a new session records the growth marker (radio-profiles stage 4): its Crescendo and Live coder songs grow on air,
     // and its replays grow them the same; a recipe saved before has none and replays in blocks
-    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: { ...current(), ...searchRecord() }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...mineRecord(), ...(L ? { lead: leadRecord(L) } : {}), ...trialRecord() }, lastOptions: null, lastCard: 0 };
+    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: { ...current(), ...searchRecord() }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...mineRecord(), ...comboRecord(), ...(L ? { lead: leadRecord(L) } : {}), ...trialRecord() }, lastOptions: null, lastCard: 0 };
     S.recipe.seed = session.seed;
     // a replay shows the code with the display controls set when it starts (the console's Custom profile), not with each
     // change made while the session was heard (radio-profiles 9.1)
@@ -361,14 +365,14 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   function exportItems(range) {
     // with the radio off: a new session, with the growth marker when one of its songs grows (radio-profiles D12; a session
     // of Classic songs keeps the recipe it had)
-    const recipe = S ? clone(S.recipe) : { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), ...searchRecord() }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...mineRecord(), ...trialRecord() };
+    const recipe = S ? clone(S.recipe) : { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), ...searchRecord() }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...mineRecord(), ...comboRecord(), ...trialRecord() };
     const marked = (r, items) => { if (!S && !items.some(x => x.grown)) delete r.growth; return items; };
     const from = S ? S.stream[S.onAir].n : 0;
     let items;
     // a clip (#5): one song composed to the clip's length, at full energy, from a new seed each time
     if (range.kind === 'clip') {
       const sec = Math.max(5, Math.min(600, +range.seconds || 30));
-      const clip = { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), ...searchRecord(), fit: Math.max(4, sec - 1) }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...mineRecord(), ...trialRecord() };
+      const clip = { seed: createSession(recipes, seedField || undefined).seed, options: { ...current(), ...searchRecord(), fit: Math.max(4, sec - 1) }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...mineRecord(), ...comboRecord(), ...trialRecord() };
       const items = rebuild(clip, 1);
       if (!items.some(x => x.grown)) delete clip.growth;
       return { recipe: clip, items, from: 0 };

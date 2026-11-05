@@ -67,3 +67,47 @@ export function combosErrors(json) {
   }
   return { errors, warnings };
 }
+
+// ---------- user overrides (voice-combos-ui) ----------
+// The browser keeps the speakers the user changed in the Voices tab under coding-misk-voice-combos, in the shape of
+// combos.json: { format: 1, en: { albert: [...] }, it: { default: [...] } }, each a full allowed list (D1). The
+// effective table is the file with each overridden entry replaced (D3). Node checks never read the browser key.
+export const COMBOS_KEY = 'coding-misk-voice-combos';
+const plainObject = x => !!x && typeof x === 'object' && !Array.isArray(x);
+// the speaker keys a language may list: "default" and the speakers that speak it
+export const comboKeys = lang => ['default', ...SPEAKERS.filter(s => speaks(lang, s))];
+// the allowed list of an entry of a table (missing: every style), always with "clear", in the order of the ids
+export const entryOf = (t, lang, key) => { const l = t && t[lang] && t[lang][key]; return Array.isArray(l) ? withClear(l) : VOICE_STYLE_IDS.slice(); };
+const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+// a clean overrides object, never throws: only known languages, speakers that speak the language (or "default") and
+// style ids, de-duplicated, "clear" added, in the order of the ids; an entry equal to the default is dropped
+export function normalizeOverrides(json, defaults = COMBOS) {
+  const out = { format: COMBOS_FORMAT };
+  if (!plainObject(json)) return out;
+  for (const lang of COMBO_LANGS) {
+    if (!plainObject(json[lang])) continue;
+    for (const key of comboKeys(lang)) {
+      const list = json[lang][key];
+      if (!Array.isArray(list)) continue;
+      const clean = withClear(list.filter(id => typeof id === 'string'));
+      if (sameList(clean, entryOf(defaults, lang, key))) continue;
+      (out[lang] = out[lang] || {})[key] = clean;
+    }
+  }
+  return out;
+}
+// the effective table: a new object, the defaults with each overridden entry replaced by the user's list
+export function effectiveCombos(defaults = COMBOS, overrides = null) {
+  const out = JSON.parse(JSON.stringify(defaults && typeof defaults === 'object' ? defaults : COMBOS));
+  const o = normalizeOverrides(overrides, defaults);
+  for (const lang of COMBO_LANGS) for (const [key, list] of Object.entries(o[lang] || {})) (out[lang] = plainObject(out[lang]) ? out[lang] : {})[key] = list.slice();
+  return out;
+}
+// the errors of a stored overrides value (checks): the rules of the file
+export const overridesErrors = json => combosErrors(json).errors;
+// the speakers with an override: ['en.albert', 'it.default', ...]
+export const overriddenKeys = o => COMBO_LANGS.flatMap(l => Object.keys((o && o[l]) || {}).map(k => `${l}.${k}`));
+// the table a new radio session records (D5): the module table when it differs from the committed file, else null
+export function combosRecord(t = table) {
+  return JSON.stringify(t) === JSON.stringify(COMBOS) ? null : JSON.parse(JSON.stringify(t));
+}

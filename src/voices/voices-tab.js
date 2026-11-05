@@ -2,7 +2,8 @@
 // (coding-misk-voices-sub, not in the backup).
 //   mine:    Le mie frasi: search, kind chips with counts, Quanto usarle, groups by kind and tag, rows, the form
 //   vocab:   Vocabolari inclusi: the built-in lines, read-only, with Copia nelle mie frasi
-//   voices:  Voci e suoni: the speakers, the voice styles to hear, a test bench
+//   voices:  Voci e suoni: the speakers, each with the voice styles automatic draws may give it (voice-combos-ui), the
+//            voice styles to hear, a test bench
 //   samples: Campioni: space by class and bank, missing samples, orphan cleanup, temporary samples
 // The per-song voice controls stay in Compose and the radio. Strings in both languages (src/i18n.js), drawn icons only.
 import { KINDS, KIND_SETS, kindsOf, kindsId, TAGS, LANGS, SHARE_LEVELS, groupsOf, matches, textIn, textsOf, textError, overCap, MAX_WORDS } from './phrases.js';
@@ -13,8 +14,8 @@ import { PHRASES, SPEAKERS, saySlug, sayBank, slugAt, speaks } from '../song/bui
 import { speakerLabel, DEFAULT_VOICE_NAME } from '../endless/voice-sound.js';
 import { POOL } from '../endless/phrases.js';
 import { VOICE_STYLES, VOICE_STYLE_IDS } from '../song/format.js';
-import { isAllowed } from './combos.js';
-import { LISTEN, PENCIL, BIN, LOCK, WAVE, MIC, QUILL, COPY, DISK, BROOM, SPARK, CLOCK, PLUS } from '../icons.js';
+import { isAllowed, allowedStyles, allowedForDraw, COMBO_LANGS, COMBOS_FILE } from './combos.js';
+import { LISTEN, PENCIL, BIN, LOCK, WAVE, MIC, QUILL, COPY, DISK, BROOM, SPARK, CLOCK, PLUS, CHEVRON } from '../icons.js';
 
 export const SUB_KEY = 'coding-misk-voices-sub';
 export const SECTIONS = ['mine', 'vocab', 'voices', 'samples'];
@@ -28,10 +29,14 @@ export const TEST_LINE = { it: 'questa è la mia voce', en: 'this is my voice' }
 // manifest; recipes: the styles; songs: the built-in and example songs; library(): the user's songs; keys(except): the
 // sample keys of D5 (builtin, mine without a phrase, songs); hear({ text, lang, speaker, settings }); samplesChanged():
 // after a delete (manifest read again, songs written again); listTemp(text, lang, bank, song)
-export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper, files, recipes, songs, library, keys, hear, samplesChanged, toast }) {
+// combos: the user's allowed voice styles (combos-store.js, voice-combos-ui), null in a page without it; radioOn(): a
+// radio session is on air (the grid says a change applies from the next one)
+export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper, files, recipes, songs, library, keys, hear, samplesChanged, toast, combos = null, radioOn = () => false }) {
   let sub = SECTIONS.includes(store.get(SUB_KEY, 'mine')) ? store.get(SUB_KEY, 'mine') : 'mine';
   const ui = { q: '', kind: 'all', form: null, confirm: null, vgroup: 'voice', bench: { text: '', speaker: '', style: 'clear' }, orphans: null, busy: '', usage: null, usageAt: 0 };
   const making = new Set();
+  // the voice cards whose Draw styles grid is open (closed by default, kept across renders of the tab)
+  const gridOpen = new Set();
   const has = (bank, text) => { return slugAt((files() || {})[bank], saySlug(text)) >= 0; };
   const ico = (svg, label) => `<span class="vt-ico" title="${esc(label)}">${svg}</span>`;
   // (a list of kinds: "voice+explain+poetic"; a list the form does not offer is named by its kinds)
@@ -176,7 +181,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
         const v = sys === undefined ? '' : sys ? esc(sys) : `<span class="ph-st none"><span class="ph-led"></span>${esc(t('phNotInstalled', { lang: t(`phLang:${l}`) }))}</span>`;
         return `<li><span class="lbl">${esc(t(`phLang:${l}`))}</span> ${v} <span class="muted small">${esc(t('phSamplesN', { n: count(sayBank(l, sp)) }))}</span></li>`;
       }).join('');
-      return `<article class="card vt-speaker" data-vt-speaker="${esc(sp)}"><h4>${MIC} ${esc(name)} <button class="mini" data-vt-sp-hear="${esc(sp)}" title="${esc(t('phHearTest'))}" aria-label="${esc(t('phHearTest'))}">${LISTEN}</button></h4><ul class="vt-langs">${per}</ul></article>`;
+      return `<article class="card vt-speaker" data-vt-speaker="${esc(sp)}"><h4>${MIC} ${esc(name)} <button class="mini" data-vt-sp-hear="${esc(sp)}" title="${esc(t('phHearTest'))}" aria-label="${esc(t('phHearTest'))}">${LISTEN}</button></h4><ul class="vt-langs">${per}</ul>${combos ? gridHtml(sp, name) : ''}</article>`;
     }).join('');
     const styles = VOICE_STYLE_IDS.map(id => `<button class="chip small vt-style" data-vt-style="${id}" title="${esc(t('phHearStyle'))}">${LISTEN} ${esc(t(`voiceStyle:${id}`))}</button>`).join('');
     const b = ui.bench;
@@ -189,6 +194,40 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
       <p class="hint muted small">${esc(t('phBenchHint'))}</p></div>`;
     return `<p class="hint muted small">${esc(t('phVoicesIntro'))}</p>${helper() ? '' : `<p class="hint">${esc(t('phNoHelper'))}</p>`}<div class="vt-speakers">${cards}</div>
       <div class="lbl">${esc(t('phVoiceStyles'))}</div><div class="chips vt-styles">${styles}</div>${bench}`;
+  }
+
+  // ---------- the Draw styles grid of a voice card (voice-combos-ui D2, D7) ----------
+  // a speaker's card edits its own language's list (en.<speaker>) and shows it; the languages it does not speak are
+  // heard as the default voice there, whose list also bounds the draw ("limited by Alice"). The default voice's card
+  // edits the default entry of each language and shows what draws give it (both lists).
+  const otherVoices = sp => (sp ? COMBO_LANGS.filter(l => !speaks(l, sp)).map(l => DEFAULT_VOICE_NAME[l]).filter(Boolean) : []);
+  const ownList = (sp, tb) => (sp ? allowedStyles(sp, COMBO_LANGS.find(l => speaks(l, sp)), tb) : allowedForDraw('', tb));
+  function gridHtml(sp, name) {
+    const own = ownList(sp), file = ownList(sp, COMBOS_FILE), draw = allowedForDraw(sp), other = otherVoices(sp).join(', ');
+    const limited = own.filter(id => !draw.includes(id));
+    const chips = VOICE_STYLE_IDS.map(id => {
+      const on = own.includes(id), changed = on !== file.includes(id), lim = limited.includes(id);
+      const tip = [id === 'clear' ? t('vcClearLocked') : '', changed ? t('vcChanged') : '', lim ? t('vcLimitedTip', { voice: other }) : ''].filter(Boolean).join(' · ');
+      return `<button type="button" class="chip small vt-cs${changed ? ' changed' : ''}${lim ? ' limited' : ''}" data-vt-cs="${id}" data-vt-cs-sp="${esc(sp)}" aria-pressed="${on}"${id === 'clear' ? ' disabled' : ''}${tip ? ` title="${esc(tip)}"` : ''}>${esc(t(`voiceStyle:${id}`))}${changed ? `<span class="vt-cs-dot" aria-label="${esc(t('vcChanged'))}"></span>` : ''}</button>`;
+    }).join('');
+    const has = combos.has(sp);
+    return `<details class="vt-grid" data-vt-grid="${esc(sp)}"${gridOpen.has(sp) ? ' open' : ''}><summary><span class="vt-grid-chev" aria-hidden="true">${CHEVRON}</span><span class="lbl">${esc(t('vcTitle'))}</span> <span class="muted small" data-vt-grid-count>${esc(t('vcCount', { n: own.length, total: VOICE_STYLE_IDS.length }))}</span>${has ? ` <span class="vt-cs-dot" aria-label="${esc(t('vcChanged'))}"></span>` : ''}</summary>
+      <p class="hint muted small">${esc(t('vcHint'))}</p>
+      <div class="chips vt-cs-chips" role="group" aria-label="${esc(t('vcTitle'))} · ${esc(name)}">${chips}</div>
+      ${limited.length ? `<p class="hint small vt-cs-lim" data-vt-cs-lim>${esc(t('vcLimited', { voice: other, list: limited.map(id => t(`voiceStyle:${id}`)).join(', ') }))}</p>` : ''}
+      <p class="hint muted small" data-vt-cs-note>${esc(sp ? t('vcNoteSpeaker', { voice: other }) : t('vcNoteDefault', { en: DEFAULT_VOICE_NAME.en, it: DEFAULT_VOICE_NAME.it }))}</p>
+      ${radioOn() ? `<p class="hint small" data-vt-cs-next>${esc(t('vcNextSession'))}</p>` : ''}
+      ${has ? `<div class="actions"><button type="button" class="btn small" data-vt-cs-reset="${esc(sp)}">${esc(t('vcReset'))}</button></div>` : ''}
+    </details>`;
+  }
+  // a toggle: the voice's list with the style on or off (clear stays)
+  function toggleStyle(sp, id) {
+    if (!combos || id === 'clear' || !VOICE_STYLE_IDS.includes(id)) return;
+    const own = ownList(sp), next = own.includes(id) ? own.filter(x => x !== id) : [...own, id];
+    combos.set(sp, next);
+    // (the tab is drawn again: the focus stays on the chip)
+    const b = [...root.querySelectorAll('[data-vt-cs]')].find(x => x.dataset.vtCs === id && (x.dataset.vtCsSp || '') === sp);
+    if (b) b.focus();
   }
 
   // the bench's pair against src/voices/combos.json (voice-style-combos D9), for the voice heard in the app's language
@@ -352,6 +391,8 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
       if (!x.error) { toast(t(x.added ? 'phCopied' : 'phKnown')); render(); }
       return;
     }
+    if (d.vtCs) { toggleStyle(d.vtCsSp || '', d.vtCs); return; }
+    if (d.vtCsReset !== undefined) { const sp = d.vtCsReset; combos && combos.reset(sp); toast && toast(t('vcResetDone', { name: sp ? sp[0].toUpperCase() + sp.slice(1) : t('phDefaultVoice') })); return; }
     if (d.vtSpHear !== undefined) { const lang = getLang(); return hear({ text: TEST_LINE[lang], lang, speaker: d.vtSpHear, temp: true }); }
     if (d.vtStyle) { const lang = getLang(); return hear({ text: TEST_LINE[lang], lang, speaker: '', settings: VOICE_STYLES[d.vtStyle], temp: true }); }
     if (d.vtBenchHear !== undefined || d.vtBenchSave !== undefined) {
@@ -410,5 +451,8 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
   });
   root.addEventListener('submit', e => { if (e.target.matches('[data-ph-form]')) { e.preventDefault(); saveForm(); } });
   phr.on(what => { if (what !== 'uses') render(); });
+  // the Draw styles grids: their open state kept, the tab drawn again after a change (here, a reset, an import)
+  root.addEventListener('toggle', e => { const g = e.target; if (g.matches && g.matches('[data-vt-grid]')) { if (g.open) gridOpen.add(g.dataset.vtGrid); else gridOpen.delete(g.dataset.vtGrid); } }, true);
+  if (combos) globalThis.addEventListener('combos-changed', () => { if (sub === 'voices') render(); });
   return { render, show, get section() { return sub; }, openForm, prepare };
 }
