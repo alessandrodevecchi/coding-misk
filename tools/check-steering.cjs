@@ -591,8 +591,12 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'air-end.png') });
       // mute and volume on the next bars: typed in the code
       const at = Math.floor(await now()) + 2;
-      const on = a.song.tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken' && !t.mute && t.clips.some(k => k.start <= at && at < k.start + k.bars));
-      const t1 = (on.find(t => t.type !== 'drums') || on[0] || {}).id, t2 = (on.find(t => t.id !== t1) || {}).id;
+      // (tracks End keeps: a line End takes out may be gone by the time the command lands, and the growth decides which)
+      const outByEnd = new Set(a.song.build.filter(x => x.by === 'listener' && ec && x.at >= ec.at).flatMap(x => [x.remove, x.mute]).filter(x => x !== undefined));
+      const on0 = a.song.tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken' && !t.mute && t.clips.some(k => k.start <= at && at < k.start + k.bars));
+      // (the volume goes to a kept line: on a line End takes out it has no arrival to turn toward; the mute to another)
+      const kept = on0.filter(t => !outByEnd.has(t.id)), on = kept.length ? kept : on0;
+      const t1 = (on.find(t => t.type !== 'drums') || on[0] || {}).id, t2 = (kept.find(t => t.id !== t1) || on0.find(t => t.id !== t1) || {}).id;
       const nameOf = id => { const t = a.song.tracks.find(x => x.id === id); return (t && (t.name || t.id)) || id; };
       // the lines of a track's block in the code shown (its header holds its name)
       const block = (cd, id) => { const ls = cd.split('\n'), i = ls.findIndex(l => l.startsWith('// ==========') && l.includes(` ${nameOf(id)} `)); if (i < 0) return []; const j = ls.findIndex((l, k) => k > i && l.startsWith('// ==========')); return ls.slice(i + 1, j < 0 ? undefined : j); };
@@ -601,7 +605,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       await sleep(300);
       a = await settled();
       const m = t2 && a.song.build.find(x => x.by === 'listener' && x.mute === t2), v = t1 && a.song.build.find(x => x.by === 'listener' && x.set && x.set.track === t1 && x.set.gain === 0.3);
-      check(!!m && !!v, 'mute and volume on a grown song: steps on the lines', JSON.stringify(mineOf(a.song, 0).slice(-5)));
+      check(!!m && !!v, 'mute and volume on a grown song: steps on the lines', `volume ${t1}, mute ${t2}: ${JSON.stringify(mineOf(a.song, 0).slice(-5))}`);
       if (v) { await seekTo(v.at - 1); check(await waitCode(v.at, cd => block(cd, t1).some(l => l.includes('.gain(0.3)'))), 'the volume shows as .gain(0.3) on the line', block(await code(), t1).join(' | ').slice(0, 200)); }
       if (m) { await seekTo(m.at - 1); check(await waitCode(m.at, cd => block(cd, t2).some(l => /^_\$:/.test(l))), 'the muted line shows "_$:"', block(await code(), t2).join(' | ').slice(0, 200)); }
       check(!(await err()), 'no evaluation error after the mixer commands', (await err()).slice(0, 120));

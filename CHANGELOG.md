@@ -41,6 +41,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - `npm run check:speakers`: every speaker is installed and sounds different from the default voice.
 - `npm run voices -- --jobs N` makes several samples at a time.
 - `node tools/voice.mjs --prune` lists the sample banks of removed speakers; `--prune --yes` deletes them.
+- Growth openings `bass`, `chord` and `top`: the bass, a chord part or the beat without its kick first.
+- Kick starts: the first kick of a build can be one kick, two, four on the floor, a push, the off-beat or the first two kicks of the groove, weighted per style with `growthShapes.kicks`.
+- More drum machines and sounds in every style.
+- New kits in the kit menu: `RolandR8`, `KorgM1`, `RolandMC303`, `RolandTR505`, `RolandTR626`, `BossDR110`, `AlesisSR16`, `YamahaRY30`, `RolandCompurhythm78`, `MPC1000`.
+- `npm run probe:openings` reports how radio songs open, `-- --check` checks the targets.
+- `npm run check:kit-rows`: every style kit has the drum rows its grooves play.
 
 ### Changed
 
@@ -63,6 +69,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - The speakers are Albert, Fred, Junior and Kathy, in English only; in Italian Alice speaks their lines.
 - A removed speaker in a saved song, session or style plays with the default voice.
 - `npm run voices` leaves out a speaker that speaks like the default voice.
+- Crescendo draws its first track from the style's opening weights instead of always starting on the kick.
+- The Compose Opening control also steers the first track in Crescendo, with the lead openings only.
+- Every style has its own opening weights; the default weight of the slow opening is 1.
 
 ### Fixed
 

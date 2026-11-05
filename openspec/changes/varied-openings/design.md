@@ -43,6 +43,7 @@ A new function in `shapes.js`, `resolveLead(song, { styles, seed, deny })`, draw
 
 - **Crescendo** (no shape): `growSong` calls `resolveLead` and moves that track to the front of `dest`, with the same front rules as `orderByShape`. The drums of a kick-led draw keep today's Crescendo growth, except the kick start (D3).
 - **Live coder**, openings typed, muted-base and mid-set: `orderByShape` calls the same draw for the track that comes first. Today these openings put the drums first by type order. `voice` keeps the spoken track first, with the lead draw choosing the second track.
+- With the `as-written` development the openings typed, muted-base and mid-set keep the written order (no lead draw): that development means the tracks enter where they are written (implementation, checked by the arpeggio test song).
 - The draw uses a stream of its own, `stream(seed, 'lead-1')`, so the other Crescendo draws (stream `crescendo-1`) and the shape draws (`shape-5`) keep their values. A Crescendo song whose lead draw lands on the drums and whose kick start draws `one` grows exactly as before.
 
 Alternative: a separate `growthShapes.leads` field for Crescendo. Rejected: two tables per style that say the same thing would drift apart. Live-coder-only openings in the table are skipped by the Crescendo draw.
@@ -80,6 +81,7 @@ Every `styles/*.json` gets `growthShapes.openings` and `growthShapes.kicks`. The
 Each style gets one to three more drum machines and one or two more sounds per role, chosen from genre research and mapped only to bank ids and sound names in the app's catalog (`src/sounds/catalog.js` and the loaded sample maps). The table and its reasons are in Appendix, Instruments per style. Rules:
 
 - A new kit must have samples for every drum row the style's grooves play (`bd cp sd hh oh rd`), or `KIT_MISSING` in `src/music.js` must name the missing rows so they fall back. Two of the proposed kits need a new entry (`RolandCompurhythm78`, `MPC1000`). A new Node check reads a committed snapshot of the drum machine index's rows (`tests/snapshots/kit-rows.json`, written from the index once) and fails when a recipe kit lacks a row its grooves play and `KIT_MISSING` does not cover it; `node tools/check-style-sounds.cjs` confirms the same in the browser.
+- `RolandR8`, already listed by four styles, joins `KITS` too. The new kits without a crash sample (`RolandMC303`, `MPC1000`, `RolandCompurhythm78`) join `NO_CRASH`, so the fills' crash comes from the 909; the kit-rows check (`npm run check:kit-rows`) checks that too (implementation).
 - No brand names in recipe text, descriptions or docs beyond the existing bank ids.
 - The owner's taste rules (`docs/CONTEXT.md`) still hold: dark or tense sounds, no cheerful leads where the style does not have them.
 
@@ -110,6 +112,14 @@ Every kit added to a style is appended to `KITS` (`src/music.js`). Users of the 
 - `src/library/styles-tab.js` and `src/library/patterns-tab.js` list the kits in menus; the longer list must still fit at 400 px.
 - `tools/knowledge.mjs` marks every `KITS` entry as described, so the sounds note needs a line per new kit (`npm run check:knowledge`).
 - `kitRow` falls back only for kits in `KIT_MISSING`, so every new `KITS` entry must be complete for the six rows or have an entry there (the kit-rows check covers `KITS` too).
+
+### D11. The first minute counts from the first sound
+
+The corpus check "pace: audible changes in the first minute" (`npm run check:crescendo -- --full`) counted the steps in the first 60 s from bar 0. With the new lead draw more built-in songs open typed (a silent lead-in while the first line is typed), so part of that minute was silence: medium had 66% of the long songs inside 4 to 6 changes (70% needed, 81% on `develop`), median 4; fast median 6.
+
+Owner decision (2026-11-05): count the minute from the first audible step. `firstMinute` (`tools/growth-measure.mjs`) now opens its 60 s window at the first step that is heard. Openings that sound at bar 0 keep the same window. Result: medium 77% inside 4 to 6, median 4 (range 2 to 6); fast median 6 (range 4 to 8). The 70% threshold stays. The growth's own pacing is unchanged, and so are the first lines.
+
+A voice as the first sound was evaluated too. A spoken track with an opening line is already the `voice` opening: it sounds at bar 0 and the measure counts it. A narrator voice track is not part of the code (`audible` reads the `$:` lines only) and never counts as an opening (`shapeFacts`). Making it a first sound would change the opening rules and the fixtures for no gain on this check, so it was not done.
 
 ## Risks / Trade-offs
 
@@ -196,6 +206,81 @@ Notes:
 
 - `four`, `push` and `off` are weighted only where the groove can play them, or where the style wants that figure on purpose (industrial). The `pair` start gives variety to broken and boom-bap kicks.
 - The weights of acid, ambient, lo-fi, gated-trance, pure-trance and house replace the current ones; their old ids keep similar weights.
+
+### Result (probe, 48 songs per style and profile)
+
+`npm run probe:openings -- --check` passes (exit 0). The weights below replace the table above where they differ: the
+first runs missed the 70% cap on one kick pattern in the four-on-the-floor styles (the full-kick and filtered openings
+open on the written kick, `bd*4`) and one style's kick-led share by chance, so `slow` took weight from them and the kick
+starts were spread out (house, acid, berlin-techno, progressive-house, the trance styles, darksynth, melodic-metal,
+phonk, country, dreamy-cyberpunk); drum-and-bass got `filtered` 2.
+
+| Profile    | Kick first (before) | Most common first line (before)             | Distinct first lines |
+| ---------- | ------------------- | ------------------------------------------- | -------------------- |
+| Crescendo  | 43% (92%)           | `$: s("bd*4").bank("RolandTR909")`, 4% (38%) | 440 of 960           |
+| Live coder | 44% (74%)           | `$: s("bd*4").bank("RolandTR909")`, 6% (19%) | 462 of 960           |
+
+The probe works out the share a style's weights give per song, over the openings that song can play: a song without a
+pad never draws `pad`, so the share moves with the songs. The Live-coder-only openings typed, muted-base and mid-set
+take their first track from the lead draw and count with its kick-led share; the voice opening never leads with the
+kick. The check grows 48 songs per style and profile, so the ±15 points hold without misses by chance (on 24 songs, two
+to three pairs of 40 missed by chance; a run with other seeds, `--salt`, tells a rule from chance).
+
+| Style | `openings` | `kicks` | Kick-led, Crescendo (weights) | Kick-led, Live coder (weights) |
+| ----- | ---------- | ------- | ----------------------------- | ------------------------------ |
+| acid | filtered 2, full-kick 1, slow 3, bass 3, typed 1 | one 2, two 1, four 1, push 1 | 58% (67%) | 73% (67%) |
+| ambient | pad 3, melodic 1, chord 1, typed 1, voice 0.5 | one 1, off 1 | 0% (0%) | 2% (3%) |
+| berlin-techno | full-kick 1, filtered 2, slow 2, broken 1, top 1, bass 1, typed 1 | four 1, one 1, off 1, two 1 | 81% (77%) | 65% (77%) |
+| classic-rock | chord 3, top 1, full-kick 1, slow 1, bass 1, melodic 1 | two 2, one 1, four 1 | 29% (26%) | 33% (26%) |
+| country | chord 3, bass 1, top 1, melodic 1, slow 1 | two 2, one 2 | 13% (16%) | 8% (16%) |
+| dark-cyberpunk | pad 2, bass 2, melodic 1, broken 1, filtered 1, full-kick 1, typed 1 | two 2, one 1, push 1 | 54% (41%) | 58% (43%) |
+| darksynth | bass 2, full-kick 2, melodic 2, filtered 1, slow 1, pad 1 | four 1, two 1, one 1 | 44% (46%) | 50% (48%) |
+| dreamy-cyberpunk | pad 3, melodic 2, chord 1, top 1, slow 1 | two 1, one 1, pair 1 | 17% (14%) | 13% (15%) |
+| drum-and-bass | broken 3, top 2, pad 2, bass 1, filtered 2, melodic 1 | pair 3, one 1 | 38% (50%) | 52% (50%) |
+| gated-trance | full-kick 3, filtered 1, slow 1, pad 1, mid-set 1, top 0.5 | four 3, one 1, two 1 | 85% (88%) | 92% (89%) |
+| house | full-kick 2, filtered 1, slow 2, broken 1, chord 2, bass 1, top 1, muted-base 1 | four 2, one 1, two 1, push 1 | 67% (63%) | 63% (64%) |
+| industrial | broken 2, full-kick 1, slow 1, filtered 1, top 1, bass 1, typed 1 | one 1, two 1, four 1, push 1, off 1 | 75% (74%) | 69% (74%) |
+| jazz | top 3, bass 3, chord 2, melodic 1, typed 0.5 | one 1, two 1 | 0% (0%) | 0% (0%) |
+| lo-fi | chord 3, bass 2, melodic 1, pad 1, top 1, slow 1, typed 1 | one 1, pair 2, two 1 | 21% (23%) | 17% (24%) |
+| melodic-metal | chord 2, full-kick 2, melodic 2, pad 1, top 1 | four 1, two 1, one 1 | 19% (27%) | 38% (25%) |
+| phonk | melodic 3, bass 2, broken 1, slow 1, top 1, voice 1 | pair 2, one 1, two 1 | 19% (28%) | 31% (27%) |
+| progressive-house | filtered 1, full-kick 1, slow 2, melodic 2, chord 1, pad 1, bass 1, top 1 | four 1, one 1, push 1, two 1 | 48% (43%) | 35% (45%) |
+| pure-trance | full-kick 3, filtered 1, slow 1, pad 1, melodic 1, typed 1 | four 2, one 1, two 1 | 85% (82%) | 83% (81%) |
+| synthwave | melodic 2, pad 2, bass 2, chord 1, full-kick 1, slow 1, filtered 1 | four 2, two 2, one 1 | 25% (32%) | 27% (31%) |
+| trance | full-kick 3, filtered 2, slow 1, pad 1, melodic 1, top 0.5, typed 0.5 | four 2, one 1, two 1, push 1 | 73% (72%) | 63% (69%) |
+
+### Listening pass (task 6.5)
+
+One radio song per style whose first line plays a kit added by this change. Each row is the first song of a radio
+session with that style alone, the profile named, chaos 0.3, energy 0.6, complexity 0.5, talk 0.5 and the seed given
+(the probe's seeds, `tools/opening-probe.mjs`). Listen to the opening and to the new kit or sound; drop any addition
+that does not fit.
+
+| Style | Profile | Seed | New kit heard first | First line |
+| ----- | ------- | ---- | ------------------- | ---------- |
+| acid | Crescendo | `op-crescendo-14-2` | RolandTR606 | `s("bd")` |
+| ambient | Live coder | `op-switch-0-0` | RolandCompurhythm78 | `s("~ hh")` |
+| berlin-techno | Crescendo | `op-crescendo-1-1` | RolandTR808 | `s("bd*2")` |
+| classic-rock | Crescendo | `op-crescendo-2-1` | YamahaRY30 | `s("bd*4")` |
+| country | Crescendo | `op-crescendo-3-1` | AlesisSR16 | `s("bd*2")` |
+| dark-cyberpunk | Crescendo | `op-crescendo-4-3` | RolandTR808 | `s("bd ~ ~ bd")` |
+| darksynth | Crescendo | `op-crescendo-5-8` | RolandTR707 | `s("bd*2")` |
+| dreamy-cyberpunk | Crescendo | `op-crescendo-6-1` | RolandTR808 | `s("hh*8")` |
+| drum-and-bass | Crescendo | `op-crescendo-7-1` | RolandTR808 | `s("bd ~!9 bd ~!5")` |
+| gated-trance | Crescendo | `op-crescendo-16-2` | RolandTR707 | `s("bd*4")` |
+| house | Crescendo | `op-crescendo-15-3` | RolandTR707 | `s("bd ~ ~ bd")` |
+| industrial | Crescendo | `op-crescendo-8-3` | RolandTR606 | `s("bd")` |
+| jazz | Crescendo | `op-crescendo-9-8` | YamahaRY30 | `s("[rd ~ rd rd]*2")` |
+| lo-fi | Crescendo | `op-crescendo-10-3` | MPC1000 | `s("hh*8")` |
+| melodic-metal | Crescendo | `op-crescendo-11-11` | YamahaRY30 | `s("hh*8")` |
+| phonk | Crescendo | `op-crescendo-12-4` | AkaiMPC60 | `s("bd")` |
+| progressive-house | Crescendo | `op-crescendo-13-1` | KorgM1 | `s("bd")` |
+| pure-trance | Crescendo | `op-crescendo-17-6` | RolandMC303 | `s("bd*2")` |
+| synthwave | Crescendo | `op-crescendo-18-10` | AkaiLinn | `s("bd*2")` |
+| trance | Crescendo | `op-crescendo-19-1` | RolandMC303 | `s("bd ~ ~ bd")` |
+
+The added melodic sounds (pads, basses, leads) show up later in the songs; `npm run probe:openings -- --styles <id>
+--json out.json` lists more seeds per style.
 
 ### Sounds the app can play
 

@@ -34,7 +34,9 @@
   "phrase": 8,
   "drums": {
     "kits": [
-      "RolandTR808"
+      "RolandTR808",
+      "EmuSP12",
+      "AkaiMPC60"
     ],
     "grooves": [
       "phonk"
@@ -73,7 +75,8 @@
     ],
     "waves": [
       "cowbell",
-      "square"
+      "square",
+      "gm_piano"
     ],
     "modes": [
       "phrygian",
@@ -88,7 +91,8 @@
     ],
     "waves": [
       "gm_choir_aahs",
-      "supersaw"
+      "supersaw",
+      "gm_pad_choir"
     ],
     "weight": 0.4
   },
@@ -170,5 +174,9 @@
     "weight": 0.1,
     "ways": { "refrain": 1, "chop": 1 },
     "vocab": "dark"
+  },
+  "growthShapes": {
+    "openings": { "melodic": 3, "bass": 2, "broken": 1, "slow": 1, "top": 1, "voice": 1 },
+    "kicks": { "pair": 2, "one": 1, "two": 1 }
   }
 }

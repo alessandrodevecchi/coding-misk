@@ -49,7 +49,8 @@
   "drums": {
     "material": { "source": "mix", "share": 0.3, "families": ["euclid", "half-time"] },
     "kits": [
-      "RolandTR808"
+      "RolandTR808",
+      "RolandCompurhythm78"
     ],
     "grooves": [
       "pulse"
@@ -83,7 +84,8 @@
     "waves": [
       "gm_celesta",
       "gm_tubular_bells",
-      "gm_vibraphone"
+      "gm_vibraphone",
+      "gm_fx_crystal"
     ],
     "modes": [
       "dorian",
@@ -106,7 +108,10 @@
       "gm_pad_warm",
       "gm_string_ensemble_1",
       "gm_choir_aahs",
-      "supersaw"
+      "supersaw",
+      "gm_pad_halo",
+      "gm_pad_bowed",
+      "gm_fx_atmosphere"
     ],
     "settings": {
       "cutoff": [
@@ -198,7 +203,8 @@
     ]
   },
   "growthShapes": {
-    "openings": { "pad": 3, "melodic": 1, "typed": 1 },
+    "openings": { "pad": 3, "melodic": 1, "chord": 1, "typed": 1, "voice": 0.5 },
+    "kicks": { "one": 1, "off": 1 },
     "paces": { "slow": 3, "medium": 1 }
   }
 }

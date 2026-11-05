@@ -20,6 +20,7 @@
     "check:phrases": "node --no-warnings tools/check-phrases.mjs",
     "endless": "node --no-warnings tools/endless.mjs",
     "check:styles": "node --no-warnings tools/style.mjs validate",
+    "check:kit-rows": "node --no-warnings tools/check-kit-rows.mjs",
     "check:song-filter": "node --no-warnings tools/check-song-filter.mjs",
     "check:playlists": "node --no-warnings tools/check-playlists.mjs",
     "check:trash": "node --no-warnings tools/check-trash.mjs",
@@ -63,7 +64,8 @@
     "durations": "node --no-warnings tools/song-durations.mjs write",
     "check:durations": "node --no-warnings tools/song-durations.mjs check",
     "check:song-options": "node --no-warnings tools/check-song-options.mjs",
-    "growth:probe": "node --no-warnings tools/growth-probe.mjs"
+    "growth:probe": "node --no-warnings tools/growth-probe.mjs",
+    "probe:openings": "node --no-warnings tools/opening-probe.mjs"
   },
   "dependencies": {
     "@mediabunny/flac-encoder": "^1.61.3",

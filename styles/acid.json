@@ -43,7 +43,8 @@
     "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
       "RolandTR909",
-      "RolandTR808"
+      "RolandTR808",
+      "RolandTR606"
     ],
     "grooves": [
       "techno",
@@ -63,7 +64,8 @@
       "rumble"
     ],
     "waves": [
-      "sawtooth"
+      "sawtooth",
+      "square"
     ],
     "settings": {
       "cutoff": [
@@ -195,7 +197,8 @@
     ]
   },
   "growthShapes": {
-    "openings": { "filtered": 3, "slow": 1, "typed": 1 },
+    "openings": { "filtered": 2, "full-kick": 1, "slow": 3, "bass": 3, "typed": 1 },
+    "kicks": { "one": 2, "two": 1, "four": 1, "push": 1 },
     "paces": { "medium": 3, "slow": 1 }
   },
   "spoken": {

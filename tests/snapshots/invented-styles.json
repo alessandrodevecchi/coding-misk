@@ -1,5 +1,5 @@
 {
- "maker": 2,
+ "maker": 3,
  "styles": [
   {
    "seed": "fixture-0",
@@ -8,7 +8,7 @@
     "en": "Chalk Mirage",
     "it": "Miraggio di gesso"
    },
-   "genre": "trance",
+   "genre": "experimental",
    "from": {
     "tempo": "synthwave",
     "drums": "house",
@@ -18,7 +18,7 @@
     "pads": "synthwave",
     "voice": "darksynth"
    },
-   "hash": "933c09ed"
+   "hash": "b2c562b5"
   },
   {
    "seed": "fixture-1",
@@ -37,7 +37,7 @@
     "pads": "progressive-house",
     "voice": "gated-trance"
    },
-   "hash": "63afbdf9"
+   "hash": "3b131938"
   },
   {
    "seed": "fixture-2",
@@ -56,7 +56,7 @@
     "pads": "country",
     "voice": "country"
    },
-   "hash": "7ba87982"
+   "hash": "a2e06e91"
   },
   {
    "seed": "fixture-3",
@@ -75,7 +75,7 @@
     "pads": "melodic-metal",
     "voice": "melodic-metal"
    },
-   "hash": "e37a6c55"
+   "hash": "77e490ea"
   },
   {
    "seed": "fixture-4",
@@ -94,7 +94,7 @@
     "pads": "acid",
     "voice": "acid"
    },
-   "hash": "6bbf4fc4"
+   "hash": "4fb4d27f"
   },
   {
    "seed": "fixture-5",
@@ -113,7 +113,7 @@
     "pads": "synthwave",
     "voice": "classic-rock"
    },
-   "hash": "9044d8c4"
+   "hash": "7d1b712f"
   },
   {
    "seed": "fixture-6",
@@ -132,7 +132,7 @@
     "pads": "classic-rock",
     "voice": "classic-rock"
    },
-   "hash": "66947df1"
+   "hash": "c34ccf7c"
   },
   {
    "seed": "fixture-7",
@@ -151,7 +151,7 @@
     "pads": "drum-and-bass",
     "voice": "acid"
    },
-   "hash": "fe008ba3"
+   "hash": "fdb1dac1"
   },
   {
    "seed": "fixture-8",
@@ -170,7 +170,7 @@
     "pads": "phonk",
     "voice": "pure-trance"
    },
-   "hash": "fd49d14d"
+   "hash": "e76214b0"
   },
   {
    "seed": "fixture-9",
@@ -189,7 +189,7 @@
     "pads": "acid",
     "voice": "berlin-techno"
    },
-   "hash": "10775303"
+   "hash": "957be02a"
   },
   {
    "seed": "fixture-10",
@@ -208,7 +208,7 @@
     "pads": "country",
     "voice": "country"
    },
-   "hash": "53369cf0"
+   "hash": "8bbe7633"
   },
   {
    "seed": "fixture-11",
@@ -227,7 +227,7 @@
     "pads": "progressive-house",
     "voice": "progressive-house"
    },
-   "hash": "ac70cb79"
+   "hash": "24d0f9ea"
   },
   {
    "seed": "fixture-12",
@@ -246,7 +246,7 @@
     "pads": "berlin-techno",
     "voice": "berlin-techno"
    },
-   "hash": "e680a050"
+   "hash": "a9de1bcb"
   },
   {
    "seed": "fixture-13",
@@ -265,7 +265,7 @@
     "pads": "jazz",
     "voice": "industrial"
    },
-   "hash": "963b51f7"
+   "hash": "f917b875"
   },
   {
    "seed": "fixture-14",
@@ -284,7 +284,7 @@
     "pads": "melodic-metal",
     "voice": "industrial"
    },
-   "hash": "595779b0"
+   "hash": "4ba41b6a"
   },
   {
    "seed": "fixture-15",
@@ -303,7 +303,7 @@
     "pads": "melodic-metal",
     "voice": "melodic-metal"
    },
-   "hash": "2297f54"
+   "hash": "16d63a4a"
   },
   {
    "seed": "fixture-16",
@@ -322,7 +322,7 @@
     "pads": "classic-rock",
     "voice": "classic-rock"
    },
-   "hash": "9dc5b11"
+   "hash": "4b4c44fa"
   },
   {
    "seed": "fixture-17",
@@ -331,17 +331,17 @@
     "en": "Flintwave",
     "it": "Flintwave"
    },
-   "genre": "house",
+   "genre": "hip-hop",
    "from": {
-    "tempo": "house",
-    "drums": "dark-cyberpunk",
-    "bass": "house",
-    "harmony": "house",
-    "lead": "dark-cyberpunk",
-    "pads": "house",
-    "voice": "house"
+    "tempo": "phonk",
+    "drums": "phonk",
+    "bass": "lo-fi",
+    "harmony": "phonk",
+    "lead": "phonk",
+    "pads": "lo-fi",
+    "voice": "phonk"
    },
-   "hash": "723b8de5"
+   "hash": "832b7999"
   },
   {
    "seed": "fixture-18",
@@ -360,7 +360,7 @@
     "pads": "classic-rock",
     "voice": "classic-rock"
    },
-   "hash": "b0059c"
+   "hash": "18e2e332"
   },
   {
    "seed": "fixture-19",
@@ -379,7 +379,7 @@
     "pads": "melodic-metal",
     "voice": "melodic-metal"
    },
-   "hash": "ff465a0"
+   "hash": "966ea630"
   },
   {
    "seed": "fixture-20",
@@ -398,7 +398,7 @@
     "pads": "ambient",
     "voice": "ambient"
    },
-   "hash": "6fe47103"
+   "hash": "40557b3a"
   },
   {
    "seed": "fixture-21",
@@ -417,7 +417,7 @@
     "pads": "ambient",
     "voice": "ambient"
    },
-   "hash": "8dcb0fad"
+   "hash": "a5c7e906"
   },
   {
    "seed": "fixture-22",
@@ -436,7 +436,7 @@
     "pads": "progressive-house",
     "voice": "progressive-house"
    },
-   "hash": "54b3df35"
+   "hash": "eca6cfc6"
   },
   {
    "seed": "fixture-23",
@@ -455,7 +455,7 @@
     "pads": "country",
     "voice": "jazz"
    },
-   "hash": "7053b785"
+   "hash": "b6d42216"
   },
   {
    "seed": "fixture-24",
@@ -464,7 +464,7 @@
     "en": "Pollen Orbit",
     "it": "Orbita di polline"
    },
-   "genre": "synthwave",
+   "genre": "ambient",
    "from": {
     "tempo": "dreamy-cyberpunk",
     "drums": "lo-fi",
@@ -474,7 +474,7 @@
     "pads": "lo-fi",
     "voice": "dreamy-cyberpunk"
    },
-   "hash": "dac7c99a"
+   "hash": "4257af8e"
   },
   {
    "seed": "fixture-25",
@@ -493,7 +493,7 @@
     "pads": "industrial",
     "voice": "trance"
    },
-   "hash": "7faaee6f"
+   "hash": "f7ff3161"
   },
   {
    "seed": "fixture-26",
@@ -512,7 +512,7 @@
     "pads": "darksynth",
     "voice": "phonk"
    },
-   "hash": "936c2009"
+   "hash": "43269a1b"
   },
   {
    "seed": "fixture-27",
@@ -531,7 +531,7 @@
     "pads": "jazz",
     "voice": "ambient"
    },
-   "hash": "1352a32a"
+   "hash": "f0b1bef0"
   },
   {
    "seed": "fixture-28",
@@ -550,7 +550,7 @@
     "pads": "dark-cyberpunk",
     "voice": "country"
    },
-   "hash": "ab2273e6"
+   "hash": "9a0ee613"
   },
   {
    "seed": "fixture-29",
@@ -569,7 +569,7 @@
     "pads": "dark-cyberpunk",
     "voice": "dark-cyberpunk"
    },
-   "hash": "383461fb"
+   "hash": "e289e7c2"
   }
  ]
 }

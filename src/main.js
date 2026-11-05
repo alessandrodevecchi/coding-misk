@@ -19,7 +19,7 @@ import { steerSong } from './endless/steering.js';
 import { VOCAB_GROUPS } from './song/vocabulary.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, writtenOptions } from './live/profiles.js';
 import { TRIALS_KEY, configOf, controlsOf, cleanTrials, setTrial, withConfig, compactConfig, plannedOf, normalConfig, setDuration } from './live/song-config.js';
-import { OPENINGS, PACES, DEVELOPMENTS, resolveShape, shapeFacts, canPlay, SHAPES_VERSION } from './song/shapes.js';
+import { OPENINGS, LEAD_OPENINGS, PACES, DEVELOPMENTS, resolveShape, resolveLead, shapeFacts, canPlay, SHAPES_VERSION } from './song/shapes.js';
 import { liveCode } from './live/live-code.js';
 import { installHelpers, useFns, FUNCTION_PRESETS, FUNCTION_OPTIONS, functionOptions, writeCode, levelsOf, busesOf, functionContext, tail, preludeText } from './song/writer.js';
 import { upgradeLibrary } from './library/code-upgrade.js';
@@ -2295,8 +2295,9 @@ function renderArranger() {
   $('#live-legend').textContent = t(on ? 'liveBuild' : 'codeOptsLbl');
   $$('[data-live-only="on"]').forEach(el => { el.hidden = !on; });
   $$('[data-live-only="crescendo"]').forEach(el => { el.hidden = !crescendo; });
-  // the growth shape belongs to the natural growth (Live coder)
-  $('#live-shape').hidden = !crescendo || C.growth !== 'natural';
+  // the growth shape belongs to the natural growth (Live coder); the Crescendo growth shows its Opening only
+  // (varied-openings D9)
+  $('#live-shape').hidden = !crescendo || (C.growth !== 'natural' && C.growth !== 'crescendo');
   $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments; $('#live-fns').value = C.functions;
   // (voice and spoken: "V:N code" and "V:T code" in Options, voice-track-tuning D11)
   for (const k of ['tracks', 'notes', 'steps', 'voice', 'spoken']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
@@ -2311,6 +2312,9 @@ function renderArranger() {
 // the values it cannot play disabled, and the shape that plays with where each part comes from
 function renderShape(C, building) {
   const T2 = { ...T, kind: 'composed' }, f = shapeFacts(T2, SHAPE_STYLES);
+  const lead = C.growth === 'crescendo';
+  for (const p of ['pace', 'development']) $(`#live-${p}`).closest('.ctrl').hidden = lead;
+  if (lead) return renderLead(C, building, T2, f);
   // (the song held as written while it grows away at start: the shape drawn, until the growth comes back)
   const c = building && C.growth === 'natural' && !compiled.pending ? crescendoOf(T2) : null;
   const shape = (c && c.crescendo && c.crescendo.shape) || resolveShape(T2, { user: { opening: C.opening, pace: C.pace, development: C.development }, styles: SHAPE_STYLES });
@@ -2326,6 +2330,19 @@ function renderShape(C, building) {
   const from = p => t(`shapeFrom:${(shape.from || {})[p] || 'seed'}`);
   $('#live-shape-now').textContent = t('shapeNow', { v: ['opening', 'pace', 'development'].map(p => t(`${p}:${shape[p]}`)).join(' · ') });
   $('#live-shape-now').title = ['opening', 'pace', 'development'].map(p => `${t(`${p}Lbl`)}: ${t(`${p}:${shape[p]}`)} (${from(p)})`).join('\n');
+}
+// the Opening control of the Crescendo growth (varied-openings D9): Auto and the lead openings; a Live-coder-only value
+// reads as Auto here and stays stored for Live coder
+function renderLead(C, building, T2, f) {
+  const c = building && !compiled.pending ? crescendoOf(T2) : null;
+  const drawn = (c && c.crescendo && c.crescendo.lead) || resolveLead(T2, { styles: SHAPE_STYLES }) || null;
+  const own = LEAD_OPENINGS.includes(C.opening) ? C.opening : 'auto', now = (c && c.crescendo && c.crescendo.lead) || resolveLead(T2, { styles: SHAPE_STYLES, user: own }) || null;
+  const sel = $('#live-opening');
+  sel.innerHTML = [`<option value="auto">${esc(drawn ? t('shapeAutoIs', { v: t(`opening:${drawn.opening}`) }) : t('shapeAuto'))}</option>`,
+    ...LEAD_OPENINGS.map(v => { const ok = canPlay('opening', v, f); return `<option value="${v}"${ok ? '' : ' disabled'}${ok ? '' : ` title="${esc(t('shapeCannot'))}"`}>${esc(t(`opening:${v}`))}</option>`; })].join('');
+  sel.value = own;
+  $('#live-shape-now').textContent = now ? t('shapeNow', { v: t(`opening:${now.opening}`) }) : '';
+  $('#live-shape-now').title = now ? `${t('openingLbl')}: ${t(`opening:${now.opening}`)} (${t(`shapeFrom:${now.from || 'seed'}`)})` : '';
 }
 // ---------- growth and ending columns (timeline-growth D2-D4) ----------
 // the growth column: hidden (a narrow tab), compact (fixed width, default) or open (the written song's scale)

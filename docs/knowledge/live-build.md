@@ -59,9 +59,9 @@ Step actions (`BUILD_ACTIONS`): `add`, `remove`, `set`, `pattern`, `rack`, `unra
 ## Example
 
 <!-- generated:example-growth-step -->
-The Ideas example in the Live coder profile. Shape drawn: opening `slow`, pace `slow`, development `second-section` (from opening seed, pace seed, development seed).
+The Ideas example in the Live coder profile. Shape drawn: opening `full-kick`, pace `slow`, development `second-section` (from opening seed, pace seed, development seed).
 
-The pattern lines that the step at bar 53 rewrites, before:
+The pattern lines that the step at bar 32 rewrites, before:
 
 ```js
 $: chord("Am").anchor("c4").voicing()
@@ -73,15 +73,15 @@ After:
 
 ```js
 $: chord("Am").anchor("c4").voicing()
-  .s("supersaw").attack(.4).release(1.2).wob(196, 784)
-  .room(.85).degradeBy(0.5)
+  .s("supersaw").attack(.4).release(1.2)
+  .room(.85).degradeBy(0.5).seg(16)
 ```
 
 The steps at that bar:
 
 ```json
 [
-  {"at":53,"reveal":{"track":"pad","keys":"cutoff"}}
+  {"at":32,"rack":{"track":"pad","device":"seg","steps":16}}
 ]
 ```
 <!-- /generated -->

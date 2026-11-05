@@ -38,7 +38,9 @@
     "kits": [
       "LinnDrum",
       "OberheimDMX",
-      "RolandTR707"
+      "RolandTR707",
+      "AkaiLinn",
+      "RolandTR505"
     ],
     "grooves": [
       "synthwave",
@@ -55,7 +57,8 @@
     ],
     "waves": [
       "sawtooth",
-      "square"
+      "square",
+      "gm_synth_bass_1"
     ],
     "settings": {
       "cutoff": [
@@ -109,7 +112,9 @@
     "waves": [
       "supersaw",
       "gm_synth_strings_1",
-      "gm_synth_brass_1"
+      "gm_synth_brass_1",
+      "gm_epiano2",
+      "gm_pad_poly"
     ]
   },
   "riser": {},
@@ -180,5 +185,9 @@
     "weight": 0.15,
     "ways": { "opening": 1, "refrain": 1, "chop": 1 },
     "vocab": "night"
+  },
+  "growthShapes": {
+    "openings": { "melodic": 2, "pad": 2, "bass": 2, "chord": 1, "full-kick": 1, "slow": 1, "filtered": 1 },
+    "kicks": { "four": 2, "two": 2, "one": 1 }
   }
 }
