@@ -92,9 +92,13 @@ const worst = [];
       const text = TEXTS[mode]();
       await measureStart();
       await page.fill('#radio-steer [data-sv-line]', text);
-      const q = await rel();
+      // (the bar the click handler really sees: page.click first scrolls and checks the button, which at this CPU rate takes
+      // a few hundred ms after the song was read, so a song position read before the click made the lead look longer than
+      // the app's rule; the capturing listener reads it on the click itself)
+      await page.evaluate(() => { const sch = () => document.querySelector('strudel-editor').editor.repl.scheduler; document.addEventListener('click', () => { const s = globalThis.codingMiskRadio.state; window.__clickRel = sch().now() - s.stream[s.onAir].start; }, { capture: true, once: true }); });
       const t0 = await page.evaluate(() => { window.__lt = []; return performance.now(); });
       await page.click(`#radio-steer [data-sv-say="${mode}"]`);
+      const q = await page.evaluate(() => window.__clickRel);
       let clip = null, seenAt = null, at = null;
       // (the queue and Coming next are read while the line waits for its bar)
       for (let k = 0; k < 400 && !clip; k++) { await sleep(30); clip = await clipOf(text); if (clip) { seenAt = await rel(); at = await shown(text); } }
