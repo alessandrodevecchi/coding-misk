@@ -7,6 +7,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Draw styles grid on each voice card of the Voices tab: switch the voice styles automatic draws may give a voice, with a mark on changed styles, the count of allowed styles and Reset to defaults.
+- Voice style choices kept in the browser and in the settings backup; an import merges them per voice.
+- Radio sessions record the allowed voice styles they started with, so Replay, saved sessions and exports keep them.
+- Guide card for the Draw styles grid.
 - `src/voices/combos.json`: the voice styles automatic draws may use per speaker and language; it ships with every pair allowed.
 - Voice style pickers mark a style that is not allowed for the current speaker; it stays selectable.
 - Voices tab test bench line that says whether the chosen speaker and style are allowed.
