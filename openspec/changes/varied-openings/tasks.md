@@ -5,9 +5,9 @@
 
 ## 2. Openings and kick starts in the shape rules
 
-- [ ] 2.1 `src/song/shapes.js`: add `bass`, `chord`, `top` to `OPENINGS`; `canPlay` rules (bass track; pad or guitar; a non-kick drum row with at least four hits per bar); new `DEFAULT_WEIGHTS.opening` (slow 1, the new ids 1); `KICKS` (`one`, `pair`, `two`, `four`, `push`, `off`) with default weights; `RECIPE_KEYS` and `checkGrowthShapes` accept `kicks`; `checkGrowthShape` accepts the new ids. Verify: `npm run check:styles` and `npm run check:songs` pass, and a recipe with `kicks.gallop` fails at that path.
-- [ ] 2.2 `resolveLead(song, { styles, seed, deny })` and `resolveKick(song, facts, { styles, seed })` in `shapes.js`, with streams `lead-1` and `kick-1`; a song's lead `growthShape.opening` wins; a kick start outside the written kick is playable only with an explicit style weight. Verify: a unit check in `tools/check-crescendo.mjs` (shape checks) draws them for fixed seeds, twice, with the same result.
-- [ ] 2.3 Bump `SHAPES_VERSION` to 9 (keep `SHAPES_SEED` 5). Verify: `card-duration.js` keys change (durations measured again in 7.3).
+- [x] 2.1 `src/song/shapes.js`: add `bass`, `chord`, `top` to `OPENINGS`; `canPlay` rules (bass track; pad or guitar; a non-kick drum row with at least four hits per bar); new `DEFAULT_WEIGHTS.opening` (slow 1, the new ids 1); `KICKS` (`one`, `pair`, `two`, `four`, `push`, `off`) with default weights; `RECIPE_KEYS` and `checkGrowthShapes` accept `kicks`; `checkGrowthShape` accepts the new ids. Verify: `npm run check:styles` and `npm run check:songs` pass, and a recipe with `kicks.gallop` fails at that path.
+- [x] 2.2 `resolveLead(song, { styles, seed, deny })` and `resolveKick(song, facts, { styles, seed })` in `shapes.js`, with streams `lead-1` and `kick-1`; a song's lead `growthShape.opening` wins; a kick start outside the written kick is playable only with an explicit style weight. Verify: a unit check in `tools/check-crescendo.mjs` (shape checks) draws them for fixed seeds, twice, with the same result.
+- [x] 2.3 Bump `SHAPES_VERSION` to 9 (keep `SHAPES_SEED` 5). Verify: `card-duration.js` keys change (durations measured again in 7.3).
 
 ## 3. Growth: lead track and kick start
 

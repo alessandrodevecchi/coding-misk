@@ -27,7 +27,7 @@ import { buildSteps, stateAt, checkBuild, stepTrack, buildMap } from '../src/son
 import { crescendoSong, patternVariants, waypointSong, CRESCENDO_VERSION, songSeconds } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules } from '../src/live/profiles.js';
 import { liveCode } from '../src/live/live-code.js';
-import { resolveShape, shapeFacts, canPlay, SHAPES_VERSION, OPENINGS } from '../src/song/shapes.js';
+import { resolveShape, resolveLead, resolveKick, shapeFacts, canPlay, SHAPES_VERSION, OPENINGS, LEAD_OPENINGS, KICKS } from '../src/song/shapes.js';
 import { audible, firstMinute, fullKick, typingLoad } from './growth-measure.mjs';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
@@ -259,6 +259,29 @@ export const CHECKS = [
     const se = validateSong({ ...s, growthShape: { opening: 'kick-drum' } }).errors, re = validateRecipe({ ...styles.acid, growthShapes: { paces: { fastest: 1 } } }).errors;
     assert(se.some(e => e.path === 'growthShape.opening') && re.some(e => e.path === 'growthShapes.paces.fastest'), `${JSON.stringify(se)} ${JSON.stringify(re)}`);
     assert(!validateSong(s).errors.length && Object.values(styles).every(r => !validateRecipe(r).errors.length), 'built-in songs and recipes valid');
+  } },
+  { name: 'lead and kick start (varied-openings): same draw twice, lead openings only, impossible ones left out, kick starts outside the groove only by style weight', unit() {
+    const s = byId('switch-prima-luce'), f = shapeFacts(s, styles);
+    for (let k = 0; k < 50; k++) {
+      const seed = `lead-${k}`, a = resolveLead(s, { styles, seed }), b = resolveLead(s, { styles, seed });
+      assert(JSON.stringify(a) === JSON.stringify(b) && LEAD_OPENINGS.includes(a.opening) && canPlay('opening', a.opening, f), `${seed}: ${JSON.stringify(a)} ${JSON.stringify(b)}`);
+      const x = resolveKick(s, f, { styles, seed }), y = resolveKick(s, f, { styles, seed });
+      assert(x === y && KICKS.includes(x), `${seed}: kick ${x} ${y}`);
+    }
+    assert(resolveLead({ ...s, growthShape: { opening: 'pad' } }, { styles }).opening === (canPlay('opening', 'pad', f) ? 'pad' : resolveLead(s, { styles }).opening), 'the song\'s lead opening wins');
+    assert(resolveLead({ ...s, growthShape: { opening: 'pad' } }, { styles, user: 'slow' }).from === (f.drums ? 'user' : 'song'), 'the user\'s lead opening wins');
+    // a song without a bass track never leads with the bass; a style that weighs only Live coder openings draws the defaults
+    const nob = { ...s, tracks: s.tracks.filter(t => t.type !== 'bass') }, only = { ...styles, [f.recipe ? f.recipe.id : 'x']: { ...(f.recipe || {}), growthShapes: { openings: { bass: 5, typed: 3 } } } };
+    for (let k = 0; k < 100; k++) assert(resolveLead(nob, { styles: only, seed: `b-${k}` }).opening !== 'bass', 'bass drawn without a bass track');
+    // a straight kick: off is never drawn under the default weights when the groove has no kick on beat three
+    const facts = { ...f, recipe: null, kickHits: [0, 10] }, drawn = new Set();
+    for (let k = 0; k < 200; k++) drawn.add(resolveKick(s, facts, { seed: `k-${k}` }));
+    assert(!drawn.has('off') && !drawn.has('four') && !drawn.has('two') && drawn.has('pair') && drawn.has('one'), [...drawn].join(','));
+    const styled = { ...facts, recipe: { growthShapes: { kicks: { four: 1, off: 1 } } } }, got = new Set();
+    for (let k = 0; k < 100; k++) got.add(resolveKick(s, styled, { seed: `k-${k}` }));
+    assert(got.has('four') && got.has('off') && got.size === 2, [...got].join(','));
+    const re = validateRecipe({ ...styles.acid, growthShapes: { kicks: { gallop: 2 } } }).errors;
+    assert(re.some(e => e.path === 'growthShapes.kicks.gallop' && /pair/.test(e.msg)), JSON.stringify(re));
   } },
   { name: 'shapes: Classic and Crescendo take no shape; the Live coder build records it', unit() {
     for (const s of songs.slice(0, 10)) assert(!crescendoSong(s).crescendo.shape && !crescendoSong(s, { rules: growthRules(resolveProfile('crescendo')) }).crescendo.shape, s.id);
