@@ -2575,3 +2575,10 @@ Ramo `fix/82-saved-pattern-add`. `check-arrangement-levels.cjs --scenario` dava 
 - **Backup:** la chiave viaggia già; l'import unisce per lingua e voce (vince il backup, le altre restano, le parti non valide si scartano), contato tra le impostazioni.
 - **Copia come combos.json:** non serve (scelta del proprietario): i nuovi predefiniti si fanno una volta a mano, copiando le voci dal backup in `src/voices/combos.json`. Ripiego per voce (D8, 6.1): rinviato.
 - **Prove:** `check:voice-combos` 13 su 13 (override, tabella effettiva, `opts.combos`), `check:spoken` 60 su 60 (300 brani con `opts.combos`, ricetta registrata contro tabella del modulo), `check:backup` 18 su 18, `check:endless` fixture ferme (un caso di tempo, «one vary takes less than 20 ms», è fallito una volta con la macchina carica e passa da solo), `check-voices-tab.cjs --grid` (nuovo), `check-voices.cjs`, `check-radio.cjs` con Replay dopo un cambio delle scelte.
+
+## 2026-11-05 pausa tra le parole di «verve, profondità, calamità» (#82)
+
+- **Cosa:** nel vocabolario poetico (`POETIC.any`) il testo italiano «verve · profondità · calamità» diventa «verve, profondità, calamità»; l'inglese resta con i punti, Samantha si ferma già da sola.
+- **Causa:** Alice leggeva i punti medi senza pausa, in 1,58 s e senza silenzi sopra 0,1 s; con le virgole si ferma tra le parole.
+- **Sample:** `say_it/verve_profondita_calamita.wav` rigenerato nella cartella principale `public/samples` con `makeSample(..., { force: true })` e `say_lengths.json` aggiornato solo per quel file (il nome file è lo stesso: lo `saySlug` ignora la punteggiatura). Nuova durata 2,14 s; `silencedetect` (-35 dB, 0,1 s) trova due pause: 0,42-0,66 s (0,24 s) e 1,30-1,54 s (0,24 s). Nulla cancellato.
+- **Prove:** `check:spoken` 60 su 60, `check:samples` 0 mancanti, `check:phrases` 24 su 24, `check:endless` 94 su 94. Fixture ferme: nessuna rigenerazione, nessun controllo fissava il vecchio testo.
