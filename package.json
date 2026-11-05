@@ -63,7 +63,8 @@
     "durations": "node --no-warnings tools/song-durations.mjs write",
     "check:durations": "node --no-warnings tools/song-durations.mjs check",
     "check:song-options": "node --no-warnings tools/check-song-options.mjs",
-    "growth:probe": "node --no-warnings tools/growth-probe.mjs"
+    "growth:probe": "node --no-warnings tools/growth-probe.mjs",
+    "probe:openings": "node --no-warnings tools/opening-probe.mjs"
   },
   "dependencies": {
     "@mediabunny/flac-encoder": "^1.61.3",

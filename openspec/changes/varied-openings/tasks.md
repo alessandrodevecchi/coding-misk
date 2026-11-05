@@ -1,7 +1,7 @@
 ## 1. Baseline and probe tool
 
-- [ ] 1.1 Add `tools/opening-probe.mjs` from the investigation's `probe.mjs` and `an.mjs`: grow N songs per built-in style with the Crescendo and Live coder profiles (default 24, `--n 12` for a quick run), find the first sounding `$:` line, and report per profile and per style: kick-led share, share of each exact first line, kick patterns among kick-led openings, banks, and the opening drawn with its source. Add `npm run probe:openings`. Verify: it runs without a browser and prints the baseline of `design.md` (Appendix) (about 94% kick in Crescendo, 73% in Live coder) on `develop`.
-- [ ] 1.2 Add a `--check` mode that compares the result with the targets of the spec (Opening distribution) and the per-style kick-led shares in `design.md` (Appendix), and exits 1 naming each style and target missed. Verify: `--check` fails on the baseline.
+- [x] 1.1 Add `tools/opening-probe.mjs` from the investigation's `probe.mjs` and `an.mjs`: grow N songs per built-in style with the Crescendo and Live coder profiles (default 24, `--n 12` for a quick run), find the first sounding `$:` line, and report per profile and per style: kick-led share, share of each exact first line, kick patterns among kick-led openings, banks, and the opening drawn with its source. Add `npm run probe:openings`. Verify: it runs without a browser and prints the baseline of `design.md` (Appendix) (about 94% kick in Crescendo, 73% in Live coder) on `develop`.
+- [x] 1.2 Add a `--check` mode that compares the result with the targets of the spec (Opening distribution) and the per-style kick-led shares in `design.md` (Appendix), and exits 1 naming each style and target missed. Verify: `--check` fails on the baseline.
 
 ## 2. Openings and kick starts in the shape rules
 
