@@ -99,7 +99,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     const S = () => page.evaluate(() => globalThis.codingMiskRadio.steering);
     const on = b => page.evaluate(async b => { const { stateAt } = await import('/src/song/build.js'), s = globalThis.codingMiskRadio.steering; return stateAt(s.song, b).song.tracks.filter(t => !t.mute && !['voice', 'spoken'].includes(t.type)).map(t => t.id); }, b);
     await page.evaluate(b => globalThis.codingMiskRadio.seek(b), (await S()).plan.phrase + 0.3); await sleep(1200);
-    await page.click('#radio-steer [data-lock-part="kick"]'); await sleep(400);
+    // (a lock waits for its boundary like "+" and "−", console-add-ahead D8)
+    await page.click('#radio-steer [data-lock-part="kick"]'); await sleep(400); await settle(); await sleep(400);
     const st = await S(), P = st.plan, ph = P.phrase, R = P.roles, cur = await now();
     const d = R.findIndex((x, i) => i > 0 && x === 'break' && R[i - 1] !== 'break' && i * 2 * ph > cur + ph);
     const dr = d > 0 ? R.findIndex((x, i) => i > d && x === 'drop' && R[i - 1] !== 'drop') : -1;
@@ -397,6 +398,8 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   st = await ST();
   check(st.commands.some(c => c.kind === 'volume' && c.track === tr && c.value === 0.2), 'mixer volume queued for the next bar');
   await page.click(`#radio-steer [data-mix-lock="${tr}"]`); await sleep(300);
+  check(!!(await page.getAttribute(`#radio-steer [data-mix-lock="${tr}"]`, 'data-pend-s')) && /^(Locks on bar \d+ · in|Si chiude alla battuta \d+ · tra) \d+ s$/.test(await page.getAttribute(`#radio-steer [data-mix-lock="${tr}"]`, 'title')), 'the mixer lock shows its pending ring and its bar until it enters');
+  await settle(); await sleep(400);
   st = await ST();
   check(st.plan.locked.includes(tr), 'lock keeps the director off the track', tr);
 
@@ -679,17 +682,22 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     const tipPlus = await page.getAttribute('#radio-steer [data-cmd="more"][data-inst="kick"]', 'title');
     check(/×3/.test(tipPlus), 'the + tooltip warns before the press', tipPlus);
     // lock the pad: the mixer rows of the pads lock too; unlocking one row gives the half state
+    // (each lock waits for its boundary, console-add-ahead D8: the queue row first, then the lock once it entered)
     await page.click('#radio-steer [data-lock-part="pad"]'); await sleep(300);
+    check(/pad: (locked|bloccato) · \d+ s/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "pad: locked" with the seconds left');
+    await settle(); await sleep(600);
     a = await A();
     const padRows = await page.$$eval('#radio-steer [data-mix-lock]', xs => xs.filter(x => /^pad/.test(x.dataset.mixLock)).map(x => [x.dataset.mixLock, x.getAttribute('aria-pressed')]));
     check(a.s.plan.lockedParts.includes('pad') && padRows.length >= 2 && padRows.every(([, p]) => p === 'true') && (await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'data-state')) === 'closed', 'locking the pad locks its mixer rows', JSON.stringify(padRows));
-    await page.click(`#radio-steer [data-mix-lock="${padRows[padRows.length - 1][0]}"]`); await sleep(300);
+    await page.click(`#radio-steer [data-mix-lock="${padRows[padRows.length - 1][0]}"]`); await sleep(300); await settle(); await sleep(600);
     check((await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'data-state')) === 'half' && /1|2/.test(await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'title')), 'unlocking one row in the mixer shows the half state', await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'title'));
-    await page.click('#radio-steer [data-lock-part="pad"]'); await sleep(300);
+    await page.click('#radio-steer [data-lock-part="pad"]'); await sleep(300); await settle(); await sleep(600);
     check((await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'data-state')) === 'closed', 'a click on the half lock locks them all');
-    check(/pad: (locked|bloccato)/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "pad: locked"');
-    await page.click('#radio-steer [data-lock-part="pad"]'); await sleep(300);
+    await page.click('#radio-steer [data-lock-part="pad"]'); await sleep(300); await settle(); await sleep(600);
     check((await page.getAttribute('#radio-steer [data-lock-part="pad"]', 'data-state')) === 'open', 'the lock opens again');
+    // (the four locks above each waited for a phrase start: back to the bar of the owner's test, so the riser below
+    // still has a part change ahead)
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), at2 + 0.3); await sleep(1500);
     // the riser row: 4 bars, up; placed on the next part change
     await page.selectOption('#radio-steer [data-riser="bars"]', '4'); await sleep(200);
     check((await page.$$eval('#radio-steer [data-riser="sound"] option', xs => xs.length)) === 1, 'the Sound dropdown shows its one option');
