@@ -48,11 +48,11 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     for (const [l, x] of textsOf(p)) {
       const bank = sayBank(l, ''), k = `${bank}/${saySlug(x)}`;
       if (has(bank, x) || making.has(k)) continue;
-      making.add(k); refresh();
+      making.add(k); render();
       try { await fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: x, lang: l, speaker: '' }) }); } catch (e) { /* stays missing */ }
       making.delete(k);
     }
-    await samplesChanged(); refresh();
+    await samplesChanged(); render();
   }
   async function usage(force = false) {
     if (!helper()) return null;
@@ -217,7 +217,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
         <p class="muted small">${esc(t('phMissingN', { n: missing.length }))}</p>`;
     }
     const u = ui.usage;
-    if (!u) { usage().then(() => refresh()); return `<p class="muted">${esc(t('phLoading'))}</p>`; }
+    if (!u) { usage().then(() => render()); return `<p class="muted">${esc(t('phLoading'))}</p>`; }
     const k = keys(), rows = classify(u.banks, { ...k, temp: u.temp || {} }), T = totals(rows);
     const cls = CLASSES.map(c => `<div class="vt-class vt-${c}"><span class="lbl">${esc(t(`phClass:${c}`))}</span><span class="vt-n">${T.classes[c].n}</span><span class="muted small">${esc(sizeText(T.classes[c].b))}</span></div>`).join('');
     const banks = Object.entries(T.banks).map(([b, x]) => `<tr><td>${esc(b)}</td><td>${x.n}</td><td>${esc(sizeText(x.b))}</td><td>${x.mine}</td><td>${x.temp}</td><td>${x.orphan}</td></tr>`).join('');
@@ -243,19 +243,15 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     const body = sub === 'mine' ? mineHtml() : sub === 'vocab' ? vocabHtml() : sub === 'voices' ? voicesHtml() : samplesHtml();
     root.innerHTML = `<p class="intro">${esc(t('introVoices'))}</p><div class="chips vt-subs" role="tablist">${chips}</div><div class="vt-body vt-${sub}">${body}</div>`;
     if (keep && keep.sel) { const el = root.querySelector(keep.sel); if (el) { el.focus(); try { el.setSelectionRange(keep.at, keep.at); } catch (e) { /* number inputs */ } } }
-    if ((sub === 'voices' || sub === 'samples') && helper() && !ui.usage) usage().then(u => { if (u) refresh(); });
-  }
-  // a render that does not come from the form (a sample made, the usage read, the phrases changed elsewhere): the open
-  // form keeps what was typed or picked and not saved yet
-  function refresh() {
-    if (ui.form && root && root.querySelector('[data-ph-form]')) readForm();
-    render();
+    if ((sub === 'voices' || sub === 'samples') && helper() && !ui.usage) usage().then(u => { if (u) render(); });
   }
   function show(s) { if (SECTIONS.includes(s)) { sub = s; store.set(SUB_KEY, s); } ui.usage = null; render(); }
 
   // ---------- actions ----------
   async function deletePhrase(id) {
     const p = phr.items.find(x => x.id === id); if (!p) return;
+    // (the form open at the click closes; one opened while the samples are read stays)
+    const open = ui.form;
     const u = await usage(true), k = keys(id), pf = u ? phraseFiles(p, u.banks, k) : { files: [], kept: [] };
     const songsWith = library().filter(s => JSON.stringify(s).includes(JSON.stringify(p.text).slice(1, -1))).length;
     const size = pf.files.reduce((a, x) => a + x.b, 0);
@@ -268,7 +264,8 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
       ui.usage = null; render();
       toast(t('phDeleted', { text: p.text }), [{ label: t('vinstUndo'), run: () => { phr.restore(r.removed, r.at); prepare(r.removed); } }]);
     } };
-    ui.form = null; render();
+    if (ui.form === open) ui.form = null;
+    render();
     const c = root.querySelector('.ph-confirm'); if (c) c.scrollIntoView({ block: 'nearest' });
   }
   function openForm(id = null) {
@@ -292,13 +289,18 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     if (err) { if (errEl) errEl.textContent = t(`phErr:${err}`, { n: MAX_WORDS }); return; }
     const input = { text: f.text, lang: f.lang, alt: f.alt.trim() ? { [other]: f.alt.trim() } : {}, kinds: f.kinds, tag: f.kinds.length === 1 ? f.tag || null : null, styles: f.styles, on: !!f.on };
     if (f.id) {
-      const before = phr.items.find(x => x.id === f.id), u = before ? await usage(true) : null;
+      // (the edit and the form closing happen at once, never after a wait: a slow helper used to apply them late, after
+      // the next form was opened, and close that one)
+      const before = phr.items.find(x => x.id === f.id);
       const r = phr.edit(f.id, input);
       if (r.error) { if (errEl) errEl.textContent = t(r.error === 'exists' ? 'phErr:exists' : `phErr:${r.error}`, { n: MAX_WORDS }); return; }
-      // a changed text: the old sample becomes temporary if nothing else uses it (D7)
-      if (u && before && (before.text !== r.phrase.text || JSON.stringify(before.alt) !== JSON.stringify(r.phrase.alt))) {
-        const k = keys(), stale = phraseFiles(before, u.banks, { ...k, mine: mineKeys(phr.items) }).files;
-        if (stale.length && helper()) fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ add: stale.map(x => ({ file: x.rel, ms: phr.tempMs(), song: 'voci', text: before.text })) }) }).catch(() => {});
+      // a changed text: the old sample becomes temporary if nothing else uses it (D7), once the samples are read
+      if (before && helper() && (before.text !== r.phrase.text || JSON.stringify(before.alt) !== JSON.stringify(r.phrase.alt))) {
+        usage(true).then(u => {
+          if (!u) return;
+          const k = keys(), stale = phraseFiles(before, u.banks, { ...k, mine: mineKeys(phr.items) }).files;
+          if (stale.length) fetch('/voice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ add: stale.map(x => ({ file: x.rel, ms: phr.tempMs(), song: 'voci', text: before.text })) }) }).catch(() => {});
+        });
       }
       ui.form = null; render();
       // (widened: merged with the phrases of the same text that share a kind, with Undo; phrase-any-voice D5)
@@ -386,13 +388,18 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
       ui.usage = null; return render();
     }
   });
+  // (the open form's values go to ui.form as they are typed or picked: a render from anywhere, a sample made, the usage
+  // read, the phrases changed by the app (main.js), rebuilds the form with them, never with the values it opened with)
+  const formInput = el => { if (ui.form && el.closest('[data-ph-form]') && el.matches('[data-ph-f]')) readForm(); };
   root.addEventListener('input', e => {
     const el = e.target;
+    formInput(el);
     if (el.matches('[data-ph-q]')) { ui.q = el.value; render(); }
     else if (el.matches('[data-vt-bench="text"]')) ui.bench.text = el.value;
   });
   root.addEventListener('change', e => {
     const el = e.target;
+    formInput(el);
     if (el.matches('[data-ph-f="kind"]')) { readForm(); ui.form.tag = ''; render(); }
     else if (el.matches('[data-ph-f="lang"]')) readForm();
     else if (el.matches('[data-vt-bench]')) {
@@ -402,6 +409,6 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     }
   });
   root.addEventListener('submit', e => { if (e.target.matches('[data-ph-form]')) { e.preventDefault(); saveForm(); } });
-  phr.on(what => { if (what !== 'uses') refresh(); });
+  phr.on(what => { if (what !== 'uses') render(); });
   return { render, show, get section() { return sub; }, openForm, prepare };
 }

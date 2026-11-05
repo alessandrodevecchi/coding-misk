@@ -14,6 +14,9 @@
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voices.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
+// the combos table the page uses (voice-style-combos): the module at the URL the page loaded (Vite adds ?t= to a file
+// changed since the server started; another URL would be another copy of the module)
+const setCombos = (page, table) => page.evaluate(async t => { const url = performance.getEntriesByType('resource').map(e => e.name).filter(n => n.includes('/src/voices/combos.js')).pop() || '/src/voices/combos.js'; (await import(url)).setCombos(t); }, table);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
@@ -142,7 +145,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(o.join() === '=Default (Samantha),albert=Albert,fred=Fred,junior=Junior,kathy=Kathy', 'English speakers (real-voices): the default voice, Albert, Fred, Junior and Kathy, no note', o.join()); }
   // (voice-style-combos D6: a style not allowed for the speaker carries a mark and a tip in both pickers, stays selectable,
   // and the marks follow the speaker)
-  { await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos({ format: 1, en: { fred: ['clear', 'radio'] } }));
+  { await setCombos(page, { format: 1, en: { fred: ['clear', 'radio'] } });
     const marks = () => page.evaluate(ti => [`#track-panel [data-ptrk="${ti}"] [data-vstyle]`, '[data-vsound-style="narrator"]'].map(q => { const o = document.querySelector(q).querySelector('option[value="robot"]'), r = document.querySelector(q).querySelector('option[value="radio"]'); return { robot: o.textContent, tip: o.title, disabled: o.disabled, radio: r.textContent }; }), ti);
     await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'kathy'); await sleep(400);
     await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'fred'); await sleep(600);
@@ -153,7 +156,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'kathy'); await sleep(600);
     check((await marks()).every(x => x.robot === 'Robot' && !x.tip), 'combos: the marks follow the speaker (Kathy, no entry: every style allowed)', JSON.stringify(await marks()));
     if (shots) { await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'fred'); await sleep(400); await page.screenshot({ path: path.join(shots, 'combos-panel.png') }); }
-    await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos(null)); }
+    await setCombos(page, null); }
   await page.click('#cfg-reset').catch(() => {}); await sleep(600);
 
   // ---------- Compose: the voice track ----------
