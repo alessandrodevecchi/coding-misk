@@ -184,17 +184,19 @@ export const TEX_RHYTHMS = {
   sixteenth: [{ it: 'Sedicesimi', en: '16th notes' }, 'X*16', 'irand(16)'],
 };
 // drum machine senza piatto crash: il crash viene preso dalla 909
-const NO_CRASH = ['YamahaRX5', 'AlesisHR16', 'KorgMinipops'];
+export const NO_CRASH = ['YamahaRX5', 'AlesisHR16', 'KorgMinipops', 'RolandMC303', 'MPC1000', 'RolandCompurhythm78'];
 // sounds a drum machine of Strudel's tidal-drum-machines bank does not have (checked against the bank's index):
 // the row plays the nearest sound the kit has instead of nothing
-const KIT_MISSING = { RolandTR808: ['rd'], RolandTR707: ['rd'], RolandTR606: ['cp', 'rd', 'rim', 'mt'], AkaiLinn: ['rim'], LinnLM1: ['rd', 'cr', 'mt'], AlesisHR16: ['rd', 'cr', 'mt'], YamahaRX5: ['cp', 'rd', 'cr', 'mt', 'ht'] };
+export const KIT_MISSING = { RolandTR808: ['rd'], RolandTR707: ['rd'], RolandTR606: ['cp', 'rd', 'rim', 'mt'], AkaiLinn: ['rim'], LinnLM1: ['rd', 'cr', 'mt'], AlesisHR16: ['rd', 'cr', 'mt'], YamahaRX5: ['cp', 'rd', 'cr', 'mt', 'ht'], RolandCompurhythm78: ['cp', 'rd', 'cr', 'rim', 'mt', 'ht'], MPC1000: ['rd', 'cr', 'rim', 'mt', 'ht'] };
 const NEAREST = { rd: ['cr', 'oh', 'hh'], cr: ['oh', 'hh'], cp: ['sd'], rim: ['sd'], mt: ['lt', 'ht'], ht: ['mt', 'lt'] };
 export function kitRow(kit, row) {
   const miss = KIT_MISSING[kit] || [];
   if (!miss.includes(row)) return row;
   return (NEAREST[row] || []).find(r => !miss.includes(r)) || row;
 }
-export const KITS = ['RolandTR909', 'RolandTR808', 'RolandTR707', 'RolandTR606', 'LinnDrum', 'AkaiLinn', 'LinnLM1', 'OberheimDMX', 'EmuSP12', 'AkaiMPC60', 'AkaiXR10', 'AlesisHR16', 'YamahaRX5'];
+// (varied-openings D10: the kits the style recipes list are appended at the end, so the indexes before stay)
+export const KITS = ['RolandTR909', 'RolandTR808', 'RolandTR707', 'RolandTR606', 'LinnDrum', 'AkaiLinn', 'LinnLM1', 'OberheimDMX', 'EmuSP12', 'AkaiMPC60', 'AkaiXR10', 'AlesisHR16', 'YamahaRX5',
+  'RolandR8', 'KorgM1', 'RolandMC303', 'RolandTR505', 'RolandTR626', 'BossDR110', 'AlesisSR16', 'YamahaRY30', 'RolandCompurhythm78', 'MPC1000'];
 // [id campione, etichetta, moltiplicatore volume, strumento nel visual Palco]
 export const ROWS = [['bd', 'Kick', 1, 'kick'], ['cp', 'Clap', .8, 'snare'], ['sd', 'Snare', .75, 'snare'], ['hh', 'Hat', .5, 'hats'], ['oh', 'Open', .45, 'hats'], ['rd', 'Ride', .35, 'hats']];
 const E16 = '................';

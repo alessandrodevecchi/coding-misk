@@ -40,7 +40,8 @@
     "kits": [
       "RolandR8",
       "AkaiXR10",
-      "LinnDrum"
+      "LinnDrum",
+      "AlesisSR16"
     ],
     "grooves": [
       "train",
@@ -74,7 +75,8 @@
     "waves": [
       "gm_harmonica",
       "gm_fiddle",
-      "gm_banjo"
+      "gm_banjo",
+      "gm_electric_guitar_clean"
     ],
     "modes": [
       "mixolydian",
@@ -91,7 +93,8 @@
     "waves": [
       "gm_acoustic_guitar_steel",
       "gm_banjo",
-      "gm_drawbar_organ"
+      "gm_drawbar_organ",
+      "gm_piano"
     ]
   },
   "guitar": {
@@ -164,5 +167,9 @@
       "Frontera"
     ]
   },
-  "spoken": { "weight": 0 }
+  "spoken": { "weight": 0 },
+  "growthShapes": {
+    "openings": { "chord": 3, "bass": 1, "top": 1, "melodic": 1, "slow": 1 },
+    "kicks": { "two": 2, "one": 2 }
+  }
 }

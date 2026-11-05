@@ -1008,7 +1008,8 @@ const CHECKS = {
   },
   'narrator marks (narrator-ghost-row D2): the narrator lines of spokenSchedule (explaining and poetic), the narrator off counted as on, none on a voice-track bar, none from a muted narrator track, the same marks once the Narrator track is added; luci-rosse in Live coder: 19 lines heard, 17 in the growth'() {
     const pairs = l => JSON.stringify(l.map(x => [x.at, x.text]));
-    const C = resolveProfile('switch'), grown = crescendoSong({ ...read('songs/luci-rosse.json'), kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles: recipes }) });
+    // (varied-openings: the full-kick opening luci-rosse drew before, so the counts stay)
+    const C = resolveProfile('switch', { opening: 'full-kick' }), grown = crescendoSong({ ...read('songs/luci-rosse.json'), kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles: recipes }) });
     const B = liveBuildOf(grown, C), G = grown.crescendo.growth, m = narratorMarks(B, C, 'it', ANY);
     assert(m.length === 19 && m.filter(x => x.at < G).length === 17, `luci-rosse: ${m.length} lines, ${m.filter(x => x.at < G).length} in the ${G} bars of the growth`);
     assert(m.every(x => x.track === null), 'a song without a narrator track: marks with no track');
@@ -1059,7 +1060,8 @@ const CHECKS = {
       }
       return { sch, cs };
     };
-    const explain = resolveProfile('switch'), A = liveBuildOf(grownOf('luci-rosse', explain), explain), a = same(A, explain, 'it', ANY);
+    // (varied-openings: the full-kick opening luci-rosse drew before, so the counts and bars stay)
+    const explain = resolveProfile('switch', { opening: 'full-kick' }), A = liveBuildOf(grownOf('luci-rosse', explain), explain), a = same(A, explain, 'it', ANY);
     // explain: every step line heard is the caption and never a tag
     assert(a.cs.filter(x => x.kind === 'narrator').length === 19, `luci-rosse explain: ${a.cs.filter(x => x.kind === 'narrator').length} captions`);
     for (const x of a.cs.filter(y => y.kind === 'narrator')) assert(!captionFrame(a.cs, x.at + 0.01, S).tag, `explain, bar ${x.at + 1}: a tag under "${x.text}"`);

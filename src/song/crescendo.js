@@ -9,7 +9,7 @@ import { PROGS, DEFAULT, presetIdea, meterSteps } from '../music.js';
 import { ideaLadder, expandIdea, ideaRows } from './ideas.js';
 import { coderPath } from './coder.js';
 import { stateAt, applyStep } from './build.js';
-import { resolveShape, shapeFacts, canPlay, openingLine, SHAPES_VERSION, SHAPES_SEED, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES, DETAIL_VARIANTS } from './shapes.js';
+import { resolveShape, resolveLead, resolveKick, kickStartHits, KICK_LED, shapeFacts, canPlay, openingLine, SHAPES_VERSION, SHAPES_SEED, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES, DETAIL_VARIANTS } from './shapes.js';
 import { placeSpoken } from './spoken.js';
 import { liveCode } from '../live/live-code.js';
 import { resolveProfile } from '../live/profiles.js';
@@ -24,7 +24,8 @@ import { KEYS } from '../music.js';
 
 // raised when an intended change to the rules changes the steps of a checked song (tools/check-crescendo.mjs)
 // 2 (idea-model): the Live coder's natural growth grows ideas (presets included) through simpler forms of themselves
-export const CRESCENDO_VERSION = 2;
+// 3 (varied-openings): the first track drawn from the style's opening weights, the kick start
+export const CRESCENDO_VERSION = 3;
 // the random stream keeps the name of version 1: a version raised for the Live coder rules does not move the steps of
 // Classic and Crescendo
 const STREAM = 'crescendo-1';
@@ -47,6 +48,10 @@ const HIDES = {
 const r3 = x => Math.round(x * 1000) / 1000;
 
 // ---------- growing patterns ----------
+// with a medium or fast pace the drums grow one row (one line of code) at a time: the kick first (its core, then
+// whole), then the snare or clap, then the hats and the rest; the written rows last
+const ROW_ORDER = ['bd', 'sd', 'cp', 'rim', 'hh', 'oh', 'rd', 'cr', 'lt', 'mt', 'ht', 'cb', 'sh', 'perc', 'misc'];
+const rowRank = r => { const i = ROW_ORDER.indexOf(r); return i < 0 ? ROW_ORDER.length : i; };
 // strength of a 16th position: 4 first beat, 3 other beats, 2 off-beat 8ths, 1 off 16ths
 const strength = i => (i % 16 === 0 ? 4 : i % 4 === 0 ? 3 : i % 2 === 0 ? 2 : 1);
 const ROW_CLASS = { bd: 2, cp: 1, sd: 1, hh: 0, oh: 0, rd: 0 };
@@ -59,13 +64,23 @@ function thinHits(hits, core, n) {
   return Array.from({ length: n }, (_, k) => new Set([...core, ...rest.slice(Math.round(rest.length * (k + 1) / n))]));
 }
 // growth-shapes: o.core is the core the opening asks for ('kick': every kick hit, 'broken': the kick hits off the
-// beat), o.kickFirst keeps the kick hits until last, so the kick row is whole a few levels before the rest
+// beat, varied-openings: { hits } a kick start's hits on a bar of 16 steps, 'top': the busiest row other than the
+// kick), o.kickFirst keeps the kick hits until last, so the kick row is whole a few levels before the rest
+// (a kick start's hits on a row of len steps; a hit between two steps is left out)
+const startSteps = (hits, len) => hits.map(h => (h * len) / 16).filter(i => Number.isInteger(i) && i < len);
+// whether a kick start plays hits the written kick does not (its first form is then the start alone)
+export const startOutside = (core, bd) => !!(core && core.hits && bd && startSteps(core.hits, Math.min(16, String(bd).length)).some(i => String(bd)[i] !== 'x'));
+const startRow = (core, len) => { const at = startSteps(core.hits, Math.min(16, len)); return [...Array(len)].map((_, i) => (at.includes(i % 16) ? 'x' : '.')).join(''); };
+// the row the top opening starts from: the busiest row other than the kick (at least four hits)
+const topRow = rows => { const r = Object.entries(rows || {}).filter(([row, v]) => row !== 'bd' && (String(v).match(/x/g) || []).length >= 4).sort((a, b) => (b[1].match(/x/g) || []).length - (a[1].match(/x/g) || []).length || rowRank(a[0]) - rowRank(b[0]))[0]; return r ? r[0] : null; };
 function thinRows(rows, n, o = {}) {
   const hits = [];
   Object.entries(rows || {}).forEach(([row, steps], r) => [...steps].forEach((c, i) => { if (c === 'x') hits.push({ row, i, w: strength(i) * 3 + (ROW_CLASS[row] ?? 1) + (o.kickFirst && row === 'bd' ? 100 : 0), order: spread(i) * 8 + r }); }));
   if (!hits.length) return Array(n).fill(rows);
   // the simplest variant keeps the kick on the first beat (or the strongest hit when there is no kick)
-  let core = o.core === 'kick' ? hits.filter(h => h.row === 'bd') : o.core === 'broken' ? hits.filter(h => h.row === 'bd' && h.i % 4 !== 0) : [];
+  const top = o.core === 'top' ? topRow(rows) : null, len = String((rows || {}).bd || '').length || 16;
+  let core = o.core === 'kick' ? hits.filter(h => h.row === 'bd') : o.core === 'broken' ? hits.filter(h => h.row === 'bd' && h.i % 4 !== 0) : top ? hits.filter(h => h.row === top)
+    : o.core && o.core.hits ? hits.filter(h => h.row === 'bd' && startSteps(o.core.hits, Math.min(16, len)).includes(h.i % 16) && h.i < 16) : [];
   if (!core.length) core = hits.filter(h => h.row === 'bd' && h.i % 16 === 0);
   if (!core.length) { const top = Math.max(...hits.map(h => h.w)); core = [hits.find(h => h.w === top)]; }
   return thinHits(hits, core, n).map(keep => Object.fromEntries(Object.entries(rows).map(([row, steps]) =>
@@ -125,7 +140,9 @@ export function beatForms(beat, o = {}) {
   const grid = beat.grid ?? 16, onBeat = grid >= 12 ? 4 : grid >= 6 ? 2 : 1, str = k => (k % grid === 0 ? 4 : k % onBeat === 0 ? 3 : k % (onBeat / 2) === 0 ? 2 : 1);
   const all = Object.entries(beat).filter(([r]) => r !== 'grid').flatMap(([row, list], r) => String(list).split(',').map(x => x.trim()).filter(Boolean).map(x => ({ row, k: +x, r })));
   if (!all.length) return [];
-  let core = o.core === 'kick' ? all.filter(h => h.row === 'bd') : o.core === 'broken' ? all.filter(h => h.row === 'bd' && h.k % onBeat !== 0) : [];
+  const busiest = o.core === 'top' ? Object.entries(beat).filter(([r, l]) => r !== 'grid' && r !== 'bd' && String(l).split(',').filter(x => x.trim()).length >= 4).sort((a, b) => String(b[1]).split(',').length - String(a[1]).split(',').length || rowRank(a[0]) - rowRank(b[0]))[0] : null;
+  let core = o.core === 'kick' ? all.filter(h => h.row === 'bd') : o.core === 'broken' ? all.filter(h => h.row === 'bd' && h.k % onBeat !== 0) : busiest ? all.filter(h => h.row === busiest[0])
+    : o.core && o.core.hits ? all.filter(h => h.row === 'bd' && h.k < grid && o.core.hits.includes((h.k * 16) / grid)) : [];
   if (!core.length) core = [all.find(h => h.row === 'bd') || all[0]];
   const rest = all.filter(h => !core.includes(h)).sort((a, b) => (o.kickFirst ? (b.row === 'bd') - (a.row === 'bd') : 0) || str(b.k) - str(a.k) || a.r - b.r || a.k - b.k);
   const form = hits => { const out = { grid }; for (const [row] of Object.entries(beat).filter(([r]) => r !== 'grid')) { const ks = hits.filter(h => h.row === row).map(h => h.k).sort((a, b) => a - b); if (ks.length) out[row] = ks.join(','); } return out; };
@@ -134,18 +151,24 @@ export function beatForms(beat, o = {}) {
   for (let m = 0; m < rest.length; m++) forms.push(form([...core, ...rest.slice(0, m)]));
   return forms.reverse();
 }
-// with a medium or fast pace the drums grow one row (one line of code) at a time: the kick first (its core, then
-// whole), then the snare or clap, then the hats and the rest; the written rows last
-const ROW_ORDER = ['bd', 'sd', 'cp', 'rim', 'hh', 'oh', 'rd', 'cr', 'lt', 'mt', 'ht', 'cb', 'sh', 'perc', 'misc'];
-const rowRank = r => { const i = ROW_ORDER.indexOf(r); return i < 0 ? ROW_ORDER.length : i; };
 export function rowForms(rows, o = {}) {
   const live = Object.entries(rows || {}).filter(([, v]) => /x/.test(v)).sort(([a], [b]) => rowRank(a) - rowRank(b));
+  // varied-openings: the top lead starts from the busiest row other than the kick, then the kick, then the others
+  if (o.core === 'top') {
+    const top = topRow(rows);
+    if (!top || live.length < 2) return [];
+    const order = [live.find(([r]) => r === top), ...live.filter(([r]) => r !== top)];
+    return order.slice(1).map((_, k) => Object.fromEntries(order.slice(0, k + 1))).reverse();
+  }
   if (live.length < 2 || live[0][0] !== 'bd') return [];
   const bd = live[0][1], hits = [...bd].map((c, i) => (c === 'x' ? i : -1)).filter(i => i >= 0);
-  const coreHits = o.core === 'kick' ? hits : o.core === 'broken' ? hits.filter(i => i % 4 !== 0) : hits.filter(i => i % 16 === 0).slice(0, 1);
+  const start = o.core && o.core.hits ? startSteps(o.core.hits, Math.min(16, bd.length)) : null;
+  const coreHits = o.core === 'kick' ? hits : o.core === 'broken' ? hits.filter(i => i % 4 !== 0) : start ? hits.filter(i => start.includes(i)) : hits.filter(i => i % 16 === 0).slice(0, 1);
   const row = keep => [...bd].map((c, i) => (keep.includes(i) ? 'x' : '.')).join('');
   const forms = [];
-  if (coreHits.length && coreHits.length < hits.length) forms.push({ bd: row(coreHits) });
+  // a kick start the written kick does not play (varied-openings D3): the start alone first
+  if (start && startOutside(o.core, bd)) forms.push({ bd: startRow(o.core, bd.length) });
+  else if (coreHits.length && coreHits.length < hits.length) forms.push({ bd: row(coreHits) });
   // a straight kick that opens broken: a tresillo or a two-step kick first
   else if (o.core === 'broken' && !coreHits.length) forms.push({ bd: (BROKEN[o.broken] || BROKEN.tresillo).slice(0, bd.length).padEnd(bd.length, '.') });
   for (let k = 1; k < live.length; k++) forms.push(Object.fromEntries(live.slice(0, k)));
@@ -161,12 +184,16 @@ function drumVariants(pat, n, o, ctx) {
       const steps = [...(BROKEN[o.broken] || BROKEN.tresillo)].map((c, i) => (c === 'x' ? i * (grid >= 12 ? 1 : grid / 16) : -1)).filter(i => i >= 0 && Number.isInteger(i) && i < grid);
       out[n - 1] = { ...pat, idea: { ...pat.idea, beat: { grid, bd: steps.join(',') } } };
     }
+    if (o.core && o.core.hits && n && beat.bd !== undefined && o.core.hits.some(h => !String(beat.bd).split(',').map(x => (+x * 16) / grid).includes(h))) {
+      out[n - 1] = { ...pat, idea: { ...pat.idea, beat: { grid, bd: o.core.hits.map(h => (h * grid) / 16).filter(k => Number.isInteger(k) && k < grid).join(',') } } };
+    }
     return out;
   }
   const rows = pat.idea && !pat.rows ? ideaRows(pat.idea, ctx.N || 16) : pat.rows, base = { ...pat };
   if (pat.idea && !pat.rows) delete base.idea;
   const out = thinRows(rows, n, o).map(r => ({ ...base, rows: r }));
   if (o.core === 'broken' && n && !offBeatKick(rows) && rows && rows.bd) out[n - 1] = { ...base, rows: { bd: (BROKEN[o.broken] || BROKEN.tresillo).slice(0, String(rows.bd).length).padEnd(String(rows.bd).length, '.') } };
+  if (n && rows && rows.bd && startOutside(o.core, rows.bd)) out[n - 1] = { ...base, rows: { bd: startRow(o.core, String(rows.bd).length) } };
   return out;
 }
 export function patternVariants(type, pat, n, rules = {}, ctx = {}) {
@@ -180,6 +207,13 @@ export function patternVariants(type, pat, n, rules = {}, ctx = {}) {
     }
   }
   if (type === 'arp' && rules.natural && pat.notes && /\d/.test(pat.notes)) return arpVariants(pat.notes, n).map(notes => ({ ...pat, notes }));
+  // varied-openings: the Crescendo drums that lead start from the kick start (or without the kick: the top lead)
+  if (type === 'drums' && rules.start) {
+    const { idea, ...rest } = pat, rows = pat.idea && !pat.rows ? ideaRows(idea, ctx.N || 16) : pat.rows, base = pat.idea && !pat.rows ? rest : pat;
+    const out = thinRows(rows, n, { core: rules.start }).map(r => ({ ...base, rows: r }));
+    if (n && rows && rows.bd && startOutside(rules.start, rows.bd)) out[n - 1] = { ...base, rows: { bd: startRow(rules.start, String(rows.bd).length) } };
+    return out;
+  }
   if (type === 'drums' && pat.idea && !pat.rows) { const { idea, ...rest } = pat; return thinRows(ideaRows(idea, ctx.N || 16), n).map(rows => ({ ...rest, rows })); }
   if (type === 'drums') return thinRows(pat.rows, n).map(rows => ({ ...pat, rows }));
   if (pat.notes) return thinNotes(pat.notes, n).map(notes => ({ ...pat, notes }));
@@ -389,17 +423,30 @@ const SKIN = 'skin';
 const kickTrack = t => t.type === 'drums' && Object.values(t.patterns || {}).some(p => (p.rows ? /x/.test(String(p.rows.bd || '')) : p.idea ? !!(p.idea.beat && p.idea.beat.bd) : true));
 // the order of entries (D4): by type as today, or as written (where each track's first clip starts); the opening names
 // the track that comes first (the kick, a melodic track, the pad)
-function orderByShape(dest, shape, srng, rank, plays) {
+// lead: the lead opening that names the first track when the shape's opening names none (varied-openings D2)
+function orderByShape(dest, shape, srng, rank, plays, lead) {
   const first = t => Math.min(...t.clips.map(c => c.start));
   if (shape.development === 'as-written') dest.sort((a, b) => first(a) - first(b) || rank(a) - rank(b) || plays.indexOf(a) - plays.indexOf(b));
   else for (let i = 1; i < dest.length - 1; i++) if (srng.chance(0.3)) [dest[i], dest[i + 1]] = [dest[i + 1], dest[i]];
-  const o = shape.opening;
-  // a track that holds only the kick comes before a beat track
-  const kickOnly = t => kickTrack(t) && Object.values(t.patterns || {}).every(p => !p.rows || Object.keys(p.rows).every(r => r === 'bd' || !/x/.test(p.rows[r])));
-  const front = ['slow', 'full-kick', 'filtered', 'broken'].includes(o) ? dest.find(kickOnly) || dest.find(kickTrack) || dest.find(t => t.type === 'drums')
+  toFront(dest, lead || shape.opening);
+}
+// a track that holds only the kick comes before a beat track
+const kickOnly = t => kickTrack(t) && Object.values(t.patterns || {}).every(p => !p.rows || Object.keys(p.rows).every(r => r === 'bd' || !/x/.test(p.rows[r])));
+// a part that plays chords (varied-openings D1): a guitar, a pad with a rhythmic preset or a keys sound
+const HELD_PADS = ['pad', 'ring'], KEYS_WAVE = /piano|organ|clav|harpsi|guitar|vibra|marimba/;
+const chordy = t => t.type === 'guitar' || (t.type === 'pad' && (Object.values(t.patterns || {}).some(p => p.preset && !HELD_PADS.includes(p.preset)) || KEYS_WAVE.test(String((t.settings || {}).wave || ''))));
+// the drums the top opening starts with: a beat track without the kick, else drums with a busy row other than the kick
+const topRows = t => Object.values(t.patterns || {}).some(p => Object.entries(p.rows || (p.idea && p.idea.beat ? ideaRows(p.idea, 16) : {})).some(([r, v]) => r !== 'bd' && (String(v).match(/x/g) || []).length >= 4));
+// the track an opening names, moved to the front of the destination
+function toFront(dest, o) {
+  const front = KICK_LED.includes(o) ? dest.find(kickOnly) || dest.find(kickTrack) || dest.find(t => t.type === 'drums')
     : o === 'melodic' ? dest.find(t => ['arp', 'hook', 'guitar'].includes(t.type))
-      : o === 'pad' ? dest.find(t => t.type === 'pad') || dest.find(t => t.type === 'texture') : null;
+      : o === 'pad' ? dest.find(t => t.type === 'pad') || dest.find(t => t.type === 'texture')
+        : o === 'bass' ? dest.find(t => t.type === 'bass')
+          : o === 'chord' ? dest.find(chordy) || dest.find(t => t.type === 'pad')
+            : o === 'top' ? dest.find(t => t.type === 'drums' && !kickTrack(t) && topRows(t)) || dest.find(t => t.type === 'drums' && topRows(t)) : null;
   if (front) { dest.splice(dest.indexOf(front), 1); dest.unshift(front); }
+  return front || null;
 }
 // draws of the shape that the plans need: the broken kick (tresillo or two-step), the track whose cutoff slides
 function shapeExtras(dest, shape, srng) {
@@ -415,9 +462,10 @@ function openingSetup(dest, plans, shape) {
 }
 // what the coder's path takes from the shape: the drums whole early with a medium or fast pace, masks, a passing
 // melody, the moves
-function coderShape(dest, shape) {
+// (lead: the lead opening of the first track, varied-openings D2)
+function coderShape(dest, shape, lead) {
   return {
-    opening: shape.opening, development: shape.development, moves: true,
+    opening: shape.opening, lead: lead || shape.opening, development: shape.development, moves: true,
     kickEarly: shape.pace !== 'slow',
     early: shape.pace === 'fast' ? 'all' : null,
     masks: shape.development === 'masks',
@@ -822,10 +870,18 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   const n = normalizeSong(song), W = n.total, secs = n.sections;
   // a song shorter than 24 bars has no room for slow growth: it grows with the Crescendo rules
   // (the on-air limits stay, radio-profiles: the bars the growth takes, no ending)
-  if (rules.natural && W < 24) rules = Object.fromEntries(['budget', 'span', 'noEnding'].filter(k => k in rules).map(k => [k, rules[k]]));
+  if (rules.natural && W < 24) rules = Object.fromEntries(['budget', 'span', 'noEnding', 'styles'].filter(k => k in rules).map(k => [k, rules[k]]));
   // growth shape (growth-shapes): only the natural growth like a live coder follows one; Classic and Crescendo never
   const shape = rules.coder && rules.shape ? resolveShape(song, { user: rules.shape, styles: rules.styles || {}, seed, weights: rules.shapeWeights, deny: rules.deny }) : null;
   const srng = shape ? stream(String(seed ?? song.id ?? 'song'), `shape-${SHAPES_SEED}/growth`) : null;
+  // varied-openings D2: the lead track of a growth without a shape (Crescendo; not the gradual growth), and of the
+  // openings that name no track (the as-written development keeps the written order); D3: the kick start when the kick leads slow or in Crescendo
+  const styles = rules.styles || {}, facts = shape || !rules.natural ? shapeFacts(song, styles) : null;
+  const lead = !shape && !rules.natural ? resolveLead(song, { user: rules.lead, styles, seed })
+    : shape && ['typed', 'muted-base', 'mid-set', 'voice'].includes(shape.opening) && shape.development !== 'as-written' ? resolveLead(song, { styles, seed, weights: rules.shapeWeights, deny: rules.deny }) : null;
+  const leadOpening = lead ? lead.opening : shape ? shape.opening : null;
+  const kickStart = (!shape && KICK_LED.includes(leadOpening)) || leadOpening === 'slow' ? resolveKick(song, facts, { styles, seed }) : null;
+  const startCore = kickStart ? { hits: kickStartHits(kickStart, facts.kickHits) } : null;
   const over = (c, s) => c.start < s.start + s.bars && c.start + c.bars > s.start;
   const plays = n.tracks.filter(t => !t.mute && t.type !== 'voice' && t.type !== 'spoken' && t.clips.length);
   if (!plays.length || !W) return { ...clone(song), build: [] };
@@ -844,8 +900,8 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   const rank = t => { const i = ORDER.indexOf(t.type); return i < 0 ? ORDER.length : i; };
   dest.sort((a, b) => rank(a) - rank(b) || plays.indexOf(a) - plays.indexOf(b));
   // a little variety in who comes in after the anchor
-  if (!shape) { for (let i = 1; i < dest.length - 1; i++) if (rng.chance(0.3)) [dest[i], dest[i + 1]] = [dest[i + 1], dest[i]]; }
-  else orderByShape(dest, shape, srng, rank, plays);
+  if (!shape) { for (let i = 1; i < dest.length - 1; i++) if (rng.chance(0.3)) [dest[i], dest[i + 1]] = [dest[i + 1], dest[i]]; if (lead) toFront(dest, lead.opening); }
+  else orderByShape(dest, shape, srng, rank, plays, lead && lead.opening);
   if (voiceOpen) dest.unshift(voiceOpen.track);
   const meta = !!shape && shape.development === 'metamorphosis';
   const clipR = t => (voiceOpen && t === voiceOpen.track ? voiceOpen.clip : t.clips.find(c => over(c, R)));
@@ -861,7 +917,9 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   // pace, the filtered opening, one value that slides) and the shape the coder's path follows
   const sx = shape ? shapeExtras(dest, shape, srng) : null;
   // (a fast pace: the anchor turns its knobs in more, smaller moves, so the first minute is made of small edits)
-  const trackRules = (t, i) => (!shape ? rules : { ...rules, drum: t.type === 'drums' ? { core: i === 0 ? CORE[shape.opening] || 'one' : 'one', kickFirst: shape.pace !== 'slow', broken: sx.broken } : undefined, filtered: i === 0 && shape.opening === 'filtered' && t.type === 'drums' && !clipKeys(t).has('cutoff'), slide: t.id === sx.slide, small: i === 0 && shape.pace === 'fast', ref: (clipR(t) || {}).pattern });
+  // (varied-openings: the drums that lead start from the kick start, or without the kick for the top lead)
+  const leadCore = (t, i) => (i === (voiceOpen ? 1 : 0) && t.type === 'drums' ? (leadOpening === 'top' ? 'top' : startCore) : null);
+  const trackRules = (t, i) => (!shape ? (leadCore(t, i) && (leadCore(t, i) === 'top' || kickStart !== 'one') ? { ...rules, start: leadCore(t, i) } : rules) : { ...rules, drum: t.type === 'drums' ? { core: i === 0 ? CORE[leadOpening] || leadCore(t, i) || 'one' : 'one', kickFirst: shape.pace !== 'slow', broken: sx.broken } : undefined, filtered: i === 0 && shape.opening === 'filtered' && t.type === 'drums' && !clipKeys(t).has('cutoff'), slide: t.id === sx.slide, small: i === 0 && shape.pace === 'fast', ref: (clipR(t) || {}).pattern });
   const secBar = (meterSteps(R.meter) / 4) * 60 / R.bpm;
   // one try at a level of detail (from `top` down): plans, path, steps and their gaps; a shaped growth whose typing does
   // not fit its budget tries again with less detail (growth-shapes, bursts of edits)
@@ -873,7 +931,7 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
     // like a live coder (live-coder-growth): waypoints and small moves between them
     if (meta) { coder = revealPath(dest, plans); path = coder.path; }
     else if (shape && shape.development === 'second-section') { coder = sectionPath(dest, plans, prng, rules, shape); path = coder.path; }
-    else if (rules.coder) { coder = coderPath(dest, plans, prng.fork('coder'), { detours: rules.detours, chooser: rules.chooser, shape: shape ? coderShape(dest, shape) : null }); path = coder.path; }
+    else if (rules.coder) { coder = coderPath(dest, plans, prng.fork('coder'), { detours: rules.detours, chooser: rules.chooser, shape: shape ? coderShape(dest, shape, leadOpening) : null }); path = coder.path; }
     else path = crescendoPath(plans, prng.fork('path'));
     if (meta || path.length * (rules.natural ? 3 : 1.5) + 4 <= cap || d === 0) break;
   }
@@ -1070,6 +1128,8 @@ function growSong(song, { seed, narrated = false, rules = {} } = {}) {
   // the growth shape it followed (growth-shapes), the silent bars of a typed opening, the second skin
   // (the bar of each unit of the growth, for crescendoSong: not saved with the song)
   Object.defineProperty(out.crescendo, 'units', { value: growth.map(u => u.at), enumerable: false });
+  if (lead) out.crescendo.lead = { opening: lead.opening, from: lead.from };
+  if (kickStart) out.crescendo.kick = kickStart;
   if (shape) out.crescendo.shape = { version: SHAPES_VERSION, opening: shape.opening, pace: shape.pace, development: shape.development, from: shape.from, leadIn: gaps[0], ...(skin ? { skin: { bpm: skin.bpm, key: skin.key, style: skin.style, at: skinBar } } : {}), ...(typing ? { relaxed: typing.relaxed } : {}), ...(typing && (typing.waited || rules.extraGaps) ? { waited: typing.waited + Object.values(rules.extraGaps || {}).reduce((a, b) => a + b, 0) } : {}) };
   return out;
 }

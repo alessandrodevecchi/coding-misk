@@ -43,7 +43,9 @@
     "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "euclid"] },
     "kits": [
       "RolandTR909",
-      "OberheimDMX"
+      "OberheimDMX",
+      "RolandTR606",
+      "BossDR110"
     ],
     "grooves": [
       "hard",
@@ -69,7 +71,8 @@
     ],
     "waves": [
       "sawtooth",
-      "square"
+      "square",
+      "gm_synth_bass_2"
     ],
     "settings": {
       "drive": [
@@ -87,7 +90,8 @@
     ],
     "waves": [
       "square",
-      "sawtooth"
+      "sawtooth",
+      "gm_orchestra_hit"
     ],
     "modes": [
       "chromatic",
@@ -188,5 +192,9 @@
     "weight": 0.15,
     "ways": { "opening": 1, "refrain": 1, "chop": 1 },
     "vocab": "dark"
+  },
+  "growthShapes": {
+    "openings": { "broken": 2, "full-kick": 1, "slow": 1, "filtered": 1, "top": 1, "bass": 1, "typed": 1 },
+    "kicks": { "one": 1, "two": 1, "four": 1, "push": 1, "off": 1 }
   }
 }

@@ -47,7 +47,9 @@
     "kits": [
       "AkaiXR10",
       "RolandR8",
-      "AkaiMPC60"
+      "AkaiMPC60",
+      "YamahaRY30",
+      "AlesisSR16"
     ],
     "grooves": [
       "swing"
@@ -79,7 +81,9 @@
     "waves": [
       "gm_vibraphone",
       "gm_flute",
-      "gm_epiano1"
+      "gm_epiano1",
+      "gm_tenor_sax",
+      "gm_muted_trumpet"
     ],
     "modes": [
       "dorian",
@@ -94,7 +98,8 @@
     ],
     "waves": [
       "gm_piano",
-      "gm_epiano1"
+      "gm_epiano1",
+      "gm_electric_guitar_jazz"
     ]
   },
   "voice": {
@@ -160,5 +165,9 @@
     "weight": 0.05,
     "ways": { "opening": 1, "passage": 1 },
     "vocab": "night"
+  },
+  "growthShapes": {
+    "openings": { "top": 3, "bass": 3, "chord": 2, "melodic": 1, "typed": 0.5 },
+    "kicks": { "one": 1, "two": 1 }
   }
 }

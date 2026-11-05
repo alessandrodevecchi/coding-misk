@@ -4,8 +4,8 @@
     "styles": [
       "berlin-techno"
     ],
-    "hash": "9cea74d0",
-    "music": "60245135"
+    "hash": "29c76727",
+    "music": "3bb7e4b8"
   },
   {
     "seed": "aurora",
@@ -15,8 +15,8 @@
       "country"
     ],
     "chaos": 1,
-    "hash": "3a682240",
-    "music": "84910df6"
+    "hash": "d1335c53",
+    "music": "a3d89df5"
   },
   {
     "seed": "kellerlicht",
@@ -27,8 +27,8 @@
     "energy": 0.9,
     "complexity": 0.9,
     "minutes": 20,
-    "hash": "e4185cd2",
-    "music": "47c29c06"
+    "hash": "3d348797",
+    "music": "e60f6e3b"
   },
   {
     "seed": "quiet",
@@ -39,7 +39,7 @@
     "energy": 0.2,
     "complexity": 0.1,
     "minutes": 12,
-    "hash": "d2b6183a",
-    "music": "5613b9b6"
+    "hash": "bbbedff0",
+    "music": "0952a9d2"
   }
 ]

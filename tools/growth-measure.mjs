@@ -25,12 +25,19 @@ export function audible(code) {
   return layers.filter(x => !x.muted && (!solo || x.solo)).map(x => x.text.replace(/\s*\/\/.*$/, '')).join('\n');
 }
 
-// bars of the steps in the first `seconds` that change what is heard (the first sound counts)
+// bars of the steps in the first `seconds` after the first sound that change what is heard (the first sound counts)
+// (varied-openings, owner 2026-11-05: an opening that starts with typing or silence, the typed lead-in, counts its
+// minute from its first audible step; every other opening sounds at bar 0, so its window is unchanged)
 export function firstMinute(c, seconds = 60) {
-  const sb = barSeconds(c), bars = [...new Set(buildSteps(c).map(x => x.at))].filter(b => b * sb < seconds);
-  let prev = '';
+  const sb = barSeconds(c), bars = [0, ...new Set(buildSteps(c).map(x => x.at))].filter((b, i, a) => a.indexOf(b) === i).sort((x, y) => x - y);
+  let prev = '', start = null;
   const out = [];
-  for (const b of bars) { const a = audible(compileSong(stateAt(c, b).song)); if (a !== prev && a.trim()) out.push(b); prev = a; }
+  for (const b of bars) {
+    if (start !== null && (b - start) * sb >= seconds) break;
+    const a = audible(compileSong(stateAt(c, b).song));
+    if (a !== prev && a.trim()) { if (start === null) start = b; out.push(b); }
+    prev = a;
+  }
   return out;
 }
 
