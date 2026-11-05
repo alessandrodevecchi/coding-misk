@@ -194,6 +194,8 @@ The style's ranges are widened around their middle (1.6 times, plus the chaos), 
 
 The draws use their own random stream (`voice`), so they never change the music of a seed. The session report and the recap show the speaker and the character of each song.
 
+The character is drawn only among those `src/voices/combos.json` allows for the speaker heard (voice-style-combos, #82), in every app language: an English-only speaker also follows the list of the Italian default voice. An artist's character weights are filtered the same way. A pick takes one random value whatever the length of the list, so a narrowed file moves only the voice parts, never the music; with nothing allowed the voice has no character. The voice instrument's character follows the same rule, and a narrator style chosen in the radio with no fixed speaker draws the speaker again, on a stream of its own, among those that allow it when the drawn one does not. The shipped file allows every pair, so no draw changes until the owner narrows it.
+
 ### Voice instrument
 
 A style may give its songs a voice instrument (`spoken` in the recipe, `docs/STYLES.md`): a spoken track that is part of the music, apart from the narrator (voice-instrument, #39). Its `weight` is the chance that a song gets one; the way (`passage`, `refrain`, `chop`, `opening`) is drawn by the style's `ways`, the line from its `lines` for that way, else from the vocabulary (`src/song/vocabulary.js`, the style's `vocab` group); the speaker from its `speakers`, never the narrator's; sometimes a voice character on top (more often on a chop). Where it plays:

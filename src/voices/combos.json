@@ -1,0 +1,13 @@
+{
+  "format": 1,
+  "en": {
+    "default": ["clear", "radio", "distant", "robot", "deep", "bright", "cathedral", "echo", "dirty", "slow"],
+    "albert": ["clear", "radio", "distant", "robot", "deep", "bright", "cathedral", "echo", "dirty", "slow"],
+    "fred": ["clear", "radio", "distant", "robot", "deep", "bright", "cathedral", "echo", "dirty", "slow"],
+    "junior": ["clear", "radio", "distant", "robot", "deep", "bright", "cathedral", "echo", "dirty", "slow"],
+    "kathy": ["clear", "radio", "distant", "robot", "deep", "bright", "cathedral", "echo", "dirty", "slow"]
+  },
+  "it": {
+    "default": ["clear", "radio", "distant", "robot", "deep", "bright", "cathedral", "echo", "dirty", "slow"]
+  }
+}

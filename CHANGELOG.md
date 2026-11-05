@@ -7,6 +7,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- `src/voices/combos.json`: the voice styles automatic draws may use per speaker and language; it ships with every pair allowed.
+- Voice style pickers mark a style that is not allowed for the current speaker; it stays selectable.
+- Voices tab test bench line that says whether the chosen speaker and style are allowed.
+- `npm run check:voice-combos`.
 - Narrator style control: automatic, explaining or poetic, for any song.
 - Voices group in Compose and in the radio Custom profile: narrator voice, narrator style and narrated growth.
 - Voice instrument controls for generated songs: phrases per song, different, repeated or mixed lines, ways and how often, with presets.
@@ -36,6 +40,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Generated voices, the voice instrument and the narrator speaker drawn next to a chosen narrator style use only the speaker and style pairs that `src/voices/combos.json` allows.
 - Radio: a style the compilation invents shows in Now playing and in On air, STYLES as the same chip and hint as the Invent die's trial style, with an explicit Keep.
 - "Fully narrated" is now "Narrated growth".
 - The Compose Voices group is always shown; narrator controls that cannot apply are disabled with the reason.

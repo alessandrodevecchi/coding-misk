@@ -5,6 +5,7 @@
 import { VOICE_DEFAULT, VOICE_STYLES, VOICE_STYLE_IDS, VOICE_SOUND_KEYS, styleOf } from '../song/format.js';
 import { SPEAKERS, speaks, speakerId } from '../song/build.js';
 import { getLang } from '../i18n.js';
+import { isAllowed } from '../voices/combos.js';
 
 export const VOICES = ['narrator', 'spoken'];
 // [key, label, min, max, step, format]: format "pct" shows 50%, "num" the number, "cut" the filter on a log scale
@@ -24,6 +25,30 @@ export const DEFAULT_VOICE_NAME = { en: 'Samantha', it: 'Alice' };
 // a speaker's name in a picker; in a language it does not speak, with the note that the default voice speaks for it
 // (real-voices: every speaker stays selectable in every language)
 export const speakerLabel = (s, lang, t) => (!s || speaks(lang, s) ? speakerName(s) : t('speakerOtherLang', { name: speakerName(s), voice: DEFAULT_VOICE_NAME[lang] || '' }));
+
+// A style that is not in the allowed set of the voice (voice-style-combos D6): the option stays selectable, with a
+// trailing mark and a tip. any: the speaker is drawn (no speaker set on the radio or the voice instrument), so only a
+// style no voice allows is marked. The voice is the one heard in the app's language.
+export const COMBO_MARK = ' ·';
+export function styleMarked(style, { speaker = '', any = false, lang = getLang() } = {}) {
+  if (!VOICE_STYLE_IDS.includes(style)) return false;
+  return any ? !['', ...SPEAKERS].some(s => isAllowed(s, style, lang)) : !isAllowed(speakerId(speaker), style, lang);
+}
+// an option of a style picker: its label, the mark and the tip when the style is not allowed
+export function styleOptionHtml(s, { selected = false, disabled = false, t, esc, speaker = '', any = false, lang = getLang() }) {
+  const label = t(`voiceStyle:${s}`), off = styleMarked(s, { speaker, any, lang });
+  return `<option value="${s}" data-label="${esc(label)}"${off ? ` title="${esc(t('comboNotAllowed'))}"` : ''}${selected ? ' selected' : ''}${disabled ? ' disabled' : ''}>${esc(label + (off ? COMBO_MARK : ''))}</option>`;
+}
+// the marks of a style picker brought up to date (the speaker changed); the value stays
+export function markStyleOptions(sel, { t, speaker = '', any = false, lang = getLang() }) {
+  if (!sel) return;
+  for (const o of sel.options) {
+    if (!o.dataset.label) continue;
+    const off = styleMarked(o.value, { speaker, any, lang }), text = o.dataset.label + (off ? COMBO_MARK : '');
+    if (o.textContent !== text) o.textContent = text;
+    if (off) o.title = t('comboNotAllowed'); else o.removeAttribute('title');
+  }
+}
 
 // The radio sound option of a voice ({ style: 'auto' | <style> | 'custom', settings?, speaker? }), cleaned: unknown
 // values read as "auto" (each song draws its voice, as before)
@@ -68,9 +93,9 @@ export function voiceSoundHtml({ voice, settings, t, esc, radio = null, off = ''
   const v = { ...VOICE_DEFAULT, ...(settings || {}) }, dis = off ? ' disabled' : '', tip = off ? ` title="${esc(off)}"` : '';
   const style = radio ? cleanSound(radio).style : styleOf(v);
   const styles = [...(radio ? ['auto'] : []), ...VOICE_STYLE_IDS, 'custom'];
-  const styleSel = `<label class="ctrl vs-style"${tip}><span class="lbl">${esc(t('voiceStyleLbl'))}</span><select data-vsound-style="${voice}" data-no-knob title="${esc(off || t('voiceStyleTip'))}"${dis}>${styles.map(s => `<option value="${s}"${s === style ? ' selected' : ''}${s === 'custom' ? ' disabled' : ''}>${esc(t(`voiceStyle:${s}`))}</option>`).join('')}</select></label>`;
   // (a removed speaker in a saved song shows as the default option, real-voices D3)
-  const sp = radio ? cleanSound(radio).speaker || '' : speakerId(v.speaker);
+  const sp = radio ? cleanSound(radio).speaker || '' : speakerId(v.speaker), any = !sp && (!!radio || voice === 'spoken');
+  const styleSel = `<label class="ctrl vs-style"${tip}><span class="lbl">${esc(t('voiceStyleLbl'))}</span><select data-vsound-style="${voice}" data-no-knob title="${esc(off || t('voiceStyleTip'))}"${dis}>${styles.map(s => styleOptionHtml(s, { selected: s === style, disabled: s === 'custom', t, esc, speaker: sp, any, lang })).join('')}</select></label>`;
   const first = radio ? t('speakerStyle') : voice === 'narrator' ? t('speakerDefault') : t('speakerDrawn');
   const spkSel = `<label class="ctrl vs-speaker"${tip}><span class="lbl">${esc(t('speaker'))}</span><select data-vsound="${voice}:speaker" data-no-knob title="${esc(off || t('speaker'))}"${dis}><option value="">${esc(first)}</option>${SPEAKERS.map(k => `<option value="${k}"${k === sp ? ' selected' : ''}>${esc(speakerLabel(k, lang, t))}</option>`).join('')}</select></label>`;
   const ranges = SOUND_CONTROLS.map(([k, label, min, max, step]) => {
@@ -95,6 +120,8 @@ export function syncVoiceSound(box, { voice, settings, t, radio = null, off = ''
   if (sp && sp !== active) sp.value = radio ? cleanSound(radio).speaker || '' : v.speaker || '';
   const st = box.querySelector(`[data-vsound-style="${voice}"]`);
   if (st && st !== active) st.value = radio ? cleanSound(radio).style : styleOf(v);
+  const spk = radio ? cleanSound(radio).speaker || '' : speakerId(v.speaker);
+  markStyleOptions(st, { t, speaker: spk, any: !spk && (!!radio || voice === 'spoken') });
   const sum = box.querySelector(`[data-vsound-sum="${voice}"]`);
   if (sum) sum.textContent = soundSummary(v, { t, radio, voice });
 }
