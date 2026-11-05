@@ -481,6 +481,13 @@ function capsOf(sg) {
 }
 const NO_CAPTIONS = Object.freeze({ rows: [], tag: '', history: [] });
 let lastCapHtml = '', lastCapFit = '';
+// the stage's size for the captions' fit key, kept by a ResizeObserver (#82: read every frame, it forced a layout right
+// after a live build step changed the editor)
+let capStage = null;
+{
+  const wrap = document.getElementById('say') && document.getElementById('say').parentElement;
+  if (wrap && typeof ResizeObserver === 'function') new ResizeObserver(() => { capStage = `${wrap.clientWidth}x${wrap.clientHeight}`; }).observe(wrap);
+}
 // the caption lane's lines fitted in the room it has (the free side of Code over, the stage, a phone): shrunk, then on
 // two or three lines, cut with … only at the smallest size (fitCaption, the same rule as the videos). The room mirrors
 // the CSS: .say's max-width and padding, the lane at the bottom 3% under a whole-width code
@@ -874,10 +881,18 @@ function markMuted() {
 }
 // code-widgets D4, D5: the hidden parameter groups of the widgets, from the settings, the code theme's widget colours
 // (code-themes D7) and the panel
+// (#82: the panel's width kept by a ResizeObserver: read on each evaluation, right after a live build step changed the
+// editor, it forced a layout)
+let edhostW = null;
+{
+  const host = $('#edhost');
+  if (host && typeof ResizeObserver === 'function') new ResizeObserver(() => { edhostW = host.clientWidth; }).observe(host);
+}
 function widgetGroups() {
   const S = cwSettings(), W = codeThemes.current.roles.widget;
   const host = $('#edhost');
-  return widgetOptions(S, { fg: W.ink, accent: W.a1, accent2: W.a2, muted: W.muted }, host ? host.clientWidth - 72 : 500);
+  if (edhostW === null && host) edhostW = host.clientWidth;
+  return widgetOptions(S, { fg: W.ink, accent: W.a1, accent2: W.a2, muted: W.muted }, host ? edhostW - 72 : 500);
 }
 // code-widgets D9, D10: at a section boundary without a step the widgets move (a song as written, Classic's past
 // sections): the code of the boundary and one evaluation, as a step does. A typing in progress keeps its code: the
@@ -997,9 +1012,20 @@ function liveBuild(sg, s, cyc) {
   // (#82: the step's code holds the widgets of its bar, so the section boundaries up to it are done: widgetTick in the
   // same tick must not write an earlier bar's code over the step's)
   cwAt = Math.max(cwAt, next.at);
-  const t0 = performance.now();
-  setCodeRange(codeNow(sg, next.at)); ed.evaluate();
-  lastStepMs = performance.now() - t0;
+  // (#82: the editor's change in this frame, the evaluation in a task of its own right after it: together, with the
+  // frame's layout, they made one long task of 90 to 150 ms with the CPU slowed 4 times. The step is due 0.1 cycle
+  // before its bar, so a task later is still in time; a song stopped or changed, or code changed, in between is not
+  // evaluated here)
+  const t0 = performance.now(), txt = codeNow(sg, next.at);
+  setCodeRange(txt);
+  const t1 = performance.now();
+  setTimeout(() => {
+    if (song !== sg || !isPlaying() || (ed.code || '') !== txt) return;
+    codeBar = next.at; codeFresh = true;
+    const t2 = performance.now();
+    ed.evaluate();
+    lastStepMs = t1 - t0 + performance.now() - t2;
+  }, 0);
 }
 // (the main thread's cost of the last step, for the radio's entry of a console change, console-add-ahead D2)
 let lastStepMs = 0;
@@ -2724,9 +2750,30 @@ $$('[data-arr-mode]').forEach(b => b.addEventListener('click', () => {
 // la posizione si calcola sui blocchi delle sezioni, così funziona in entrambe le viste
 // one scale for the played song (timeline-growth D5): every column of the strip (growth, written sections, ending)
 // says where it starts and how many bars it holds; inside a column the scale is linear
-function rulerGeo() {
-  const track = $('#ruler-track'), tr = track.getBoundingClientRect();
-  return { tr, bars: playMap().bars, secs: $$('#arr-strip [data-col-start]').map(b => { const r = b.getBoundingClientRect(); return { left: r.left - tr.left, width: r.width, start: +b.dataset.colStart, bars: +b.dataset.colBars, grow: b.dataset.xcol === 'growth' }; }) };
+// (#82: updateRuler runs every frame, also right after a live build step changed the editor: measuring there forced a
+// layout of the whole page, 20 ms with the CPU slowed 4 times. The measure is kept until the strip or the ruler changes
+// size or content, or something scrolls; a click or a drag on the ruler measures afresh)
+let rulerMemo = null;
+const rulerDirty = () => { rulerMemo = null; };
+function rulerGeo(fresh = false) {
+  if (fresh || !rulerMemo) {
+    const track = $('#ruler-track'), tr = track.getBoundingClientRect();
+    rulerMemo = { tr, secs: $$('#arr-strip [data-col-start]').map(b => { const r = b.getBoundingClientRect(); return { left: r.left - tr.left, width: r.width, start: +b.dataset.colStart, bars: +b.dataset.colBars, grow: b.dataset.xcol === 'growth' }; }) };
+  }
+  return { ...rulerMemo, bars: playMap().bars };
+}
+{
+  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(rulerDirty) : null;
+  for (const id of ['#ruler-track', '#arr-strip']) { const el = $(id); if (!el) continue; if (ro) ro.observe(el); }
+  // (the columns drawn again or the strip's grid changed; not the play head's position, set inside it every frame)
+  const strip = $('#arr-strip'), track = $('#ruler-track');
+  if (strip && typeof MutationObserver === 'function') {
+    new MutationObserver(rulerDirty).observe(strip, { childList: true, subtree: true });
+    new MutationObserver(rulerDirty).observe(strip, { attributes: true, attributeFilter: ['style', 'class'] });
+  }
+  addEventListener('resize', rulerDirty);
+  // (a scroll that moves the ruler: the page's or a box around it, not the code panel's)
+  document.addEventListener('scroll', e => { const el = e.target; if (el === document || el === document.documentElement || !track || (el.contains && el.contains(track))) rulerDirty(); }, { capture: true, passive: true });
 }
 function barToX(g, bar) {
   const s = g.secs.find(x => bar < x.start + x.bars) || g.secs[g.secs.length - 1];
@@ -2743,7 +2790,7 @@ function xToBar(g, x) {
 }
 function renderRuler() {
   requestAnimationFrame(() => {
-    const g = rulerGeo(), P = playMap(), M = compiled.meta, every = P.bars > 96 ? 8 : 4;
+    const g = rulerGeo(true), P = playMap(), M = compiled.meta, every = P.bars > 96 ? 8 : 4;
     // the growth: minutes and its steps when compact, nothing in the hidden tab, bars like the song when open
     const inGrow = b => b < P.G, open = growView === 'open';
     let html = '';
@@ -2788,7 +2835,7 @@ globalThis.codingMiskCaptions = {
 let rulerDrag = null;
 $('#ruler-track').addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
-  const g = rulerGeo(); rulerDrag = { g, bar: xToBar(g, e.clientX - g.tr.left) };
+  const g = rulerGeo(true); rulerDrag = { g, bar: xToBar(g, e.clientX - g.tr.left) };
   $('#ruler-track').setPointerCapture(e.pointerId); e.preventDefault();
 });
 $('#ruler-track').addEventListener('pointermove', e => { if (rulerDrag) rulerDrag.bar = xToBar(rulerDrag.g, e.clientX - rulerDrag.g.tr.left); });
@@ -5024,7 +5071,7 @@ try {
   { const sayEl = $('#say'), f = playing && resumeTo === null && song && s ? stageCaptions(s.now(), { hand }) : NO_CAPTIONS;
     const html = look === 'claude' && capS.claude ? '' : captionHtml(f, capS, { label: capLabel, name: capName });
     // (fitted again when the stage changes size: full screen, the window, the Code over side or width)
-    const fitKey = html && `${html}|${sayEl.parentElement.clientWidth}x${sayEl.parentElement.clientHeight}|${coLane.on}${coLane.side}${coLane.width}`;
+    const fitKey = html && `${html}|${capStage || `${sayEl.parentElement.clientWidth}x${sayEl.parentElement.clientHeight}`}|${coLane.on}${coLane.side}${coLane.width}`;
     if (html && (html !== lastCapHtml || fitKey !== lastCapFit)) { sayEl.innerHTML = html; sayEl.dataset.rows = f.rows.length; fitLane(sayEl); lastCapFit = fitKey; }
     if (html) lastCapHtml = html;
     const where = capS.where === 'top' ? 'top' : 'bottom';
@@ -5475,6 +5522,9 @@ radio = createRadio({
     start: (p, bar, o) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio', { voices: o && o.voices }); },
     // the next song's voice samples, as it will be written on air (#82)
     preloadVoices: list => queueVoices(list),
+    // a typed line's sample loaded and decoded at once ({ s, n }): resolves once its buffer is ready, so the line is
+    // put on a bar only then (#82: a sample still decoding on its bar was skipped, the line lost)
+    loadVoice: v => { const k = voicePath(v); if (voiceDone.has(k)) return Promise.resolve(); voiceQueued.add(k); return warmOne(v).then(() => { voiceQueued.delete(k); }); },
     // resume after a pause: by hand, the user's code goes on
     resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),
     // a new window while the radio plays: the code on air does not change, the steps to come do

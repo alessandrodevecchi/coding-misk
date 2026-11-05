@@ -117,10 +117,14 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   {
     // (the narrator's lines only: orbit 15 and up, the voice track speaks on 13 and 14; read in the code evaluated, as the
     // narrator's code is hidden by default in the profiles that grow the song, voice-track-tuning)
-    const voiceBank = () => page.evaluate(() => (((globalThis.codingMiskEvaluated && globalThis.codingMiskEvaluated()) || document.querySelector('strudel-editor').editor.code).match(/s\("(say_[a-z_]+)"\)[^\n]*\.orbit\((?:1[5-9]|2\d)\)/) || [])[1] || '');
+    // (the code of the session just started only: until its first evaluation the page still holds the previous one's)
+    const evaluated = () => page.evaluate(() => (globalThis.codingMiskEvaluated && globalThis.codingMiskEvaluated()) || document.querySelector('strudel-editor').editor.code);
+    let stale = null;
+    const voiceBank = async () => { const code = await evaluated(); return code === stale ? '' : (code.match(/s\("(say_[a-z_]+)"\)[^\n]*\.orbit\((?:1[5-9]|2\d)\)/) || [])[1] || ''; };
     const banks = {};
     for (const style of ['industrial', 'country']) {
       await page.click('#radio-start'); await sleep(500);
+      stale = await evaluated();
       await pick([style]); await page.fill('#radio-seed', `voice-${style}`); await page.click('#radio-start');
       // (up to a minute: a voice-track line on bar 0 makes the narrator yield there, voice-track-tuning)
       for (let k = 0; k < 300 && !banks[style]; k++) { banks[style] = await voiceBank(); if (!banks[style]) await sleep(200); }

@@ -1259,7 +1259,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // moment: the next free part where the voice track may speak from that bar. When the sample or the window is not ready
   // a third of a bar before the line's bar, the line moves to the first bar SAY_LEAD seconds ahead again (a push), never
   // lost; after SAY_PUSHES pushes its window is finished at once. Recorded like any command, so Replay says it
-  const SAY_LEAD = 2, SAY_PUSHES = 3, sayPushes = {};
+  const SAY_LEAD = 2, SAY_PUSHES = 3, SAY_LOAD = 15000, sayPushes = {};
   // the bars of SAY_LEAD seconds at a bar of a song
   const leadOf = (song, bar) => { let a = 0, bpm = 120; for (const x of song.sections) { bpm = x.bpm || 120; if (bar < a + x.bars) break; a += x.bars; } return SAY_LEAD * bpm / 240; };
   // the command's bar for a typed line on the song on air, now: SAY_LEAD seconds ahead at least; null when it is late
@@ -1292,6 +1292,12 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (!got) { drop(); renderSteer(true); return toast(t('svSampleFailed')); }
     // (only the bank of the new sample is read again: the whole manifest took a long task, #82)
     await reloadSamples(got.bank || null);
+    // its buffer loaded and decoded before the line goes on a bar: a sample still decoding on its bar is skipped by the
+    // player and the line lost (#82); a sample that never answers is given up after SAY_LOAD ms
+    if (player.loadVoice && got.bank && got.n >= 0) {
+      w.ready = false;
+      Promise.race([player.loadVoice({ s: got.bank, n: got.n }), new Promise(r => setTimeout(r, SAY_LOAD))]).catch(() => {}).then(() => { w.ready = true; });
+    }
     placeLine(w, { kind: 'say-live', text, lang, speaker, mode }, drop);
   }
   // the line tried on the song on air (the window with it made ready a little at a time), queued when ready before its
@@ -1325,20 +1331,26 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // (the window made in a task of its own after the steering's song)
     setTimeout(() => {
       if (!still()) { later(0); return; }
-      const p = windowPlayable({ item, song: pre.song }), forced = tries >= SAY_PUSHES;
+      const p = windowPlayable({ item, song: pre.song }), forced = tries >= SAY_PUSHES, loaded = () => w.ready !== false;
       const commit = () => {
         if (!still()) { later(0); return; }
         if (S.paused !== undefined) { later(300); return; }
-        // (late: its window not ready a third of a bar before the line's bar, as swapSoon: the line moves on)
-        if (!forced && player.now() >= item.start + bar - 0.34) { later(0, tries + 1); return; }
+        // (late: its window not ready a third of a bar before the line's bar, as swapSoon, or its sample not decoded yet
+        // (#82; even after SAY_PUSHES pushes): the line moves on)
+        if ((!forced || !loaded()) && player.now() >= item.start + bar - 0.34) { later(0, tries + 1); return; }
         drop();
         if (!command(c, { ...pre, p })) renderSteer(true);
       };
-      if (forced || !p.prepare) { commit(); return; }
+      const waits = [];
+      if (!forced && p.prepare) waits.push(null);
+      if (!loaded()) waits.push(new Promise(r => { const poll = () => (loaded() ? r() : setTimeout(poll, 30)); poll(); }));
+      if (!waits.length) { commit(); return; }
       // (late before it is ready: given up at once, the slices stop)
       let gone = false;
       const watch = () => { if (gone) return; if (!still()) { gone = true; return; } if (player.now() >= item.start + bar - 0.34) { gone = true; commit(); } else setTimeout(watch, 30); };
-      p.prepare(12, () => !gone && still()).then(() => { if (!gone) { gone = true; commit(); } }, () => { if (!gone) { gone = true; commit(); } });
+      const ready = waits.map(x => x || p.prepare(12, () => !gone && still()));
+      const go = () => { if (!gone) { gone = true; commit(); } };
+      Promise.all(ready.map(x => x.catch(() => {}))).then(go);
       watch();
     }, 0);
   }
@@ -1619,19 +1631,44 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   const compStyleOf = item => item && item.comp && item.comp.kind === 'invented' && item.comp.style && !recipes.some(r => r.id === item.comp.style.id) ? item.comp.style : null;
   const compChip = style => trialChip({ t, tx, esc, style, actions: 'keep', label: t('inventBadgeShort'), keepAttr: 'data-comp-keep-style' });
   const compHint = style => trialHint({ t, tx, esc, recipes, style, label: t('inventCompHint'), back: false });
+  // what the card shows apart from the position within the bar: the same within a bar, unless the song, its plan, the
+  // queue, the next song or a setting of the card changed (#82: the card was built again four times a second; between
+  // bars only the position marks move, see movePos)
+  let nowMemo = null;
+  const nowSig = (item, rel) => [S, item, item.song, item.plan, item.plan && item.plan.extended, item.curves, item.comp, item.commands, item.commands && item.commands.length, item.bars, item.cut, S.stream[S.onAir + 1], (S.stream[S.onAir + 1] || {}).song, Math.floor(rel), prepText, detailsOpen, hoverD, S.paused, getLang(), voiceFiles(), artists().length];
+  const sameSig = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+  // the position marks of the card's curves moved in place (the line where the song is and the shade of the past)
+  function movePos(box, item, rel) {
+    if (item.plan) {
+      const n = item.plan.plan.length, frac = rel / Math.max(1, n * 2 * item.plan.phrase), px = CPAD + Math.min(1, frac) * (CW - 2 * CPAD);
+      for (const svg of box.querySelectorAll('svg.radio-curve')) {
+        const ln = svg.querySelector('line.pos'), sh = svg.querySelector('rect.past-shade');
+        if (ln) { ln.setAttribute('x1', px.toFixed(1)); ln.setAttribute('x2', px.toFixed(1)); }
+        if (sh) sh.setAttribute('width', Math.max(0, px - CPAD).toFixed(1));
+      }
+    } else {
+      const ln = box.querySelector('svg.radio-curve line.pos'), x = Math.min(160, Math.max(0, rel / Math.max(1, item.entry.bars) * 160));
+      if (ln) { ln.setAttribute('x1', x); ln.setAttribute('x2', x); }
+    }
+  }
   function renderNow(cyc) {
     const box = root.querySelector('#radio-now');
     if (!box || dragging) return;
     const rt = root.querySelector('#radio-rec-time'); if (rt) rt.textContent = clockOf(recElapsed());
     renderSteer();
-    if (!S) { box.innerHTML = `<div class="lbl">${esc(t('radioNow'))}</div><p class="muted">${esc(t('radioIdle'))}</p>`; return; }
+    if (!S) { nowMemo = null; box.innerHTML = `<div class="lbl">${esc(t('radioNow'))}</div><p class="muted">${esc(t('radioIdle'))}</p>`; return; }
     const item = S.stream[S.onAir], song = item.song, e = item.entry;
     // (paused: the bar it stopped on, the player's clock no longer runs)
     const rel = Math.max(0, (cyc ?? (S.paused !== undefined ? S.paused : player.now())) - item.start);
+    // (the player's tick, four times a second: built again only when what the card shows changed, or a row of Coming
+    // next is reached; other calls follow a change and build it again)
+    const sig = nowSig(item, rel);
+    if (cyc !== undefined && nowMemo && nowMemo.box === box && rel < nowMemo.until && sameSig(nowMemo.sig, sig)) { movePos(box, item, rel); return; }
     let acc = 0, sec = song.sections[0];
     for (const s of song.sections) { if (rel >= acc) sec = s; acc += s.bars; }
     const next = nextRows(song, scheduleOf(item), rel, 3);
     const nextSong = S.stream[S.onAir + 1];
+    nowMemo = { box, sig, until: next.length ? next[0].at : Infinity };
     box.innerHTML = `<div class="lbl">${esc(t('radioNow'))} · ${esc(e.lead ? t('radioLeadShort') : t('radioSongN', { n: item.n + 1 }))}</div>
       ${item.comp ? `<div class="comp-tag"><span class="chip small">${esc(item.comp.start + item.comp.length - item.n <= 1 ? t('compNextOne') : t('compNext', { n: item.comp.start + item.comp.length - item.n }))}</span>${item.comp.kind === 'random' && !artists().some(a => a.name === item.comp.artist.name) ? `<button class="chip small" data-comp-keep title="${esc(t('diceKeepHint'))}">${esc(t('diceKeep'))} ${esc(item.comp.artist.name)}</button>` : ''}</div>${compStyleOf(item) ? `${compChip(compStyleOf(item))}${compHint(compStyleOf(item))}` : ''}` : ''}
       ${e.artist ? `<div class="radio-artist">${(() => { const a = artistOf(e.artist.id); return a ? `<img class="portrait tiny" src="${face(a)}" alt="">` : ''; })()}<span>${esc(e.artist.name)}</span>${e.artist.quirks && e.artist.quirks.length ? `<span class="muted small">· ${esc(e.artist.quirks.map(q => tx(QUIRKS[q] || { en: q })).join(', '))}</span>` : ''}</div>` : ''}
