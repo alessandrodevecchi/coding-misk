@@ -7,6 +7,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Italian speaker Siri 4 (`siri4`), spoken with the macOS system voice; `npm run voices` makes its samples with `say` without `-v`.
 - Draw styles grid on each voice card of the Voices tab: switch the voice styles automatic draws may give a voice, with a mark on changed styles, the count of allowed styles and Reset to defaults.
 - Voice style choices kept in the browser and in the settings backup; an import merges them per voice.
 - Radio sessions record the allowed voice styles they started with, so Replay, saved sessions and exports keep them.
