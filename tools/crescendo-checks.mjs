@@ -296,6 +296,14 @@ export const CHECKS = [
       }
     }
   } },
+  { name: 'Crescendo opening control (varied-openings D9): a chosen lead opening steers the first track, a Live-coder-only one reads as Auto', unit() {
+    const s = byId('luci-rosse');
+    const c = crescendoSong(s, { rules: growthRules(resolveProfile('crescendo', { opening: 'bass' }), { styles }) }), on = heardTracks(c, firstSound(c));
+    assert(c.crescendo.lead.opening === 'bass' && c.crescendo.lead.from === 'user' && on.length === 1 && on[0].type === 'bass', `${JSON.stringify(c.crescendo.lead)} ${on.map(t => t.type)}`);
+    const typed = growthRules(resolveProfile('crescendo', { opening: 'typed' }), { styles }), auto = growthRules(resolveProfile('crescendo'), { styles });
+    assert(!('lead' in typed) && JSON.stringify(crescendoSong(s, { rules: typed }).build) === JSON.stringify(crescendoSong(s, { rules: auto }).build), 'typed in Crescendo is not Auto');
+    assert(!crescendoSong(s, { rules: growthRules(resolveProfile('crescendo', { opening: 'bass' }), { styles }) }).crescendo.shape, 'Crescendo took a shape');
+  } },
   { name: 'shapes: Classic and Crescendo take no shape; the Live coder build records it', unit() {
     for (const s of songs.slice(0, 10)) assert(!crescendoSong(s).crescendo.shape && !crescendoSong(s, { rules: growthRules(resolveProfile('crescendo')) }).crescendo.shape, s.id);
     assert(shaped(coder(byId('switch-prima-luce'))) && coder(byId('switch-prima-luce')).crescendo.shape.version === SHAPES_VERSION, 'Live coder');

@@ -91,6 +91,9 @@ Generated from the app's own texts in `src/i18n.js`: the tabs, the profiles, the
 | Growth shape values | voice track | voce traccia | `opening:voice` |
 | Growth shape values | muted base | base muta | `opening:muted-base` |
 | Growth shape values | mid-set | a metà set | `opening:mid-set` |
+| Growth shape values | bass first | basso per primo | `opening:bass` |
+| Growth shape values | chords first | accordi per primi | `opening:chord` |
+| Growth shape values | beat without kick | ritmo senza cassa | `opening:top` |
 | Growth shape values | slow | lenta | `pace:slow` |
 | Growth shape values | medium | media | `pace:medium` |
 | Growth shape values | fast | veloce | `pace:fast` |

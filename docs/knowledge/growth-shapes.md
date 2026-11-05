@@ -11,7 +11,9 @@ checks: [npm run check:crescendo, npm run check:typing]
 
 A growth shape says how a Live coder build opens, how fast it grows and in which order. It has three parts: an opening, a pace and a development.
 
-Shapes apply only with the Live coder profile and its natural growth. Classic and Crescendo never use them.
+Shapes apply only with the Live coder profile and its natural growth. Classic never uses them. Crescendo takes the opening only (varied-openings): `resolveLead` draws its first track from the lead openings (`LEAD_OPENINGS`: `slow`, `full-kick`, `filtered`, `broken`, `melodic`, `pad`, `bass`, `chord`, `top`) by the Opening control, the song's `growthShape.opening`, the style's `growthShapes.openings`, else the defaults, in the stream `lead-1`. In Live coder the openings `typed`, `muted-base`, `mid-set` and the voice's second track draw their first track the same way (not with the `as-written` development).
+
+**Kick starts.** When the kick leads slow, or in Crescendo, `resolveKick` draws its first figure (`KICKS`: `one`, `pair`, `two`, `four`, `push`, `off`) from the style's `growthShapes.kicks`, else `DEFAULT_KICKS`, in the stream `kick-1`; a start the written kick does not play needs an explicit style weight and is the first form only. The start is a `{ hits }` core of `thinRows`, `beatForms` and `rowForms`; the `top` lead uses the core `'top'` (the busiest row other than the kick). `npm run probe:openings -- --check` grows 48 radio songs per style and profile and checks the targets (kick-led share per style, no first line above 12%, no kick pattern above 70%).
 
 ## How it connects
 
@@ -40,7 +42,7 @@ Shapes apply only with the Live coder profile and its natural growth. Classic an
 ## Options
 
 <!-- generated:growth-shapes -->
-**Opening (it: Apertura)** (`opening`): How it starts: one kick that grows (Slow), the full kick, silence while the first line is typed, a broken beat, a filtered kick that opens, an arpeggio or a melody, a pad or a drone, the voice track, a written base kept muted and switched on line by line, two tracks already playing in solo.
+**Opening (it: Apertura)** (`opening`): How it starts: one kick that grows (Slow), the full kick, silence while the first line is typed, a broken beat, a filtered kick that opens, an arpeggio or a melody, a pad or a drone, the voice track, a written base kept muted and switched on line by line, two tracks already playing in solo, the bass, the chords (keys, a stab or a guitar), the beat without the kick. In Crescendo it chooses the first track only.
 
 | Value | Name | Default weight |
 | --- | --- | --- |
@@ -54,9 +56,9 @@ Shapes apply only with the Live coder profile and its natural growth. Classic an
 | `voice` | voice track (it: voce traccia) | 0.5 |
 | `muted-base` | muted base (it: base muta) | 1 |
 | `mid-set` | mid-set (it: a metà set) | 1 |
-| `bass` |  | 1 |
-| `chord` |  | 1 |
-| `top` |  | 1 |
+| `bass` | bass first (it: basso per primo) | 1 |
+| `chord` | chords first (it: accordi per primi) | 1 |
+| `top` | beat without kick (it: ritmo senza cassa) | 1 |
 
 **Pace (it: Velocità)** (`pace`): How many changes in the first minute. Slow: as before, sparse steps and long pauses. Medium: a step every 10 to 15 seconds. Fast: a step about every 8 seconds, small moves. With medium and fast the kick is whole within the first minute. The typing never rushes: a step that takes long to type comes later.
 
