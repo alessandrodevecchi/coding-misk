@@ -93,7 +93,7 @@ const CHECKS = {
 const STYLES = Object.fromEntries(fs.readdirSync('styles').filter(f => f.endsWith('.json')).map(f => JSON.parse(fs.readFileSync(`styles/${f}`, 'utf8'))).map(r => [r.id, r]));
 // the Live coder openings these checks were written for (varied-openings: the songs draw other openings now; the
 // checks are about the code, so their songs keep the opening they had)
-const OPENED = { kellerlicht: { opening: 'broken' } };
+const OPENED = { kellerlicht: { opening: 'broken' }, 'crescendo-notte-lunga': { opening: 'melodic' } };
 function live(id, over = {}) {
   const C = resolveProfile('switch', { ...(OPENED[id] || {}), ...over }), b = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
   const L = liveCode(b, C, { lang: () => 'en', cols: () => 80 }), bars = [0, ...new Set(buildSteps(L.build).map(x => x.at))].sort((x, y) => x - y);
