@@ -13,6 +13,7 @@ import { PHRASES, SPEAKERS, saySlug, sayBank, slugAt, speaks } from '../song/bui
 import { speakerLabel, DEFAULT_VOICE_NAME } from '../endless/voice-sound.js';
 import { POOL } from '../endless/phrases.js';
 import { VOICE_STYLES, VOICE_STYLE_IDS } from '../song/format.js';
+import { isAllowed } from './combos.js';
 import { LISTEN, PENCIL, BIN, LOCK, WAVE, MIC, QUILL, COPY, DISK, BROOM, SPARK, CLOCK, PLUS } from '../icons.js';
 
 export const SUB_KEY = 'coding-misk-voices-sub';
@@ -47,11 +48,11 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     for (const [l, x] of textsOf(p)) {
       const bank = sayBank(l, ''), k = `${bank}/${saySlug(x)}`;
       if (has(bank, x) || making.has(k)) continue;
-      making.add(k); render();
+      making.add(k); refresh();
       try { await fetch('/voice/say', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: x, lang: l, speaker: '' }) }); } catch (e) { /* stays missing */ }
       making.delete(k);
     }
-    await samplesChanged(); render();
+    await samplesChanged(); refresh();
   }
   async function usage(force = false) {
     if (!helper()) return null;
@@ -184,9 +185,16 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
       <div class="ph-row"><label class="ctrl"><span class="lbl">${esc(t('phSpeaker'))}</span><select data-vt-bench="speaker" data-no-knob>${['', ...SPEAKERS].map(sp => `<option value="${sp}"${b.speaker === sp ? ' selected' : ''}>${esc(sp ? speakerLabel(sp, lang, t) : t('phDefaultVoice'))}</option>`).join('')}</select></label>
       <label class="ctrl"><span class="lbl">${esc(t('phVoiceStyle'))}</span><select data-vt-bench="style" data-no-knob>${VOICE_STYLE_IDS.map(id => `<option value="${id}"${b.style === id ? ' selected' : ''}>${esc(t(`voiceStyle:${id}`))}</option>`).join('')}</select></label></div>
       <div class="actions"><button class="btn primary" data-vt-bench-hear>${LISTEN} ${esc(t('phListen'))}</button><button class="btn" data-vt-bench-save>${esc(t('phSaveMine'))}</button></div>
+      <p class="hint small vt-combo" data-vt-bench-status>${esc(benchStatus())}</p>
       <p class="hint muted small">${esc(t('phBenchHint'))}</p></div>`;
     return `<p class="hint muted small">${esc(t('phVoicesIntro'))}</p>${helper() ? '' : `<p class="hint">${esc(t('phNoHelper'))}</p>`}<div class="vt-speakers">${cards}</div>
       <div class="lbl">${esc(t('phVoiceStyles'))}</div><div class="chips vt-styles">${styles}</div>${bench}`;
+  }
+
+  // the bench's pair against src/voices/combos.json (voice-style-combos D9), for the voice heard in the app's language
+  function benchStatus() {
+    const lang = getLang(), sp = ui.bench.speaker, name = sp && speaks(lang, sp) ? sp[0].toUpperCase() + sp.slice(1) : DEFAULT_VOICE_NAME[lang] || '';
+    return t(isAllowed(sp, ui.bench.style, lang) ? 'phComboOk' : 'phComboNo', { name });
   }
 
   // ---------- 4. Campioni ----------
@@ -209,7 +217,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
         <p class="muted small">${esc(t('phMissingN', { n: missing.length }))}</p>`;
     }
     const u = ui.usage;
-    if (!u) { usage().then(() => render()); return `<p class="muted">${esc(t('phLoading'))}</p>`; }
+    if (!u) { usage().then(() => refresh()); return `<p class="muted">${esc(t('phLoading'))}</p>`; }
     const k = keys(), rows = classify(u.banks, { ...k, temp: u.temp || {} }), T = totals(rows);
     const cls = CLASSES.map(c => `<div class="vt-class vt-${c}"><span class="lbl">${esc(t(`phClass:${c}`))}</span><span class="vt-n">${T.classes[c].n}</span><span class="muted small">${esc(sizeText(T.classes[c].b))}</span></div>`).join('');
     const banks = Object.entries(T.banks).map(([b, x]) => `<tr><td>${esc(b)}</td><td>${x.n}</td><td>${esc(sizeText(x.b))}</td><td>${x.mine}</td><td>${x.temp}</td><td>${x.orphan}</td></tr>`).join('');
@@ -235,7 +243,13 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     const body = sub === 'mine' ? mineHtml() : sub === 'vocab' ? vocabHtml() : sub === 'voices' ? voicesHtml() : samplesHtml();
     root.innerHTML = `<p class="intro">${esc(t('introVoices'))}</p><div class="chips vt-subs" role="tablist">${chips}</div><div class="vt-body vt-${sub}">${body}</div>`;
     if (keep && keep.sel) { const el = root.querySelector(keep.sel); if (el) { el.focus(); try { el.setSelectionRange(keep.at, keep.at); } catch (e) { /* number inputs */ } } }
-    if ((sub === 'voices' || sub === 'samples') && helper() && !ui.usage) usage().then(u => { if (u) render(); });
+    if ((sub === 'voices' || sub === 'samples') && helper() && !ui.usage) usage().then(u => { if (u) refresh(); });
+  }
+  // a render that does not come from the form (a sample made, the usage read, the phrases changed elsewhere): the open
+  // form keeps what was typed or picked and not saved yet
+  function refresh() {
+    if (ui.form && root && root.querySelector('[data-ph-form]')) readForm();
+    render();
   }
   function show(s) { if (SECTIONS.includes(s)) { sub = s; store.set(SUB_KEY, s); } ui.usage = null; render(); }
 
@@ -381,9 +395,13 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     const el = e.target;
     if (el.matches('[data-ph-f="kind"]')) { readForm(); ui.form.tag = ''; render(); }
     else if (el.matches('[data-ph-f="lang"]')) readForm();
-    else if (el.matches('[data-vt-bench]')) ui.bench[el.dataset.vtBench] = el.value;
+    else if (el.matches('[data-vt-bench]')) {
+      ui.bench[el.dataset.vtBench] = el.value;
+      const st = root.querySelector('[data-vt-bench-status]');
+      if (st) st.textContent = benchStatus();
+    }
   });
   root.addEventListener('submit', e => { if (e.target.matches('[data-ph-form]')) { e.preventDefault(); saveForm(); } });
-  phr.on(what => { if (what !== 'uses') render(); });
+  phr.on(what => { if (what !== 'uses') refresh(); });
   return { render, show, get section() { return sub; }, openForm, prepare };
 }

@@ -47,6 +47,7 @@ import { stream } from '../src/endless/random.js';
 import { captionFrame, captionSettings } from '../src/captions/captions.js';
 import { SPEAKER_KINDS, kindOf, outranks, applyExclusive, captionRows } from '../src/song/speakers.js';
 import { barSeconds } from '../src/song/spoken.js';
+import { setCombos } from '../src/voices/combos.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const read = f => JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -79,6 +80,23 @@ function radioSongs(profile, style, seed, n = 3) {
   return radioMemo.get(k);
 }
 const withLang = (l, fn) => { const d = globalThis.document; globalThis.document = { documentElement: {} }; try { setLang(l); return fn(); } finally { setLang('en'); globalThis.document = d; } };
+
+// voice-style-combos (#82): draws with a narrowed combos file (setCombos), put back after; a character is read from the
+// settings by its own values (applied after the drawn knobs, so all of them are there unless a chosen sound covers them)
+const withCombos = (t, fn) => { const old = setCombos(t); try { return fn(); } finally { setCombos(old); } };
+const hasChar = (st, c) => Object.entries(VOICE_CHARACTERS[c]).every(([k, v]) => st[k] === v);
+const charsOf = st => Object.keys(VOICE_CHARACTERS).filter(c => hasChar(st, c));
+const COMBO_STYLES = ['dark-cyberpunk', 'ambient', 'pure-trance', 'berlin-techno'];
+// at least 300 radio songs (the session entries and the songs), from seeds of their own
+function comboSongs(extra = {}, min = 300) {
+  const out = { entries: [], songs: [] };
+  for (let i = 0; out.songs.length < min; i++) {
+    const g = generateSession(recipes, { styles: COMBO_STYLES, seed: `combos-${i}`, minutes: 120, chaos: 0.8, ...extra });
+    out.entries.push(...g.session.songs); out.songs.push(...g.songs);
+  }
+  return out;
+}
+const voiceTracks = songs => songs.flatMap(s => s.tracks.filter(t => t.type === 'voice' || t.type === 'spoken'));
 
 const CHECKS = {
   'format: a spoken track validates; a wrong way, an unknown bound track and a line over 12 words are errors with their paths'() {
@@ -1363,6 +1381,68 @@ const CHECKS = {
     assert(needs.some(x => x.voice === 'N') && needs.some(x => x.voice === 'T'), 'needs: narrator and voice-track lines');
     assert(spokenNeeds(B, C, 'it', ANY).every(x => x.has), 'needs with every sample: a line missing');
     console.log(`      prova-voce-notte poetic: ${needs.length} lines to make with no samples`);
+  },
+  'voice combos (D3): over 300 songs a limited speaker never gets another character; an all-allowed file gives the same songs'() {
+    const T = { format: 1, en: { albert: ['clear', 'deep'] } };
+    const lim = withCombos(T, () => comboSongs()), free = withCombos({}, () => comboSongs());
+    const albert = lim.entries.filter(e => e.voice.speaker === 'albert');
+    assert(albert.length >= 10, `few albert narrators: ${albert.length}`);
+    assert(albert.every(e => e.voice.character === null || e.voice.character === 'deep'), `albert characters: ${[...new Set(albert.map(e => e.voice.character))]}`);
+    assert(free.entries.some(e => e.voice.speaker === 'albert' && e.voice.character && e.voice.character !== 'deep'), 'the free draw never gives albert another character (the test proves nothing)');
+    const narr = lim.songs.map(s => s.tracks.find(t => t.type === 'voice')).filter(t => t && t.settings.speaker === 'albert');
+    assert(narr.every(t => charsOf(t.settings).every(c => c === 'deep')), 'an albert narrator track sounds like another character');
+    // the shipped file (every style listed) draws the songs of no file, byte for byte; a narrowed file moves no music
+    assert(JSON.stringify(comboSongs().songs) === JSON.stringify(free.songs), 'the all-allowed file changes the songs');
+    const strip = s => JSON.stringify({ ...s, tracks: s.tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken') });
+    assert(lim.songs.length === free.songs.length && lim.songs.every((s, i) => strip(s) === strip(free.songs[i])), 'a narrowed file moved the music');
+    console.log(`      ${lim.songs.length} songs, ${albert.length} with albert narrating`);
+  },
+  'voice combos (D3 point 2): the voice instrument draws only allowed characters, on a chop and on the other ways; none allowed: the plain voice'() {
+    const all = list => ({ format: 1, en: Object.fromEntries(['default', ...SPEAKERS].map(s => [s, list])), it: { default: list } });
+    const opts = { voice: { presence: 'always' } };
+    const tracks = songs => songs.flatMap(s => s.tracks.filter(t => t.type === 'spoken'));
+    const echo = tracks(withCombos(all(['clear', 'echo']), () => comboSongs(opts, 120)).songs), free = tracks(comboSongs(opts, 120).songs);
+    const ways = new Set(echo.map(t => t.patterns.A.way));
+    assert(ways.has('chop') && ways.size > 1, `ways: ${[...ways]}`);
+    for (const way of ways) {
+      const of = echo.filter(t => t.patterns.A.way === way);
+      assert(of.every(t => charsOf(t.settings).every(c => c === 'echo')), `${way}: another character than echo`);
+      assert(of.some(t => hasChar(t.settings, 'echo')), `${way}: never echo`);
+    }
+    assert(free.some(t => charsOf(t.settings).some(c => c !== 'echo')), 'the free draw has no other character (the test proves nothing)');
+    const none = tracks(withCombos(all(['clear']), () => comboSongs(opts, 120)).songs);
+    assert(none.length && none.every(t => !charsOf(t.settings).length && t.settings.pitch === 1 && t.settings.drive === 0 && t.settings.delay === 0), 'a character with nothing allowed');
+  },
+  'voice combos (D5): a chosen narrator style redraws a speaker that does not allow it, only then; the style stays'() {
+    const only = { format: 1, en: { default: ['clear'], albert: ['clear'], fred: ['clear'], junior: ['clear'], kathy: ['clear', 'robot'] }, it: { default: ['clear', 'robot'] } };
+    const narrators = songs => songs.map(s => s.tracks.find(t => t.type === 'voice').settings);
+    const opts = { styles: ['dark-cyberpunk'], seed: 'combos-n', minutes: 60, narratorSound: { style: 'robot' } };
+    const free = narrators(generateSession(recipes, opts).songs), lim = narrators(withCombos(only, () => generateSession(recipes, opts).songs));
+    assert(lim.every(s => s.speaker === 'kathy' && hasChar(s, 'robot')), `speakers: ${[...new Set(lim.map(s => s.speaker))]}`);
+    assert(free.some(s => s.speaker !== 'kathy'), 'every drawn speaker was kathy (the test proves nothing)');
+    // no speaker allows it: as drawn; a fixed speaker or "auto": as drawn; every pair allowed: as drawn
+    const nobody = narrators(withCombos({ format: 1, en: { default: ['clear'], albert: ['clear'], fred: ['clear'], junior: ['clear'], kathy: ['clear'] } }, () => generateSession(recipes, opts).songs));
+    assert(JSON.stringify(nobody) === JSON.stringify(free), 'no speaker allows the style: the speaker moved');
+    const fixed = { ...opts, narratorSound: { style: 'robot', speaker: 'fred' } };
+    assert(withCombos(only, () => generateSession(recipes, fixed).songs).every(s => s.tracks.find(t => t.type === 'voice').settings.speaker === 'fred'), 'a fixed speaker moved');
+    // (the voice instrument's speaker is never the narrator's, so it may follow the redrawn one: voice parts only)
+    const music = s => JSON.stringify({ ...s, tracks: s.tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken') });
+    assert(withCombos(only, () => generateSession(recipes, opts).songs).map(music).join() === generateSession(recipes, opts).songs.map(music).join(), 'the redraw moved the music');
+  },
+  'voice combos (2.4): Crescendo and Live coder radio songs grown on air add no draw of their own'() {
+    const T = { format: 1, en: Object.fromEntries(['default', ...SPEAKERS].map(s => [s, VOICE_STYLE_IDS.filter(x => x !== 'robot' && x !== 'dirty')])) };
+    const grown = profile => COMBO_STYLES.flatMap(style => [0, 1].flatMap(i => {
+      const rec = { seed: `combos-${profile}-${i}`, options: { styles: [style], chaos: 0.8, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile, voice: { presence: 'always' } }, changes: [], growth: GROWTH_ON_AIR };
+      return sessionItems(RADIO_RECIPES, rec, 3).map(it => it.song);
+    }));
+    let n = 0, freeHit = 0;
+    for (const profile of ['crescendo', 'switch']) {
+      const lim = voiceTracks(withCombos(T, () => grown(profile))), free = voiceTracks(grown(profile));
+      n += lim.length; freeHit += free.filter(t => hasChar(t.settings, 'robot') || hasChar(t.settings, 'dirty')).length;
+      assert(lim.length && lim.every(t => !hasChar(t.settings, 'robot') && !hasChar(t.settings, 'dirty')), `${profile}: a robot or dirty voice with them not allowed`);
+    }
+    assert(freeHit > 0, 'no robot or dirty voice without the file (the test proves nothing)');
+    console.log(`      ${n} voice tracks in grown songs, ${freeHit} robot or dirty without the file`);
   },
   'speaker registry (spoken-text-on-stage D11): N and T mapped to kinds, the voice track outranks the narrator, one narrator line per bar; a fake third kind is captioned with no other change, exclusive quiets the lower ranks, multiCaption adds a row'() {
     assert(kindOf('N') === 'narrator' && kindOf('T') === 'voice' && SPEAKER_KINDS.singing.future && outranks('voice', 'narrator') && !outranks('narrator', 'voice'), 'registry');

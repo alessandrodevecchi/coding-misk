@@ -19,7 +19,8 @@ import { planTransition, MAX_RAMP } from './transitions.js';
 import { applyMaterial, sessionSource } from './material.js';
 import { songProfileOnAir } from './profile.js';
 import { voiceOption, PHRASE_RANGES, VOICE_WAYS, isQuietOnly, whereOf } from './voice-options.js';
-import { soundPatch } from './voice-sound.js';
+import { soundPatch, cleanSound } from './voice-sound.js';
+import { allowedForDraw, allowedCharacters } from '../voices/combos.js';
 import { placeGestures, gestureSteps, gestureRate } from './gestures.js';
 
 export const SESSION_FORMAT = 'coding-misk/endless-session';
@@ -253,6 +254,13 @@ export function planSong({ parts, byId, prev, opts, rng, index, recent = null })
   // chosen style or values go over it, and the speaker when one is set; the rack the draw picked is kept
   const narSound = soundPatch(opts.narratorSound);
   if (Object.keys(narSound).length) voice.settings = { ...voice.settings, ...narSound };
+  // (voice-style-combos D5: a chosen style with no fixed speaker, on a drawn speaker that does not allow it: the speaker
+  // again among those that do, from a stream of its own, only then; the style stays; none allows it: as drawn)
+  const narChosen = cleanSound(opts.narratorSound);
+  if (narChosen.style !== 'auto' && narChosen.style !== 'custom' && !narChosen.speaker && !allowedForDraw(voice.settings.speaker).includes(narChosen.style)) {
+    const ok = ['', ...SPEAKERS].filter(s => allowedForDraw(s).includes(narChosen.style));
+    if (ok.length) voice.settings = { ...voice.settings, speaker: rng.voice.fork(`combos/${index}`).pick(ok) };
+  }
   // (voice-controls: the options' extra draws come from a stream of their own, so the default draws as before)
   // (a single song with the voice instrument on, from a style without one, speaks with the speakers of the styles that
   // have one: their vocabulary samples exist)
@@ -320,7 +328,14 @@ export function voiceFor(R, opts, rng, index = 0) {
   base.speaker = rng.chance(0.15 + 0.3 * opts.chaos) ? rng.pick(['', ...SPEAKERS]) : rng.pick(own);
   let character = null;
   const chance = opts.voiceChance ?? 0.4 + 0.4 * opts.chaos;
-  if (rng.chance(chance)) { character = (opts.voiceCharacters && pickWeighted(rng, opts.voiceCharacters)) || rng.pick(Object.keys(VOICE_CHARACTERS)); Object.assign(base, VOICE_CHARACTERS[character]); }
+  // (voice-style-combos D3: only the characters src/voices/combos.json allows for the speaker heard, the narrator's
+  // fixed speaker when one is set; one random value either way, so nothing else moves; none allowed: no character)
+  if (rng.chance(chance)) {
+    const names = allowedCharacters(cleanSound(opts.narratorSound).speaker ?? base.speaker);
+    const taste = opts.voiceCharacters && Object.values(opts.voiceCharacters).some(w => w > 0);
+    character = (taste ? pickWeighted(rng, opts.voiceCharacters, names) : names.length ? rng.pick(names) : null) || (rng.next(), null);
+    if (character) Object.assign(base, VOICE_CHARACTERS[character]);
+  }
   const rack = [];
   if (rng.chance(0.25 + 0.4 * chaos)) for (const name of rng.shuffle(Object.keys(VOICE_DEVICES)).slice(0, rng.int(1, 2))) {
     const dev = { device: name };
@@ -408,7 +423,11 @@ export function spokenFor(R, opts, voice, rng, more = null, speakers = [], recen
   const own = (sp.speakers || []).map(speakerId).filter(x => x && x !== nar), speaker = rng.pick(own.length ? own : SPEAKERS.filter(x => x !== nar));
   const settings = { ...VOICE_DEFAULT, gain: 0.5, room: 0.3, speaker };
   // a character now and then (more often on a chop, which may go further)
-  if (rng.chance(way === 'chop' ? 0.6 : 0.25 + 0.3 * (opts.chaos ?? 0.3))) Object.assign(settings, VOICE_CHARACTERS[rng.pick(way === 'chop' ? ['robot', 'radio', 'dirty', 'echo'] : ['radio', 'deep', 'cathedral', 'echo', 'slow'])]);
+  // (only the characters the combos file allows for the speaker heard, D3 point 2; none: the plain voice)
+  if (rng.chance(way === 'chop' ? 0.6 : 0.25 + 0.3 * (opts.chaos ?? 0.3))) {
+    const ok = allowedCharacters((V && cleanSound(V.sound).speaker) || speaker), list = (way === 'chop' ? ['robot', 'radio', 'dirty', 'echo'] : ['radio', 'deep', 'cathedral', 'echo', 'slow']).filter(c => ok.includes(c));
+    if (list.length) Object.assign(settings, VOICE_CHARACTERS[rng.pick(list)]); else rng.next();
+  }
   const pat = { way, text, ...extrasFor(way, rng) };
   // the voice track's sound for the next songs (D4): over the draw, the speaker when one is set
   if (V && V.sound) Object.assign(settings, soundPatch(V.sound));

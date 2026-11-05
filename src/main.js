@@ -61,7 +61,7 @@ import { createSession, stylesNear } from './endless/director.js';
 import { freshSeed } from './endless/random.js';
 import { cleanVoice, voiceOption, presetOf as voicePresetOf } from './endless/voice-options.js';
 import { voicePanel, voiceEvent } from './endless/voice-panel.js';
-import { voiceSoundHtml, syncVoiceSound, soundEvent, speakerLabel } from './endless/voice-sound.js';
+import { voiceSoundHtml, syncVoiceSound, soundEvent, speakerLabel, styleOptionHtml, markStyleOptions } from './endless/voice-sound.js';
 import { phraseRows, listVocab, editText, editBars, editWay, removeRow, addRow, fillRows, fillMine, freeParts, FILL_GROUPS } from './endless/phrase-list.js';
 import { rewriteSpoken, trackVoice } from './endless/voice-track.js';
 import { styleId, stylePush } from './endless/recipe.js';
@@ -3664,7 +3664,8 @@ function settingHtml([type, key, label, o]) {
 }
 // the voice style picker of a voice track's panel (voice-full-controls D3): the same list as the Voices group, the
 // style the settings match, else Custom
-const vstyleHtml = () => `<div class="ctrl" data-ctl="vstyle"><label class="lbl">${esc(t('voiceStyleLbl'))}</label><select data-vstyle data-no-knob>${[...Object.keys(VOICE_STYLES), 'custom'].map(s => `<option value="${s}"${s === 'custom' ? ' disabled' : ''}>${esc(t(`voiceStyle:${s}`))}</option>`).join('')}</select></div>`;
+// (a style not in the allowed set of the track's speaker carries a mark, voice-style-combos D6; syncPanel keeps it)
+const vstyleHtml = () => `<div class="ctrl" data-ctl="vstyle"><label class="lbl">${esc(t('voiceStyleLbl'))}</label><select data-vstyle data-no-knob>${[...Object.keys(VOICE_STYLES), 'custom'].map(s => styleOptionHtml(s, { disabled: s === 'custom', t, esc })).join('')}</select></div>`;
 // note per gradi: una griglia passi × gradi (basso e arpeggio: note dell'accordo 0-3, hook: gradi della scala 0-7)
 const noteCols = (tr, pat) => { const n = meterSteps(secFull().meter); return tr.type === 'hook' || (tr.type === 'arp' && pat.speed === '8') ? n / 2 : n; };
 const noteRows = tr => tr.type === 'hook' ? [7, 6, 5, 4, 3, 2, 1, 0] : [3, 2, 1, 0];
@@ -4094,7 +4095,7 @@ function syncPanel(host) {
     const o = host.querySelector('#' + i.id + '-o');
     if (o && i.type === 'range') o.textContent = i.dataset.cut ? (v >= 18000 ? '∞' : `${v} Hz`) : i.dataset.fmt === 'num' ? String(v) : `${Math.round(v * 100)}%`;
   });
-  all('[data-vstyle]').forEach(x => { if (!active(x)) x.value = styleOf(e); });
+  all('[data-vstyle]').forEach(x => { if (!active(x)) x.value = styleOf(e); markStyleOptions(x, { t, speaker: e.speaker || '', any: !e.speaker && tr.type === 'spoken' }); });
   all('[data-set-ramp]').forEach(b => { const on = e[b.dataset.setRamp + 'End'] != null; b.setAttribute('aria-pressed', on); const end = host.querySelector(`[data-end-for="${b.dataset.setRamp}"]`); if (end) end.hidden = !on; });
   // values the live build steps change: a pin shows whether the track's own value is fixed against them
   const sk = compiled.build ? stepKeys(compiled.build, tr.id) : {};

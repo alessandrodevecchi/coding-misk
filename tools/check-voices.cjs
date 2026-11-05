@@ -8,7 +8,8 @@
 // Sound and Narrator lines folded, the user's state back with it on: narrator-ghost-row); the ghost narrator row replaced
 // by the Narrator track on the first edit and back on Undo; no "In the next song" row (new-song-panel D9: the New song panel has its own Voci). Radio: the Voices group for the
 // next songs (two blocks, switches, How often without Mai and with Sempre, a saved Mai and an old Custom profile with
-// the narrator off, presets that keep Sempre, the Sound parts, Fill with, no on-air button). Italian labels.
+// the narrator off, presets that keep Sempre, the Sound parts, Fill with, no on-air button). Italian labels. The style
+// pickers' mark for a style not in the allowed set of the speaker (voice-style-combos).
 // Screenshots of each part when a folder is given.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voices.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -139,6 +140,20 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(await page.$eval('[data-vsound="narrator:speaker"]', s => s.value) === 'fred', 'panel to group: the speaker Fred picked in the panel shows in the group');
   { const o = await page.$eval('[data-vsound="narrator:speaker"]', s => [...s.options].map(x => x.value + '=' + x.textContent));
     check(o.join() === '=Default (Samantha),albert=Albert,fred=Fred,junior=Junior,kathy=Kathy', 'English speakers (real-voices): the default voice, Albert, Fred, Junior and Kathy, no note', o.join()); }
+  // (voice-style-combos D6: a style not allowed for the speaker carries a mark and a tip in both pickers, stays selectable,
+  // and the marks follow the speaker)
+  { await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos({ format: 1, en: { fred: ['clear', 'radio'] } }));
+    const marks = () => page.evaluate(ti => [`#track-panel [data-ptrk="${ti}"] [data-vstyle]`, '[data-vsound-style="narrator"]'].map(q => { const o = document.querySelector(q).querySelector('option[value="robot"]'), r = document.querySelector(q).querySelector('option[value="radio"]'); return { robot: o.textContent, tip: o.title, disabled: o.disabled, radio: r.textContent }; }), ti);
+    await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'kathy'); await sleep(400);
+    await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'fred'); await sleep(600);
+    const m = await marks();
+    check(m.every(x => x.robot === 'Robot ·' && /Not in the allowed set/.test(x.tip) && !x.disabled && x.radio === 'Radio'), 'combos: Robot marked for Fred in the panel and the group (tip, still enabled), Radio not', JSON.stringify(m));
+    await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-vstyle]`, 'robot'); await sleep(600);
+    check((await T()).T.tracks[ti].settings.drive === 3.5, 'combos: a marked style picked by hand is set', String((await T()).T.tracks[ti].settings.drive));
+    await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'kathy'); await sleep(600);
+    check((await marks()).every(x => x.robot === 'Robot' && !x.tip), 'combos: the marks follow the speaker (Kathy, no entry: every style allowed)', JSON.stringify(await marks()));
+    if (shots) { await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'fred'); await sleep(400); await page.screenshot({ path: path.join(shots, 'combos-panel.png') }); }
+    await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos(null)); }
   await page.click('#cfg-reset').catch(() => {}); await sleep(600);
 
   // ---------- Compose: the voice track ----------

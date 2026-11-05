@@ -6,8 +6,9 @@
 // of samples while a song plays (the code's sample numbers follow the new manifest), the Settings card, English, the
 // hardware and light themes and 400 px (no sideways scroll). phrase-any-voice: the five options of Chi la dice, the tag
 // field hidden for several kinds and back on Any when narrowed, the row and the kind chips, the merge with Annulla, and
-// a delete that counts the files of two speakers. With shots-dir: pictures of the tab, the phrase editor,
-// the Settings card and the Chiedi notice in neon, hardware and light, at desktop and 400 px.
+// a delete that counts the files of two speakers; a sample made while the edit form is open; the test bench's line on
+// allowed voice style pairs (voice-style-combos), in Italian and English. With shots-dir: pictures of the tab, the
+// phrase editor, the Settings card and the Chiedi notice in neon, hardware and light, at desktop and 400 px.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voices-tab.cjs [shots-dir]
 //   (dev server on PORT, default 5173, with the voice helper: macOS `say` and ffmpeg; samples in public/samples)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -133,6 +134,17 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   await tap(page, `[data-ph-edit="${fermi.id}"]`); await sleep(200);
   await page.selectOption('[data-ph-f="tag"]', 'drop'); await tap(page, '[data-ph-save]'); await sleep(300);
   check((await items(page)).find(p => p.id === fermi.id).tag === 'drop', 'Modifica: the moment changed');
+  // a sample made while the form is open (the tab renders again in the background) keeps what was picked and not saved
+  await page.route('**/voice/say', async r => { await sleep(1200); await r.fulfill({ status: 200, contentType: 'application/json', body: '{"bank":"say_it","n":0,"seconds":1,"made":true}' }).catch(() => {}); });
+  await tap(page, '[data-ph-new]'); await sleep(200);
+  await page.fill('[data-ph-f="text"]', 'corsa contro il tempo'); await page.selectOption('[data-ph-f="kind"]', 'explain'); await sleep(200);
+  await tap(page, '[data-ph-save]'); await sleep(200);
+  const corsa = (await items(page)).find(p => p.text === 'corsa contro il tempo');
+  await tap(page, `[data-ph-edit="${corsa.id}"]`); await sleep(100);
+  await page.selectOption('[data-ph-f="tag"]', 'drop'); await sleep(1800);
+  await tap(page, '[data-ph-save]'); await sleep(300);
+  check((await items(page)).find(p => p.id === corsa.id).tag === 'drop', 'Modifica: a sample made while the form is open keeps the moment picked');
+  await page.evaluate(id => globalThis.codingMiskPhrases.phr.remove(id), corsa.id); await page.unroute('**/voice/say'); await sleep(300);
   // copy a vocabulary entry: kind voice, tag night, source copy (spec: copy)
   await tap(page, '[data-vt-sub="vocab"]'); await sleep(300);
   await tap(page, '[data-vt-group="voice-night"]'); await sleep(200);
@@ -229,6 +241,18 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   await page.fill('[data-vt-bench="text"]', 'prova del banco notturno'); await tap(page, '[data-vt-bench-hear]'); await sleep(2500);
   const ledger = (() => { try { return JSON.parse(fs.readFileSync(path.join(SAMPLES, 'say_temp.json'), 'utf8')); } catch (e) { return {}; } })();
   check(!!ledger['say_it/prova_del_banco_notturno.wav'], 'the test bench line is a temporary sample', Object.keys(ledger).join());
+  // (voice-style-combos D9: the bench says whether the pair is in src/voices/combos.json, for the voice heard; still playable)
+  const status = () => page.$eval('[data-vt-bench-status]', el => el.textContent);
+  check(/Abbinamento consentito per Alice/.test(await status()), 'banco: the shipped file allows the pair', await status());
+  await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos({ format: 1, it: { default: ['clear', 'radio'] } }));
+  await page.selectOption('[data-vt-bench="speaker"]', 'albert'); await page.selectOption('[data-vt-bench="style"]', 'robot'); await sleep(150);
+  check(/Non tra gli stili consentiti per Alice \(si può ascoltare lo stesso\)/.test(await status()), 'banco: Albert in Italian is Alice, robot not allowed, still playable', await status());
+  const asked = page.waitForRequest(r => r.url().includes('/voice/say'), { timeout: 8000 }).then(() => true).catch(() => false);
+  await page.fill('[data-vt-bench="text"]', 'il robot non è in lista'); await tap(page, '[data-vt-bench-hear]');
+  check(await asked, 'banco: Ascolta still plays a pair that is not allowed');
+  await page.selectOption('[data-vt-bench="style"]', 'radio'); await sleep(150);
+  check(/Abbinamento consentito per Alice/.test(await status()), 'banco: radio allowed', await status());
+  await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos(null)); await sleep(1500);
   await shot(page, 'voices-neon');
 
   // ---------- 5. a delete during playback: the code follows the new manifest ----------
@@ -303,6 +327,14 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
   await openTab(page, 'voices'); await sleep(2500);
   { const k = await page.$eval('.vt-speaker[data-vt-speaker="kathy"]', el => el.textContent.replace(/\s+/g, ' '));
     check(/English Kathy/.test(k) && /does not speak Italian: Alice speaks instead/.test(k) && !/not installed/.test(k), 'Voices and sounds in English: Kathy\'s system voice for English, Alice speaks instead in Italian', k.slice(0, 160)); }
+  { await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos({ format: 1, en: { albert: ['clear', 'deep'] } }));
+    const st = () => page.$eval('[data-vt-bench-status]', el => el.textContent);
+    await page.selectOption('[data-vt-bench="speaker"]', 'albert'); await page.selectOption('[data-vt-bench="style"]', 'robot'); await sleep(150);
+    const no = await st();
+    await page.selectOption('[data-vt-bench="style"]', 'deep'); await sleep(150);
+    const yes = await st();
+    check(no === 'Not in the allowed set for Albert (still playable)' && yes === 'Allowed for Albert', 'bench in English: robot not allowed for Albert, deep allowed', `${no} | ${yes}`);
+    await page.evaluate(async () => (await import('/src/voices/combos.js')).setCombos(null)); }
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `\n${failed} failed` : '\nall passed');
