@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Steering reuses the work of earlier commands
-The steering of a radio song SHALL keep its result after each command, for both the director's rewrite and the steering on air of a grown song. A new steering of the same song SHALL reuse the kept result for the longest list of commands it shares with an earlier steering, and steer only the commands after it. The director's view of a steered song SHALL reuse the same results. The director SHALL evaluate the moves of a boundary from the song's state at the start of that boundary, not from bar 0.
+The steering of a radio song SHALL keep its result after each command, for both the director's rewrite and the steering on air of a grown song. A new steering of the same song SHALL reuse the kept result for the longest list of commands it shares with an earlier steering, and steer only the commands after it. The director's view of a steered song SHALL reuse the same results.
 
 #### Scenario: A new press late in a Live coder song
 - **WHEN** a grown Live coder song has eight standing console commands and the listener presses "+" on a later phrase

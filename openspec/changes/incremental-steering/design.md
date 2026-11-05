@@ -28,7 +28,7 @@ Classic (`steerSong` only, seed `grow-2`, 144 bars, 9 standing `energy-up`): 0.1
 
 ### Prototype: the same presses with reuse (not committed)
 
-A copy of `src/` in the scratchpad (`steer/proto/`) with three switches. The first two keep the result of `steerSong` per command prefix and the loop state of `steerOnAir` after each command (D1, D2). The third keeps `compileSong`'s code per state content in `compileNow` (D4). D3 (checkpoints in the director) and D5 were not prototyped.
+A copy of `src/` in the scratchpad (`steer/proto/`) with three switches. The first two keep the result of `steerSong` per command prefix and the loop state of `steerOnAir` after each command (D1, D2). The third keeps `compileSong`'s code per state content in `compileNow` (D4). D5 was not prototyped.
 
 **Fair comparison** (`steer/inter.mjs`). One process, and for each press the full steering today runs first, then the steering with D1 + D2 + D4, right after it under the same load. The caches are filled only by the reuse runs. Load average 20 to 40. Seconds per press (`steerOnAir` + `steerView`):
 
@@ -44,14 +44,14 @@ A copy of `src/` in the scratchpad (`steer/proto/`) with three switches. The fir
 - **The output is the same.** For each of the 23 presses, the grown song, the resolved commands and the director's view are equal with and without reuse (a hash of their serialized form). An earlier run of 7 presses with D1 + D2 + D4 and 12 presses with D1 + D2 alone, in separate processes, was equal too.
 - **The cost no longer grows with the commands before.** Press 9 drops from 17.9 to 1.3 s and from 10.1 to 2.1 s. The totals are 6 to 8 times lower. The reuse run comes right after the run today on the same press, so it may gain a little from a warm JIT. The check of task 1.2 measures each mode in its own process.
 - **What is left is the new command's own typing measurement.** Breakdown in a separate run with D1 + D2 on grow-4 (press 1 to 7): the director 0.02 to 0.65 s, the transit 0.01 to 0.24 s, and `typingFrom` 0.8 to 47 s, over 1 to 7 calls per press (one per candidate boundary and round). With D4 the same calls take 0.9 to 6.4 s. The compile memo hit 1702 of 2229 compiles (76%). With D1 + D2 + D4, the profile puts 52 of the 60 s left in the typing measurement in the written plan (`planWrittenSteps` → `pass`). `compileNow` takes 37 s, mostly the content key's `JSON.stringify` and the misses. D4 is the larger part of the gain: D1 + D2 alone was 3.3 times faster in total on grow-4, and D1 + D2 + D4 was 16 times faster (separate runs, not interleaved).
-- **Classic with D1 alone** (`steer/cls.mjs`, interleaved, 5 songs of 96 to 144 bars, nine mixed presses): press 9 drops from 151 to 1360 ms today to 4 to 59 ms. Every result was the same. Once the prefix is reused, the director's `stateAt` replay is no longer the bottleneck of a press. It still costs on the first press of a song and after a cancel early in the song, which D3 is for.
+- **Classic with D1 alone** (`steer/cls.mjs`, interleaved, 5 songs of 96 to 144 bars, nine mixed presses): press 9 drops from 151 to 1360 ms today to 4 to 59 ms. Every result was the same. Once the prefix is reused, the director's `stateAt` replay is no longer the bottleneck of a press. It still costs on the first press of a song and after a cancel early in the song (see "Rejected / later").
 
 ## Goals / Non-Goals
 
 **Goals:**
 - The same output as today for every input, checked over many songs and command sequences.
 - The cost of a press depends on the new command, not on the number of commands before it.
-- A late press on a Live coder song steered in under 1.5 s in Node on a quiet machine (the reference machine is the owner's Mac with no other jobs; check 6.2 records the load average). In the page, a batch late in a Live coder song is ready within one phrase.
+- A late press on a Live coder song steered in under 1.5 s in Node on a quiet machine (the reference machine is the owner's Mac with no other jobs; the timing script of task 1.2 records the load average). In the page, a batch late in a Live coder song is ready within one phrase.
 - A Classic press under 150 ms in Node, late in a 144-bar song with nine standing commands.
 - Memory bounded per worker.
 
@@ -79,18 +79,9 @@ After each command the loop's state is kept: the grown song `N`, the written for
 - `steerView` and `directorView` call `steerSong` with the same resolved commands, so with D1 they find the result at once. The prototype measured 0 to 26 ms for them.
 - A command that changes (cancelled, moved to another boundary, edited) changes the key from that command on. The commands before it still match.
 
-### D3. `directSong` evaluates from a checkpoint per boundary
+### D3. Director checkpoints: dropped from this change
 
-At the start of each boundary `k`, `directSong` builds the state with every step before bar `at` applied: the checkpoint, built once per boundary from the previous one. Each `stateAt(working(base, steps), at)` in the boundary becomes `stateFrom(checkpoint, stepsAt(at), at)`. It copies the checkpoint, applies only the steps on bar `at` in their order, then restores the pinned settings as `stateAt` does.
-
-- **Copy on write.** `stateFrom` copies the song and its track list shallowly. Each track a step touches (`stepTrack` and the ids of `add`/`remove`/`mute` lists) is deep-cloned before the step applies. The pinned-settings restore clones the settings of the tracks it changes. The checkpoint itself is never changed.
-- **One state per candidate.** The candidate loop builds the candidate's state once and gives it to `energyOf`, `playing` and `curveParts`. Today `measure` and the count each rebuild it.
-- **Same result as `stateAt`.** The steps on one bar keep their file order (`buildSteps` sorts by bar, then by index). The `added` muting of `stateAt` changes nothing in the director's working song, where every planned track starts muted. `stateFrom` asserts this in the check. The kept steps (`keep`) can lie past the boundary (the listener's varied parts). They enter the checkpoint when the loop reaches their bar, as `stateAt` would apply them.
-- **The other callers stay as they are.** `stateOf` in the console's limits (`whyNot`, `partCount`) and `spokenPlace`/`spokenParts` call `stateAt` a few times per press. They move only if the timing script shows them over 5% of a press.
-
-- **Priority.** With D1 the Classic target is already met under load (press 9 at 4 to 59 ms). D3 still makes the first press of a song and a cancel early in the song cheaper, and it trims the director's 0.02 to 0.65 s inside a Live coder press. If the timing script shows D3 gains less than 10% of a late press, it is left out (open question 6).
-
-*Alternative considered:* memoizing `stateAt` by (song, bar). The working song changes with every step taken, so the key would be the whole step list. The hit rate is low, and the key costs about as much as the replay.
+Evaluating the director's moves from a checkpoint per boundary (the backlog idea) is not part of this change. The owner decided this on 5 November. See "Rejected / later" below.
 
 ### D4. `compileNow` keeps the compiled code per state content
 
@@ -101,12 +92,12 @@ At the start of each boundary `k`, `directSong` builds the state with every step
 
 ### D5. The written plan reused by content (behind a gate)
 
-After D1 to D4, the timing script (task 6.2) measures a late press on the check songs. If the 90th percentile is still over 1.5 s on a quiet machine, `planWrittenSteps` keeps its per-step results across `liveCode` instances of the same steering. These are the code of a step for a given active plan (the `early` map, today per instance) and the typing plans (`typings`, today per instance). The keys are their content, with the same bound and eviction as D4. If the gate stays shut, D5 is left out and the design records the measured numbers.
+After D1, D2 and D4, the timing script (task 5.1) measures a late press on the check songs. If the 90th percentile is still over 1.5 s on a quiet machine, `planWrittenSteps` keeps its per-step results across `liveCode` instances of the same steering. These are the code of a step for a given active plan (the `early` map, today per instance) and the typing plans (`typings`, today per instance). The keys are their content, with the same bound and eviction as D4. If the gate stays shut, D5 is left out and the design records the measured numbers.
 
 ### D6. Lifetime and invalidation
 
 - **Per realm, per worker.** The caches live in the module where they are used. The console worker keeps them across presses, which is where reuse pays. The growth worker and the page have their own.
-- **Bounds.** D1: at most 128 prefix results. D2: at most 64 loop states, each holding a grown song. D4: 3000 codes. Each is a least-recently-used `Map`. Task 6.2 records the heap after a session of 20 presses on three songs and moves the bounds if needed.
+- **Bounds.** D1: at most 128 prefix results. D2: at most 64 loop states, each holding a grown song. D4: 3000 codes. Each is a least-recently-used `Map`. Task 5.2 records the heap after a session of 20 presses on three songs and moves the bounds if needed.
 - **`forget`.** When a song leaves the air or is skipped, the radio sends `{ forget: baseKey }` to the console worker, which drops that base's D1 and D2 entries. A new session (`startSession`) clears all.
 - **What changes a key:** the base (new song, regrown `g0`, extended song, session bias), the context version (spoken context, language, my phrases), the controls and the chooser (`AIR_CHOOSER` version), and any command in the prefix.
 - **Turned off** while `globalThis.codingMiskAhead` is set (the growth probe's overrides), and by `STEER_MEMO=0` in Node for comparisons.
@@ -118,7 +109,7 @@ After D1 to D4, the timing script (task 6.2) measures a late press on the check 
 - **Songs**: 20 Classic songs (styles in turn, seeds `memo-<i>`), 5 Crescendo and 10 Live coder songs grown as `check-radio-profiles` grows them (`ONLY`/`SEEDS` to widen it).
 - **Sequences**: per song, 6 to 10 presses from a seeded mix of the console's kinds: `energy-up`, `energy-down`, `more`, `less`, `lock-part`, `unlock-part`, `vary`, `swap`, `curve`, `darker`, `more-space`, `mute`, `volume`, `riser`, `say-live`, `extend`. Each press is pending (`pend`, `q`) as the radio sends it. After some presses, a command in the middle is cancelled, or a pending batch is replaced.
 - **The comparison**: after each press, the result with reuse (one long-lived cache, as in the worker) against a full steering with the reuse off, in the same process. Both are serialized and compared byte for byte (`steerOnAir`'s song, commands, plan, options and `plain`; `steerView`; Classic `steerSong`'s song, plan and options). Kept values are deeply frozen, so a mutation throws.
-- **Directly**: `stateFrom` against `stateAt` on every boundary of every rewrite in those runs, byte for byte, and `compileNow` with the cache against without on a sample of bars.
+- **Directly**: `compileNow` with the cache against without, on a sample of bars.
 - It also runs with the context changed halfway (language, spoken context), to check the context version.
 - **Time**: about 3 minutes, so it is a quick check, not part of `check:endless`.
 
@@ -137,20 +128,24 @@ After D1 to D4, the timing script (task 6.2) measures a late press on the check 
 
 - [A kept value changed by a caller corrupts later results] → the check freezes kept values. `rewrite` and the waypoint steps already build new objects. A mutation found by the check is fixed at the caller.
 - [A missing input in a key gives a stale result] → the key covers every argument and the module context that the steering reads. The check changes the context halfway. Any module-level state found later goes in the context version.
-- [Memory in the console worker: grown songs are large] → bounds and `forget`, measured in task 6.2.
+- [Memory in the console worker: grown songs are large] → bounds and `forget`, measured in task 5.2.
 - [The content keys of D4 cost time] → measured, with a cheaper key from the caller as a fallback.
-- [D3 changes the director's hottest loop] → `stateFrom` is compared with `stateAt` on every call in the check, and the endless fixtures must not move.
 - [The page still waits for the first press of a song: nothing is kept yet] → the first press costs what one command costs today, which is already the cheap case.
 
 ## Migration Plan
 
 No data changes. Replays give the same songs. The reuse can be switched off (`STEER_MEMO=0` in Node, a constant in the worker) if a problem shows on air.
 
-## Open Questions
+## Rejected / later
 
-1. **Reuse in the page's main thread too, or only in the workers and Node?** The main thread steers only as a fallback (no worker, or `growNow`) and for `airView`. There a caller is more likely to change a result. *Recommendation:* on in the workers and Node, off on the main thread at first. Turn it on there after the check has run for a while.
-2. **Include D5 (written plan) in this change or leave it to a follow-up?** *Recommendation:* in this change, behind the gate. The prototype leaves the typing measurement at 0.9 to 6.4 s per press under load. On a quiet machine it may already fit, so measure first.
-3. **The bounds (128 / 64 / 3000).** *Recommendation:* start there, measure the worker's heap after 20 presses on three songs (task 6.2), and adjust.
-4. **Should the radio lower its preparation estimate (`addPrep`, `ADD_LEAD`) once steering is fast?** *Recommendation:* no change. The estimate already follows the measured time (`item.addPrep`), so it falls by itself.
-5. **The reference machine for the targets.** *Recommendation:* the owner's Mac with no checks running (load average under 4), recorded by the timing script. Under load the script reports the ratios only.
-6. **Keep D3 (director checkpoints) if its gain is small?** D1 already meets the Classic target, and the director is a small part of a Live coder press once D1 and D2 are in. *Recommendation:* build it after D1, D2 and D4 and keep it only if it saves 10% or more of a late press or halves the first press of a long Classic song. Otherwise drop it and record the numbers. It is the riskiest part, because it touches the director's hottest loop.
+- **Director checkpoints (former D3).** `directSong` would keep the song state at the start of each boundary and evaluate each candidate move from it (`stateFrom`, copy on write), instead of `stateAt` from bar 0. It was dropped from this change on 5 November (owner: "lascerei perdere"). With the reuse per command prefix, Classic press 9 already took 4 to 59 ms under load, and the director is 0.02 to 0.65 s of a Live coder press. The idea still helps the first press of a long song and a cancel early in a song, and touches the director's hottest loop, so it can come back as its own change if the timing script shows those cases matter.
+- **Memoizing `stateAt` by (song, bar).** The working song changes with every step taken, so the key would be the whole step list. The hit rate is low, and the key costs about as much as the replay.
+
+## Owner decisions (5 November)
+
+1. **The reuse runs in the workers and in Node only.** The page's main thread, which steers only as a fallback and for `airView`, keeps the reuse off.
+2. **D5 stays in this change, behind its gate.** It is built only if the timing script still shows a late press over 1.5 s on a quiet machine.
+3. **The bounds are 128 / 64 / 3000** (D1, D2, D4). Task 5.2 measures the heap and may move them.
+4. **No change to `addPrep` or `ADD_LEAD`.** The estimate already follows the measured time.
+5. **The reference machine is the owner's Mac with no checks running** (load average under 4), recorded by the timing script. Under load the script reports ratios only.
+6. **Director checkpoints are dropped** (see "Rejected / later").

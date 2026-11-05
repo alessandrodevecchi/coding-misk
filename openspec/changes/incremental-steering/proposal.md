@@ -7,13 +7,12 @@ The backlog idea was to memoize `stateAt`. The profile shows that it is only par
 ## What Changes
 
 - **A command is steered once.** The result after each command of a song (the director's song, plan and options, and on air the grown song, the written form and the boundary chosen) is kept, keyed by the song and the exact list of commands up to it. A new press reuses the kept result of the commands before it and steers only the new one. The director's view (`directorView`, `steerView`) reuses the same results. A change in a command (cancel, a different boundary, a new song) recomputes from that command on.
-- **The director writes from a checkpoint (kept if it pays).** `directSong` keeps the song state at the start of each boundary and evaluates each candidate move from that state, instead of replaying every step from bar 0 for each candidate. This is the backlog idea. With the reuse per command it matters less, so it stays only if the timing script shows a real gain.
 - **Code compiled once per state.** The code of a song state is compiled once and reused while the steering measures the typing (`compileNow`). The key is the state's content, and the cache has a size bound.
-- **The written plan reused where its input is the same (behind a measurement gate).** If the first three levels still leave a late press over its target, the written plan's per-step codes and typings are kept by their content across the measurements of one steering and across presses.
+- **The written plan reused where its input is the same (behind a measurement gate).** If the first two levels still leave a late press over its target, the written plan's per-step codes and typings are kept by their content across the measurements of one steering and across presses.
 - **The same output, checked.** A new check steers many songs (Classic, Crescendo and Live coder, many seeds) with mixed command sequences, presses one at a time with cancels in between. It compares every result with a full steering from scratch, byte for byte. Kept results are frozen in the check so a caller that changes one fails at once.
 - **Targets.** On a quiet machine in Node: a late press on a Live coder song with eight standing commands is steered in under 1.5 s, and the cost of a press does not grow with the number of commands before it. A Classic press stays under 150 ms. In the page, a console batch late in a Live coder song is ready within one phrase, so it enters on the first phrase start that `console-add-ahead` offers.
 
-Not in scope: changing what the director or the steering chooses; a different typing model; the window build and sound loading after the steering (`console-add-ahead`); growth speed (`growOnAir`).
+Not in scope: director checkpoints, the backlog idea of evaluating moves from a per-boundary state (dropped by the owner, see design "Rejected / later"); changing what the director or the steering chooses; a different typing model; the window build and sound loading after the steering (`console-add-ahead`); growth speed (`growOnAir`).
 
 ## Capabilities
 
@@ -29,8 +28,6 @@ None.
 
 - `src/endless/steering.js`: `steerSong` (results kept per command prefix).
 - `src/endless/waypoints.js`: `steerOnAir` (the state after each command kept), `directorView` and `steerView` (reuse).
-- `src/endless/director.js`: `directSong` (state checkpoints per boundary, one state per candidate).
-- `src/song/build.js`: a `stateFrom(checkpoint, steps, bar)` helper next to `stateAt`. `stateAt` itself is unchanged.
 - `src/song/compile-compact.js`: `compileNow` (the compiled code kept by state content).
 - `src/live/written-plan.js`, `src/live/live-code.js`: only if the gate of D5 opens.
 - `src/endless/grow-worker.js`, the console worker and `src/main.js` (`growAway`): the cache's lifetime per worker, the context version, a `forget` message for songs that left the air.
