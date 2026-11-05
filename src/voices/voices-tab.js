@@ -11,7 +11,7 @@ import { MOMENT_GROUPS, POETIC_TAGS } from './moments.js';
 import { builtinKeys, classify, totals, phraseFiles, sizeText, CLASSES, bankLang, mineKeys } from './samples.js';
 import { VOCABULARY, VOCAB_GROUPS, POETIC } from '../song/vocabulary.js';
 import { PHRASES, SPEAKERS, saySlug, sayBank, slugAt, speaks } from '../song/build.js';
-import { speakerLabel, DEFAULT_VOICE_NAME } from '../endless/voice-sound.js';
+import { speakerLabel, speakerName, DEFAULT_VOICE_NAME } from '../endless/voice-sound.js';
 import { POOL } from '../endless/phrases.js';
 import { VOICE_STYLES, VOICE_STYLE_IDS } from '../song/format.js';
 import { isAllowed, allowedStyles, allowedForDraw, COMBO_LANGS, COMBOS_FILE } from './combos.js';
@@ -173,7 +173,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     const u = ui.usage, banks = u ? u.banks : null, man = files() || {}, lang = getLang();
     const count = b => (banks ? (banks[b] || []).length : (man[b] || []).length);
     const cards = ['', ...SPEAKERS].map(sp => {
-      const name = sp ? sp[0].toUpperCase() + sp.slice(1) : t('phDefaultVoice');
+      const name = sp ? speakerName(sp) : t('phDefaultVoice');
       const per = LANGS.map(l => {
         // (a speaker that does not speak the language: the default voice speaks for it, real-voices)
         if (sp && !speaks(l, sp)) return `<li><span class="lbl">${esc(t(`phLang:${l}`))}</span> <span class="muted">${esc(t('phSpeaksInstead', { lang: t(`phLang:${l}`), voice: DEFAULT_VOICE_NAME[l] || '' }))}</span></li>`;
@@ -215,7 +215,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
       <p class="hint muted small">${esc(t('vcHint'))}</p>
       <div class="chips vt-cs-chips" role="group" aria-label="${esc(t('vcTitle'))} · ${esc(name)}">${chips}</div>
       ${limited.length ? `<p class="hint small vt-cs-lim" data-vt-cs-lim>${esc(t('vcLimited', { voice: other, list: limited.map(id => t(`voiceStyle:${id}`)).join(', ') }))}</p>` : ''}
-      <p class="hint muted small" data-vt-cs-note>${esc(sp ? t('vcNoteSpeaker', { voice: other }) : t('vcNoteDefault', { en: DEFAULT_VOICE_NAME.en, it: DEFAULT_VOICE_NAME.it }))}</p>
+      <p class="hint muted small" data-vt-cs-note>${esc(sp ? t(speaks('en', sp) ? 'vcNoteSpeaker' : 'vcNoteSpeakerIt', { voice: other }) : t('vcNoteDefault', { en: DEFAULT_VOICE_NAME.en, it: DEFAULT_VOICE_NAME.it }))}</p>
       ${radioOn() ? `<p class="hint small" data-vt-cs-next>${esc(t('vcNextSession'))}</p>` : ''}
       ${has ? `<div class="actions"><button type="button" class="btn small" data-vt-cs-reset="${esc(sp)}">${esc(t('vcReset'))}</button></div>` : ''}
     </details>`;
@@ -232,7 +232,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
 
   // the bench's pair against src/voices/combos.json (voice-style-combos D9), for the voice heard in the app's language
   function benchStatus() {
-    const lang = getLang(), sp = ui.bench.speaker, name = sp && speaks(lang, sp) ? sp[0].toUpperCase() + sp.slice(1) : DEFAULT_VOICE_NAME[lang] || '';
+    const lang = getLang(), sp = ui.bench.speaker, name = sp && speaks(lang, sp) ? speakerName(sp) : DEFAULT_VOICE_NAME[lang] || '';
     return t(isAllowed(sp, ui.bench.style, lang) ? 'phComboOk' : 'phComboNo', { name });
   }
 
@@ -392,7 +392,7 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
       return;
     }
     if (d.vtCs) { toggleStyle(d.vtCsSp || '', d.vtCs); return; }
-    if (d.vtCsReset !== undefined) { const sp = d.vtCsReset; combos && combos.reset(sp); toast && toast(t('vcResetDone', { name: sp ? sp[0].toUpperCase() + sp.slice(1) : t('phDefaultVoice') })); return; }
+    if (d.vtCsReset !== undefined) { const sp = d.vtCsReset; combos && combos.reset(sp); toast && toast(t('vcResetDone', { name: sp ? speakerName(sp) : t('phDefaultVoice') })); return; }
     if (d.vtSpHear !== undefined) { const lang = getLang(); return hear({ text: TEST_LINE[lang], lang, speaker: d.vtSpHear, temp: true }); }
     if (d.vtStyle) { const lang = getLang(); return hear({ text: TEST_LINE[lang], lang, speaker: '', settings: VOICE_STYLES[d.vtStyle], temp: true }); }
     if (d.vtBenchHear !== undefined || d.vtBenchSave !== undefined) {

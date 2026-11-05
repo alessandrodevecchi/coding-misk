@@ -3159,7 +3159,7 @@ function sampleState(sp, texts) {
   const files = spokenContext.files, lang = getLang();
   if (files === null) return 'ok';
   const bank = sayBank(lang, speakerOf(T, sp));
-  const ok = x => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
+  const ok = x => [bank, bank.replace(/_[a-z0-9]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
   if (texts.every(ok)) return 'ok';
   return texts.some(x => sampleAsked.has(`${bank}/${saySlug(x)}`)) ? 'wait' : 'none';
 }
@@ -3268,7 +3268,7 @@ function typedInput(text, lang, sg) {
 }
 const lineSamples = () => {
   const out = [], lang = getLang(), files = spokenContext.files || {};
-  const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
+  const has = (bank, x) => [bank, bank.replace(/_[a-z0-9]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
   for (const sp of T.tracks.filter(x => x.type === 'spoken')) {
     const speaker = speakerIn(lang, speakerOf(T, sp)), bank = sayBank(lang, speaker);
     let rows = []; try { rows = phraseRows(T, sp.id, { lang }); } catch (e) { rows = []; }
@@ -3333,7 +3333,7 @@ function playLate(lines) {
     let at = Math.ceil(now * 4 + 0.01) / 4;
     if (at >= x.at + 1 || busy(at)) at = Math.floor(now) + 1;
     if (at >= x.at + 2 || busy(at)) continue;
-    const bank = [x.bank, x.bank.replace(/_[a-z]+$/, '')].find(b => slugAt(files[b], saySlug(x.text)) >= 0);
+    const bank = [x.bank, x.bank.replace(/_[a-z0-9]+$/, '')].find(b => slugAt(files[b], saySlug(x.text)) >= 0);
     if (!bank) continue;
     const n = slugAt(files[bank], saySlug(x.text)), tr = voiceOf(song.build), v = { gain: 1, tempo: 1, ...((tr && tr.settings) || {}) };
     try { globalThis.superdough({ s: bank, n, gain: v.gain, speed: v.tempo, orbit: 15 }, globalThis.getAudioContext().currentTime + (at - now) / cps, 2); } catch (e) { continue; }

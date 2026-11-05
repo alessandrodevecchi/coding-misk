@@ -190,7 +190,8 @@ export function annotate(code, song, upTo, lang) {
 // the voice track a step speaks with: the one named by "voice", otherwise the first voice track (none: default settings)
 // the speakers and the languages each speaks (macOS system voices, real-voices D1); '' is the default voice (Samantha in
 // English, Alice in Italian). tools/voice-sample.mjs keeps a copy of this table (check:spoken asserts they agree).
-export const SPEAKER_LANGS = { albert: ['en'], fred: ['en'], junior: ['en'], kathy: ['en'] };
+// siri4 (#82) speaks Italian only, with the macOS system voice (see SYSTEM_SPEAKERS in tools/voice-sample.mjs).
+export const SPEAKER_LANGS = { albert: ['en'], fred: ['en'], junior: ['en'], kathy: ['en'], siri4: ['it'] };
 export const SPEAKERS = Object.keys(SPEAKER_LANGS);
 // removed by real-voices: they were never installed (#63); read as the default voice
 export const REMOVED_SPEAKERS = ['eddy', 'flo', 'grandma', 'grandpa', 'reed', 'rocko', 'sandy', 'shelley'];
@@ -454,7 +455,7 @@ export const captionHold = (len, barSec) => (len === null || len === undefined ?
 // opts.speakers (the radio, radio-narrator-speakers D3): also any line of a speaker (not the default voice) with no
 // sample of its own, a built-in narrator line, voice-track line or vocabulary entry the default voice has among them
 export function missingNeeds(list, files = {}, mineSlugs = null, opts = {}) {
-  const fl = files || {}, any = (bank, slug) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(fl[b], slug) >= 0);
+  const fl = files || {}, any = (bank, slug) => [bank, bank.replace(/_[a-z0-9]+$/, '')].some(b => slugAt(fl[b], slug) >= 0);
   const speakers = !!(opts && opts.speakers);
   return (list || []).filter(x => {
     if (x.has) return false;

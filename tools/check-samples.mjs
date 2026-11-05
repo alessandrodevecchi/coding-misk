@@ -27,7 +27,7 @@ const has = f => fs.existsSync(path.join(ROOT, f));
 const size = f => { try { return fs.statSync(path.join(ROOT, f)).size; } catch (e) { return 0; } };
 const mb = b => `${(b / 1024 / 1024).toFixed(1)} MB`;
 // the default voice's file of a speaker's line: say_it_reed/x.wav → say_it/x.wav
-const fallbackOf = f => f.replace(/^(say_[a-z]{2})_[a-z]+\//, '$1/');
+const fallbackOf = f => f.replace(/^(say_[a-z]{2})_[a-z0-9]+\//, '$1/');
 
 function report() {
   const all = [...new Set(wanted())], missing = all.filter(f => !has(f));

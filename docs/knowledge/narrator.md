@@ -43,7 +43,7 @@ Each radio song has its own voice. The style gives a speaker list and ranges for
 <!-- generated:narrator -->
 Narrator styles: `explain`, `poetic`.
 
-Speakers (`SPEAKERS`, with the languages each speaks): `albert` (en), `fred` (en), `junior` (en), `kathy` (en); in a language a speaker does not speak, the default voice (Samantha in English, Alice in Italian) speaks.
+Speakers (`SPEAKERS`, with the languages each speaks): `albert` (en), `fred` (en), `junior` (en), `kathy` (en), `siri4` (it); in a language a speaker does not speak, the default voice (Samantha in English, Alice in Italian) speaks.
 <!-- /generated -->
 
 - `explain`: the default. It says what each step does.

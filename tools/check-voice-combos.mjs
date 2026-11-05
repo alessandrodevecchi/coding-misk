@@ -84,7 +84,8 @@ const CHECKS = {
     const t = { format: 1, en: Object.fromEntries(['default', ...SPEAKERS].map(s => [s, ['clear', 'distant']])) };
     assert(withTable(t, () => voices()).every(v => v.character === null), 'a character with nothing allowed');
     assert(withTable(t, () => voices({ voiceCharacters: { robot: 3, deep: 1 } })).every(v => v.character === null), 'an artist character with nothing allowed');
-    const taste = withTable({ format: 1, it: { default: ['deep', 'radio'] } }, () => voices({ voiceCharacters: { robot: 3, deep: 1 } }));
+    // (siri4 speaks Italian, #82: its own entry bounds it too)
+    const taste = withTable({ format: 1, it: { default: ['deep', 'radio'], siri4: ['deep', 'radio'] } }, () => voices({ voiceCharacters: { robot: 3, deep: 1 } }));
     assert(taste.every(v => v.character === 'deep'), `artist taste filtered: ${[...new Set(taste.map(v => v.character))]}`);
   },
   'an all-allowed file draws the same voices as no file, and the same random values': () => {

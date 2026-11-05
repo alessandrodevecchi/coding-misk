@@ -56,7 +56,8 @@ export const SESSION_FORMAT = 'coding-misk/endless-session';
 // drawn speakers move; the same number of draws, the music and the lines do not
 // 18 (varied-openings, #82): every style lists more drum machines and sounds, and the opening and kick-start weights;
 // the kit list of the steering (KITS) is longer, so the drawn kits and sounds move
-export const DIRECTOR_VERSION = 18;
+// 19 (siri-it-voice, #82): the Italian speaker siri4 joins the speakers, so the drawn speakers move
+export const DIRECTOR_VERSION = 19;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // (gestures, director-fold-ring D6: false turns the effect gestures off; the checks use it to compare with version 14)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
