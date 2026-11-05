@@ -47,9 +47,9 @@ OpenSpec changes not archived: 109. With open tasks: 33. All tasks ticked, waiti
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [track-to-code](../../openspec/changes/track-to-code/tasks.md) | 11 | 42 |
-| [varied-openings](../../openspec/changes/varied-openings/tasks.md) | 12 | 28 |
+| [varied-openings](../../openspec/changes/varied-openings/tasks.md) | 8 | 28 |
 | [voice-instrument](../../openspec/changes/voice-instrument/tasks.md) | 1 | 16 |
-| [voice-style-combos](../../openspec/changes/voice-style-combos/tasks.md) | 12 | 12 |
+| [voice-style-combos](../../openspec/changes/voice-style-combos/tasks.md) | 1 | 12 |
 | [widget-render-styles](../../openspec/changes/widget-render-styles/tasks.md) | 2 | 21 |
 
 Ticked and not archived: `after-tests-oct28`, `app-guide`, `arp-patterns`, `artists-and-styles`, `backfill-app-features`, `clear-names`, `code-follow-toggle`, `code-lanes`, `code-over-visual`, `code-themes`, `code-writing`, `continue-in-radio`, `curve-look`, `denser-renders`, `director-fold-ring`, `extend-song`, `fast-export`, `fast-video`, `faster-checks`, `fm-like-effects`, `fragment-extras`, `growth-in-background`, `human-typing`, `knowledge-base`, `level-headroom`, `lines-ahead-balanced`, `live-coder-growth`, `my-phrases`, `narrator-ghost-row`, `pattern-followups`, `phrase-any-voice`, `playlists`, `poetic-steps`, `procedural-visuals`, `profile-options`, `radio-chooser-versions`, `radio-compilation`, `radio-curves`, `radio-fast-export`, `radio-invented-style-chip`, `radio-knob-locks`, `radio-phrase-speaker`, `radio-sessions-in-playlists`, `radio-steering`, `random-tools`, `real-voices`, `reused-lines`, `saved-patterns-hide`, `saved-patterns-list`, `session-choice-prepared`, `session-video`, `shape-search`, `song-functions`, `song-own-settings`, `song-search`, `song-soul`, `song-transitions`, `song-trash`, `sound-guard`, `spoken-text-on-stage`, `stage-app-widgets`, `strudel-catalog`, `takeover-pending-edit`, `test-fixes`, `timeline-growth`, `two-modes`, `typing-lines`, `typing-mistakes`, `vertical-clips`, `voice-controls`, `voice-full-controls`, `voice-function`, `voice-placement`, `voice-track-tuning`, `widgets-on-stage`, `written-like-coder`.

@@ -43,13 +43,20 @@
 
 Fixtures are regenerated once, here at the end, after every rule and recipe change. If the voice speakers change lands on `develop` first, rebase on it, keep one `DIRECTOR_VERSION` bump and regenerate once.
 
-- [ ] 7.0 Bump `DIRECTOR_VERSION` to 17 (or keep the other change's bump if it already raised it in this release). Verify: `npm run check:endless` reports the fixture move until 7.2.
+- [x] 7.0 Bump `DIRECTOR_VERSION` to 17 (or keep the other change's bump if it already raised it in this release). Verify: `npm run check:endless` reports the fixture move until 7.2.
 
 - [ ] 7.1 `npm run check:crescendo -- --write` and `-- --write-fixtures` (Crescendo and Live coder fixtures move together on purpose, both versions raised), then `npm run check:crescendo -- --full`. Verify: full level passes.
-- [ ] 7.2 `npm run check:endless -- --write-fixtures`, `npm run check:radio-profiles -- --write-fixtures`, and `npm run check:invent -- --write-fixtures` only if its fixtures moved (then `STYLE_MAKER_VERSION` 2). Verify: `check:endless`, `check:radio-profiles`, `check:invent`, `check:material`, `check:spoken` pass; `endless-v14.json` still matches with gestures off.
-- [ ] 7.3 `npm run durations`, then `npm run check:durations`; `npm run check:live-code -- --write` if its fixture moved. Verify: both pass.
-- [ ] 7.4 `npm run check:songs`, `npm run check:code`, `npm run check:mixer`, `npm run check:strudel`, `npm run catalog:strudel`. Verify: all pass; `catalog:strudel` committed if it changed.
+- [x] 7.2 `npm run check:endless -- --write-fixtures`, `npm run check:radio-profiles -- --write-fixtures`, and `npm run check:invent -- --write-fixtures` only if its fixtures moved (then `STYLE_MAKER_VERSION` 2). Verify: `check:endless`, `check:radio-profiles`, `check:invent`, `check:material`, `check:spoken` pass; `endless-v14.json` still matches with gestures off.
+- [x] 7.3 `npm run durations`, then `npm run check:durations`; `npm run check:live-code -- --write` if its fixture moved. Verify: both pass.
+- [x] 7.4 `npm run check:songs`, `npm run check:code`, `npm run check:mixer`, `npm run check:strudel`, `npm run catalog:strudel`. Verify: all pass; `catalog:strudel` committed if it changed.
 - [ ] 7.5 Browser checks on a free port (owner's dev server): `tools/check-growth-background.cjs`, `tools/check-endless-play.cjs` on a fresh session of every style, `tools/check-playlists.cjs` (old sessions show the badge, frozen sessions do not). Verify: all pass, no `evalError`.
+
+### Status (2026-11-05)
+
+- Done: groups 1 to 6 (but 6.5, the owner's listening, list in `design.md`), 7.0 (`DIRECTOR_VERSION` 18, the next free number after real-voices; `STYLE_MAKER_VERSION` 3), 7.2, 7.3, 7.4. Fixtures regenerated once: Crescendo, Live coder, live code, endless (with the recorded hashes and `endless-v14.json`), radio profiles, invented styles, song durations, Strudel catalog.
+- Open, 7.1: `npm run check:crescendo -- --full` fails one corpus check, "pace: audible changes in the first minute": medium inside 4 to 6 changes on 66% of the long songs (81% on develop, needs 70%), median 4 (5 before); fast median 6 (7 before, needs 6). The built-in songs draw other openings now (more typed, bass, chord and top leads); a typed opening's silent lead-in and a first line of notes take longer than a kick row, so fewer audible changes fit in the first minute. The top lead was given row-by-row forms (`rowForms`), which raised the share from 58% to 66%. Owner decision: accept a lower share for the medium pace, count the first minute from the first sound for typed openings, or lower the typed weights.
+- Open, 4.5 and 7.5: the browser checks (`check-style-sounds.cjs`, `check-steering.cjs` kit swap, kit menus at 400 px, `check-growth-background.cjs`, `check-endless-play.cjs`, `check-playlists.cjs`) and the Compose Opening control in Crescendo in the browser.
+- `check:live-code`: the kellerlicht code checks keep the opening it drew before (`broken`), so they test the code as before; one check (reused-lines D8 on crescendo-notte-lunga) fails as on develop. `check:spoken` keeps luci-rosse on its old `full-kick` opening for its counted captions.
 
 ## Workflow follow-up
 

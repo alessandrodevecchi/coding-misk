@@ -241,6 +241,39 @@ to three pairs of 40 missed by chance; a run with other seeds, `--salt`, tells a
 | synthwave | melodic 2, pad 2, bass 2, chord 1, full-kick 1, slow 1, filtered 1 | four 2, two 2, one 1 | 25% (32%) | 27% (31%) |
 | trance | full-kick 3, filtered 2, slow 1, pad 1, melodic 1, top 0.5, typed 0.5 | four 2, one 1, two 1, push 1 | 73% (72%) | 63% (69%) |
 
+### Listening pass (task 6.5)
+
+One radio song per style whose first line plays a kit added by this change. Each row is the first song of a radio
+session with that style alone, the profile named, chaos 0.3, energy 0.6, complexity 0.5, talk 0.5 and the seed given
+(the probe's seeds, `tools/opening-probe.mjs`). Listen to the opening and to the new kit or sound; drop any addition
+that does not fit.
+
+| Style | Profile | Seed | New kit heard first | First line |
+| ----- | ------- | ---- | ------------------- | ---------- |
+| acid | Crescendo | `op-crescendo-14-2` | RolandTR606 | `s("bd")` |
+| ambient | Live coder | `op-switch-0-0` | RolandCompurhythm78 | `s("~ hh")` |
+| berlin-techno | Crescendo | `op-crescendo-1-1` | RolandTR808 | `s("bd*2")` |
+| classic-rock | Crescendo | `op-crescendo-2-1` | YamahaRY30 | `s("bd*4")` |
+| country | Crescendo | `op-crescendo-3-1` | AlesisSR16 | `s("bd*2")` |
+| dark-cyberpunk | Crescendo | `op-crescendo-4-3` | RolandTR808 | `s("bd ~ ~ bd")` |
+| darksynth | Crescendo | `op-crescendo-5-8` | RolandTR707 | `s("bd*2")` |
+| dreamy-cyberpunk | Crescendo | `op-crescendo-6-1` | RolandTR808 | `s("hh*8")` |
+| drum-and-bass | Crescendo | `op-crescendo-7-1` | RolandTR808 | `s("bd ~!9 bd ~!5")` |
+| gated-trance | Crescendo | `op-crescendo-16-2` | RolandTR707 | `s("bd*4")` |
+| house | Crescendo | `op-crescendo-15-3` | RolandTR707 | `s("bd ~ ~ bd")` |
+| industrial | Crescendo | `op-crescendo-8-3` | RolandTR606 | `s("bd")` |
+| jazz | Crescendo | `op-crescendo-9-8` | YamahaRY30 | `s("[rd ~ rd rd]*2")` |
+| lo-fi | Crescendo | `op-crescendo-10-3` | MPC1000 | `s("hh*8")` |
+| melodic-metal | Crescendo | `op-crescendo-11-11` | YamahaRY30 | `s("hh*8")` |
+| phonk | Crescendo | `op-crescendo-12-4` | AkaiMPC60 | `s("bd")` |
+| progressive-house | Crescendo | `op-crescendo-13-1` | KorgM1 | `s("bd")` |
+| pure-trance | Crescendo | `op-crescendo-17-6` | RolandMC303 | `s("bd*2")` |
+| synthwave | Crescendo | `op-crescendo-18-10` | AkaiLinn | `s("bd*2")` |
+| trance | Crescendo | `op-crescendo-19-1` | RolandMC303 | `s("bd ~ ~ bd")` |
+
+The added melodic sounds (pads, basses, leads) show up later in the songs; `npm run probe:openings -- --styles <id>
+--json out.json` lists more seeds per style.
+
 ### Sounds the app can play
 
 - **Drum machines.** A recipe kit must be in `MACHINES` (`src/sounds/machines.js`, 71 bank ids). The samples come from the drum machine index that the app loads at run time . Songs play six rows only: `bd cp sd hh oh rd` (`ROWS`, `src/music.js`). Fills also play `cr`, and the `cowbell` hook wave plays `cb` from `RolandTR808`. A missing row falls back to the nearest one only for the kits in `KIT_MISSING` (`src/music.js`); for every other kit a missing row is silent.

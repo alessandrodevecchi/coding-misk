@@ -153,9 +153,15 @@ export function beatForms(beat, o = {}) {
 }
 export function rowForms(rows, o = {}) {
   const live = Object.entries(rows || {}).filter(([, v]) => /x/.test(v)).sort(([a], [b]) => rowRank(a) - rowRank(b));
+  // varied-openings: the top lead starts from the busiest row other than the kick, then the kick, then the others
+  if (o.core === 'top') {
+    const top = topRow(rows);
+    if (!top || live.length < 2) return [];
+    const order = [live.find(([r]) => r === top), ...live.filter(([r]) => r !== top)];
+    return order.slice(1).map((_, k) => Object.fromEntries(order.slice(0, k + 1))).reverse();
+  }
   if (live.length < 2 || live[0][0] !== 'bd') return [];
   const bd = live[0][1], hits = [...bd].map((c, i) => (c === 'x' ? i : -1)).filter(i => i >= 0);
-  if (o.core === 'top') return [];
   const start = o.core && o.core.hits ? startSteps(o.core.hits, Math.min(16, bd.length)) : null;
   const coreHits = o.core === 'kick' ? hits : o.core === 'broken' ? hits.filter(i => i % 4 !== 0) : start ? hits.filter(i => start.includes(i)) : hits.filter(i => i % 16 === 0).slice(0, 1);
   const row = keep => [...bd].map((c, i) => (keep.includes(i) ? 'x' : '.')).join('');
