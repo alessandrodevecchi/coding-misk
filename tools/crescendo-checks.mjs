@@ -283,6 +283,19 @@ export const CHECKS = [
     const re = validateRecipe({ ...styles.acid, growthShapes: { kicks: { gallop: 2 } } }).errors;
     assert(re.some(e => e.path === 'growthShapes.kicks.gallop' && /pair/.test(e.msg)), JSON.stringify(re));
   } },
+  { name: 'kick starts (varied-openings): four on a house song and pair on a drum and bass kick, in Crescendo and in a slow Live coder opening, then the written kick', unit() {
+    const cases = [['switch-house-prova', 'four', 'x...x...x...x...'], ['prova-drum-and-bass', 'pair', 'x.........x.....']];
+    for (const [id, start, want] of cases) {
+      const s = byId(id), sid = s.tags.styles[0], st = { ...styles, [sid]: { ...styles[sid], growthShapes: { ...styles[sid].growthShapes, openings: { slow: 1 }, kicks: { [start]: 1 } } } };
+      for (const C of [resolveProfile('crescendo'), resolveProfile('switch', { opening: 'slow', pace: 'medium', development: 'by-type' })]) {
+        const c = crescendoSong(s, { rules: growthRules(C, { styles: st }) }), at = firstSound(c), on = heardTracks(c, at), who = `${id} ${C.id} ${start}`;
+        assert(c.crescendo.kick === start && on.length === 1 && on[0].type === 'drums', `${who}: kick ${c.crescendo.kick}, ${on.map(t => t.id)}`);
+        const bd = String(rowsOf(on[0]).bd || '').slice(0, 16);
+        assert(bd === want && Object.keys(rowsOf(on[0])).every(r => r === 'bd'), `${who}: first kick ${bd}`);
+        assert(ends(c), `${who}: does not end on the written song`);
+      }
+    }
+  } },
   { name: 'shapes: Classic and Crescendo take no shape; the Live coder build records it', unit() {
     for (const s of songs.slice(0, 10)) assert(!crescendoSong(s).crescendo.shape && !crescendoSong(s, { rules: growthRules(resolveProfile('crescendo')) }).crescendo.shape, s.id);
     assert(shaped(coder(byId('switch-prima-luce'))) && coder(byId('switch-prima-luce')).crescendo.shape.version === SHAPES_VERSION, 'Live coder');
@@ -360,7 +373,11 @@ export const CHECKS = [
       const at = firstSound(c), on = heardTracks(c, at), who = `${s.id} ${opening}`;
       const kickOf = t => String(rowsOf(t, N).bd || '');
       if (['slow', 'full-kick', 'filtered', 'broken'].includes(opening)) assert(on.length === 1 && on[0].type === 'drums', `${who}: ${on.map(t => t.id)}`);
-      if (opening === 'slow' && /x/.test(kickOf(on[0]))) assert([...kickOf(on[0])].every((x, i) => x !== 'x' || i % 16 === 0) && Object.keys(rowsOf(on[0], N)).length === 1, `${who}: ${JSON.stringify(rowsOf(on[0], N))}`);
+      // (varied-openings: the slow kick starts from its kick start; one: the first beat only)
+      if (opening === 'slow' && /x/.test(kickOf(on[0]))) assert(c.crescendo.kick && Object.keys(rowsOf(on[0], N)).length === 1 && (c.crescendo.kick !== 'one' || [...kickOf(on[0])].every((x, i) => x !== 'x' || i % 16 === 0)), `${who}: ${c.crescendo.kick} ${JSON.stringify(rowsOf(on[0], N))}`);
+      if (opening === 'bass') assert(on.length === 1 && on[0].type === 'bass', `${who}: ${on.map(t => t.type)}`);
+      if (opening === 'chord') assert(on.length === 1 && ['pad', 'guitar'].includes(on[0].type), `${who}: ${on.map(t => t.type)}`);
+      if (opening === 'top') assert(on.length === 1 && on[0].type === 'drums' && !/x/.test(kickOf(on[0])) && Object.keys(rowsOf(on[0], N)).length >= 1, `${who}: ${on.map(t => t.id)} ${JSON.stringify(rowsOf(on[0], N))}`);
       if (opening === 'full-kick' || opening === 'filtered') assert(kickOf(on[0]) === String(baseRows(on[0], N).bd || '') && Object.keys(rowsOf(on[0], N)).every(r => r === 'bd'), `${who}: ${JSON.stringify(rowsOf(on[0], N))}`);
       if (opening === 'filtered') assert(on[0].settings.cutoff === 300 && !(on[0].hidden || []).includes('cutoff'), `${who}: cutoff ${on[0].settings.cutoff}`);
       if (opening === 'broken') assert(/x/.test(kickOf(on[0])) && [...kickOf(on[0])].some((x, i) => x === 'x' && i % 4 !== 0), `${who}: ${kickOf(on[0])}`);

@@ -11,11 +11,11 @@
 
 ## 3. Growth: lead track and kick start
 
-- [ ] 3.1 `src/song/crescendo.js` `growSong`: without a shape, move the track named by `resolveLead` to the front of `dest` (same front rules as `orderByShape`, plus `bass`, `chord`, `top`). Verify: a Crescendo growth of an ambient radio song opens on its pad; Classic fixtures unchanged.
-- [ ] 3.2 `orderByShape`: fronts for `bass`, `chord`, `top`; for typed, muted-base and mid-set the front comes from `resolveLead`; voice keeps the spoken track first. `src/song/coder.js`: drums with a kick enter no earlier than the third waypoint for `bass` and `chord`, and the kick track at the second for `top`. Verify: Live coder growths with `--opening bass|chord|top` in `npm run growth:probe` open on the named part.
-- [ ] 3.3 Kick start core: a `{ hits }` core in `thinRows`, `beatForms` and `rowForms`, and the `top` core (non-kick rows only); `trackRules` passes the drawn start for the slow opening and for Crescendo drums. Verify: `slow` with `four` on a house song writes `s("bd*4")` as its first line and grows to the written groove; `pair` on a dnb song writes the two kicks.
-- [ ] 3.4 Check that the writer writes every kick start in short form (`bd*2`, `bd*4`, `[bd ~ ~ bd]`, `~ bd`, the pair) in Live coder and Crescendo code. Verify: `npm run check:functions` and `npm run check:live-code` pass; fix the writer only if a start comes out long.
-- [ ] 3.5 Bump `CRESCENDO_VERSION` to 3 (keep the stream name `crescendo-1`). Verify: `tools/fixtures/crescendo.json` version mismatch is reported until 7.1.
+- [x] 3.1 `src/song/crescendo.js` `growSong`: without a shape, move the track named by `resolveLead` to the front of `dest` (same front rules as `orderByShape`, plus `bass`, `chord`, `top`). Verify: a Crescendo growth of an ambient radio song opens on its pad; Classic fixtures unchanged.
+- [x] 3.2 `orderByShape`: fronts for `bass`, `chord`, `top`; for typed, muted-base and mid-set the front comes from `resolveLead`; voice keeps the spoken track first. `src/song/coder.js`: drums with a kick enter no earlier than the third waypoint for `bass` and `chord`, and the kick track at the second for `top`. Verify: Live coder growths with `--opening bass|chord|top` in `npm run growth:probe` open on the named part.
+- [x] 3.3 Kick start core: a `{ hits }` core in `thinRows`, `beatForms` and `rowForms`, and the `top` core (non-kick rows only); `trackRules` passes the drawn start for the slow opening and for Crescendo drums. Verify: `slow` with `four` on a house song writes `s("bd*4")` as its first line and grows to the written groove; `pair` on a dnb song writes the two kicks.
+- [x] 3.4 Check that the writer writes every kick start in short form (`bd*2`, `bd*4`, `[bd ~ ~ bd]`, `~ bd`, the pair) in Live coder and Crescendo code. Verify: `npm run check:functions` and `npm run check:live-code` pass; fix the writer only if a start comes out long.
+- [x] 3.5 Bump `CRESCENDO_VERSION` to 3 (keep the stream name `crescendo-1`). Verify: `tools/fixtures/crescendo.json` version mismatch is reported until 7.1.
 
 ## 4. Instruments in the style recipes
 
