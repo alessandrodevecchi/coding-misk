@@ -113,6 +113,14 @@ Every kit added to a style is appended to `KITS` (`src/music.js`). Users of the 
 - `tools/knowledge.mjs` marks every `KITS` entry as described, so the sounds note needs a line per new kit (`npm run check:knowledge`).
 - `kitRow` falls back only for kits in `KIT_MISSING`, so every new `KITS` entry must be complete for the six rows or have an entry there (the kit-rows check covers `KITS` too).
 
+### D11. The first minute counts from the first sound
+
+The corpus check "pace: audible changes in the first minute" (`npm run check:crescendo -- --full`) counted the steps in the first 60 s from bar 0. With the new lead draw more built-in songs open typed (a silent lead-in while the first line is typed), so part of that minute was silence: medium had 66% of the long songs inside 4 to 6 changes (70% needed, 81% on `develop`), median 4; fast median 6.
+
+Owner decision (2026-11-05): count the minute from the first audible step. `firstMinute` (`tools/growth-measure.mjs`) now opens its 60 s window at the first step that is heard. Openings that sound at bar 0 keep the same window. Result: medium 77% inside 4 to 6, median 4 (range 2 to 6); fast median 6 (range 4 to 8). The 70% threshold stays. The growth's own pacing is unchanged, and so are the first lines.
+
+A voice as the first sound was evaluated too. A spoken track with an opening line is already the `voice` opening: it sounds at bar 0 and the measure counts it. A narrator voice track is not part of the code (`audible` reads the `$:` lines only) and never counts as an opening (`shapeFacts`). Making it a first sound would change the opening rules and the fixtures for no gain on this check, so it was not done.
+
 ## Risks / Trade-offs
 
 - [A new kit lacks a row a groove plays (for example no `rd` or `oh`)] → the kit-rows check fails on it; the kit gets a `KIT_MISSING` entry or is dropped from that style.
