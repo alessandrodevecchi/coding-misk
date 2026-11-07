@@ -248,8 +248,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the window and its songs, each with its own controls (radio-profiles D7, D8): the song on air in its profile's view,
   // the next one shown (Classic, as before) or hidden (a grown song) as the incoming option says
   // over: { item, song } the window with that song on that item, without changing it (a typed line tried first, #82)
-  function windowPlayable(over = null) {
-    const items = S.stream.slice(S.onAir, S.onAir + 2).map(x => (over && x === over.item ? { ...x, song: over.song } : x));
+  // (items: the window's items, the song on air first; a skip makes the window of the next song before it goes on air)
+  function windowPlayable(over = null, list = null) {
+    const items = (list || S.stream.slice(S.onAir, S.onAir + 2)).map(x => (over && x === over.item ? { ...x, song: over.song } : x));
     const W = windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start, transition: x.entry.transition, cut: x.cut })));
     return player.makePlayable(W, items.map((x, i) => ({ n: x.n + 1, prefix: `s${x.n + 1}-`, start: x.start, song: x.song, title: x.song.title, profile: profileOf(x), custom: !!x.custom || !!displayOn(x), ctl: liveControlsOf(x), show: i === 0 ? 'air' : showOf(x) })));
   }
@@ -427,6 +428,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const mine = S;
     idle(() => {
       if (S !== mine) return;
+      // (a skip pressed meanwhile made the next song already, #82)
+      if (S.stream.length > S.onAir + 1) { S.pending = false; return; }
       // (the window with the next song made ready a little at a time: the song on air's plan is made again, #82)
       // (the next song's voice samples then load one at a time, in a task of their own, #82)
       const it = generate(true), ready = () => { if (S !== mine) return; S.pending = false; const nx = S.stream[S.onAir + 1]; swapSoon(windowPlayable(), nx ? nx.start : Infinity); render(); setTimeout(() => { if (S === mine && player.preloadVoices && nx) player.preloadVoices(voicesOf(nx)); }, 0); };
@@ -450,18 +453,66 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     } else if (performance.now() - S.lastCard > 250) { S.lastCard = performance.now(); renderNow(cyc); }
   }
   // skip: the song on air ends with this bar, the next one starts on the next bar
+  // (#82: a next song still growing away from the page, or not made yet, grew here, on the main thread: up to seconds
+  // of frozen page and late notes. Now the skip waits for it, "Skipping…", while the song on air plays on; then the
+  // next song's window is made ready, its plan away from the page, and it goes on air on the first bar after that)
   function skip() {
-    if (!S || S.paused !== undefined) return;
+    if (!S || S.paused !== undefined || S.skipping) return;
     if (S.limit && S.onAir + 1 >= S.limit) return endLimited();
-    const cyc = player.now(), cur = S.stream[S.onAir], cut = Math.floor(cyc) + 1;
-    if (S.stream.length <= S.onAir + 1) generate();
+    if (S.stream.length <= S.onAir + 1 && !generate(true)) return endLimited();
+    const mine = S, nx = S.stream[S.onAir + 1], token = S.skipping = { at: performance.now() };
+    paintSkip();
+    const alive = () => S === mine && S.skipping === token && S.paused === undefined && S.stream[S.onAir + 1] === nx;
+    const drop = () => { if (S === mine && S.skipping === token) { delete S.skipping; render(); } };
+    // (a newer growth or steering of the next song meanwhile is waited for too)
+    const grown = () => { if (!alive()) return drop(); if (nx.growing) { nx.growing.then(grown, grown); return; } skipPrepare(nx, token, alive, drop); };
+    grown();
+  }
+  // the next song's window, its first bar at least SKIP_LEAD seconds plus the expected preparation ahead, made ready (the
+  // plan of its song away from the page), then handed to the player on that bar; when the bar is reached first, the
+  // skip goes on at the next bar with the window made here (as before)
+  const SKIP_LEAD = 0.5;
+  let skipPrep = 1;
+  function skipPrepare(nx, token, alive, drop) {
+    const cur = S.stream[S.onAir], now = player.now(), bs = barSecOf(cur.song, Math.max(0, Math.floor(now - cur.start)));
+    const cut = Math.max(Math.floor(now) + 1, Math.ceil(now + (SKIP_LEAD + skipPrep) / bs));
+    const p = windowPlayable(null, [{ ...nx, start: cut }]), t0 = performance.now(), song0 = nx.song;
+    let done = false, ready = false;
+    const go = () => {
+      done = true;
+      // (too late for its bar, or the next song changed meanwhile: on the next bar, with a window made now)
+      if (player.now() > cut - 0.05 || nx.song !== song0) { skipNow(); return; }
+      skipNow(cut, p);
+    };
+    // (on air in the last half bar before the cut, as a skip on the next bar did; not ready a third of a bar before it,
+    // it goes on air anyway and its plan is finished at once)
+    const watch = () => { if (done) return; if (!alive()) { done = true; drop(); return; } const now = player.now(); if ((ready && now >= cut - 0.5) || now >= cut - 0.34) go(); else setTimeout(watch, 30); };
+    const prepared = () => { ready = true; skipPrep = Math.max(0.3, Math.min(8, (performance.now() - t0) / 1000 * 1.3)); };
+    (p.prepare ? p.prepare(12, () => !done && alive()) : Promise.resolve()).then(prepared, prepared);
+    watch();
+  }
+  // the skip itself: the song on air cut at `cut` (the next bar without one), the next song on air from there
+  function skipNow(cut = null, p = null) {
+    delete S.skipping;
+    const cyc = player.now(), cur = S.stream[S.onAir];
+    if (cut === null) cut = Math.floor(cyc) + 1;
     growNow(S.stream[S.onAir + 1]);
     cur.bars = Math.max(1, cut - cur.start); cur.cut = true;
     relayout();
     S.onAir++;
     remember(S.stream[S.onAir]);
-    player.jump(windowPlayable(), S.stream[S.onAir].start, { voices: airVoices() });
-    render();
+    player.jump(p || windowPlayable(), S.stream[S.onAir].start, { voices: airVoices() });
+    // (the radio drawn in a task of its own)
+    setTimeout(() => render(), 0);
+  }
+  // the Skip button while the skip waits for the next song
+  function paintSkip() {
+    const b = root.querySelector('#radio-skip');
+    if (!b) return;
+    const on = !!(S && S.skipping);
+    b.disabled = on || !S || S.paused !== undefined;
+    b.textContent = `⏭ ${t(on ? 'radioSkipping' : 'radioSkip')}`;
+    if (on) b.setAttribute('aria-busy', 'true'); else b.removeAttribute('aria-busy');
   }
   // ---------- recording (#30) ----------
   // the session as audio, from now until stopped (pauses leave no gap), with the recipe and a track list
@@ -1789,7 +1840,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         <div class="radio-onair">
           <button class="btn primary radio-start" id="radio-start" aria-pressed="${on}" ${tip(on ? 'tipStop' : 'tipStart')}>${on ? '■ ' + esc(t('radioStop')) : '▶ ' + esc(t('radioStart'))}</button>
           <button class="btn" id="radio-pause" ${on ? '' : 'disabled'} ${tip(paused ? 'tipResume' : 'tipPause')}>${paused ? '▶ ' + esc(t('radioResume')) : '❚❚ ' + esc(t('radioPause'))}</button>
-          <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
+          <button class="btn" id="radio-skip" ${on && !paused && !S.skipping ? '' : 'disabled'}${on && S.skipping ? ' aria-busy="true"' : ''} ${tip('tipSkip')}>⏭ ${esc(t(on && S.skipping ? 'radioSkipping' : 'radioSkip'))}</button>
           <button class="btn" id="radio-pl" ${on && !S.limit ? '' : 'disabled'} ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>
           <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
         </div>
