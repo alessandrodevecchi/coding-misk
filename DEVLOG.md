@@ -2654,3 +2654,12 @@ Ramo `feat/82-clear-optional`, su richiesta del proprietario dopo la prova vc2.
 - **Bug:** con la radio in pausa, Play o «Resume» non ripartivano. In console: `Cannot read properties of undefined (reading 's')` in `placeSpoken` (`src/song/spoken.js`). Alla ripresa la radio compila la parte di finestra da cui riparte; una frase «passage» della traccia voce poteva cadere fuori dalle sezioni, la ricerca della sezione più tranquilla non trovava niente e la compilazione si fermava (da qui anche il codice incompleto, `Unexpected token`).
 - **Fix:** senza sezioni coperte, la frase parte all'inizio della sua clip.
 - **Prove:** nuovo caso in `check:spoken` (61, prima fallisce con lo stesso errore), `check:endless` (94).
+
+## 2026-11-07 durata ignorata con la compilation (#82)
+
+Ramo `fix/82-radio-entries`.
+
+- **Bug:** con la compilation accesa la Durata della radio (Breve, Esatta 12…) non arrivava al regista: `howOf` (`src/endless/items.js`) passava a `compilationOptions` le altre scelte di «Come» ma non `length` e `lengthHeard`, quindi ogni brano durava quanto il suo stile. `growCtx.fitted` leggeva comunque la durata grezza, così la crescita restava «nella durata» di un brano lungo quanto lo stile.
+- **Fix:** `howOf` copia anche `length` e `lengthHeard` (vale per la radio, il replay e l'export, che usano tutti `howOf`).
+- **Testi:** la riga sotto i chip della Durata e il toast dicono che il cambio vale dai brani non ancora in coda: un brano già preparato tiene la sua durata (non viene ridisegnato). Il toast distingue i due casi (`radioLenNext`, nuovo `radioLenQueued`), in italiano e inglese.
+- **Prove:** nuovo caso in `check:song-options` (compilation con Breve ed Esatta 12, Live coder e Classic: 115-136 s e 698-731 s); `tools/check-radio.cjs` con la compilation accesa (Breve, Esatta 12, il toast con un brano in coda). Fixture del regista invariate (`check:endless` 94 ok).

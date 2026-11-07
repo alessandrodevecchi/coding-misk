@@ -1845,7 +1845,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // the song controls (new-song-panel D2): the shared rules; the radio draws again, tells what applies from the next
     // song, and redraws when a style ends a compilation
     { const wasComp = opts.compilation !== 'off', r = songControlEvent(ctl, b, 'click');
-      if (r) { if (r.render || (wasComp && opts.compilation === 'off')) render(); if (S && (r.keys.includes('voice') || r.keys.includes('voices'))) toast(t('vinstNextOnly')); if (S && r.keys.includes('material')) toast(t('matNext', { m: t(`matShort:${opts.material}`) })); if (S && r.keys.includes('length')) toast(t('radioLenNext')); return; } }
+      if (r) { if (r.render || (wasComp && opts.compilation === 'off')) render(); if (S && (r.keys.includes('voice') || r.keys.includes('voices'))) toast(t('vinstNextOnly')); if (S && r.keys.includes('material')) toast(t('matNext', { m: t(`matShort:${opts.material}`) })); if (S && r.keys.includes('length')) toast(t(S.stream.length > S.onAir + 1 ? 'radioLenQueued' : 'radioLenNext')); return; } }
     if (b.id === 'radio-comp') { opts.compilation = opts.compilation === 'off' ? 'song' : opts.compilation === 'song' ? 'some' : 'off'; saveOpts(); return render(); }
     if (b.id === 'radio-comp-setup') { compOpen = !compOpen; return render(); }
     if (b.dataset.compMove) return editSetup(S0 => { S0.movement = b.dataset.compMove; });
