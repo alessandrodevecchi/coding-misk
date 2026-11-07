@@ -112,6 +112,23 @@ const CHECKS = {
     const n = clone(EXAMPLE); n.narrator = 'loud';
     assert(validateSong(n).errors.some(e => e.path === 'narrator'), 'a bad narrator style');
   },
+  'ways: a passage clip that covers no section of the window (a resume after a pause) starts on its clip, no throw'() {
+    let checked = 0;
+    for (const s of [...withSpoken, ...voiced({ phrases: '4-5', kind: 'different', presence: 'often' })]) {
+      const n = normalizeSong(s), tr = n.tracks.find(t => t.type === 'spoken');
+      for (const clip of tr.clips) {
+        const pat = (tr.patterns || {})[clip.pattern];
+        if (!pat || pat.way !== 'passage' || pat.before !== undefined) continue;
+        // the window's sections end before the clip, as in the part of a window the radio compiles on a resume
+        const cut = clone(s); cut.sections = n.sections.filter(x => x.start + x.bars <= clip.start).map(x => ({ ...x }));
+        if (!cut.sections.length) continue;
+        const p = placeSpoken(cut, 'en').find(x => x.track === tr.id && x.key === clip.pattern);
+        assert(p && p.starts.some(st => st.bar === clip.start), `${s.id} ${tr.id}/${clip.pattern}: ${JSON.stringify(p && p.starts)}`);
+        checked++;
+      }
+    }
+    assert(checked >= 1, `${checked} passage clips`);
+  },
   'ways: an entry line ends one beat before its track comes in'() {
     let checked = 0;
     for (const s of withSpoken) {

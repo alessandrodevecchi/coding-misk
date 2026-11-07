@@ -2648,3 +2648,9 @@ Ramo `feat/82-clear-optional`, su richiesta del proprietario dopo la prova vc2.
 - **Regole della lista (`src/voices/combos.js`):** `clear` non viene più aggiunto d'ufficio. Una lista vuota vale `["clear"]`. Se le liste di inglese e italiano non hanno stili in comune, l'estrazione usa `clear`.
 - **Estrazioni (`director.js`):** con `clear` spento, il narratore e la traccia voce hanno sempre un effetto preso dalla lista, anche «Lontana», che non è un carattere e usa i valori dello stile. Con `clear` acceso i numeri casuali sono gli stessi di prima: fixture invariate, nessuna nuova versione del regista.
 - **Prove:** `check:voice-combos` (14), `check:endless` (94), `check:spoken` (60), `check:speakers`, `check:phrases` (25), `check:knowledge`, `npm run build`; `check-voices-tab --grid` nel browser (porta 5293), tutto ok.
+
+## 2026-11-07 ripresa dopo la pausa: crash della voce
+
+- **Bug:** con la radio in pausa, Play o «Resume» non ripartivano. In console: `Cannot read properties of undefined (reading 's')` in `placeSpoken` (`src/song/spoken.js`). Alla ripresa la radio compila la parte di finestra da cui riparte; una frase «passage» della traccia voce poteva cadere fuori dalle sezioni, la ricerca della sezione più tranquilla non trovava niente e la compilazione si fermava (da qui anche il codice incompleto, `Unexpected token`).
+- **Fix:** senza sezioni coperte, la frase parte all'inizio della sua clip.
+- **Prove:** nuovo caso in `check:spoken` (61, prima fallisce con lo stesso errore), `check:endless` (94).
