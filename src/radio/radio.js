@@ -226,11 +226,15 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // a grown song steered with waypoints, away from the page when async (the worker grows it first when needed)
   function steerAir(item, { async = false, then = null } = {}) {
     const token = item.growToken = (item.growToken || 0) + 1, s0t = performance.now(), n0 = item.commands.length;
-    if (item.g0) airView(item);
-    const args = { grown: item.g0 || null, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe) };
+    // (#82: the director's view with the new commands, for the console until the answer, in a task of its own after the
+    // press; the answer brings the view made in the worker)
+    const hasView = async && !!player.steer;
+    if (item.g0) { if (hasView) setTimeout(() => { if (S && item.growToken === token && item.growing) airView(item); }, 0); else airView(item); }
+    const args = { grown: item.g0 || null, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe), ...(hasView ? { view: true } : {}) };
     // (the answer to a typed line gives the song already on air: that one is kept, so the window is not written again
     // and its plan not made twice, #82)
-    const done = r => { if (item.growToken !== token || !S) return; if (async) item.steerSeen = { ms: performance.now() - s0t, n: n0 }; delete item.growing; delete item.finish; item.g0 = r.grown; airSettle(item, r.commands); airView(item); const same = item.said && item.said === item.song && JSON.stringify(r.song) === JSON.stringify(item.song); delete item.said; setSong(item, same ? item.song : r.song); };
+    const view = r => { if (r.view) { item.plan = r.view.plan; item.opts = r.view.opts; item.plain = r.view.song; } else airView(item); };
+    const done = r => { if (item.growToken !== token || !S) return; if (async) item.steerSeen = { ms: performance.now() - s0t, n: n0 }; delete item.growing; delete item.finish; item.g0 = r.grown; airSettle(item, r.commands); view(r); const same = item.said && item.said === item.song && JSON.stringify(r.song) === JSON.stringify(item.song); delete item.said; setSong(item, same ? item.song : r.song); };
     item.finish = () => { done(steerOnAir(args)); item.growToken++; };
     if (!async || !player.steer) { item.finish(); return; }
     item.growing = player.steer(args).then(done, () => { if (item.growToken === token) item.finish(); });

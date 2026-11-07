@@ -9,16 +9,27 @@
 // The page's own work runs here too, in a second worker so the radio never waits for it: the growth of the song
 // restored in Compose at start (crescendo: crescendoSong with the Compose rules) and the grown length of a song card
 // (duration: src/live/card-duration.js). Song lists never grow songs in the page.
+// The written plan of a radio window's song on air (#82) is made here too, in a worker of its own: in the page it took
+// hundreds of ms in slices after every console command.
 import { growOnAir, composeGrowth } from './growth.js';
 import { grownDuration } from '../live/card-duration.js';
 import { steerOnAir, steerView } from './waypoints.js';
 import { steerSong } from './steering.js';
 import { setSpokenContext, spokenContext } from '../song/spoken.js';
+import { liveCode } from '../live/live-code.js';
 
 self.onmessage = e => {
-  const { id, song, ctx, spoken, steer, classic, crescendo, duration } = e.data || {};
+  const { id, song, ctx, spoken, steer, classic, crescendo, duration, plan } = e.data || {};
   try {
     if (spoken) setSpokenContext(spoken);
+    // the written plan of a radio window's song on air (#82): the plan the page would make in slices, from the same
+    // build, controls, language and samples (live-code.js, written-plan.js are pure)
+    if (plan) {
+      globalThis.codingMiskAhead = plan.limits || undefined;
+      const p = liveCode(plan.build, plan.ctl, { lang: () => plan.lang, files: () => spokenContext.files }).plan();
+      self.postMessage({ id, plan: { edits: [...p.edits], ahead: p.ahead } });
+      return;
+    }
     if (crescendo) { self.postMessage({ id, crescendo: composeGrowth(crescendo.song, crescendo.opts) }); return; }
     if (duration) { self.postMessage({ id, duration: grownDuration(duration, spokenContext.styles) }); return; }
     if (classic) { const r = steerSong(classic); self.postMessage({ id, steered: { song: r.song, plan: r.plan, opts: r.opts } }); return; }

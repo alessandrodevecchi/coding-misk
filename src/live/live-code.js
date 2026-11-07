@@ -359,6 +359,15 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   const standalone = run && (shown => { const pre = any || inPlace ? preludeText(buses, fns) : ''; return pre + shown + tail(shown, { table: any ? table : new Map(), entries: any ? entrySets.get(plainKey(shown)) || null : null, voice: hidden.get(plainKey(shown)) || '', like: lineLike, offset: pre.length, lanes: lanesOf(shown) }); });
   const out = { build, now, inPlace, codeAt, codeLoad, run, standalone, buses, fns, shownLine, plan: () => (planOn ? planOf() : { edits: new Map(), ahead: [] }), prepare: preparePlan };
   self = out;
+  // the written part's plan made away from the page (#82): whether it is still to make, and the plan made elsewhere from
+  // the same build, controls and language (liveCode(build, C).plan() in the growth worker) put in its place
+  out.planReady = () => !planOn || (canon ? !!(planMemo && planMemo.k === lang()) : reference().planReady());
+  out.setPlan = (plan, k = lang()) => {
+    if (!planOn) return;
+    if (!canon) { reference().setPlan(plan, k); return; }
+    if (k !== lang() || (planMemo && planMemo.k === k)) return;
+    planJob = null; planMemo = { k, plan };
+  };
   // the code widgets of codeAt(bar) (#79, for the checks): { holders, shown, alive } (placeWidgets' out), or null off
   out.widgetsAt = bar => { if (!widgetsNow()) return null; const o = {}; codeWith(bar, null, { plan: planAt(bar), widgets: true, split: true, allow: typedWidgets() ? idleAllow(bar) : null, hold: o }); return o; };
   // the lines typed ahead, muted (reused-lines D8): [{ header, text, from, to }]
