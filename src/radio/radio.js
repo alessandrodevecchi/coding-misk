@@ -1433,7 +1433,14 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // (a drawing carries the values it was drawn with, so a console rebuild can keep it: saved-patterns-list D4)
     const pvKey = x => { const c = x.context || {}; return `${c.chords || secNow.chords || ''}|${c.meter || '4/4'}|${c.mode || 'minor'}`; };
     const spCanvas = (x, big) => `<canvas class="sp-pv${big ? ' big' : ''}" data-sp-pv="${esc(x.id)}" data-sp-k="${esc(pvKey(x))}" width="${big ? 220 : 64}" height="${big ? 44 : 20}" aria-hidden="true"></canvas>`;
-    const spRow = x => `<li class="sp-row">${listenBtn(x)}${spCanvas(x, false)}<span class="sp-name">${esc(x.name || x.id)}</span><span class="chip small">${esc(typeOf(x))}</span></li>`;
+    // (the folded list adds as a new track from its row too, with the card's reason when it cannot)
+    const spPlus = x => {
+      const wk = `new|${x.type}|`;
+      if (!whyMemo.has(wk)) whyMemo.set(wk, whyOf({ kind: 'pattern', mode: 'new', item: x }));
+      const why = whyMemo.get(wk), tip = `${t('savedAddNew')}${why ? ` · ${t(`steerWhy:${why}`, { type: typeOf(x) })}` : ''}`;
+      return `<button class="mini sp-add" data-sp-new="${esc(x.id)}" title="${esc(tip)}" aria-label="${esc(tip)}"${why ? ` disabled data-why="${why}"` : ''}>+</button>`;
+    };
+    const spRow = x => `<li class="sp-row">${listenBtn(x)}${spCanvas(x, false)}<span class="sp-name">${esc(x.name || x.id)}</span><span class="chip small">${esc(typeOf(x))}</span>${spPlus(x)}</li>`;
     // with the toolbar (more than 8 patterns), a card says how often the pattern was used (D5)
     const spUses = x => { const n = Number(x.uses) || 0, d = daysAgo(x.lastUsed); return !n ? t('savedNeverUsed') : `${t(n === 1 ? 'savedUsedOnce' : 'savedUsedN', { n })}${d === null ? '' : ` · ${d === 0 ? t('savedToday') : d === 1 ? t('savedYesterday') : t('savedDaysAgo', { d })}`}`; };
     const spCard = (x, uses = false) => `<div class="sp-card"><div class="sp-top">${listenBtn(x)}<b>${esc(x.name || x.id)}</b></div><small class="muted">${esc(spInfo(x))}${(x.styles || []).filter(y => y !== 'any').length ? ` · ${esc(x.styles.filter(y => y !== 'any').join(', '))}` : ''}</small>${uses ? `<small class="muted sp-uses">${esc(spUses(x))}</small>` : ''}${spCanvas(x, true)}${tempoHint(x)}<div class="sp-acts">${spBtn(x, 'new')}${spBtn(x, 'replace')}</div></div>`;
