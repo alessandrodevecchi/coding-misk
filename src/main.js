@@ -298,6 +298,17 @@ let growN = 0;
 // (steering a grown song, radio-profiles stage 5: the commands as waypoints are worked out there too)
 // (and a Classic song's steering, console-add-ahead D4: classic holds steerSong's arguments; a steer with view also gives
 // the director's view of the grown song back. Without the worker both run in the page, in a task of their own)
+function laneWorker(L) {
+  if (L.worker || L.worker === false) return;
+  L.worker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
+  L.worker.onmessage = e => { const w = L.waits.get(e.data && e.data.id); if (!w) return; L.waits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.plan || e.data.song); };
+  L.worker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of L.waits.values()) w.reject(new Error('worker')); L.waits.clear(); L.worker = false; };
+}
+// the radio's workers started with a session (#82): a worker loads its modules on its first job, which then waited
+// for that (a Classic session's first command, its first window plan)
+function warmLanes() {
+  for (const k of ['grow', 'plan']) { const L = lanes[k]; if (L.worker) continue; try { laneWorker(L); if (L.worker) L.worker.postMessage({ warm: true }); } catch (e) { L.worker = false; } }
+}
 // the written plan of a radio window's song on air made in a worker of its own (#82): made in the page, in slices, it
 // took most of the time after a console command on a slow computer. Resolves true once the plan is in the window (or
 // it needs none), false when it could not be made there (the page makes it, as before)
@@ -312,11 +323,7 @@ function growAway(song, ctx, steer = null, classic = null, lane = 'grow', extra 
   const here = () => (classic || (steer && steer.view) ? new Promise(r => setTimeout(r, 0)) : Promise.resolve()).then(() => (classic ? (({ song: s, plan, opts }) => ({ song: s, plan, opts }))(steerSong(classic)) : steer ? (r => ({ song: r.song, grown: r.grown, commands: r.commands, ...(steer.view ? { view: steerView(steer, r) } : {}) }))(steerOnAir(steer)) : growOnAir(song, ctx)));
   const L = lanes[lane];
   try {
-    if (!L.worker) {
-      L.worker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
-      L.worker.onmessage = e => { const w = L.waits.get(e.data && e.data.id); if (!w) return; L.waits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.plan || e.data.song); };
-      L.worker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of L.waits.values()) w.reject(new Error('worker')); L.waits.clear(); L.worker = false; };
-    }
+    laneWorker(L);
     if (L.worker === false) return extra ? Promise.reject(new Error('worker')) : here();
     const id = ++growN, spoken = { files: spokenContext.files, lengths: spokenContext.lengths, lang: spokenContext.lang || getLang(), styles: spokenContext.styles };
     return new Promise((resolve, reject) => { L.waits.set(id, { resolve, reject }); L.worker.postMessage({ id, song, ctx, spoken, steer, classic, ...(extra || {}) }); });
@@ -5554,6 +5561,8 @@ radio = createRadio({
     steerClassic: args => growAway(null, null, null, args, 'console'),
     // a Classic song steered there on a press of the console (#82), in the growth worker as a grown song's command
     steerPlain: args => growAway(null, null, null, args),
+    // the growth and plan workers started ahead, with a session (#82)
+    warm: () => warmLanes(),
     // a grown song's console change steered there, with the director's view (console-add-ahead D4)
     steerAhead: args => growAway(null, null, args, null, 'console'),
     // (a Classic song of an old session that grows after its steering: grown there too)

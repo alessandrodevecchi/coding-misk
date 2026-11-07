@@ -19,7 +19,9 @@ import { setSpokenContext, spokenContext } from '../song/spoken.js';
 import { liveCode } from '../live/live-code.js';
 
 self.onmessage = e => {
-  const { id, song, ctx, spoken, steer, classic, crescendo, duration, plan } = e.data || {};
+  const { id, song, ctx, spoken, steer, classic, crescendo, duration, plan, warm } = e.data || {};
+  // (started ahead by the page: the modules are loaded, nothing to do)
+  if (warm) return;
   try {
     if (spoken) setSpokenContext(spoken);
     // the written plan of a radio window's song on air (#82): the plan the page would make in slices, from the same

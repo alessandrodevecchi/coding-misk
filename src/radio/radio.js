@@ -242,7 +242,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   }
   // the song an item plays; its bars move the songs after it
   function setSong(item, song) {
-    item.song = song; item.curves = null;
+    // (ver: the console is drawn again when the song changes, #82: a command's steering answers after its press)
+    item.song = song; item.curves = null; item.ver = (item.ver || 0) + 1;
     const bars = barsOf(song) + (item.cut ? 0 : item.extra || 0);
     if (bars !== item.bars && !item.cut) { item.bars = bars; const i = S ? S.stream.indexOf(item) : -1; if (i >= 0) relayoutFrom(i); }
   }
@@ -334,6 +335,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     }
     else generate();
     if (!limit) remember(S.stream[0]);
+    if (player.warm) player.warm();
     player.start(windowPlayable(), L ? Math.min(L.from || 0, S.stream[0].bars - 1) : 0, { voices: airVoices() });
     render();
   }
@@ -1503,7 +1505,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // (the use counts of the saved patterns redraw only the panel's body, not the console: an add or a replace counts a
     // use right after its own redraw, #82)
     const pats = userPatterns(), useKey = pats.map(x => `${x.uses || 0}:${x.lastUsed || ''}`).join();
-    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', pats.map(x => x.id).join(), sv.preset, sv.style, voiceHelper, sayWait.map(w => w.at).join(), typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
+    const key = [item.n, item.ver || 0, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', pats.map(x => x.id).join(), sv.preset, sv.style, voiceHelper, sayWait.map(w => w.at).join(), typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
     if (!force && key === steerKey) { if (useKey !== steerUseKey) { steerUseKey = useKey; spUsesChanged(pats); } return; }
     steerKey = key; steerUseKey = useKey;
     const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-sv-line]') ? document.activeElement.selectionStart : null;
