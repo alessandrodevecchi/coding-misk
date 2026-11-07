@@ -1200,7 +1200,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the riser row (D11): what the next press places, remembered while the page is open
   const riserForm = { bars: 'auto', dir: 'up', sound: 'noise' };
   const keyLabel = k => ({ ArrowUp: '↑', ArrowDown: '↓', V: 'Shift+V' }[k] || k.toUpperCase());
-  let steerKey = '', dragging = null, pendingSession = null;
+  let steerKey = '', steerUseKey = '', dragging = null, pendingSession = null;
   // the part Vary and Swap act on (radio-variation D5): the lead by default, remembered while the page is open
   let varyPart = 'lead';
   // the track Vary and Swap act on (radio-arrangement D7): Auto, or one playing track of the part by id; back to Auto
@@ -1418,9 +1418,12 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const ph = item.plan.phrase;
     const st = stateNow(item.song, rel), on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
     const pending = item.commands.filter(c => c.at > rel || c.scope === 'session');
-    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', userPatterns().map(x => `${x.id}:${x.uses || 0}`).join(), sv.preset, sv.style, voiceHelper, sayWait.map(w => w.at).join(), typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
-    if (!force && key === steerKey) return;
-    steerKey = key;
+    // (the use counts of the saved patterns redraw only the panel's body, not the console: an add or a replace counts a
+    // use right after its own redraw, #82)
+    const pats = userPatterns(), useKey = pats.map(x => `${x.uses || 0}:${x.lastUsed || ''}`).join();
+    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', pats.map(x => x.id).join(), sv.preset, sv.style, voiceHelper, sayWait.map(w => w.at).join(), typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
+    if (!force && key === steerKey) { if (useKey !== steerUseKey) { steerUseKey = useKey; spUsesChanged(pats); } return; }
+    steerKey = key; steerUseKey = useKey;
     const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-sv-line]') ? document.activeElement.selectionStart : null;
     setTimeout(() => { if (typing === null) return; const i = root.querySelector('[data-sv-line]'); if (i) { i.focus(); try { i.setSelectionRange(typing, typing); } catch (e) {} } }, 0);
     const tip = k => `title="${esc(t(k))}"`;
@@ -1652,6 +1655,13 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       spIo = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { spIo.unobserve(e.target); spPaintOne(e.target); } }), { root: area, rootMargin: '160px 0px' });
     }
     list.forEach(cv => spIo.observe(cv));
+  }
+  // the use counts changed (an add, a replace): the panel's patterns read again and its body drawn, not the console
+  function spUsesChanged(pats) {
+    if (!spCtx) return;
+    const by = new Map(pats.map(x => [x.id, x]));
+    spCtx.fitting = spCtx.fitting.map(x => by.get(x.id) || x);
+    spRenderBody();
   }
   // a chip, a menu or the search draws only the panel's body again, not the console (D1)
   function spRenderBody({ top = false } = {}) {
@@ -1936,8 +1946,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       delete item.created; delete item.uses; delete item.lastUsed;
       const sel = b.dataset.spNew ? null : root.querySelector(`[data-sp-target="${CSS.escape(id)}"]`);
       // (a new track waits with the "+" and "−" of its boundary and enters with them, #82)
+      // (one redraw: the badge or the queued replace is drawn by the press; the use count then redraws the panel's body)
       const ok = b.dataset.spNew ? pendPattern(item) : command({ kind: 'pattern', mode: 'replace', target: sel ? sel.value : spTarget[id], item });
-      if (ok) { onPatternUsed(id); renderSteer(true); }
+      if (ok) { onPatternUsed(id); renderSteer(); }
       return ok;
     }
     // (a lock waits for its boundary with the "+" and "−" pressed for it, console-add-ahead D8)
