@@ -1087,6 +1087,20 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const empty = q.querySelector('li.muted');
     if (rows) { if (empty) empty.hidden = true; q.insertAdjacentHTML('afterbegin', rows); } else if (empty) empty.hidden = false;
   }
+  // the Extend waiting for its double phrase (#82): a badge next to the button with the seconds left, as the "+" of the
+  // Arrangement group; drawn again with the console's quarter-second tick, without a rebuild
+  function paintExtend() {
+    const box = root.querySelector('#radio-steer'), btn = box && box.querySelector('[data-cmd="extend"]');
+    if (!btn || !S) return;
+    const item = S.stream[S.onAir], rel = relNow(), old = btn.parentElement.querySelector('[data-ext-pend]');
+    const c = item.plan ? item.commands.filter(x => x.kind === 'extend' && x.at > rel).sort((a, b) => a.at - b.at)[0] : null;
+    if (!c) { if (old) old.remove(); return; }
+    const s = Math.max(0, Math.ceil(secsTo(item, c.at))), x = `+${c.s ?? Math.round(extendSeconds(item.plan))} s`;
+    const html = `<span class="arr-pend ${c.pend ? 'prep' : 'ready'} ext-pend" data-ext-pend title="${esc(t('arrPendBar', { bar: c.at + 1 }))}"><i class="arr-pend-led" aria-hidden="true"></i><span class="arr-pend-t">${esc(t('extPendIn', { x, s }))}</span><span class="arr-pend-s" aria-hidden="true">${esc(t('arrPendShort', { n: x, s }))}</span></span>`;
+    if (old && old.outerHTML === html) return;
+    const tmp = document.createElement('span'); tmp.innerHTML = html;
+    if (old) old.replaceWith(tmp.firstChild); else btn.after(tmp.firstChild);
+  }
   // the history keeps the song as steered, so saving it from there keeps the listener's changes
   function keepHistory(item) {
     const h = history.find(x => x.n === item.n && x.seed === S.recipe.seed);
@@ -1622,6 +1636,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     spMount(box.querySelector('.sp-slot'), spOld, savedPanel, spFocus);
     // (the locks waiting for their boundary keep their ring after a rebuild, D8)
     paintPending();
+    paintExtend();
   }
 
   // ---------- saved patterns among many (saved-patterns-list) ----------
@@ -1778,6 +1793,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (!box || dragging) return;
     const rt = root.querySelector('#radio-rec-time'); if (rt) rt.textContent = clockOf(recElapsed());
     renderSteer();
+    paintExtend();
     if (!S) { nowMemo = null; box.innerHTML = `<div class="lbl">${esc(t('radioNow'))}</div><p class="muted">${esc(t('radioIdle'))}</p>`; return; }
     const item = S.stream[S.onAir], song = item.song, e = item.entry;
     // (paused: the bar it stopped on, the player's clock no longer runs)

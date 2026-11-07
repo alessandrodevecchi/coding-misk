@@ -252,7 +252,7 @@ export const GUIDE = [
       {
         id: 'extend', title: { en: 'Extend', it: 'Estendi' },
         what: { en: 'Makes the song on air longer, a block at a time (the button says how long), before its ending: a new stretch in the song\'s character, then the outro and the transition as planned.', it: 'Allunga il brano in onda, un blocco alla volta (il pulsante dice quanto), prima del finale: un tratto nuovo nel carattere del brano, poi outro e transizione come previsto.' },
-        know: { en: 'No limit. It switches off once the transition to the next song plays. The card shows the total added.', it: 'Nessun limite. Si spegne quando la transizione al brano dopo sta già suonando. La card mostra il totale aggiunto.' },
+        know: { en: 'No limit. It enters at the next double phrase: a badge next to the button counts down until then ("Extend +16 s · in 24 s"). It switches off once the transition to the next song plays. The card shows the total added.', it: 'Nessun limite. Entra alla prossima doppia frase: un badge accanto al pulsante conta i secondi che mancano («Estendi +16 s · tra 24 s»). Si spegne quando la transizione al brano dopo sta già suonando. La card mostra il totale aggiunto.' },
       },
       {
         id: 'continue', title: { en: 'Continue a song in the radio', it: 'Continua un brano in radio' },
