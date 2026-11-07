@@ -789,8 +789,15 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(painted.length === 2 && painted.every(n => n > 20), 'each row has a preview drawing', JSON.stringify(painted));
     // a row adds as a new track with its + (saved-list-add)
     check((await page.$$('#radio-steer .sp-list .sp-row [data-sp-new]:not([disabled])')).length === 2, 'each row has an enabled + (Add as new track)');
+    // (the row + waits in the console's batch like a "+" since the batch entries of #82: a pending "+1" on the bass and
+    // its queue line first, the pattern recorded when it enters, within about three phrases)
+    const pressBar = await now();
     await page.click('#radio-steer .sp-list [data-sp-new="p-bass"]'); await sleep(400);
-    check(/\+ Basso mio \(/.test(await page.innerText('#radio-steer .steer-queue')), 'the row + queues the pattern: "+ Basso mio (…)"', await page.innerText('#radio-steer .steer-queue'));
+    const rowBadge = await page.evaluate(() => { const b = document.querySelector('#radio-steer .arr-inst[data-arr="bass"] .arr-pend-t'); return b ? b.textContent : ''; }), rowQueue = await page.innerText('#radio-steer .steer-queue');
+    check(/^\+1 · Enters in \d+ s$/.test(rowBadge) && /\+1 bass/.test(rowQueue), 'the row + queues the pattern in the batch: a pending "+1" on the bass and its queue line', `${rowBadge} | ${rowQueue}`);
+    for (let k = 0; k < 150 && (await page.evaluate(() => globalThis.codingMiskRadio.pendingAdds.length)); k++) await sleep(200);
+    const rowState = await ST(), rowCmd = rowState.commands.find(c => c.kind === 'pattern' && c.mode === 'new');
+    check(rowCmd && rowCmd.item.name === 'Basso mio' && rowCmd.at - pressBar <= 3 * rowState.plan.phrase && /\+ Basso mio \(/.test(await page.innerText('#radio-steer .steer-queue')), 'the row + enters within three phrases and the queue says "+ Basso mio (…)"', JSON.stringify({ press: pressBar, at: rowCmd && rowCmd.at, phrase: rowState.plan.phrase }));
     await page.click('#sp-view'); await sleep(300);
     check((await page.$$('#radio-steer .sp-card')).length === 2 && await page.isVisible('#radio-steer [data-sp-new="p-bass"]') && await page.isVisible('#radio-steer [data-sp-replace="p-bass"]'), 'open: cards with Add as new track and Replace');
     check(/feel different/.test(await page.innerText('#radio-steer .sp-cards')), 'a pattern saved at 60 BPM warns about the tempo');

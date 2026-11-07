@@ -54,5 +54,6 @@ Each item adds existing presets to a style's list unless it says "new". Each nee
 ## Notes from the implementation
 
 - 5.3: `check:code`, `check:songs` and the Crescendo fixtures did not move. The Live coder fixtures and the durations did: the metamorphosis skin (`makeSkin` in `src/song/crescendo.js`) composes four-floor drums, which now draw a kick variant (switch-acid-prova, switch-prima-luce, switch-test-onda, switch-test-stanza). `SHAPES_VERSION` 10, `tools/fixtures/live-coder.json` and `npm run durations` in the same change; `radio-growth.json` and the soul v3 reference curves recorded again too.
-- 6.1: `check-style-sounds`, `check-endless-play`, `check-arrangement-levels` (berlin-techno 0.38, trance 0.73, phonk 0.69 out) and `check-add-lag --quick` pass. `check-steering` fails only "the row + queues the pattern", which fails the same on develop.
+- 6.1: `check-style-sounds`, `check-endless-play`, `check-arrangement-levels` (berlin-techno 0.38, trance 0.73, phonk 0.69 out) and `check-add-lag --quick` pass. `check-steering` passes; its saved-pattern row case now asserts the batch entry of #82 (it failed on develop too).
+- `check:radio-profiles` 5.5 compares the choosers over up to 80 songs of 150 seeds: the 24-song sample flipped with the longer preset lists (sampling, no chooser changed).
 - Owner's extra fix: a track added by hand on a grown song plays from its boundary (`transitSong` in `src/endless/waypoints.js`); `check:radio-profiles` asserts it.

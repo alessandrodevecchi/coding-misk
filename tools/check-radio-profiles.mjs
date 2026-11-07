@@ -121,18 +121,20 @@ const airCases = () => {
   });
   return airCache;
 };
-// the same songs as airCases and more (up to n), for check 5.5
+// the same songs as airCases and more (up to n, from the first `seeds` radio songs: those of grown() and more grown
+// here), for check 5.5
 let wideCache = null;
-const airCasesWide = n => {
-  if (wideCache && wideCache.n === n) return wideCache.list;
-  const { live } = grown(), list = [];
+const airCasesWide = (n, seeds = SEEDS) => {
+  if (wideCache && wideCache.n === n && wideCache.seeds === seeds) return wideCache.list;
+  const live = grown().live.slice(0, seeds), list = [];
+  for (let i = live.length; i < seeds; i++) { const [x] = sessionItems(RECIPES, recipeOf(i, 'switch'), 1, null, { grow: true }); live.push(x); }
   live.forEach((x, i) => {
     const g0 = x.song;
     if (!g0.crescendo.coder || barsOf(g0) - g0.crescendo.growth < 5 * x.plan.phrase || list.length >= n) return;
     const rec = recipeOf(i, 'switch'), g = createSession(RECIPES, rec.seed).next(rec.options);
     list.push({ i, id: g0.id, seed: rec.seed, song: g.song, plan: g.plan, opts: g.opts, g0 });
   });
-  wideCache = { n, list };
+  wideCache = { n, seeds, list };
   return list;
 };
 // one command of each kind, asked a little after the growth (half way through what is left)
@@ -565,13 +567,16 @@ const CHECKS = {
     assert(varies >= 4 && multi >= 1, 'too few Vary cases');
   },
   'stage 5 (5.5): the default chooser on air reaches a curve point no later in all than any other chooser version'() {
-    // a fair measure (shape-search D11): up to 24 Live coder songs on air and every curve point after the growth that a
+    // (kick-variety: 24 songs out of 50 were too few; the longer preset lists of the styles changed which songs grew
+    // and flipped the sum, normal-1 610 bars against radio-1 557 in 18 songs, while over 68 songs from 150 seeds the
+    // default is clearly sooner, 1952 against 2089. The sample is now up to 80 songs out of the first 150 radio songs)
+    // a fair measure (shape-search D11): up to 80 Live coder songs on air and every curve point after the growth that a
     // command can still reach, each raised to two energies (0.8 and the top); for each pair, the bars each chooser
     // version (AIR_CHOOSERS) needs to reach the energy asked. The default (AIR_CHOOSER) must need no more bars in all
     // than any other version. Only the pairs every version places at the same boundary count.
     const ids = Object.keys(AIR_CHOOSERS), bars = Object.fromEntries(ids.map(id => [id, 0])), vs = Object.fromEntries(ids.map(id => [id, { sooner: 0, later: 0 }]));
     let cases = 0, songs = 0, plainSame = true;
-    for (const x of airCasesWide(24)) {
+    for (const x of airCasesWide(80, 150)) {
       const q = commandsFor(x)[0].q, B0 = airBoundaries('curve', q, x.plan, x.g0)[0], d0 = Math.floor((B0 - airOffset(x.g0)) / (2 * x.plan.phrase));
       let used = false;
       for (let d = d0; d < x.plan.plan.length - 1; d++) for (const value of [0.8, 1]) {
