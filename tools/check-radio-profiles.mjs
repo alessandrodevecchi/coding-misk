@@ -665,6 +665,52 @@ const CHECKS = {
     assert(free.total > 1 && !free.frame(0.01).includes('say_') && tight.total === 0 && tight.frame(0) === `${from}\n${voice}`, 'a free step: typed when it fits, pasted when it does not');
     console.log(`      ${song.title}: ${shown} voice lines shown at ${steps.length} steps (${buildSteps(L.build).filter(s => s.display).length} display steps), voice heard on ${bars} bars the same three ways`);
   },
+  '#82: a batch of six "+" on a grown song enters soon, most on its first boundary, its tracks on their boundaries; a replay is the same; a lone saved pattern enters on its boundary'() {
+    let n = 0, sum = 0;
+    const skipped = [];
+    for (const x of airCases().slice(0, 6)) {
+      const G = x.g0.crescendo.growth, ph = x.plan.phrase, q = G + ph + 0.4;
+      const at = airBoundaries('more', q, x.plan, x.g0)[0];
+      if (at === undefined || at + 3 * ph > barsOf(x.g0) - ph) { skipped.push(`${x.id}: ${barsOf(x.g0)} bars, growth ${G}`); continue; }
+      const fams = ['kick', 'beat', 'bass'];
+      const parts = [fams[0], fams[0], fams[0], fams[1], fams[2], fams[2]];
+      const cmds = parts.map((part, k) => ({ kind: 'more', part, q, at, at0: at, min: at, pend: true, id: k + 1, batch: 1 }));
+      const r = steer(x, cmds);
+      if (r.commands.length < 4) { skipped.push(`${x.id}: ${r.commands.length} placed`); continue; }
+      const ats = r.commands.map(c => c.at), head = Math.min(...ats), last = Math.max(...ats);
+      const onHead = r.commands.filter(c => c.at === head);
+      assert(fams.every(p => !r.commands.some(c => c.part === p) || onHead.some(c => c.part === p)), `${x.id}: an instrument missing on the head ${head}: ${ats.join(' ')}`);
+      assert(onHead.length >= Math.ceil(r.commands.length / 2), `${x.id}: less than half on the head: ${r.commands.map(c => `${c.part}@${c.at}`).join(' ')}`);
+      assert(head <= at + 3 * ph && last - head <= 2 * ph, `${x.id}: pressed on ${q}, entries ${ats.join(' ')}`);
+      // (every added track the song plays comes into the code on the boundary of its command, or plays within a phrase
+      // of it when the part there leaves it out, a break for a kick; a track the director keeps silent is left aside)
+      const steps = buildSteps(r.song);
+      for (const a of r.plan.added) {
+        const B = a.at + airOffset(r.grown), on = b => soundAt(r.song, b).tracks.some(t => t.id === a.id);
+        const first = Array.from({ length: 4 * ph }, (_, k) => B + k).find(on);
+        if (first === undefined && !steps.some(st => [].concat(st.add ?? []).includes(a.id))) continue;
+        assert((first !== undefined && first < B + ph) || steps.some(st => st.at === B && [].concat(st.add ?? []).includes(a.id)), `${x.id}: ${a.id} comes in on ${first} for its boundary ${B}`);
+      }
+      // a replay: the recorded commands (no pend) give the same song
+      const again = steer(x, r.commands.map(c => ({ ...c })));
+      assert(JSON.stringify(again.song) === JSON.stringify(r.song), `${x.id}: the replay of the batch differs`);
+      sum += last - q; n++;
+    }
+    assert(n >= 2, `only ${n} songs took the batch; ${skipped.join('; ')}`);
+    // a saved pattern as a new track, pressed inside a growth: its track plays from its boundary (it went to the end of
+    // the growth before, the chooser placing its line anywhere on the way)
+    const item = { id: 'mine-1', name: 'Basso mio', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, sound: 'sawtooth', settings: { wave: 'sawtooth', gain: 0.7 }, context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 128, mode: 'minor' } };
+    let p = 0;
+    for (const x of airCases().filter(y => y.g0.crescendo.growth >= 6 * y.plan.phrase).slice(0, 3)) {
+      const q = 2 * x.plan.phrase + 0.4, at = airBoundaries('pattern', q, x.plan, x.g0)[0];
+      const r = steer(x, [{ kind: 'pattern', mode: 'new', item, q, at, at0: at, min: at, pend: true, id: 1, batch: 1 }]);
+      if (!r.commands.length || !r.plan.added.length) continue;
+      const a = r.plan.added[r.plan.added.length - 1], B = r.commands[0].at;
+      assert(B <= at + 3 * x.plan.phrase && soundAt(r.song, B).tracks.some(t => t.id === a.id), `${x.id}: the saved pattern pressed on ${q} (growth ${x.g0.crescendo.growth}) not heard on ${B}`);
+      p++;
+    }
+    console.log(`      ${n} batches of six, the last entry ${(sum / Math.max(1, n)).toFixed(1)} bars after the press on average; ${p} saved patterns inside a growth heard on their boundary`);
+  },
   'radio fixtures: Classic sessions rebuild the same items'() {
     for (const { name, recipe } of CLASSIC) {
       const a = sessionItems(RECIPES, recipe, SONGS), b = sessionItems(RECIPES, recipe, SONGS);

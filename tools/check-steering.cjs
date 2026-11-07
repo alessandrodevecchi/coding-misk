@@ -826,8 +826,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check((await page.evaluate(() => globalThis.codingMiskRadioPreview.state && globalThis.codingMiskRadioPreview.state.riding)) && (await page.getAttribute('#radio-steer [data-sp-listen="p-bass"]', 'aria-pressed')) === 'false', 'another preview takes over');
     await page.click('#radio-steer [data-sp-listen="p-hook"]'); await sleep(500);
     check(!(await page.evaluate(() => globalThis.codingMiskRadioPreview.state)), 'a second press stops the preview');
-    // add as a new track: a bass track with the pattern; the queue names it
+    // add as a new track: a bass track with the pattern; the queue names it (it waits for its boundary with the "+" and
+    // "−" pressed for it, #82: a badge first, recorded when it enters)
     await page.click('#radio-steer [data-sp-new="p-bass"]'); await sleep(400);
+    check(/^\+1 · Enters in \d+ s$/.test(await page.evaluate(() => { const b = document.querySelector('#radio-steer .arr-inst[data-arr="bass"] .arr-pend-t'); return b ? b.textContent : ''; })), 'Add as new track: a pending "+1" on the bass until it enters');
+    for (let k = 0; k < 150 && (await page.evaluate(() => globalThis.codingMiskRadio.pendingAdds.length)); k++) await sleep(200);
     let x = await ST();
     const pc = x.commands.find(c => c.kind === 'pattern');
     const added = await page.evaluate(() => globalThis.codingMiskRadio.steering.plan.added.slice(-1)[0]);

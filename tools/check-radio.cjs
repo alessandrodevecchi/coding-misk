@@ -205,7 +205,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     while ((await page.getAttribute('#radio-comp', 'aria-pressed')) !== 'true') { await page.click('#radio-comp'); await sleep(300); }
     const total = async () => { const m = /\/\s*(\d+):(\d\d)/.exec(await page.innerText('#pb-pos')); return m ? +m[1] * 60 + +m[2] : NaN; };
     for (const [len, lo, hi, seed] of [['short', 120, 150, 'comp-len-a'], [12, 720, 720, 'comp-len-b']]) {
-      if (len === 12) { await page.fill('[data-song-minutes]', '12'); await page.click('[data-song-length="exact"]'); } else await page.click(`[data-song-length="${len}"]`);
+      if (len === 12) { await page.click('[data-song-length="exact"]'); await sleep(300); await page.fill('[data-song-minutes]', '12'); await page.click('[data-song-length="exact"]'); } else await page.click(`[data-song-length="${len}"]`);
       await sleep(300);
       await page.fill('#radio-seed', seed); await page.click('#radio-start'); await sleep(6000);
       const d = await R(), sec = await total();
