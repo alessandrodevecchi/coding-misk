@@ -1,8 +1,9 @@
 // Allowed speaker and voice style pairs (voice-style-combos, #82): validates src/voices/combos.json (or the file given)
-// and tests src/voices/combos.js: a missing entry allows all, "clear" is always allowed, an English-only speaker is
+// and tests src/voices/combos.js: a missing entry allows all, "clear" may be left out (an empty list reads as "clear"; a
+// list without it gives every draw a character, "distant" included), an English-only speaker is
 // also bound by it.default, the voice draw over 300 seeds never gives a character outside the list, an empty list gives
 // no character, an all-allowed file draws the same voices as no file; the user's overrides (voice-combos-ui): unknown ids
-// ignored, clear added, an entry equal to the default dropped, an English-only speaker under it rejected, the effective
+// ignored, an entry equal to the default dropped, an English-only speaker under it rejected, the effective
 // table, the table a session records, and a draw given opts.combos follows it, never the module table. No browser.
 //   npm run check:voice-combos [-- <file>]     exit 1 on an error in the file or a failed test; warnings are printed
 import fs from 'node:fs';
@@ -45,11 +46,21 @@ const CHECKS = {
     assert(same(allowedStyles('kathy', 'en', { format: 1, en: { default: ['clear'] } }), ALL), 'no kathy entry');
     assert(same(allowedStyles('', 'it', { format: 1, en: { default: ['clear'] } }), ALL), 'no it entry');
   },
-  '"clear" is always allowed': () => {
+  '"clear" may be left out, an empty list reads as "clear"': () => {
     const t = { format: 1, en: { albert: ['radio', 'deep'], default: [] }, it: { default: [] } };
-    assert(same(allowedStyles('albert', 'en', t), ['clear', 'radio', 'deep']), `albert: ${allowedStyles('albert', 'en', t)}`);
+    assert(same(allowedStyles('albert', 'en', t), ['radio', 'deep']), `albert: ${allowedStyles('albert', 'en', t)}`);
     assert(same(allowedStyles('', 'en', t), ['clear']), 'empty default list');
-    assert(isAllowed('albert', 'clear', 'en', t) && !isAllowed('albert', 'robot', 'en', t), 'isAllowed');
+    assert(!isAllowed('albert', 'clear', 'en', t) && isAllowed('albert', 'deep', 'en', t) && !isAllowed('albert', 'robot', 'en', t), 'isAllowed');
+    assert(same(allowedForDraw('albert', { format: 1, en: { albert: ['robot'] }, it: { default: ['radio'] } }), ['clear']), 'no style in common: clear');
+  },
+  'voice draw with "clear" off: always a character from the list, "distant" too': () => {
+    const t = { format: 1, en: { fred: ['robot', 'distant'] } };
+    for (const opts of [{}, { voiceChance: 0 }, { voiceCharacters: { deep: 3 } }]) {
+      const fred = withTable(t, () => voices(opts)).filter(v => v.settings.speaker === 'fred');
+      assert(fred.length > 10 && fred.every(v => v.character === 'robot' || v.character === 'distant'), `fred characters with ${JSON.stringify(opts)}: ${[...new Set(fred.map(v => v.character))]}`);
+    }
+    const d = withTable({ format: 1, en: { fred: ['distant'] } }, () => voices({ voiceChance: 0 })).filter(v => v.settings.speaker === 'fred');
+    assert(d.length && d.every(v => v.character === 'distant' && v.settings.room === 0.8 && v.settings.cutoff === 4500), 'distant sound');
   },
   'an English-only speaker is also bound by it.default': () => {
     const t = { format: 1, en: { albert: ['clear', 'radio', 'deep', 'robot'] }, it: { default: ['clear', 'radio', 'distant'] } };
@@ -99,15 +110,15 @@ const CHECKS = {
     assert(narrow.every((v, i) => same(v.rack, wide[i].rack) && v.settings.speaker === wide[i].settings.speaker && v.settings.gain === wide[i].settings.gain), 'a narrowed file moved the speaker, the volume or the rack');
   },
   // ---------- user overrides (voice-combos-ui 1.1) ----------
-  'overrides: an unknown id is ignored, clear always present, the order of the ids, no throw on bad values': () => {
+  'overrides: an unknown id is ignored, the order of the ids, no throw on bad values': () => {
     const o = normalizeOverrides({ format: 1, en: { albert: ['deep', 'bogus', 'radio', 'deep', 7] } });
-    assert(same(o.en.albert, ['clear', 'radio', 'deep']), `albert: ${JSON.stringify(o)}`);
+    assert(same(o.en.albert, ['radio', 'deep']), `albert: ${JSON.stringify(o)}`);
     for (const bad of [null, 'x', [], 3, { en: 'x' }, { en: { albert: 'deep' } }, { fr: { default: ['deep'] } }]) assert(same(normalizeOverrides(bad), { format: 1 }), `bad value kept: ${JSON.stringify(bad)}`);
   },
   'overrides: an entry equal to the default is dropped, an English-only speaker under it is rejected': () => {
     const o = normalizeOverrides({ format: 1, en: { fred: COMBOS_FILE.en.fred.slice().reverse(), kathy: ['clear', 'echo'] }, it: { albert: ['clear'], default: ['radio'] } });
     assert(!o.en.fred && same(o.en.kathy, ['clear', 'echo']), `fred equal to the file kept: ${JSON.stringify(o)}`);
-    assert(!o.it.albert && same(o.it.default, ['clear', 'radio']), `it.albert kept: ${JSON.stringify(o)}`);
+    assert(!o.it.albert && same(o.it.default, ['radio']), `it.albert kept: ${JSON.stringify(o)}`);
     assert(overridesErrors({ format: 1, it: { albert: ['clear'] } }).some(e => /albert does not speak/.test(e)) && !overridesErrors(o).length, 'overridesErrors');
   },
   'effective table: the file with each overridden entry replaced, the others as in the file': () => {

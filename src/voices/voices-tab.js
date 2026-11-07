@@ -207,23 +207,26 @@ export function createVoicesTab({ root, phr, store, t, tx, esc, getLang, helper,
     const limited = own.filter(id => !draw.includes(id));
     const chips = VOICE_STYLE_IDS.map(id => {
       const on = own.includes(id), changed = on !== file.includes(id), lim = limited.includes(id);
-      const tip = [id === 'clear' ? t('vcClearLocked') : '', changed ? t('vcChanged') : '', lim ? t('vcLimitedTip', { voice: other }) : ''].filter(Boolean).join(' · ');
-      return `<button type="button" class="chip small vt-cs${changed ? ' changed' : ''}${lim ? ' limited' : ''}" data-vt-cs="${id}" data-vt-cs-sp="${esc(sp)}" aria-pressed="${on}"${id === 'clear' ? ' disabled' : ''}${tip ? ` title="${esc(tip)}"` : ''}>${esc(t(`voiceStyle:${id}`))}${changed ? `<span class="vt-cs-dot" aria-label="${esc(t('vcChanged'))}"></span>` : ''}</button>`;
+      const last = on && own.length === 1;
+      const tip = [last ? t('vcLastOn') : '', changed ? t('vcChanged') : '', lim ? t('vcLimitedTip', { voice: other }) : ''].filter(Boolean).join(' · ');
+      return `<button type="button" class="chip small vt-cs${changed ? ' changed' : ''}${lim ? ' limited' : ''}" data-vt-cs="${id}" data-vt-cs-sp="${esc(sp)}" aria-pressed="${on}"${last ? ' disabled' : ''}${tip ? ` title="${esc(tip)}"` : ''}>${esc(t(`voiceStyle:${id}`))}${changed ? `<span class="vt-cs-dot" aria-label="${esc(t('vcChanged'))}"></span>` : ''}</button>`;
     }).join('');
     const has = combos.has(sp);
     return `<details class="vt-grid" data-vt-grid="${esc(sp)}"${gridOpen.has(sp) ? ' open' : ''}><summary><span class="vt-grid-chev" aria-hidden="true">${CHEVRON}</span><span class="lbl">${esc(t('vcTitle'))}</span> <span class="muted small" data-vt-grid-count>${esc(t('vcCount', { n: own.length, total: VOICE_STYLE_IDS.length }))}</span>${has ? ` <span class="vt-cs-dot" aria-label="${esc(t('vcChanged'))}"></span>` : ''}</summary>
       <p class="hint muted small">${esc(t('vcHint'))}</p>
       <div class="chips vt-cs-chips" role="group" aria-label="${esc(t('vcTitle'))} · ${esc(name)}">${chips}</div>
+      ${own.includes('clear') ? '' : `<p class="hint small" data-vt-cs-noclear>${esc(t('vcNoClear'))}</p>`}
       ${limited.length ? `<p class="hint small vt-cs-lim" data-vt-cs-lim>${esc(t('vcLimited', { voice: other, list: limited.map(id => t(`voiceStyle:${id}`)).join(', ') }))}</p>` : ''}
       <p class="hint muted small" data-vt-cs-note>${esc(sp ? t(speaks('en', sp) ? 'vcNoteSpeaker' : 'vcNoteSpeakerIt', { voice: other }) : t('vcNoteDefault', { en: DEFAULT_VOICE_NAME.en, it: DEFAULT_VOICE_NAME.it }))}</p>
       ${radioOn() ? `<p class="hint small" data-vt-cs-next>${esc(t('vcNextSession'))}</p>` : ''}
       ${has ? `<div class="actions"><button type="button" class="btn small" data-vt-cs-reset="${esc(sp)}">${esc(t('vcReset'))}</button></div>` : ''}
     </details>`;
   }
-  // a toggle: the voice's list with the style on or off (clear stays)
+  // a toggle: the voice's list with the style on or off (the last style on stays)
   function toggleStyle(sp, id) {
-    if (!combos || id === 'clear' || !VOICE_STYLE_IDS.includes(id)) return;
+    if (!combos || !VOICE_STYLE_IDS.includes(id)) return;
     const own = ownList(sp), next = own.includes(id) ? own.filter(x => x !== id) : [...own, id];
+    if (!next.length) return;
     combos.set(sp, next);
     // (the tab is drawn again: the focus stays on the chip)
     const b = [...root.querySelectorAll('[data-vt-cs]')].find(x => x.dataset.vtCs === id && (x.dataset.vtCsSp || '') === sp);
