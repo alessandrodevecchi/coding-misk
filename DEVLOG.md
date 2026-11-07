@@ -2639,3 +2639,12 @@ Ramo `feat/82-siri-it-voice` da `develop`, con `develop` (aperture varie, versio
 - **Nomi dei banchi:** le regex dei banchi accettano le cifre (`[a-z0-9]+`), per `siri4`.
 - **Fixture:** `DIRECTOR_VERSION` 19. Con una voce in più cambiano le voci estratte dal regista. Ogni fixture confrontata con e senza `siri4`: cambiano solo i campi `speaker`. Registrate di nuovo: PLAIN_V2 (plain-a, plain-b, plain-c), plain-steer-d, l'hash dell'arrangiamento, `tests/snapshots/endless.json` (con `--force-music`: l'hash «music» contiene ancora il narratore di `session.songs[].voice.speaker`), `tests/snapshots/endless-v14.json`, `tests/snapshots/radio-growth.json` (compilation, compilation-live-coder). Invariati: invented-styles, snapshot del codice, durate dei brani, fixture di Crescendo e Live coder.
 - **Prove:** `check:endless` (94), `check:radio-profiles` (29), `check:spoken` (60), `check:phrases` (25), `check:speakers`, `check:voice-combos` (13), `check:knowledge`, `check:kit-rows`, `check:strudel` (10), `check:invent` (15), `check:code` (46), `check:durations`, `check:live-code` (24), `check:crescendo` livello rapido (42), `npm run build`. Prove nel browser non fatte.
+
+## 2026-11-07 Chiara spegnibile negli stili delle estrazioni
+
+Ramo `feat/82-clear-optional`, su richiesta del proprietario dopo la prova vc2.
+
+- **Chiara non è più bloccata:** nella griglia «Stili nelle estrazioni» del tab Voci si spegne come gli altri stili. Resta bloccato solo l'ultimo stile acceso. Con Chiara spenta compare la nota «nelle estrazioni questa voce ha sempre un effetto».
+- **Regole della lista (`src/voices/combos.js`):** `clear` non viene più aggiunto d'ufficio. Una lista vuota vale `["clear"]`. Se le liste di inglese e italiano non hanno stili in comune, l'estrazione usa `clear`.
+- **Estrazioni (`director.js`):** con `clear` spento, il narratore e la traccia voce hanno sempre un effetto preso dalla lista, anche «Lontana», che non è un carattere e usa i valori dello stile. Con `clear` acceso i numeri casuali sono gli stessi di prima: fixture invariate, nessuna nuova versione del regista.
+- **Prove:** `check:voice-combos` (14), `check:endless` (94), `check:spoken` (60), `check:speakers`, `check:phrases` (25), `check:knowledge`, `npm run build`; `check-voices-tab --grid` nel browser (porta 5293), tutto ok.

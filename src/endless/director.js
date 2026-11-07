@@ -2,7 +2,7 @@
 // each with live build steps that make it evolve phrase by phrase toward an energy shape.
 // Pure and deterministic: no Node or browser APIs, no Math.random (randomness comes from random.js).
 import { BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, TEX_RHYTHMS, GROOVES, ROWS, DEFAULT, KEYS, fitSteps, meterSteps } from '../music.js';
-import { FORMAT, VERSION, SETTING_FIELDS, VOICE_DEFAULT, VOICE_CHARACTERS, VOICE_LIMITS } from '../song/format.js';
+import { FORMAT, VERSION, SETTING_FIELDS, VOICE_DEFAULT, VOICE_CHARACTERS, VOICE_STYLES, VOICE_LIMITS } from '../song/format.js';
 import { stateAt, SPEAKERS, speakerId } from '../song/build.js';
 import { VOCAB_GROUPS, VOCABULARY } from '../song/vocabulary.js';
 import { makeRng, freshSeed, stream } from './random.js';
@@ -20,7 +20,7 @@ import { applyMaterial, sessionSource } from './material.js';
 import { songProfileOnAir } from './profile.js';
 import { voiceOption, PHRASE_RANGES, VOICE_WAYS, isQuietOnly, whereOf } from './voice-options.js';
 import { soundPatch, cleanSound } from './voice-sound.js';
-import { allowedForDraw, allowedCharacters } from '../voices/combos.js';
+import { allowedForDraw, allowedCharacters, forcedStyles } from '../voices/combos.js';
 import { placeGestures, gestureSteps, gestureRate } from './gestures.js';
 
 export const SESSION_FORMAT = 'coding-misk/endless-session';
@@ -304,6 +304,8 @@ export function sectionsOf(plan, h) {
 
 // Characters and limits of a voice live in src/song/format.js (the voice instrument uses them too)
 export { VOICE_CHARACTERS, VOICE_LIMITS };
+// the sound of a drawn character: its values, or the style's for one that is not a character ("distant")
+const characterSound = c => { if (VOICE_CHARACTERS[c]) return VOICE_CHARACTERS[c]; const { speaker, ...v } = VOICE_STYLES[c] || {}; return v; };
 // rack devices a voice can get, with the ranges of their values
 const VOICE_DEVICES = {
   crush: { bits: [4, 9] }, coarse: { amount: [3, 14] }, phaser: { rate: [0.3, 4], depth: [0.4, 0.9] },
@@ -334,11 +336,13 @@ export function voiceFor(R, opts, rng, index = 0) {
   // (voice-style-combos D3: only the characters src/voices/combos.json allows for the speaker heard, the narrator's
   // (voice-combos-ui D4: the table is opts.combos when the session recorded one, else the module's table)
   // fixed speaker when one is set; one random value either way, so nothing else moves; none allowed: no character)
-  if (rng.chance(chance)) {
-    const names = allowedCharacters(cleanSound(opts.narratorSound).speaker ?? base.speaker, opts.combos || undefined);
+  // (voice-clear-optional: "clear" off for the voice heard: always a character, from its allowed styles, "distant" too)
+  const heard = cleanSound(opts.narratorSound).speaker ?? base.speaker, forced = forcedStyles(heard, opts.combos || undefined);
+  if (rng.chance(chance) || forced) {
+    const names = allowedCharacters(heard, opts.combos || undefined);
     const taste = opts.voiceCharacters && Object.values(opts.voiceCharacters).some(w => w > 0);
-    character = (taste ? pickWeighted(rng, opts.voiceCharacters, names) : names.length ? rng.pick(names) : null) || (rng.next(), null);
-    if (character) Object.assign(base, VOICE_CHARACTERS[character]);
+    character = (taste ? pickWeighted(rng, opts.voiceCharacters, names) : names.length ? rng.pick(names) : null) || (forced ? rng.pick(forced) : (rng.next(), null));
+    if (character) Object.assign(base, characterSound(character));
   }
   const rack = [];
   if (rng.chance(0.25 + 0.4 * chaos)) for (const name of rng.shuffle(Object.keys(VOICE_DEVICES)).slice(0, rng.int(1, 2))) {
@@ -428,9 +432,11 @@ export function spokenFor(R, opts, voice, rng, more = null, speakers = [], recen
   const settings = { ...VOICE_DEFAULT, gain: 0.5, room: 0.3, speaker };
   // a character now and then (more often on a chop, which may go further)
   // (only the characters the combos file allows for the speaker heard, D3 point 2; none: the plain voice)
-  if (rng.chance(way === 'chop' ? 0.6 : 0.25 + 0.3 * (opts.chaos ?? 0.3))) {
-    const ok = allowedCharacters((V && cleanSound(V.sound).speaker) || speaker, opts.combos || undefined), list = (way === 'chop' ? ['robot', 'radio', 'dirty', 'echo'] : ['radio', 'deep', 'cathedral', 'echo', 'slow']).filter(c => ok.includes(c));
-    if (list.length) Object.assign(settings, VOICE_CHARACTERS[rng.pick(list)]); else rng.next();
+  // (voice-clear-optional: "clear" off for the speaker heard: always a character, any allowed one when none of the way's)
+  const heard = (V && cleanSound(V.sound).speaker) || speaker, forced = forcedStyles(heard, opts.combos || undefined);
+  if (rng.chance(way === 'chop' ? 0.6 : 0.25 + 0.3 * (opts.chaos ?? 0.3)) || forced) {
+    const ok = allowedCharacters(heard, opts.combos || undefined), list = (way === 'chop' ? ['robot', 'radio', 'dirty', 'echo'] : ['radio', 'deep', 'cathedral', 'echo', 'slow']).filter(c => ok.includes(c));
+    if (list.length) Object.assign(settings, VOICE_CHARACTERS[rng.pick(list)]); else if (forced) Object.assign(settings, characterSound(rng.pick(forced))); else rng.next();
   }
   const pat = { way, text, ...extrasFor(way, rng) };
   // the voice track's sound for the next songs (D4): over the draw, the speaker when one is set

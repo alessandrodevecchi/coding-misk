@@ -59,7 +59,8 @@ async function say(page, text) { await page.fill('#radio-steer [data-sv-line]', 
 const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; const el = await page.$(sel); if (el) await el.screenshot({ path: path.join(shots, `${name}.png`) }); };
 
 // ---------- the Draw styles grid of the voice cards (voice-combos-ui) ----------
-// toggles per voice stored as overrides (only the changed speakers), clear locked, the changed mark, n of 10 allowed,
+// toggles per voice stored as overrides (only the changed speakers), clear off with its note, the last style on locked,
+// the changed mark, n of 10 allowed,
 // the note and the "limited by Alice" mark, Reset per voice, a reload, a corrupt stored value, the bench following the
 // effective table, the on-air note, English; pictures of a card open in neon, hardware and light at desktop and 400 px
 const KEY = 'coding-misk-voice-combos';
@@ -71,19 +72,23 @@ const gridState = (page, sp) => page.evaluate(s => {
   const c = document.querySelector(`.vt-speaker[data-vt-speaker="${s}"]`), g = c && c.querySelector('[data-vt-grid]');
   if (!g) return null;
   const chips = [...g.querySelectorAll('[data-vt-cs]')];
-  return { open: g.open, count: g.querySelector('[data-vt-grid-count]').textContent, on: chips.filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.vtCs), changed: chips.filter(b => b.classList.contains('changed')).map(b => b.dataset.vtCs), limited: chips.filter(b => b.classList.contains('limited')).map(b => b.dataset.vtCs), clear: (b => b && b.disabled && b.getAttribute('aria-pressed') === 'true')(g.querySelector('[data-vt-cs="clear"]')), reset: !!g.querySelector('[data-vt-cs-reset]'), note: (g.querySelector('[data-vt-cs-note]') || {}).textContent || '', lim: (g.querySelector('[data-vt-cs-lim]') || {}).textContent || '', next: !!g.querySelector('[data-vt-cs-next]') };
+  return { open: g.open, count: g.querySelector('[data-vt-grid-count]').textContent, on: chips.filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.vtCs), changed: chips.filter(b => b.classList.contains('changed')).map(b => b.dataset.vtCs), limited: chips.filter(b => b.classList.contains('limited')).map(b => b.dataset.vtCs), clear: (b => b && !b.disabled && b.getAttribute('aria-pressed') === 'true')(g.querySelector('[data-vt-cs="clear"]')), locked: chips.filter(b => b.disabled).map(b => b.dataset.vtCs), noClear: !!g.querySelector('[data-vt-cs-noclear]'), reset: !!g.querySelector('[data-vt-cs-reset]'), note: (g.querySelector('[data-vt-cs-note]') || {}).textContent || '', lim: (g.querySelector('[data-vt-cs-lim]') || {}).textContent || '', next: !!g.querySelector('[data-vt-cs-next]') };
 }, sp);
 async function gridChecks(page) {
   await page.setViewportSize({ width: 1300, height: 900 });
   await fresh(page, { lang: 'it' }); await openTab(page, 'voices');
   let a = await gridState(page, 'albert');
-  check(a && !a.open && a.count === '10 su 10 consentiti' && a.clear && a.on.length === 10 && !a.reset && /In italiano parla Alice/.test(a.note), 'griglia: Albert closed by default, 10 su 10, clear locked on, no Reset, the note on Alice', JSON.stringify(a));
+  check(a && !a.open && a.count === '10 su 10 consentiti' && a.clear && a.on.length === 10 && !a.reset && /In italiano parla Alice/.test(a.note), 'griglia: Albert closed by default, 10 su 10, clear on and free, no Reset, the note on Alice', JSON.stringify(a));
   await openGrid(page, 'albert'); await tap(page, chip('albert', 'robot')); await sleep(300);
   a = await gridState(page, 'albert');
   check(a.open && !a.on.includes('robot') && a.changed.join() === 'robot' && a.reset && a.count === '9 su 10 consentiti', 'griglia: Robot off on Albert, marked, Reset shown, 9 su 10, the grid stays open', JSON.stringify(a));
   check(JSON.stringify(await stored(page)) === JSON.stringify({ format: 1, en: { albert: ['clear', 'radio', 'distant', 'deep', 'bright', 'cathedral', 'echo', 'dirty', 'slow'] } }), 'griglia: only Albert stored, a full list in en', JSON.stringify(await stored(page)));
-  await tap(page, chip('albert', 'clear')); await sleep(200);
-  check((await gridState(page, 'albert')).clear, 'griglia: clear cannot be turned off');
+  await tap(page, chip('albert', 'clear')); await sleep(300);
+  a = await gridState(page, 'albert');
+  check(!a.on.includes('clear') && a.noClear && a.count === '8 su 10 consentiti' && !(await stored(page)).en.albert.includes('clear'), 'griglia: clear can be turned off, with the always-an-effect note', JSON.stringify(a));
+  await tap(page, chip('albert', 'clear')); await sleep(300);
+  a = await gridState(page, 'albert');
+  check(a.on.includes('clear') && !a.noClear && a.count === '9 su 10 consentiti', 'griglia: clear on again', JSON.stringify(a));
   await openGrid(page, 'kathy'); await tap(page, chip('kathy', 'echo')); await sleep(300);
   // the bench follows the effective table (2.3): Kathy in English with echo off
   await page.evaluate(() => localStorage.setItem('coding-misk-lang', 'en')); await page.reload(); await sleep(2500); await openTab(page, 'voices');
@@ -124,7 +129,9 @@ async function gridChecks(page) {
   check(k && k.on.length === 10 && !k.reset, 'griglia: a corrupt stored value gives the committed table', JSON.stringify(k));
   await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ format: 1, en: { kathy: ['bogus', 'radio'] } })), KEY); await page.reload(); await sleep(2500); await openTab(page, 'voices');
   k = await gridState(page, 'kathy');
-  check(k && k.on.join() === 'clear,radio', 'griglia: an unknown id is ignored, the rest used', JSON.stringify(k));
+  check(k && k.on.join() === 'radio' && k.locked.join() === 'radio' && k.noClear, 'griglia: an unknown id is ignored, the rest used; the last style on is locked', JSON.stringify(k));
+  await openGrid(page, 'kathy'); await tap(page, chip('kathy', 'radio')); await sleep(200);
+  check((await gridState(page, 'kathy')).on.join() === 'radio', 'griglia: the last style on cannot be turned off');
   // on air: the note that a change applies from the next session
   await radioOn(page, 'griglia-1');
   await openTab(page, 'voices'); await openGrid(page, 'fred');
