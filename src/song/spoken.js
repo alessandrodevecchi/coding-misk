@@ -202,9 +202,10 @@ export function placeSpoken(input, lang = langOf()) {
       else if (pat.way === 'passage') {
         if (!entry()) {
           // the quietest section the clip covers (fewest tracks; the first of equals)
+          // (none: the clip lies past the sections, as in the part of a window compiled on a resume: its start)
           const cand = n.sections.map((s, i) => ({ s, i })).filter(({ s }) => s.start < end && s.start + s.bars > clip.start);
           const best = cand.reduce((a, b) => (facts.counts[b.i] < facts.counts[a.i] ? b : a), cand[0]);
-          starts.push({ bar: Math.max(clip.start, best.s.start), late: 0 });
+          starts.push({ bar: best ? Math.max(clip.start, best.s.start) : clip.start, late: 0 });
         }
       } else if (pat.way === 'refrain') {
         const every = Number.isInteger(pat.every) && pat.every > 0 ? pat.every : 4, kinds = whereOfTrack(tr), from = starts.length;
