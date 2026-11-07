@@ -46,7 +46,7 @@ Effect gestures (director-fold-ring, measured 2026-11-01 with `tools/check-gestu
 
 Ring per note is fine on one or two tracks; on every line of a dense song it breaks real time. A finished Ring should run once per track (a worklet on the orbit), not once per note.
 
-**Sound guard.** Some soundfont files are broken upstream. The guard plays a stand-in font instead of silence, and an export names a sound it had to skip. A drum row a kit lacks is mapped to the nearest row by the compiler (`kitRow` in `src/music.js`). It remembers what it learned in the browser, per soundfont library version.
+**Sound guard.** Some soundfont files are broken upstream. The guard plays a stand-in font instead of silence, and an export names a sound it had to skip. A drum row a kit lacks is mapped to the nearest row by the compiler (`kitRow` in `src/music.js`). It remembers what it learned in the browser, per soundfont library version. It never learns the voice helper's banks (`say_*`): their files are made on this machine while the page runs, so a failed load is tried once more from a fresh address (`freshUrl`: superdough keeps every address's load, a failed one too, in a private cache it cannot clear) and stored `say_*` entries are dropped on load. A sample whose address answers with a page (`text/html`) or an error status is not learned either (`servesAudio`, #82).
 
 ## How it connects
 

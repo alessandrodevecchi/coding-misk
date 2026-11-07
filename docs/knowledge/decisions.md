@@ -174,11 +174,13 @@ Important choices, and attempts that were tried and dropped. Each line has its r
 - **A lock press does no steering either (`console-add-ahead` D8, option A).** The Arrangement and mixer locks record a pending lock in the batch of their boundary, so a lock enters with the "+" and "−" of that phrase start; lock then unlock cancels. The cost: a lock pressed less than about 2 s before a phrase protects from the phrase after. Rejected: steering a lock away from the page on today's boundary (option B), a second path that can still miss the phrase. A lock click cost 125 ms (unlock 147 ms) at bar 75 of a Classic song before.
 - **Console changes have a worker of their own.** In the growth worker a batch waited behind the next song's growth (13 to 24 s measured).
 - **The steering of a grown song stays slow late in a song.** `steerOnAir` replays every standing command (about 2 s per energy command in Node, 17.5 s for nine); a batch then waits for it and enters a few phrases later, or not at all near the end of the song. Making the steering incremental is a separate change.
+| The dev server serves `/samples/*` audio from disk, and the sound guard never learns a `say_*` bank by index (#82) | A sample the voice helper had just written came back as Vite's page for about 150 ms; superdough cached that failed load for the session and the guard stored the index as broken, so the line never played and later lines of that index played their neighbour | DEVLOG 2026-11-07 |
 
 ## Rejected attempts
 
 | Attempt | Why it was dropped | Source |
 | --- | --- | --- |
+| Clearing superdough's failed load of a sample in place (#82) | `loadCache` in superdough 1.3.0's `sampler.mjs` is private and has no clear function; patching the dependency would need a pre-bundle plugin in dev and another in the build. The guard asks again from a new address instead (`freshUrl`) | DEVLOG 2026-11-07 |
 | One radio growth with a time budget inside the shape search (reused-lines D6, #85) | A growth cut by the clock is not repeatable: a replay or an export could grow another song. The radio grows the default search first and the wider one after, and records which one played. | design reused-lines |
 | Preview orbit 15 (pattern-preview D3, #84) | Voice tracks (the narrator) speak on orbits 15 and up, and one built-in song reaches 17: the preview takes at least 20, above every orbit of the song. | `src/player/preview.js` |
 | The browser voice (`speechSynthesis`) for console lines (voice-full-controls D9) | It plays outside Web Audio: no voice style, not in the master, the recording, the export or Replay, and off the beat. | [radio-commands](radio-commands.md) |

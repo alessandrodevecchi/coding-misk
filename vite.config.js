@@ -28,6 +28,26 @@ const customSamples = () => ({
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(samplesManifest()));
     });
+    // every audio file under /samples/ straight from disk, a missing one a 404 (#82): Vite's own public files are a list
+    // updated by its watcher, and a sample the voice helper has just written answered with the page (index.html, 200)
+    // for a while, which the sampler failed to decode and kept failing for the whole session
+    server.middlewares.use('/samples', (req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+      let rel = '';
+      try { rel = decodeURIComponent((req.url || '').split('?')[0]); } catch (e) { return next(); }
+      if (!AUDIO.test(rel)) return next();
+      const file = join(SAMPLES_DIR, rel);
+      if (!file.startsWith(SAMPLES_DIR + sep)) { res.statusCode = 403; return res.end(); }
+      let st = null;
+      try { st = statSync(file); } catch (e) { /* missing */ }
+      if (!st || !st.isFile()) { res.statusCode = 404; res.setHeader('Content-Type', 'text/plain'); return res.end('sample not found'); }
+      const ext = rel.split('.').pop().toLowerCase();
+      res.setHeader('Content-Type', { wav: 'audio/wav', mp3: 'audio/mpeg', ogg: 'audio/ogg', flac: 'audio/flac', m4a: 'audio/mp4', aac: 'audio/aac' }[ext] || 'application/octet-stream');
+      res.setHeader('Content-Length', st.size);
+      res.setHeader('Cache-Control', 'no-cache');
+      if (req.method === 'HEAD') return res.end();
+      res.end(readFileSync(file));
+    });
   },
   generateBundle() {
     this.emitFile({ type: 'asset', fileName: 'samples/strudel.json', source: JSON.stringify(samplesManifest()) });
