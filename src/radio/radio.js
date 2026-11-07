@@ -569,10 +569,20 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // when async: the window swaps when it is ready; since stage 5 a grown song's commands are waypoints, steerAir)
   function resteer(item, { async = false, then = null } = {}) {
     if (airSteer(item)) return steerAir(item, { async, then });
+    // (#82: a Classic song is steered away from the page too, as a grown one: on the press it took the main thread; the
+    // window swaps when the answer comes, and a song needed before that is steered here, growNow)
+    if (async && !item.growCtx && player.steerPlain) return steerPlainAway(item, then);
     const r = steerSong({ ...item.base, commands: item.commands, seed: S.recipe.seed, n: item.n });
     item.plan = r.plan; item.opts = r.opts; item.plain = r.song;
     if (!item.growCtx) { setSong(item, r.song); return; }
     grow(item, r.song, { async, then });
+  }
+  function steerPlainAway(item, then) {
+    const token = item.growToken = (item.growToken || 0) + 1, args = { ...item.base, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n };
+    const done = r => { if (item.growToken !== token || !S) return; delete item.growing; delete item.finish; item.plan = r.plan; item.opts = r.opts; item.plain = r.song; setSong(item, r.song); };
+    item.finish = () => { done(steerSong(args)); item.growToken++; };
+    item.growing = player.steerPlain(args).then(done, () => { if (item.growToken === token) item.finish(); });
+    if (then) item.growing.then(() => { if (S && S.stream.includes(item)) then(); });
   }
   function relayoutFrom(i) {
     for (let k = i + 1; k < S.stream.length; k++) { const p = S.stream[k - 1]; S.stream[k].start = p.start + p.bars - (p.cut ? 0 : overlapOf(p.entry.transition)); }
@@ -587,7 +597,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // result (Classic), and the window with it, already made ready: the line was tried before it was queued
   function command(c, pre = null) {
     if (!S || S.paused !== undefined) return false;
-    const item = S.stream[S.onAir], rel = relNow();
+    const item = S.stream[S.onAir], rel = relNow(), before = item.song;
     if (!item.plan) { toast(t(item.frozen ? 'steerWhy:frozen' : 'steerWhy:lead')); return false; }
     // a grown song (radio-profiles D9): the first boundary of the waypoint, in the grown song's bars; the steering
     // moves it to the phrase after when its edit cannot be typed in time (pend, with the bar it came: q)
@@ -633,7 +643,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // (a typed line tried first: its window is ready, made with this very song)
     // (and the console drawn in a task of its own)
     if (pre && pre.p) { if (soon) soon.done = true; soon = null; player.swap(pre.p); setTimeout(() => renderNow(), 0); return true; }
-    swapSoon(windowPlayable(), item.start + heardAt(item, cmd));
+    // (#82: while the steering runs away from the page the song is the same: its window, and the plan of its code, were
+    // made again for nothing; the answer swaps the window)
+    if (!(item.growing && item.song === before)) swapSoon(windowPlayable(), item.start + heardAt(item, cmd));
     renderNow();
     return true;
   }
@@ -672,9 +684,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const drop = x => x.id === id || (c.kind === 'extend' && x.kind === 'curve' && x.id > id && x.at > relNow() && x.d >= c.ins);
     item.commands = item.commands.filter(x => !drop(x));
     S.recipe.steering = (S.recipe.steering || []).filter(x => !(x.song === item.n && drop(x)));
+    const before = item.song;
     resteer(item, { async: true, then: () => { keepHistory(item); swapSoon(windowPlayable(), by); renderNow(); } });
     keepHistory(item);
-    swapSoon(windowPlayable(), by);
+    if (!(item.growing && item.song === before)) swapSoon(windowPlayable(), by);
     renderNow();
   }
   // ---------- "+" and "−" prepared ahead (console-add-ahead) ----------
