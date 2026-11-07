@@ -711,6 +711,30 @@ const CHECKS = {
     }
     console.log(`      ${n} batches of six, the last entry ${(sum / Math.max(1, n)).toFixed(1)} bars after the press on average; ${p} saved patterns inside a growth heard on their boundary`);
   },
+  '#82: a riser pressed early inside a long growth lands within two phrases of the press, on the grown song; a replay is the same'() {
+    let n = 0;
+    const seen = [];
+    for (const x of airCases().filter(y => y.g0.crescendo.growth >= 8 * y.plan.phrase).slice(0, 4)) {
+      const ph = x.plan.phrase, q = 2 * ph - 2 + 0.4, at = airBoundaries('riser', q, x.plan, x.g0)[0];
+      if (at === undefined) continue;
+      for (const dir of ['up', 'down']) {
+        const r = steer(x, [{ kind: 'riser', bars: 'auto', dir, sound: 'noise', q, at, at0: at, pend: true, id: 1 }]);
+        const c = r.commands[0];
+        assert(c && c.air, `${x.id}: the riser pressed on ${q} (growth ${x.g0.crescendo.growth}) was not placed on the grown song: ${JSON.stringify(c)}`);
+        assert(c.at === c.air.start && c.air.start >= q + 1.5 && c.air.end <= q + 2 * ph + (dir === 'down' ? c.air.bars : 0), `${x.id}: riser ${dir} pressed on ${q} placed ${c.air.start}-${c.air.end}`);
+        const riser = r.song.tracks.find(t => t.type === 'riser');
+        assert(riser && soundAt(r.song, c.air.start).tracks.some(t => t.id === riser.id), `${x.id}: no riser heard on ${c.air.start}`);
+        const view = directorView({ song: x.song, plan: x.plan, opts: x.opts, commands: r.commands, seed: x.seed, n: x.n, grown: r.grown });
+        assert(!(view.plan.risers || []).length, `${x.id}: the riser on the grown song also went to the written form`);
+        const again = steer(x, r.commands.map(y => ({ ...y })));
+        assert(JSON.stringify(again.song) === JSON.stringify(r.song), `${x.id}: the replay of the riser differs`);
+        seen.push(`${x.id} ${dir} ${c.air.start}-${c.air.end}`);
+      }
+      n++;
+    }
+    assert(n >= 2, `only ${n} songs with a long growth`);
+    console.log(`      risers pressed 1.6 bars before the second phrase: ${seen.join(', ')}`);
+  },
   'radio fixtures: Classic sessions rebuild the same items'() {
     for (const { name, recipe } of CLASSIC) {
       const a = sessionItems(RECIPES, recipe, SONGS), b = sessionItems(RECIPES, recipe, SONGS);
