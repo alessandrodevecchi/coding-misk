@@ -76,6 +76,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- A line typed in the radio console with Say now is heard with its own new sample, and no later line of the same voice plays a neighbouring sample.
 - An unsaved change in the phrase editor of the Voices tab is no longer lost when the tab redraws in the background.
 - Saving a phrase edit in the Voices tab no longer closes the next phrase form when the voice helper is slow.
 - Radio: Keep on a style invented by the compilation saves it with one click while Now playing is redrawn.

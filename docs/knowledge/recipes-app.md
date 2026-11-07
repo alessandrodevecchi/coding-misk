@@ -116,4 +116,4 @@ Step by step for checks, Strudel updates, texts, settings, visuals, exports and 
 
 **Checks:** `npm run check:sound-guard`, `node tools/check-style-sounds.cjs`, `node tools/check-sounds.cjs --only <name>`.
 
-**Mistakes:** adding a stand-in for a sound that is just misspelled; blaming the guard for a line muted with `_$:` or a mask.
+**Mistakes:** adding a stand-in for a sound that is just misspelled; reading `[sounds] say_… is broken` as a broken sample (a store written before #82: the guard drops those entries on load); blaming the guard for a line muted with `_$:` or a mask.

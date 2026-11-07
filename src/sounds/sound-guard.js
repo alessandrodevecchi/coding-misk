@@ -6,10 +6,15 @@
 // - the sound wrapper: every soundfont and sample sound plays its stand-in when the register knows it is broken, and a
 //   note that fails to load is learned and played again from the stand-in (another font of the instrument, another
 //   sample of the bank). Network errors are not learned: offline is not broken.
+// The voice helper's own banks (say_*, made on this machine while the page runs) are never learned by index (#82): their
+// files change under the same index, and a sample fetched before it could be served came back as the page (HTML); such a
+// load is tried again once from a fresh address instead, and stored entries of those banks are dropped on load.
 // Pure apart from the decode guard and the store: checked in Node (tools/check-sound-guard.mjs).
 import { SOUNDFONT_FIX, midiOf } from './soundfont-fix.js';
 
 export const HEALTH_KEY = 'coding-misk-sound-health';
+// the banks the voice helper makes locally (say_<lang>[_<speaker>]): never in the register
+export const isLocalBank = name => /^say_/.test(String(name || ''));
 export const SOUNDFONT_URL = 'https://felixroos.github.io/webaudiofontdata/sound';
 
 // decoders called with a success callback and no error callback get the failure as a null buffer, not silence forever
@@ -63,7 +68,16 @@ export const indexOf = (n, count) => { const i = Math.round(Number.isFinite(+n) 
 export function createRegister({ version = '', store = null, known = SOUNDFONT_FIX } = {}) {
   const base = known.map(f => ({ name: f.name, index: f.font, ...(f.low !== undefined ? { low: f.low, high: f.high } : {}), ...(f.use !== undefined ? { use: f.use } : {}) }));
   let learned = [];
-  const load = () => { try { const s = store && JSON.parse(store.getItem(HEALTH_KEY) || 'null'); learned = s && s.version === version && Array.isArray(s.broken) ? s.broken : []; } catch (e) {} };
+  const save = () => { try { if (store) store.setItem(HEALTH_KEY, JSON.stringify({ version, broken: learned })); } catch (e) {} };
+  // (entries of the local say_* banks stored by an older version are dropped, and the store written again without them)
+  const load = () => {
+    try {
+      const s = store && JSON.parse(store.getItem(HEALTH_KEY) || 'null');
+      const all = s && s.version === version && Array.isArray(s.broken) ? s.broken : [];
+      learned = all.filter(e => !(e && isLocalBank(e.name)));
+      if (learned.length !== all.length) save();
+    } catch (e) {}
+  };
   load();
   const all = () => [...base, ...learned];
   const hit = (e, name, index, midi) => e.name === name && e.index === index && (e.low === undefined || midi == null || (midi >= e.low && midi <= e.high));
@@ -74,11 +88,12 @@ export function createRegister({ version = '', store = null, known = SOUNDFONT_F
     learned: () => learned.slice(),
     // reads the stored entries again (another page of the app learned some)
     reload: load,
-    // adds a broken part; false when it was known
+    // adds a broken part; false when it was known or belongs to a local say_* bank
     add(entry) {
+      if (isLocalBank(entry.name)) return false;
       if (all().some(e => e.name === entry.name && e.index === entry.index && e.low === entry.low && e.high === entry.high)) return false;
       learned.push(entry);
-      try { if (store) store.setItem(HEALTH_KEY, JSON.stringify({ version, broken: learned })); } catch (e) {}
+      save();
       return true;
     },
     // the index to play for `index` (itself when sound), or null when every one is broken
@@ -127,25 +142,53 @@ export async function preloadFonts(names, { soundMap, play, pause = 30, get = fe
   return notes;
 }
 
+// whether a sample's address serves audio: false for a page (text/html, the dev server's fallback for a file it does not
+// list yet) or an error status; null when it cannot be asked (offline: not broken either)
+export async function servesAudio(url, get = u => fetch(u, { method: 'HEAD', cache: 'no-store' })) {
+  try {
+    const r = await get(url);
+    if (!r || !r.ok) return false;
+    const type = String((r.headers && r.headers.get && r.headers.get('content-type')) || '').toLowerCase();
+    return !/text\/html/.test(type);
+  } catch (e) { return null; }
+}
+// the same address made new, for superdough's sampler: it keeps each address's load, a failed one too, for the whole page
+// session in a private cache with no way to clear it (superdough 1.3.0 sampler.mjs loadCache); a new address is a new load
+export const freshUrl = (url, k = Date.now()) => {
+  const u = String(url).replace(/([?&])cmRetry=\d+(&|$)/, (m, a, b) => (b ? a : ''));
+  return `${u}${u.includes('?') ? '&' : '?'}cmRetry=${k}`;
+};
+
 // wraps the soundfont and sample sounds of a sound map (superdough's soundMap and registerSound), now and as more are
 // registered. now(): the audio clock, to skip a stand-in that would come too late; onReplace(name, from, to): a stand-in
 // played (on every such note). Returns a function that stops watching.
-export function guardSounds({ soundMap, registerSound, register, now = () => 0, onReplace = () => {}, zone = zoneOf }) {
+export function guardSounds({ soundMap, registerSound, register, now = () => 0, onReplace = () => {}, zone = zoneOf, probe = servesAudio }) {
   const wrapOne = (key, s) => {
     if (s.data.type === 'sample') fixSampleBank(s.data.samples);
     const type = s.data.type, fonts = type === 'soundfont' ? s.data.fonts : null;
-    const count = fonts ? fonts.length : Array.isArray(s.data.samples) ? s.data.samples.length : 1;
-    const play = s.onTrigger;
+    const list = type === 'sample' && Array.isArray(s.data.samples) ? s.data.samples : null;
+    const count = fonts ? fonts.length : list ? list.length : 1;
+    const play = s.onTrigger, local = isLocalBank(key);
     registerSound(key, async (time, v, onended) => {
       const midi = fonts ? midiOf(v) : null;
       const want = indexOf(v.n, count);
-      let idx = register.standIn(key, count, want, midi);
+      let idx = local ? want : register.standIn(key, count, want, midi);
       if (idx === null) idx = want;
       else if (idx !== want) onReplace(key, want, idx);
+      let fresh = false;
       for (let tries = 0; ; tries++) {
         try { return await play(time, idx === want ? v : { ...v, n: idx }, onended); }
         catch (e) {
+          // a local say_* sample: never another index; once more from a new address (the list is the sampler's own)
+          if (local) {
+            if (fresh || !list || typeof list[idx] !== 'string') throw e;
+            fresh = true;
+            list[idx] = freshUrl(list[idx]);
+            continue;
+          }
           if (!isBrokenError(e) || count < 2 || tries >= 3) throw e;
+          // a page or an error answered for a sample is not a broken sample
+          if (list && typeof list[idx] === 'string' && (await probe(list[idx])) !== true) throw e;
           const range = fonts ? await zone(fonts[idx], midi) : null;
           register.add({ name: key, index: idx, ...(range || {}) });
           const next = register.standIn(key, count, idx, midi);
