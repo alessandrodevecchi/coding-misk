@@ -48,6 +48,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - New kits in the kit menu: `RolandR8`, `KorgM1`, `RolandMC303`, `RolandTR505`, `RolandTR626`, `BossDR110`, `AlesisSR16`, `YamahaRY30`, `RolandCompurhythm78`, `MPC1000`.
 - `npm run probe:openings` reports how radio songs open, `-- --check` checks the targets.
 - `npm run check:kit-rows`: every style kit has the drum rows its grooves play.
+- Radio: a countdown badge next to Extend until it enters ("Extend +16 s · in 24 s").
 
 ### Changed
 
@@ -83,6 +84,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Radio: a line typed in the console is no longer lost when its sample decodes late; it plays on a later bar.
 - Shorter main-thread pause on the bar where a live build step changes the code (Classic Say now included).
 - Radio: Now playing is redrawn only when what it shows changes; the position marks move in place.
+- Radio: Skip no longer freezes the page while the next song grows; it shows "Skipping…" until the next song is ready.
+- Radio: a riser pressed inside the growth of a Live coder or Crescendo song comes within two phrases, not near the song's end.
+- Radio: console commands steer Classic songs and make the code plan of the window away from the page; the window is not made again while the steering runs.
+- Radio: adding a saved pattern redraws only the saved patterns panel after the press.
+- The code typing updates the editor at most 30 times a second, and the code panel's scroll no longer forces a layout each frame.
+- Song cards are updated each frame only while the Songs tab is shown.
 
 ### Removed
 
