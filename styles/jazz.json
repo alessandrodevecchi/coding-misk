@@ -64,7 +64,8 @@
   "bass": {
     "material": { "source": "mix", "share": 0.3, "rules": ["pulse", "half", "roots", "fifths"] },
     "presets": [
-      "walking"
+      "walking",
+      "twoFeel"
     ],
     "waves": [
       "gm_acoustic_bass"

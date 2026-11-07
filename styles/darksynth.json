@@ -133,7 +133,9 @@
   "guitar": {
     "patterns": [
       "power8",
-      "chug"
+      "chug",
+      "gallop",
+      "held"
     ],
     "types": [
       "distorted",

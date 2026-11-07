@@ -102,8 +102,8 @@ export const composesOnAir = opts => sessionSource(opts) !== 'patterns' && (opts
 // One new idea for a track, composed while the song plays. M: { seed, key, chords, meter, energy, density, complexity,
 // source, avoid (ideas it must differ from) }. density, energy and complexity (0 to 1) shape the part (D3): notes per
 // bar, register, range and rhythmic variety. With the source "varied" a preset track gets a variation of its preset.
-// Tries a few seeds until the idea differs from every idea in avoid; null when the type has no generator (drums keep
-// their grooves, textures their rhythms).
+// Tries a few seeds until the idea differs from every idea in avoid; null when the type has no generator (drums compose
+// through airGroove, textures keep their rhythms).
 // M.keepChords (a vary of the pad): the style's own progressions are left out, so the pad keeps the song's chords and
 // changes only its rhythm, register and voicing.
 export function airIdea(t, R, M) {
@@ -123,6 +123,30 @@ export function airIdea(t, R, M) {
   }
   return null;
 }
+
+// The rows of a kick or a beat composed on air (kick-variety D4), for "+ kick" and "+ beat": up to 8 grooves from the
+// style's drum material, seeded `<seed>:groove:<j>`, at the phrase's energy, in the song's meter. A kick keeps the bd
+// row, a beat the other rows (a second beat only the rows the other beats do not play, when it can). avoid: the bd rows
+// the kick tracks hold (the four-floor draw leaves them out); others: the drum rows the other beats play. Returns the
+// distinct candidates as { row: steps } with steps of `x` and `.`; [] when the style declares no drum material.
+export function airGroove(R, part, M, { avoid = [], others = [], seed = '' } = {}) {
+  const style = R && R.drums && R.drums.material;
+  if (!style || (part !== 'kick' && part !== 'beat')) return [];
+  const skip = new Set(others), out = [], seen = new Set();
+  for (let j = 0; j < 8; j++) {
+    const g = compose('drums', { seed: `${seed}:groove:${j}`, style, meter: M.meter, energy: M.energy, ...(part === 'kick' ? { avoidKicks: avoid } : {}) });
+    const beat = g && g.idea && g.idea.beat;
+    if (!beat) continue;
+    const N = beat.grid, steps = v => { const on = new Set(String(v).split(',').map(Number)); return Array.from({ length: N }, (_, i) => (on.has(i) ? 'x' : '.')).join(''); };
+    let rows = Object.fromEntries(Object.entries(beat).filter(([k, v]) => k !== 'grid' && String(v).length && (part === 'kick' ? k === 'bd' : k !== 'bd')).map(([k, v]) => [k, steps(v)]));
+    if (part === 'beat' && skip.size) { const own = Object.fromEntries(Object.entries(rows).filter(([k]) => !skip.has(k))); if (Object.keys(own).length) rows = own; }
+    const key = rowsKey(rows);
+    if (Object.keys(rows).length && !seen.has(key)) { seen.add(key); out.push(rows); }
+  }
+  return out;
+}
+// one key for a set of drum rows, whatever the order of the rows
+export const rowsKey = rows => JSON.stringify(Object.keys(rows || {}).sort().map(k => [k, rows[k]]));
 
 // ---------- ready parts for Swap (radio-variation) ----------
 

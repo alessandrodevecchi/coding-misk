@@ -122,7 +122,10 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   async function seedMany(n, lang = 'en') {
     await page.evaluate(async ({ n, lang }) => {
       const { builtinPatterns } = await import('/src/library/patterns.js');
-      const all = builtinPatterns(), word = ['notturno', 'scuro', 'teso', 'lento', 'rotto', 'acido', 'pieno', 'vuoto', 'storto'];
+      // (the catalogue as it was before kick-variety: its new grooves and presets would move the seeded lists, and
+      // with them the counts this check reads)
+      const later = new Set(['technoPickup', 'technoRolling', 'technoBroken', 'trancePush', 'trancePickup', 'housePickup', 'houseRolling', 'drift', 'heartbeat', 'phonkRoll', 'phonkHalf', 'rockPush'].map(id => `grooves/${id}`).concat(['riffs/twoFeel', 'riffs/strum', 'chords/swell']));
+      const all = builtinPatterns().filter(b => !later.has(b.key)), word =['notturno', 'scuro', 'teso', 'lento', 'rotto', 'acido', 'pieno', 'vuoto', 'storto'];
       const head = { hook: 'Melodia', bass: 'Basso', arp: 'Arpeggio', pad: 'Pad', drums: 'Groove', guitar: 'Riff' };
       const list = Array.from({ length: n }, (_, i) => { const b = all[(i * 7) % all.length]; return { id: `p-m${i}`, name: `${head[b.type] || b.type} ${word[i % 9]} ${i + 1}`, kind: b.kind, type: b.type, pattern: JSON.parse(JSON.stringify(b.pattern)), sound: null, settings: {}, context: { key: ['A', 'C#', 'F#', 'D'][i % 4], chords: 'notturna', meter: i % 12 === 5 ? '7/8' : (b.defaults.meter || '4/4'), bpm: [70, 90, 110, 124, 128, 140][i % 6], mode: 'minor' }, styles: i % 3 === 0 ? ['berlin-techno'] : i % 3 === 1 ? [] : ['jazz'], source: 'compose', created: `2026-10-${String(1 + (i % 28)).padStart(2, '0')}` }; });
       localStorage.setItem('coding-misk-patterns', JSON.stringify(list)); localStorage.setItem('coding-misk-lang', lang);

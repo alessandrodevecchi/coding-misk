@@ -48,7 +48,9 @@
     ],
     "grooves": [
       "techno",
-      "hard"
+      "hard",
+      "technoPickup",
+      "technoRolling"
     ],
     "settings": {
       "drive": [
@@ -61,7 +63,8 @@
     "material": { "source": "mix", "share": 0.3, "rules": ["rolling", "sixteenths", "octaves"] },
     "presets": [
       "sub",
-      "rumble"
+      "rumble",
+      "rolling"
     ],
     "waves": [
       "sawtooth",
@@ -81,7 +84,9 @@
   "arp": {
     "material": { "source": "mix", "share": 0.3, "rules": ["pedal", "skips", "random"] },
     "presets": [
-      "acid"
+      "acid",
+      "pulsar",
+      "spezzato"
     ],
     "waves": [
       "sawtooth",
@@ -110,7 +115,8 @@
     "material": { "source": "mix", "share": 0.3, "rules": ["polymeter", "tail", "dark"] },
     "presets": [
       "colpi",
-      "allarme"
+      "allarme",
+      "cyber"
     ],
     "waves": [
       "square"

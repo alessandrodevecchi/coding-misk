@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "songs": {
     "ali-di-cenere": "602f5e00f3c37997",
     "cavo-scoperto": "abd0e329e935a7b2",
@@ -37,14 +37,14 @@
     "ruggine-lenta": "6d091ae84fda9366",
     "segnale-nel-rumore": "bd72cfd052fe3801",
     "settimo-cielo": "f4babae1b373043b",
-    "switch-acid-prova": "cda4324ebf790e8f",
+    "switch-acid-prova": "f0f3673ca271f788",
     "switch-house-prova": "f7bccf56d18c2f3e",
-    "switch-prima-luce": "01476860677534bf",
+    "switch-prima-luce": "e85d66fd1cfcdbed",
     "switch-tappe": "6ef0322317ba6bc0",
     "switch-test-acido": "19f73cc68b98fa31",
     "switch-test-breve": "191890c7a3b35232",
-    "switch-test-onda": "7a6a045d56349697",
-    "switch-test-stanza": "0f0a14060c8502eb",
+    "switch-test-onda": "00300fba792574c6",
+    "switch-test-stanza": "413c112f2e26dc28",
     "switch-trance-prova": "14622728ffafb1c4",
     "ten-years-rebuild": "5d3c35f606721eb5"
   }

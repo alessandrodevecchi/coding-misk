@@ -5,6 +5,48 @@ import { band, meterOf, euclid } from './common.js';
 export const FAMILIES = ['four-floor', 'breakbeat', 'two-step', 'half-time', 'euclid'];
 const uniq = list => [...new Set(list)].sort((a, b) => a - b);
 
+// Four-on-the-floor kick variants (kick-variety D1), defined on the meter's beats: `back` is the beats at odd positions,
+// the last beat is the bar's last. A variant equal to an earlier one in the meter is left out (7/8 has no `push`).
+export const KICK_VARIANTS = ['straight', 'pickup', 'push', 'rolling', 'broken'];
+// weights per energy band (D2), in the order of KICK_VARIANTS; the weight of a variant left out goes to `straight`
+const KICK_WEIGHTS = [[0.45, 0.2, 0, 0.1, 0.25], [0.3, 0.25, 0.15, 0.15, 0.15], [0.2, 0.2, 0.25, 0.25, 0.1]];
+function kickSteps(variant, N, beats) {
+  const back = beats.filter((_, i) => i % 2 === 1), L = beats[beats.length - 1];
+  if (variant === 'pickup') return uniq([...beats, N - 1]);
+  if (variant === 'push') return uniq([...beats, N - 2]);
+  if (variant === 'rolling') return uniq([...beats, ...back.map(x => x - 1)]);
+  if (variant === 'broken') return uniq([...beats.filter(x => x !== L), ...(L + 2 < N ? [L + 2] : [])]);
+  return beats.slice();
+}
+const stepString = (list, N) => Array.from({ length: N }, (_, i) => (list.includes(i) ? 'x' : '.')).join('');
+// the kick variants of a meter: [{ variant, steps, row }], a variant equal to an earlier one left out
+export function kickVariants(meter) {
+  const { N, beats } = meterOf(meter), out = [];
+  for (const variant of KICK_VARIANTS) {
+    const steps = kickSteps(variant, N, beats), row = stepString(steps, N);
+    if (!out.some(x => x.row === row)) out.push({ variant, steps, row });
+  }
+  return out;
+}
+// the kick row of one variant in a meter (`x` and `.` steps), null when the meter leaves the variant out
+export function kickRow(variant, meter) {
+  const v = kickVariants(meter).find(x => x.variant === variant);
+  return v ? v.row : null;
+}
+// one variant for a band from one draw u, leaving out the rows in avoid (unless every variant is in it)
+function pickKick(u, b, meter, avoid) {
+  const all = kickVariants(meter), w = Object.fromEntries(KICK_VARIANTS.map((v, i) => [v, KICK_WEIGHTS[b][i]]));
+  for (const v of KICK_VARIANTS) if (!all.some(x => x.variant === v)) w.straight += w[v];
+  const skip = new Set((avoid || []).map(String));
+  const left = all.filter(x => !skip.has(x.row));
+  let list = (left.length ? left : all).filter(x => w[x.variant] > 0);
+  if (!list.length) list = left.length ? left : all;
+  const total = list.reduce((a, x) => a + (w[x.variant] || 0), 0);
+  let acc = 0;
+  for (const x of list) { acc += total > 0 ? (w[x.variant] || 0) / total : 1 / list.length; if (u < acc) return x; }
+  return list[list.length - 1];
+}
+
 // hats for an energy band: offbeat 8ths, 8ths, 16ths with skips
 function hats(r, N, b, beats) {
   const off = beats.map(x => x + 2).filter(x => x < N);
@@ -14,8 +56,8 @@ function hats(r, N, b, beats) {
   return all.filter(x => !skip.has(x));
 }
 
-// opts: { style, meter, energy } → { idea: { beat: { bd, cp, sd, hh, oh, rd, grid } }, why, stats }
-export function groove(r, { style = {}, meter, energy = 0.5 } = {}) {
+// opts: { style, meter, energy, avoidKicks (kick rows as step strings the four-floor draw leaves out) } → { idea: { beat: { bd, cp, sd, hh, oh, rd, grid } }, why, stats }
+export function groove(r, { style = {}, meter, energy = 0.5, avoidKicks = null } = {}) {
   const { N, beats } = meterOf(meter), b = band(energy), why = [];
   const fams = (style.families || FAMILIES).filter(f => FAMILIES.includes(f));
   const family = r.pick(fams.length ? fams : FAMILIES);
@@ -23,12 +65,15 @@ export function groove(r, { style = {}, meter, energy = 0.5 } = {}) {
   const back = beats.filter((_, i) => i % 2 === 1), mid = beats[Math.floor(beats.length / 2)], last = N - 1;
   const shape = { a: r.next(), b: r.next(), c: r.next(), rot: r.int(0, 3) };
   const rows = {};
+  let kick = null;
   if (family === 'four-floor') {
-    rows.bd = beats.slice();
+    // the kick variant first (kick-variety D2): one draw, weights by band, the rows in avoidKicks left out
+    kick = pickKick(r.next(), b, meter, avoidKicks);
+    rows.bd = kick.steps.slice();
     if (b > 0 || shape.a < 0.5) rows.cp = back.slice();
     rows.hh = hats(r, N, b, beats);
-    if (b === 2) { if (r.chance(0.5)) rows.oh = beats.map(x => x + 2).filter(x => x < N && !rows.hh.includes(x)); if (r.chance(0.5)) rows.bd = uniq([...rows.bd, last - 1]); }
-    why.push('four on the floor');
+    if (b === 2 && r.chance(0.5)) rows.oh = beats.map(x => x + 2).filter(x => x < N && !rows.hh.includes(x));
+    why.push(`four on the floor, ${kick.variant}`);
   } else if (family === 'breakbeat') {
     rows.sd = back.slice();
     const opts = [beats[1] + 2, beats[2] + 2, beats[2] + 3].filter(x => x < N);
@@ -66,5 +111,5 @@ export function groove(r, { style = {}, meter, energy = 0.5 } = {}) {
   for (const [row, list] of Object.entries(rows)) if (list && list.length) beat[row] = uniq(list).filter(x => x >= 0 && x < N).join(',');
   if (b > 0 && rows.hh && rows.hh.length) why.push(`hats ${rows.hh.length}`);
   const hits = Object.entries(beat).filter(([k]) => k !== 'grid').reduce((a, [, v]) => a + v.split(',').length, 0);
-  return { idea: { beat }, why, stats: { family, hits } };
+  return { idea: { beat }, why, stats: { family, hits, ...(kick ? { kick: kick.variant } : {}) } };
 }

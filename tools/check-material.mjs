@@ -3,7 +3,7 @@
 // Rules, determinism, ranges, key: every generated part is an idea that passes the song validator and compiles.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { compose, KINDS, FAMILIES, SOUND_KINDS, SOUND_KIND_ALIASES, FM_RANGES, fmInRange, sharedRoots, modeProgression, SESSION_SOURCES } from '../src/material/index.js';
+import { compose, KINDS, FAMILIES, KICK_VARIANTS, kickRow, kickVariants, SOUND_KINDS, SOUND_KIND_ALIASES, FM_RANGES, fmInRange, sharedRoots, modeProgression, SESSION_SOURCES } from '../src/material/index.js';
 import { tonesOf, rootOf, modeSteps, chordsOf } from '../src/material/common.js';
 import { spanOf } from '../src/material/melody.js';
 import { miniEvents, expandIdea, unknownChords, parseMini } from '../src/song/ideas.js';
@@ -131,11 +131,64 @@ const CHECKS = {
     for (const f of FAMILIES) for (const s of seeds(50)) for (const e of [0.2, 0.5, 0.9]) {
       const { idea } = compose('drums', { seed: s, style: { families: [f] }, energy: e }), b = idea.beat;
       count[f] = (count[f] || 0) + 1;
-      if (f === 'four-floor') assert(has(b, 'bd', [0, 4, 8, 12]), `${f} ${s}: ${JSON.stringify(b)}`);
+      if (f === 'four-floor') assert(has(b, 'bd', [0]) && kickVariants('4/4').some(v => v.steps.join(',') === b.bd) && has(b, 'cp', e > 0.33 ? [4, 12] : []), `${f} ${s}: ${JSON.stringify(b)}`);
       if (f === 'breakbeat') assert(has(b, 'sd', [4, 12]) && has(b, 'bd', [0]), `${f} ${s}: ${JSON.stringify(b)}`);
       if (f === 'two-step') assert(has(b, 'cp', [4, 12]) && !has(b, 'bd', [0, 4, 8, 12]), `${f} ${s}: ${JSON.stringify(b)}`);
       if (f === 'half-time') assert(has(b, 'sd', [8]) && has(b, 'bd', [0]), `${f} ${s}: ${JSON.stringify(b)}`);
       assert(b.grid === 16 && Object.keys(b).every(k => k === 'grid' || ['bd', 'cp', 'sd', 'hh', 'oh', 'rd'].includes(k)), `${f}: rows ${Object.keys(b)}`);
+    }
+  },
+  // kick-variety D1: the five four-floor kick variants on the beats of every meter
+  'four-floor kick variants: every meter, step 0, at least 3 hits, distinct (4 in 7/8)'() {
+    const want = {
+      '4/4': ['x...x...x...x...', 'x...x...x...x..x', 'x...x...x...x.x.', 'x..xx...x..xx...', 'x...x...x.....x.'],
+      '3/4': ['x...x...x...', 'x...x...x..x', 'x...x...x.x.', 'x..xx...x...', 'x...x.....x.'],
+      '5/4': ['x...x...x...x...x...', 'x...x...x...x...x..x', 'x...x...x...x...x.x.', 'x..xx...x..xx...x...', 'x...x...x...x.....x.'],
+      '7/8': ['x...x...x...x.', 'x...x...x...xx', 'x..xx...x..xx.', 'x...x...x.....'],
+    };
+    for (const [meter, rows] of Object.entries(want)) {
+      const got = kickVariants(meter), N = meterSteps(meter);
+      assert(same(got.map(v => v.row), rows), `${meter}: ${got.map(v => v.row).join(' ')}`);
+      assert(new Set(got.map(v => v.row)).size === got.length, `${meter}: variants repeat`);
+      for (const v of got) assert(v.steps[0] === 0 && v.steps.length >= 3 && v.steps.every(x => x >= 0 && x < N) && new Set(v.steps).size === v.steps.length && v.row.length === N, `${meter} ${v.variant}: ${v.row}`);
+    }
+    assert(kickRow('push', '7/8') === null && kickRow('broken', '4/4') === 'x...x...x.....x.' && KICK_VARIANTS.length === 5, 'kickRow');
+  },
+  'four-floor kick variants: each band draws its variants over 300 seeds, no push at low energy'() {
+    const allowed = { 0.2: ['straight', 'pickup', 'rolling', 'broken'], 0.5: KICK_VARIANTS, 0.9: KICK_VARIANTS };
+    for (const [e, list] of Object.entries(allowed)) {
+      const seen = {};
+      for (const s of seeds(300)) {
+        const g = compose('drums', { seed: s, style: { families: ['four-floor'] }, energy: Number(e) });
+        seen[g.stats.kick] = (seen[g.stats.kick] || 0) + 1;
+        assert(g.idea.beat.bd === kickVariants('4/4').find(v => v.variant === g.stats.kick).steps.join(','), `${s} ${e}: ${g.idea.beat.bd} is not ${g.stats.kick}`);
+        assert(g.why[0] === `four on the floor, ${g.stats.kick}`, `${s}: why ${g.why[0]}`);
+      }
+      assert(list.every(v => seen[v] > 0) && Object.keys(seen).every(v => list.includes(v)), `energy ${e}: ${JSON.stringify(seen)}`);
+    }
+  },
+  'four-floor kick variants: avoidKicks leaves variants out, all of them avoided is ignored'() {
+    const rows = kickVariants('4/4').map(v => v.row);
+    for (const s of seeds(50)) for (const e of [0.2, 0.5, 0.9]) {
+      const g = compose('drums', { seed: s, style: { families: ['four-floor'] }, energy: e, avoidKicks: rows.slice(0, 4) });
+      assert(g.idea.beat.bd === '0,4,8,14' && g.stats.kick === 'broken', `${s} ${e}: ${g.idea.beat.bd}`);
+      const h = compose('drums', { seed: s, style: { families: ['four-floor'] }, energy: e, avoidKicks: rows.slice(1) });
+      assert(h.stats.kick === 'straight', `${s} ${e}: ${h.stats.kick}`);
+      const a = compose('drums', { seed: s, style: { families: ['four-floor'] }, energy: e, avoidKicks: rows }), b = compose('drums', { seed: s, style: { families: ['four-floor'] }, energy: e });
+      assert(same(a, b), `${s} ${e}: avoiding every variant changed the draw`);
+    }
+    const t = compose('drums', { seed: 'x', style: { families: ['four-floor'] }, meter: '7/8', energy: 0.5, avoidKicks: kickVariants('7/8').map(v => v.row).slice(0, 3) });
+    assert(t.idea.beat.bd === '0,4,8' && t.idea.beat.grid === 14, `7/8 broken: ${t.idea.beat.bd}`);
+  },
+  // kick-variety 0.1: breakbeat, two-step, half-time and euclid hashed over 50 seeds and three energies before the
+  // change; the four-floor kick draw must not move them
+  'grooves: the other families draw as before kick-variety'() {
+    const hashes = { breakbeat: '4a658060aa16a7e2', 'two-step': '62542ccbf92f6389', 'half-time': '0fd22956e4c6541e', euclid: 'e033cbfd8b16c468' };
+    for (const [f, h] of Object.entries(hashes)) {
+      const out = [];
+      for (let i = 0; i < 50; i++) for (const e of [0.2, 0.5, 0.9]) out.push(compose('drums', { seed: `kv${i}`, style: { families: [f] }, energy: e }).idea);
+      const got = crypto.createHash('sha1').update(JSON.stringify(out)).digest('hex').slice(0, 16);
+      assert(got === h, `${f}: ${got}, was ${h}`);
     }
   },
   'energy: more onsets and a range at least as wide from 0.2 to 0.9'() {

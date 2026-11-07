@@ -43,7 +43,9 @@
     ],
     "grooves": [
       "trance",
-      "rolling"
+      "rolling",
+      "trancePush",
+      "trancePickup"
     ]
   },
   "bass": {
