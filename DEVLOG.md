@@ -2654,3 +2654,8 @@ Ramo `feat/82-clear-optional`, su richiesta del proprietario dopo la prova vc2.
 - **Bug:** con la radio in pausa, Play o «Resume» non ripartivano. In console: `Cannot read properties of undefined (reading 's')` in `placeSpoken` (`src/song/spoken.js`). Alla ripresa la radio compila la parte di finestra da cui riparte; una frase «passage» della traccia voce poteva cadere fuori dalle sezioni, la ricerca della sezione più tranquilla non trovava niente e la compilazione si fermava (da qui anche il codice incompleto, `Unexpected token`).
 - **Fix:** senza sezioni coperte, la frase parte all'inizio della sua clip.
 - **Prove:** nuovo caso in `check:spoken` (61, prima fallisce con lo stesso errore), `check:endless` (94).
+
+## 2026-11-07 pattern salvati: «+» nella vista a lista
+
+- **Novità:** in radio, Console → «Add a saved pattern», nella vista a lista ogni riga ha un «+» che aggiunge il pattern come nuova traccia (come «Add as new track» nelle schede). Il chip a destra è solo l'etichetta dello strumento. Disabilitato con lo stesso motivo della scheda quando non si può aggiungere.
+- **Prove:** `check-steering.cjs` nel browser (porta 5298), tutto ok, con il nuovo caso del «+» della riga; `npm run build`.

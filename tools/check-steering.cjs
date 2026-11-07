@@ -784,6 +784,10 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(/\(2\)/.test(head) && (await page.$$('#radio-steer .sp-list .sp-row')).length === 2 && /1 in another meter/.test(await page.innerText('#radio-steer .sp')), 'the panel lists the 2 patterns that fit, as rows, and counts the 7/8 one', `${head} | ${await page.innerText('#radio-steer .sp')}`);
     const painted = await page.$$eval('#radio-steer canvas[data-sp-pv]', cs => cs.map(c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; }));
     check(painted.length === 2 && painted.every(n => n > 20), 'each row has a preview drawing', JSON.stringify(painted));
+    // a row adds as a new track with its + (saved-list-add)
+    check((await page.$$('#radio-steer .sp-list .sp-row [data-sp-new]:not([disabled])')).length === 2, 'each row has an enabled + (Add as new track)');
+    await page.click('#radio-steer .sp-list [data-sp-new="p-bass"]'); await sleep(400);
+    check(/\+ Basso mio \(/.test(await page.innerText('#radio-steer .steer-queue')), 'the row + queues the pattern: "+ Basso mio (…)"', await page.innerText('#radio-steer .steer-queue'));
     await page.click('#sp-view'); await sleep(300);
     check((await page.$$('#radio-steer .sp-card')).length === 2 && await page.isVisible('#radio-steer [data-sp-new="p-bass"]') && await page.isVisible('#radio-steer [data-sp-replace="p-bass"]'), 'open: cards with Add as new track and Replace');
     check(/feel different/.test(await page.innerText('#radio-steer .sp-cards')), 'a pattern saved at 60 BPM warns about the tempo');
@@ -844,7 +848,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(!(await err()), 'no evaluation error with saved patterns', (await err()).slice(0, 120));
     check(!(await page.$('#radio-steer .sp-tools')) && !(await page.$('#radio-steer .sp-group')) && !(await page.$('#radio-steer .sp-uses')), 'few saved patterns: no toolbar, no groups, no use line, as before (saved-patterns-list D3)');
     const uses = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-patterns')).map(p => `${p.id}:${p.uses || 0}`).join());
-    check(/p-bass:1/.test(uses) && /p-odd:0/.test(uses), 'Add as new track counts one use, the preview listen none (saved-patterns-list D5)', uses);
+    check(/p-bass:2/.test(uses) && /p-odd:0/.test(uses), 'Add as new track counts one use each (the row + and the card), the preview listen none (saved-patterns-list D5)', uses);
     if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'saved-en.png') });
     await page.evaluate(() => localStorage.removeItem('coding-misk-patterns'));
   }

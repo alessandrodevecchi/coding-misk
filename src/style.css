@@ -2006,3 +2006,4 @@ summary .vt-cs-dot { margin-left: 0; }
   .dc-secs { flex-wrap: wrap; }
   .dc-sec { flex-basis: 30%; }
 }
+.sp-row .sp-add { flex: none; font-weight: 700; }
