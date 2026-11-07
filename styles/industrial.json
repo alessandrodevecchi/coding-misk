@@ -49,7 +49,9 @@
     ],
     "grooves": [
       "hard",
-      "techno"
+      "techno",
+      "technoPickup",
+      "technoBroken"
     ],
     "settings": {
       "drive": [

@@ -47,7 +47,9 @@
     ],
     "grooves": [
       "trance",
-      "pulse"
+      "pulse",
+      "trancePush",
+      "trancePickup"
     ],
     "settings": {
       "drive": [
