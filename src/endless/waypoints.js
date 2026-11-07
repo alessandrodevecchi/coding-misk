@@ -8,7 +8,7 @@
 // Bars: a grown song keeps the bars of its written form after its growth, moved by the growth (airOffset): grown bar
 // b plays the written bar b - off. A command records its boundary in the grown song's bars (what the queue shows); the
 // director's rewrite gets the same boundary in its own bars.
-import { steerSong, sayAir, COMMANDS } from './steering.js';
+import { steerSong, sayAir, COMMANDS, patternPart } from './steering.js';
 import { writtenForm, growOnAir, airControls } from './growth.js';
 import { energyOf } from './energy.js';
 import { stream } from './random.js';
@@ -30,6 +30,12 @@ const KNOBS = ['cutoff', 'reso', 'drive', 'grit', 'room', 'delay', 'gain'];
 // the boundaries a command may wait for: the next phrase or the one after (the next double phrase or the one after for
 // structural commands), the next bars for the mixer
 const PHRASE_TRIES = 2, BAR_TRIES = 4;
+// a batch of console changes (console-add-ahead, #82: commands with the same `batch`): the boundaries its head may take,
+// from the bar it was pressed, and the phrases after the head where the rest of its new lines may enter
+const BATCH_TRIES = 4, BATCH_TAIL = 2;
+// how much faster than a person a batch's head may be typed (#82): a Live coder song has a step of its own about every
+// phrase, so the lines of a batch have about a phrase to be typed in; at a person's pace one line fits, two at most
+const BATCH_HURRY = 5;
 
 // ---------- bars ----------
 // how far a grown song's bars are from its written form's: the growth took `growth` bars in place of the written
@@ -37,13 +43,13 @@ const PHRASE_TRIES = 2, BAR_TRIES = 4;
 export const airOffset = g => (g && g.onAir && g.crescendo ? g.crescendo.growth - (g.onAir.from || 0) : 0);
 // the bars where a command on a grown song may apply, in the grown song's bars, first first; rel: the bar now; plan:
 // the director's plan as steered so far; [] when none is left (late); lead: as applyBar's for a typed line
-export function airBoundaries(kind, rel, plan, g, lead = 0.5) {
+export function airBoundaries(kind, rel, plan, g, lead = 0.5, tries = PHRASE_TRIES) {
   const off = airOffset(g), C = COMMANDS[kind] || {}, ph = plan.phrase, end = plan.bars + off, out = [];
   // (a typed line: from the first bar that starts at least half a bar later, as applyBar gives a Classic song; the next
   // bar could be a few hundredths of a bar away, so the song with the line reached the player after its bar, fx3)
   if (C.bar) { for (let b = kind === 'say-live' ? Math.ceil(rel + Math.max(0.5, lead)) : Math.floor(rel) + 1; b < end - 1 && out.length < BAR_TRIES; b++) out.push(b); return out; }
   const step = C.structural ? 2 * ph : ph, last = plan.bars - ph;
-  for (let d = Math.max(0, (Math.floor((rel - off) / step) + 1) * step); d <= last && out.length < PHRASE_TRIES; d += step) if (d + off > rel) out.push(d + off);
+  for (let d = Math.max(0, (Math.floor((rel - off) / step) + 1) * step); d <= last && out.length < tries; d += step) if (d + off > rel) out.push(d + off);
   return out;
 }
 
@@ -177,7 +183,8 @@ function heardAt(st, t, bar) {
 // written form; Wprev: the written form before this command (the tracks whose part differs are the listener's); B: the
 // boundary (grown bars); off: airOffset; o: { kind, track, rng, chooser, phrase, plan (the director's, steered),
 // extra: { move key: bars the typing asked for }, minE: the arrival at the earliest, fixE: the arrival as given, lean:
-// fewer moves }. → { song, B, E (the arrival), units: [{ at, key, kind, track, step }], focus }
+// fewer moves, together: ids of the tracks a batch of console changes adds on this boundary (#82): their lines come in
+// on the boundary itself, before every other move }. → { song, B, E (the arrival), units: [{ at, key, kind, track, step }], focus }
 function transitSong(prev, W, Wprev, B, off, o) {
   const ph = o.phrase, wBars = barsOf(W), end = wBars + off, G = prev.crescendo ? prev.crescendo.growth : 0;
   const isEnd = o.kind === 'end';
@@ -306,14 +313,18 @@ function transitSong(prev, W, Wprev, B, off, o) {
     const count = ids.filter(id => before[id].on && st.tracks.some(t => t.id === id && t.type !== 'spoken' && t.type !== 'riser')).length;
     const now = energyOf(st, { usual: o.plan && o.plan.usualHigh, weights: o.plan && o.plan.R && o.plan.R.energy });
     const bias = dens !== null ? Math.sign(dens - count) : target && Number.isFinite(target.target) ? (target.target > now + 0.05 ? 1 : target.target < now - 0.05 ? -1 : 0) : 0;
-    const path = waypointPath(lanes, o.rng.fork('path'), { chooser: chooserFor(o.chooser)(focus, bias) });
+    let path = waypointPath(lanes, o.rng.fork('path'), { chooser: chooserFor(o.chooser)(focus, bias) });
+    // (a batch's new lines first, all on the boundary: the chooser placed them anywhere on the way, as late as the end of
+    // a long growth, #82)
+    const first = o.together && o.together.length ? path.filter(u => u.kind === 'enter' && o.together.includes(u.track)) : [];
+    if (first.length) path = [...first, ...path.filter(u => !first.includes(u))];
     // (the bars the typing asked for, by move: the n-th move of a track)
     const seen = {};
     path.forEach(u => { u.key = `${u.track}:${(seen[u.track] = (seen[u.track] ?? -1) + 1)}`; });
-    const gaps = path.map((u, i) => (i ? gapOf(u, path[i - 1]) + ((o.extra || {})[u.key] || 0) : 0));
+    const gaps = path.map((u, i) => (i < Math.max(1, first.length) ? 0 : gapOf(u, path[i - 1]) + ((o.extra || {})[u.key] || 0)));
     const span = gaps.reduce((a, x) => a + x, 0);
     // (two bars at least between the last move and the arrival, when the song has them)
-    return { N0, st, dest, maps, path, gaps, span, prelude, focus, fits: B + span <= E0 - 2 };
+    return { N0, st, dest, maps, path, gaps, span, prelude, focus, first: Math.max(1, first.length), fits: B + span <= E0 - 2 };
   };
   let p = plan(E);
   for (let guard = 0; guard < 12 && !p.fits && E < limitE && !o.fixE; guard++) { E = Math.min(limitE, E + ph); p = plan(E); }
@@ -323,13 +334,14 @@ function transitSong(prev, W, Wprev, B, off, o) {
   // too many moves for the bars left (the End, the end of the song): the largest gaps give way, then moves share bars
   for (let sum = p.span; sum > room;) {
     let i = -1;
-    for (let k = 1; k < gaps.length; k++) if (gaps[k] > 1 && (i < 0 || gaps[k] > gaps[i])) i = k;
-    if (i < 0) for (let k = gaps.length - 1; k > 0; k--) if (gaps[k] > 0) { i = k; break; }
+    for (let k = p.first; k < gaps.length; k++) if (gaps[k] > 1 && (i < 0 || gaps[k] > gaps[i])) i = k;
+    if (i < 0) for (let k = gaps.length - 1; k >= p.first; k--) if (gaps[k] > 0) { i = k; break; }
     if (i < 0) break;
     gaps[i]--; sum--;
   }
   // the rest of a growth taken by the moves: they spread over it, at most 8 bars apart
-  if (B < G && !isEnd && gaps.length > 1) for (let sum = gaps.reduce((a, x) => a + x, 0), k = 0; sum < room && k < 8 * gaps.length; k++) { const i = 1 + (k % (gaps.length - 1)); if (gaps[i] < 8) { gaps[i]++; sum++; } }
+  // (a batch's new lines stay on the boundary)
+  if (B < G && !isEnd && gaps.length > p.first) for (let sum = gaps.reduce((a, x) => a + x, 0), k = 0; sum < room && k < 8 * gaps.length; k++) { const i = p.first + (k % (gaps.length - p.first)); if (gaps[i] < 8) { gaps[i]++; sum++; } }
   let at = B;
   const units = p.path.map((u, i) => ({ ...u, at: (at += gaps[i]) }));
   // ---- the song: the past, the moves (the listener's), the written form; then what is left set right at the arrival ----
@@ -389,15 +401,18 @@ function barSecondsAt(song, bar) {
 // How the human typing meets a song's steps from a boundary to the arrival, as the app types them (makeTyping, the
 // typing load): the edit of the boundary from the step before it (or from the bar the command came, when later) and
 // each later edit from the step before it, at most as fast as a person. → { fits (the boundary's edit), late: [{ at,
-// bars }] (moves that need more bars before them) }
-function typingFrom(N, B, q, E, C) {
+// bars }] (moves that need more bars before them), need, usable: the boundary's seconds of typing and to type in };
+// hurry: how many times a person's pace still fits; head: the boundary's edit only (no late)
+function typingFrom(N, B, q, E, C, { hurry = 1, head = false } = {}) {
   const L = liveCode(N, C, { cols: () => 80 }), seed = N.id || '';
   const bars = [...new Set(buildSteps(L.build).map(s => s.at))].sort((a, b) => a - b);
   const codes = new Map(), code = b => { if (!codes.has(b)) codes.set(b, L.codeAt(b)); return codes.get(b); };
   const need = (from, to) => { const c = code(to), was = settleOthers(code(from), c, to); return was === c ? 0 : typingPlan(was, c, { style: 'human', lean: true, seed }).natural; };
   const usable = (from, to) => { const avail = Math.max(0.2, (to - from) * barSecondsAt(N, to) - 0.2); return Math.max(0.2, avail - Math.min(avail * 0.5, 2)); };
   const prev = bars.filter(b => b < B).pop() ?? 0, start = Math.max(prev + 0.5, Number.isFinite(q) ? q : 0);
-  const fits = need(prev, B) <= usable(start, B), late = [];
+  const nB = need(prev, B), uB = usable(start, B), fits = nB <= uB * hurry, late = [];
+  // (head: the boundary's edit only, as a batch tries its boundaries)
+  if (head) return { fits, late, need: nB, usable: uB };
   let from = B;
   for (const b of bars.filter(x => x > B && x <= E)) {
     const nd = need(from, b);
@@ -434,7 +449,25 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
   const typed = c => c.kind === 'say-live', director = list => list.filter(c => !typed(c)).map(toDirector);
   let N = g0, Wprev = writtenForm(song), P = plan, R = { song, plan, opts };
   const done = [];
-  commands.forEach((cmd, i) => {
+  // the moves that need more bars get them, the arrival kept (three times at most); when some still has to hurry (the
+  // arrival's edit, the written form's lines of its section, among them) the arrival moves a phrase later
+  const settle = (t, ty, B, W, o, q) => {
+    for (let outer = 0, minE = 0; outer < 4; outer++) {
+      const extra = {}, fixE = t.E;
+      for (let round = 0; round < 3 && ty.late.some(x => x.at < fixE); round++) {
+        for (const x of ty.late) { const u = t.units.find(v => v.at === x.at); if (u && u.at > B) extra[u.key] = (extra[u.key] || 0) + x.bars; }
+        t = transitSong(N, W, Wprev, B, off, { ...o, extra: { ...extra }, fixE });
+        ty = typingFrom(t.song, B, q, t.E, C);
+      }
+      if (!ty.late.length) break;
+      minE = fixE + plan.phrase;
+      const t2 = transitSong(N, W, Wprev, B, off, { ...o, minE });
+      if (t2.E <= fixE) break;
+      t = t2; ty = typingFrom(t.song, B, q, t.E, C);
+    }
+    return t;
+  };
+  const one = (cmd, i) => {
     // (a typed line keeps the bar the radio gave it: Say now leaves a few seconds before it, #82)
     // (min: the first boundary a console change prepared ahead may take, console-add-ahead D2; the steering moves it
     // later only when its typing does not fit)
@@ -448,23 +481,9 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
       const W = writtenForm(r.song), o = { kind: cmd.kind, track: cmd.track, rng, chooser, phrase: plan.phrase, plan: r.plan };
       let t = transitSong(N, W, Wprev, B, off, o);
       const last = j === cands.length - 1;
-      let ty = typingFrom(t.song, B, cmd.q, t.E, C);
+      const ty = typingFrom(t.song, B, cmd.q, t.E, C);
       if (cmd.pend && !last && !ty.fits) continue;
-      // the moves that need more bars get them, the arrival kept (three times at most); when some still has to hurry
-      // (the arrival's edit, the written form's lines of its section, among them) the arrival moves a phrase later
-      for (let outer = 0, minE = 0; outer < 4; outer++) {
-        const extra = {}, fixE = t.E;
-        for (let round = 0; round < 3 && ty.late.some(x => x.at < fixE); round++) {
-          for (const x of ty.late) { const u = t.units.find(v => v.at === x.at); if (u && u.at > B) extra[u.key] = (extra[u.key] || 0) + x.bars; }
-          t = transitSong(N, W, Wprev, B, off, { ...o, extra: { ...extra }, fixE });
-          ty = typingFrom(t.song, B, cmd.q, t.E, C);
-        }
-        if (!ty.late.length) break;
-        minE = fixE + plan.phrase;
-        const t2 = transitSong(N, W, Wprev, B, off, { ...o, minE });
-        if (t2.E <= fixE) break;
-        t = t2; ty = typingFrom(t.song, B, cmd.q, t.E, C);
-      }
+      t = settle(t, ty, B, W, o, cmd.q);
       pick = { B, r, W, t };
       break;
     }
@@ -472,7 +491,71 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
     N = pick.t.song; Wprev = pick.W; P = pick.r.plan; R = pick.r;
     const { pend, ...kept } = cmd;
     done.push({ ...kept, at: pick.B });
-  });
+  };
+  // A batch of console changes (commands with the same `batch`, console-add-ahead, #82): pending, its head takes the
+  // first boundary, from the bar it was pressed and up to BATCH_TRIES phrases on, where most of its new lines can be
+  // typed in time (at least one of each instrument, at least half of them); the rest come in over the next BATCH_TAIL
+  // phrases. The lines that come in on a boundary come in on it together (transitSong's `together`). A replay gives
+  // the commands their recorded boundaries and builds them the same way.
+  const familyOf = c => c.part || (c.item ? patternPart(c.item) : null) || c.track || c.kind;
+  const adds = c => c.kind === 'more' || (c.kind === 'pattern' && c.mode !== 'replace');
+  const group = (list, i0) => {
+    const rng = stream(seed, `waypoint:${n}:${i0}`), o0 = { kind: list[0].kind, rng, chooser, phrase: plan.phrase };
+    // the commands on one boundary on top of the song so far: the steered written form and the transit to it
+    const onB = (B, cmds) => {
+      const r = steerSong({ song, plan, opts, commands: director([...done, ...cmds.map(c => ({ ...c, at: B }))]), seed, n });
+      const W = writtenForm(r.song), together = (r.plan.added || []).filter(a => a.at === B - off).map(a => a.id);
+      const o = { ...o0, plan: r.plan, together };
+      return { r, W, o, t: transitSong(N, W, Wprev, B, off, o) };
+    };
+    let at = new Map(list.map(c => [c, c.at]));
+    if (list.some(c => c.pend)) {
+      const q = Number.isFinite(list[0].q) ? list[0].q : list[0].at - 1, min = list[0].min;
+      const cands = airBoundaries(list[0].kind, q, P, g0, 0.5, BATCH_TRIES + 8).filter(b => !Number.isFinite(min) || b >= min).slice(0, BATCH_TRIES);
+      if (!cands.length) return;
+      // (the new lines one instrument after another: the first of each, then the second of each…)
+      const rest = list.filter(c => !adds(c)), fams = [...new Set(list.filter(adds).map(familyOf))], byFam = fams.map(f => list.filter(c => adds(c) && familyOf(c) === f));
+      const order = [];
+      for (let k = 0; order.length < list.length - rest.length; k++) for (const xs of byFam) if (xs[k]) order.push(xs[k]);
+      const need = Math.min(order.length, Math.max(fams.length, Math.ceil(order.length / 2)));
+      const memo = new Map(), probe = (B, k) => { const key = `${B}:${k}`; if (!memo.has(key)) { const x = onB(B, [...rest, ...order.slice(0, k)]); memo.set(key, typingFrom(x.t.song, B, q, x.t.E, C, { hurry: BATCH_HURRY, head: true })); } return memo.get(key); };
+      let B = null, k = need;
+      for (const b of cands) {
+        if (!probe(b, need).fits) continue;
+        B = b;
+        if (need < order.length) {
+          if (probe(b, order.length).fits) k = order.length;
+          else { let lo = need, hi = order.length; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (probe(b, m).fits) lo = m; else hi = m; } k = lo; }
+        }
+        break;
+      }
+      // (no boundary leaves time for the head even in a hurry: the first one with about the most time to type it, so
+      // the lines come in soon, typed as fast as they must)
+      if (B === null) { const most = Math.max(...cands.map(b => probe(b, need).usable)); B = cands.find(b => probe(b, need).usable >= most * 0.75); }
+      const tail = order.slice(k);
+      const next = airBoundaries(list[0].kind, B, P, g0, 0.5, BATCH_TAIL);
+      at = new Map(list.map(c => [c, B]));
+      // (the rest on the next phrase; more of them than the head came with: half there, half on the phrase after)
+      const half = tail.length <= k ? tail.length : Math.ceil(tail.length / 2);
+      tail.forEach((c, j) => at.set(c, next.length ? (j < half ? next[0] : next[next.length - 1]) : B));
+    }
+    // the boundaries in order, each with its commands (in the order given)
+    for (const B of [...new Set(list.map(c => at.get(c)))].sort((a, b) => a - b)) {
+      const cmds = list.filter(c => at.get(c) === B), x = onB(B, cmds);
+      const t = settle(x.t, typingFrom(x.t.song, B, cmds[0].q, x.t.E, C), B, x.W, x.o, cmds[0].q);
+      N = t.song; Wprev = x.W; P = x.r.plan; R = x.r;
+      for (const c of cmds) { const { pend, ...kept } = c; done.push({ ...kept, at: B }); }
+    }
+  };
+  const batched = c => c.batch !== undefined && c.batch !== null && !typed(c);
+  for (let i = 0; i < commands.length;) {
+    const c = commands[i];
+    if (!batched(c)) { one(c, i); i++; continue; }
+    let j = i + 1;
+    while (j < commands.length && batched(commands[j]) && commands[j].batch === c.batch) j++;
+    group(commands.slice(i, j), i);
+    i = j;
+  }
   const said = done.filter(typed);
   if (said.length) N = sayAir(N, said.map(c => ({ at: c.at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' })));
   return { song: N, grown: g0, commands: done, plan: R.plan, opts: R.opts, plain: R.song };

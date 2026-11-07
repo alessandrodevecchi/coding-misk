@@ -182,7 +182,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     if ((await R()).on) await page.click('#radio-start');
     await page.click('[data-song-length="medium"]'); await sleep(300);
     const o = (await R()).options, kept = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio')).length);
-    check(kept === 'medium' && o.length === 'medium' && o.lengthHeard === true && /next songs/.test(await page.innerText('#radio-length-line')), 'Durata Media: kept, sent to the director, its line', JSON.stringify({ kept, length: o.length }));
+    check(kept === 'medium' && o.length === 'medium' && o.lengthHeard === true && /not yet queued/.test(await page.innerText('#radio-length-line')), 'Durata Media: kept, sent to the director, its line', JSON.stringify({ kept, length: o.length }));
     await page.selectOption('#radio-profile', 'switch'); await sleep(300);
     await pick(['synthwave']); await page.fill('#radio-seed', 'durata'); await page.click('#radio-start'); await sleep(6000);
     const d = await R(), it = d.state.stream[0], pos = await page.innerText('#pb-pos'), m = /\/\s*(\d+):(\d\d)/.exec(pos), sec = m ? +m[1] * 60 + +m[2] : NaN;
@@ -194,6 +194,33 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     await page.selectOption('#radio-custom [data-custom="duration"]', 'free'); await sleep(300);
     const o2 = (await R()).options;
     check(planned === 'planned' && !o2.length && await page.isVisible('#radio-target-off') && (await page.getAttribute('[data-song-length="style"]', 'aria-pressed')) === 'true', 'the Custom free growth turns the Durata off, with its line', JSON.stringify({ planned, length: o2.length }));
+    await page.selectOption('#radio-profile', 'artist'); await sleep(300);
+  }
+
+  // the Durata with a compilation (#82): the song on air keeps the asked length (Short, then exactly 12 minutes), not its
+  // style's; a change while a song is queued says it applies from the song after the queued one
+  {
+    if ((await R()).on) await page.click('#radio-start');
+    await page.selectOption('#radio-profile', 'switch'); await sleep(300);
+    while ((await page.getAttribute('#radio-comp', 'aria-pressed')) !== 'true') { await page.click('#radio-comp'); await sleep(300); }
+    const total = async () => { const m = /\/\s*(\d+):(\d\d)/.exec(await page.innerText('#pb-pos')); return m ? +m[1] * 60 + +m[2] : NaN; };
+    for (const [len, lo, hi, seed] of [['short', 120, 150, 'comp-len-a'], [12, 720, 720, 'comp-len-b']]) {
+      if (len === 12) { await page.click('[data-song-length="exact"]'); await sleep(300); await page.fill('[data-song-minutes]', '12'); await page.click('[data-song-length="exact"]'); } else await page.click(`[data-song-length="${len}"]`);
+      await sleep(300);
+      await page.fill('#radio-seed', seed); await page.click('#radio-start'); await sleep(6000);
+      const d = await R(), sec = await total();
+      check(d.state.recipe.options.compilation && d.state.recipe.options.length === len && sec >= lo - 40 && sec <= hi + 40, `a compilation song with Durata ${len} lasts ${lo}-${hi} s, give or take a phrase`, `${sec} s, ${JSON.stringify(d.state.recipe.options.length)}`);
+      if (len === 12) {
+        await page.evaluate(b => globalThis.codingMiskRadio.seek(b), Math.floor(d.state.stream[0].bars * 0.45));
+        for (let end = Date.now() + 60000; Date.now() < end && (await R()).state.stream.length < 2;) await sleep(300);
+        await page.click('[data-song-length="medium"]'); await sleep(300);
+        const msg = await page.evaluate(() => (document.querySelector('.toast') || {}).textContent || '');
+        check(/after the one already queued/.test(msg), 'a Durata change with a song queued applies from the song after it', msg);
+      }
+      await page.click('#radio-start'); await sleep(500);
+    }
+    while ((await page.getAttribute('#radio-comp', 'aria-pressed')) === 'true') { await page.click('#radio-comp'); await sleep(300); }
+    await page.click('[data-song-length="style"]'); await sleep(300);
     await page.selectOption('#radio-profile', 'artist'); await sleep(300);
   }
 

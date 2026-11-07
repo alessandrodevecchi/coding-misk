@@ -232,6 +232,22 @@ const CHECKS = {
   }
   console.log(`      heard: ${asked.join(', ')} s`);
 },
+'the radio Durata with a compilation: every song keeps the asked length, not its style\'s (#82)': () => {
+  // (howOf carries length and lengthHeard into compilationOptions; before, every compilation song took its style's minutes)
+  const heardS = [];
+  for (const [length, [lo, hi]] of [['short', RANGE.short], [12, [720, 720]]]) {
+    for (const profile of ['switch', 'classic']) {
+      const recipe = { seed: `rc-${length}-${profile}`, options: { compilation: { every: 'song', setup: clone(PRESETS.journey), pool: clone(ARTISTS) }, transition: 'artist', harmony: 'artist', ...profileOptions(profile), length, lengthHeard: true }, changes: [], growth: GROWTH_ON_AIR };
+      for (const [i, x] of sessionItems(RECIPES, recipe, 4).entries()) {
+        assert(x.opts.length === length && x.opts.lengthHeard === true, `${length} ${profile} song ${i}: the director got length ${JSON.stringify(x.opts.length)}`);
+        const s = songSecs(x.song), ph = phraseSecs(x.song, x.plan.phrase);
+        assert(s >= lo - 2 * ph - 1 && s <= hi + ph + 1, `${length} ${profile} song ${i}: ${s.toFixed(0)} s outside ${lo}-${hi} s within a phrase`);
+        heardS.push(`${length}/${profile[0]} ${Math.round(s)}`);
+      }
+    }
+  }
+  console.log(`      heard: ${heardS.join(', ')} s`);
+},
 'Sorprendimi: the same seed gives the same values and the same song, the radio unchanged (D13)': () => {
   const st = memStore({ [RADIO_KEY]: SAVED[1] }), radio = radioOf(st), before = JSON.stringify(st.raw[RADIO_KEY]);
   const seen = new Set();

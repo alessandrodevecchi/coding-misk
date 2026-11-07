@@ -34,7 +34,8 @@ async function runScenario(page, style) {
   if (!(await page.$('#radio-steer .sp-cards'))) { await page.click('#sp-view'); await sleep(300); }
   const spAdd = await page.$('#radio-steer [data-sp-new="p-scenario"]:not([disabled])');
   check(!!spAdd, `${style}: the saved bassline has its add button`);
-  if (spAdd) { await spAdd.click(); await sleep(300); }
+  // (a new track waits for its boundary with the "+" and "−" pressed for it and is recorded when it enters, #82)
+  if (spAdd) { await spAdd.click(); await sleep(300); for (let k = 0; k < 150 && (await page.evaluate(() => globalThis.codingMiskRadio.pendingAdds.length)); k++) await sleep(200); }
   check(await page.evaluate(() => globalThis.codingMiskRadio.steering.commands.some(c => c.kind === 'pattern' && c.mode === 'new')), `${style}: the saved bassline is queued as a new track`);
   await page.evaluate(() => globalThis.codingMiskRadio.command({ kind: 'voicing', type: 'pad', target: 'auto', treatment: 'auto' })); await sleep(300);
   const s0 = await page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return { added: s.plan.added, risers: s.plan.risers, at: Math.min(...s.commands.map(c => c.at)), phrase: s.plan.phrase, roles: s.plan.roles, bars: s.plan.bars, kinds: s.commands.map(c => c.kind) }; });

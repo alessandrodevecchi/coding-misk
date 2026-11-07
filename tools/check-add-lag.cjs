@@ -17,6 +17,11 @@
 //   ring within 100 ms, no task over the budget, recorded as lock-part and unlock-part on the entry bar); a lock pressed
 //   with a "+" enters in the same batch, "+" first; a lock then an unlock before the entry cancel out and record nothing;
 //   a mixer lock waits on its button and locks its track on the entry bar.
+// - grown songs (#82): six presses on three instruments late in the song make one batch; most of it (one track of each
+//   instrument at least) enters on its first boundary and every entry within about three phrases of the press; each
+//   instrument's badge reads "k of n in" until all of its tracks play; in Live coder a saved pattern added as a new
+//   track inside the growth of an 11-minute song waits in one batch with two "+" and they enter within about three
+//   phrases, never at the end of the growth.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-add-lag.cjs [--budget 100] [--profiles classic,crescendo,switch] [--rate 4] [--style berlin-techno] [--standing n] [--quick]
 // --standing n: the commands standing before the late cases (default 8 in Classic, 3 on a grown song)
 // --quick: only the late "+", the burst, the net counts and the locks, at normal CPU speed
@@ -40,7 +45,7 @@ const table = [];
     // (the badge's time from the click, in the page: the first press's click and the first badge added after it)
     window.__badge = { click: null, shown: null };
     // (a lock's pending state is its ring: the data-pend-s attribute on the button)
-    addEventListener('click', e => { if (e.target.closest && e.target.closest('.arr-pm, .arr-lock, [data-mix-lock]') && window.__badge.click === null) window.__badge.click = performance.now(); }, true);
+    addEventListener('click', e => { if (e.target.closest && e.target.closest('.arr-pm, .arr-lock, [data-mix-lock], [data-sp-new]') && window.__badge.click === null) window.__badge.click = performance.now(); }, true);
     new MutationObserver(() => { const b = window.__badge; if (b.click !== null && b.shown === null && document.querySelector('#radio-steer .arr-pend, #radio-steer [data-pend-s]')) b.shown = performance.now(); }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-pend-s'] });
     try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push({ s: e.startTime, d: e.duration }); }).observe({ type: 'longtask', buffered: true }); } catch (e) {}
   });
@@ -60,7 +65,12 @@ const table = [];
   const rows = () => R(() => [...document.querySelectorAll('#radio-steer [data-pend-row]')].map(x => ({ id: x.dataset.pendRow, text: x.textContent.trim() })));
   const playing = (part, bar) => R(async ([p, b]) => { const { stateAt } = await import('/src/song/build.js'), { instrumentOf } = await import('/src/endless/steering.js'), s = globalThis.codingMiskRadio.steering; return stateAt(s.song, b).song.tracks.filter(t => !t.mute && instrumentOf(t) === p && t.clips.some(c => c.start <= b && c.start + c.bars > b)).length; }, [part, bar]);
   // a press: "+" or "−" of an instrument, the Arrangement lock of an instrument ('lock'), a mixer lock ('mixlock')
-  const pressSel = (kind, part) => kind === 'lock' ? `#radio-steer [data-lock-part="${part}"]` : kind === 'mixlock' ? `#radio-steer [data-mix-lock="${part}"]` : `#radio-steer [data-cmd="${kind}"][data-inst="${part}"]`;
+  const pressSel = (kind, part) => kind === 'lock' ? `#radio-steer [data-lock-part="${part}"]` : kind === 'mixlock' ? `#radio-steer [data-mix-lock="${part}"]` : kind === 'pattern' ? `#radio-steer [data-sp-new="${part}"]` : `#radio-steer [data-cmd="${kind}"][data-inst="${part}"]`;
+  // the bar where each of the last n tracks the listener added comes into the code (its step) or first plays, from bar
+  // `from` (null: neither within `bars`, a track the director keeps silent)
+  const heardFrom = (n, from, bars) => R(async ([n, from, bars]) => { const { soundAt } = await import('/src/endless/growth.js'), { buildSteps } = await import('/src/song/build.js'), s = globalThis.codingMiskRadio.steering, steps = buildSteps(s.song); return s.plan.added.slice(-n).map(a => { const st = steps.find(x => x.at >= from && [].concat(x.add ?? []).includes(a.id)); if (st) return st.at; for (let b = Math.floor(from); b < from + bars; b++) if (soundAt(s.song, b).tracks.some(t => t.id === a.id)) return b; return null; }); }, [n, from, bars]);
+  // the badges of the instruments of the last batch until all of its tracks play (#82): sampled until the last entry
+  const watchTrail = async (ats, parts) => { const seen = {}, last = Math.max(...ats); for (let k = 0; k < 600 && (await rel()) < last + 0.5; k++) { const b = await badges(); for (const p of parts) if (b[p] && / of \d+ in · next in \d+ s$/.test(b[p].text)) seen[p] = b[p].text; await sleep(150); } await sleep(400); return { seen, after: await badges() }; };
   const lockRing = sel => R(q => { const b = document.querySelector(q); return b ? { s: b.dataset.pendS || null, tip: b.title } : null; }, sel);
   const lockedParts = () => R(() => (globalThis.codingMiskRadio.steering.plan.lockedParts || []).slice());
   const lockPart = on => (on.find(x => x.p === 'bass') || on.find(x => x.less) || on[0] || {}).p;
@@ -238,6 +248,61 @@ const table = [];
       const got = (await steering()).commands.slice(before), net = {};
       for (const c of got) net[c.part] = (net[c.part] || 0) + (c.kind === 'more' ? 1 : -1);
       check(JSON.stringify(Object.keys(net).sort().map(k => [k, net[k]])) === JSON.stringify(Object.keys(want).sort().map(k => [k, want[k]])), `${name}: the record holds the net counts only`, `${JSON.stringify(net)} for ${JSON.stringify(want)}`);
+    }
+    // 11. six presses late in a grown song (#82): one batch that enters soon, most of it on its first boundary (one of
+    // each instrument at least), the rest over the next phrases, all within about three phrases of the press; each
+    // instrument's badge stays until all of its tracks play ("1 of 2 in"); no long task
+    if (profile !== 'classic') {
+      await fresh(`add-ahead-${profile}-six`);
+      await freshPhrase(lateBar);
+      const on = await instOn(), plus = on.filter(x => x.more).map(x => x.p), ph = (await steering()).phrase;
+      const fams = ['kick', 'beat', 'hook', 'arp', 'bass', 'pad', 'texture', 'guitar'].filter(p => plus.includes(p)).slice(0, 3);
+      const presses = [fams[0], fams[0], fams[0], fams[1], fams[2], fams[2]].filter(Boolean).map((p, i, a) => ['more', p, i < a.length - 1 ? 120 : 0]);
+      const before = (await steering()).commands.length;
+      const m = await measure(presses);
+      report(`${name}, six presses (${presses.map(x => `+ ${x[1]}`).join(', ')})`, m);
+      const got = (await steering()).commands.slice(before), ats = got.map(c => c.at), head = Math.min(...ats), last = Math.max(...ats);
+      table.push(`${name}, six presses: press ${m.r0.toFixed(1)}, entries ${got.map(c => `${c.part}@${c.at}`).join(' ')}`);
+      check(got.length >= 4 && fams.every(p => got.some(c => c.part === p && c.at === head)) && got.filter(c => c.at === head).length >= Math.ceil(got.length / 2), `${name}: most of the six enter on the first boundary, one of each instrument at least`, got.map(c => `${c.part}@${c.at}`).join(' '));
+      check(last - m.r0 <= 3 * ph + 1, `${name}: every entry within about three phrases of the press`, `press ${m.r0.toFixed(1)}, last ${last}, phrase ${ph}`);
+      const hf = await heardFrom(got.length, m.r0, 6 * ph);
+      check(hf.filter(b => b !== null && b <= last).length >= Math.ceil(hf.length / 2), `${name}: most added tracks play by the last entry bar (a kick may sit out a break; check:radio-profiles checks each track's boundary)`, `${JSON.stringify(hf)} for ${JSON.stringify(ats)}`);
+      const tailParts = [...new Set(got.filter(c => c.at > head).map(c => c.part))];
+      if (tailParts.length && (await rel()) < last) {
+        const w = await watchTrail(ats, tailParts);
+        check(tailParts.every(p => w.seen[p]) && tailParts.every(p => !w.after[p]), `${name}: an instrument's badge stays until all of its tracks play (${tailParts.join(', ')}), then goes`, JSON.stringify(w));
+      } else console.log(`info  ${name}: the six entered on one boundary${tailParts.length ? ' (already past)' : ''}`);
+      await waitEntered();
+    }
+    // 12. a saved pattern added as a new track in a long grown song (11 minutes), pressed inside the growth, then a "+"
+    // of two instruments (#82): they wait in one batch and enter soon, never at the end of the growth; no long task
+    if (profile === 'switch') {
+      const mine = [{ id: 'p-bass', name: 'Basso mio', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, sound: 'sawtooth', settings: { wave: 'sawtooth', gain: 0.7 }, context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 128, mode: 'minor' }, styles: [], source: 'compose', created: '2026-11-07' }];
+      await page.click('#radio-start'); await sleep(800);
+      await R(list => { localStorage.setItem('coding-misk-patterns', JSON.stringify(list)); localStorage.removeItem('coding-misk-radio-saved-hidden'); localStorage.setItem('coding-misk-radio-saved-open', 'true'); }, mine);
+      await page.click('[data-song-length="exact"]'); await sleep(300); await page.fill('[data-song-minutes]', '11'); await page.click('[data-song-length="exact"]'); await sleep(300);
+      await page.fill('#radio-seed', `add-ahead-${profile}-saved`); await page.click('#radio-start'); check(await waitReady(), `${name}: session add-ahead-${profile}-saved is ready`); await sleep(2000);
+      const s1 = await steering(), grown = await R(() => { const s = globalThis.codingMiskRadio.steering.song; return s.crescendo ? s.crescendo.growth : 0; });
+      await freshPhrase(Math.min(50, Math.max(2 * s1.phrase, grown - 3 * s1.phrase)));
+      if ((await page.getAttribute('#sp-toggle', 'aria-expanded')) !== 'true') { await page.click('#sp-toggle'); await sleep(300); }
+      if (!(await page.$('#radio-steer .sp-cards'))) { await page.click('#sp-view'); await sleep(300); }
+      const on = await instOn(), plus = on.filter(x => x.more && x.p !== 'bass').map(x => x.p).slice(0, 2);
+      const can = !!(await page.$('#radio-steer [data-sp-new="p-bass"]:not([disabled])'));
+      check(can, `${name}: the saved pattern has its add button`);
+      if (can) {
+        const before = (await steering()).commands.length;
+        console.log(`info  ${name}: ${s1.bars} bars, growth ${grown}, the saved pattern pressed inside the growth`);
+        const m = await measure([['pattern', 'p-bass', 600], ...plus.map((p, i) => ['more', p, i < plus.length - 1 ? 120 : 0])]);
+        report(`${name}, a saved pattern and ${plus.map(p => `+ ${p}`).join(', ')} in an 11-minute song`, m);
+        const got = (await steering()).commands.slice(before), last = Math.max(...got.map(c => c.at));
+        table.push(`${name}, saved pattern in a long song: press ${m.r0.toFixed(1)}, growth ${grown}, entries ${got.map(c => `${c.kind === 'pattern' ? 'pattern' : c.part}@${c.at}`).join(' ')}`);
+        check(m.first.length === 1 && got.some(c => c.kind === 'pattern' && c.mode === 'new') && got.length === 1 + plus.length, `${name}: the saved pattern waits in one batch with the "+"`, JSON.stringify(got.map(c => `${c.kind}:${c.part || ''}@${c.at}`)));
+        check(last - m.r0 <= 3 * s1.phrase + 1, `${name}: the saved pattern and the "+" enter within about three phrases of the press`, `press ${m.r0.toFixed(1)}, last ${last}`);
+        const hf = await heardFrom(got.length, m.r0, 6 * s1.phrase);
+        check(hf.some(b => b !== null) && hf.every(b => b === null || b <= last), `${name}: the saved pattern's track and the others come in by the last entry bar, not at the end of the growth (bar ${grown})`, `${JSON.stringify(hf)} for ${JSON.stringify(got.map(c => c.at))}`);
+      }
+      await R(() => localStorage.removeItem('coding-misk-patterns'));
+      await page.click('[data-song-length="style"]'); await sleep(300);
     }
     // 10. locks on a fresh session (D8): with a "+" in one batch, lock then unlock cancels, a mixer lock
     await fresh(`add-ahead-${profile}-l`);
