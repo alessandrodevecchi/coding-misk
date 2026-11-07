@@ -48,6 +48,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - New kits in the kit menu: `RolandR8`, `KorgM1`, `RolandMC303`, `RolandTR505`, `RolandTR626`, `BossDR110`, `AlesisSR16`, `YamahaRY30`, `RolandCompurhythm78`, `MPC1000`.
 - `npm run probe:openings` reports how radio songs open, `-- --check` checks the targets.
 - `npm run check:kit-rows`: every style kit has the drum rows its grooves play.
+- Four-on-the-floor kick variants in the drum generator: straight, pickup, push, rolling and broken, drawn by energy.
+- Twelve built-in grooves: Techno pickup, Rolling kick (techno), Broken techno, Trance push, Trance pickup, House pickup, Rolling kick (house), Drift, Heartbeat, Phonk roll, Phonk half-time and Rock push.
+- Presets Strum (country guitar), Swell (ambient pad) and Two-feel (jazz bass).
 - Radio: a countdown badge next to Extend until it enters ("Extend +16 s · in 24 s").
 
 ### Changed
@@ -74,9 +77,14 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Crescendo draws its first track from the style's opening weights instead of always starting on the kick.
 - The Compose Opening control also steers the first track in Crescendo, with the lead openings only.
 - Every style has its own opening weights; the default weight of the slow opening is 1.
+- Radio: «+ kick» and «+ beat» compose the new rows first when the session composes on air, then use the style's built-in grooves, and avoid the rhythms the instrument already plays.
+- Every style with a kick lists at least two kick rhythms; acid, ambient, berlin-techno, classic-rock, country, dark-cyberpunk, gated-trance, house, industrial, phonk, progressive-house, pure-trance and trance list more grooves.
+- Acid lists more arp, hook and bass presets, country and darksynth more guitar patterns, ambient a new pad and jazz a new bassline.
+- Radio sessions made before director version 20 may sound different.
 
 ### Fixed
 
+- A track added with «+» on a grown radio song plays from its phrase, also when several instruments are added at once.
 - A line typed in the radio console with Say now is heard with its own new sample, and no later line of the same voice plays a neighbouring sample.
 - An unsaved change in the phrase editor of the Voices tab is no longer lost when the tab redraws in the background.
 - Saving a phrase edit in the Voices tab no longer closes the next phrase form when the voice helper is slow.

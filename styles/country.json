@@ -45,7 +45,8 @@
     ],
     "grooves": [
       "train",
-      "rock"
+      "rock",
+      "rockPush"
     ],
     "settings": {
       "gain": [
@@ -100,7 +101,9 @@
   "guitar": {
     "patterns": [
       "quarter",
-      "power8"
+      "power8",
+      "held",
+      "strum"
     ],
     "types": [
       "clean",

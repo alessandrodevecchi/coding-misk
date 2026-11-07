@@ -128,7 +128,10 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   async function seedMany(n, lang = 'en') {
     await page.evaluate(async ({ n, lang }) => {
       const { builtinPatterns } = await import('/src/library/patterns.js');
-      const all = builtinPatterns(), word = ['notturno', 'scuro', 'teso', 'lento', 'rotto', 'acido', 'pieno', 'vuoto', 'storto'];
+      // (the catalogue as it was before kick-variety: its new grooves and presets would move the seeded lists, and
+      // with them the counts this check reads)
+      const later = new Set(['technoPickup', 'technoRolling', 'technoBroken', 'trancePush', 'trancePickup', 'housePickup', 'houseRolling', 'drift', 'heartbeat', 'phonkRoll', 'phonkHalf', 'rockPush'].map(id => `grooves/${id}`).concat(['riffs/twoFeel', 'riffs/strum', 'chords/swell']));
+      const all = builtinPatterns().filter(b => !later.has(b.key)), word =['notturno', 'scuro', 'teso', 'lento', 'rotto', 'acido', 'pieno', 'vuoto', 'storto'];
       const head = { hook: 'Melodia', bass: 'Basso', arp: 'Arpeggio', pad: 'Pad', drums: 'Groove', guitar: 'Riff' };
       const list = Array.from({ length: n }, (_, i) => { const b = all[(i * 7) % all.length]; return { id: `p-m${i}`, name: `${head[b.type] || b.type} ${word[i % 9]} ${i + 1}`, kind: b.kind, type: b.type, pattern: JSON.parse(JSON.stringify(b.pattern)), sound: null, settings: {}, context: { key: ['A', 'C#', 'F#', 'D'][i % 4], chords: 'notturna', meter: i % 12 === 5 ? '7/8' : (b.defaults.meter || '4/4'), bpm: [70, 90, 110, 124, 128, 140][i % 6], mode: 'minor' }, styles: i % 3 === 0 ? ['berlin-techno'] : i % 3 === 1 ? [] : ['jazz'], source: 'compose', created: `2026-10-${String(1 + (i % 28)).padStart(2, '0')}` }; });
       localStorage.setItem('coding-misk-patterns', JSON.stringify(list)); localStorage.setItem('coding-misk-lang', lang);
@@ -792,9 +795,15 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(painted.length === 2 && painted.every(n => n > 20), 'each row has a preview drawing', JSON.stringify(painted));
     // a row adds as a new track with its + (saved-list-add)
     check((await page.$$('#radio-steer .sp-list .sp-row [data-sp-new]:not([disabled])')).length === 2, 'each row has an enabled + (Add as new track)');
+    // (the row + waits in the console's batch like a "+" since the batch entries of #82: a pending "+1" on the bass and
+    // its queue line first, the pattern recorded when it enters, within about three phrases)
+    const pressBar = await now();
     await page.click('#radio-steer .sp-list [data-sp-new="p-bass"]'); await sleep(400);
-    // (a new track waits in the batch of its boundary, #82: the queue shows the bass row of the batch)
-    check(/\+1 (bass|basso)/i.test(await queueText()), 'the row + queues the pattern in the batch: "+1 bass"', await queueText());
+    const rowBadge = await page.evaluate(() => { const b = document.querySelector('#radio-steer .arr-inst[data-arr="bass"] .arr-pend-t'); return b ? b.textContent : ''; }), rowQueue = await page.innerText('#radio-steer .steer-queue');
+    check(/^\+1 · Enters in \d+ s$/.test(rowBadge) && /\+1 bass/.test(rowQueue), 'the row + queues the pattern in the batch: a pending "+1" on the bass and its queue line', `${rowBadge} | ${rowQueue}`);
+    for (let k = 0; k < 150 && (await page.evaluate(() => globalThis.codingMiskRadio.pendingAdds.length)); k++) await sleep(200);
+    const rowState = await ST(), rowCmd = rowState.commands.find(c => c.kind === 'pattern' && c.mode === 'new');
+    check(rowCmd && rowCmd.item.name === 'Basso mio' && rowCmd.at - pressBar <= 3 * rowState.plan.phrase && /\+ Basso mio \(/.test(await page.innerText('#radio-steer .steer-queue')), 'the row + enters within three phrases and the queue says "+ Basso mio (…)"', JSON.stringify({ press: pressBar, at: rowCmd && rowCmd.at, phrase: rowState.plan.phrase }));
     await page.click('#sp-view'); await sleep(300);
     check((await page.$$('#radio-steer .sp-card')).length === 2 && await page.isVisible('#radio-steer [data-sp-new="p-bass"]') && await page.isVisible('#radio-steer [data-sp-replace="p-bass"]'), 'open: cards with Add as new track and Replace');
     check(/feel different/.test(await page.innerText('#radio-steer .sp-cards')), 'a pattern saved at 60 BPM warns about the tempo');

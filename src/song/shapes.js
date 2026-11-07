@@ -10,7 +10,9 @@ import { ideaRows } from './ideas.js';
 
 // raised when an intended change to the shape rules changes the steps of a checked Live coder build
 // (tools/check-crescendo.mjs, Live coder fixtures); saved growths carry it, so a new version grows them anew
-export const SHAPES_VERSION = 9;
+// 10 (kick-variety): the metamorphosis skin's four-floor drums draw a kick variant (switch-acid-prova, switch-prima-luce, switch-test-onda,
+// switch-test-stanza)
+export const SHAPES_VERSION = 10;
 // salt of the shape draws (resolveShape, shape search, growth stream): fixed at the value SHAPES_VERSION 5 used, so a
 // version raised for a rule fix (v6: blank lines in the typing alignment; v7: a melody rewrite turned by whole
 // mini-notation steps) keeps every song's drawn shapes; change it only when new draws are wanted

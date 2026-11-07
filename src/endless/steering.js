@@ -6,7 +6,7 @@ import { stream } from './random.js';
 import { stateAt, buildSteps } from '../song/build.js';
 import { playing, curveParts, CURVES } from './energy.js';
 import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, GROOVES, PROGS, meterSteps, fitSteps } from '../music.js';
-import { airIdea, composesOnAir, sessionSource, readyParts } from './material.js';
+import { airIdea, airGroove, rowsKey, composesOnAir, sessionSource, readyParts } from './material.js';
 import { presetOf, compose } from '../material/index.js';
 import { rewriteSpoken, nextQuiet, newSpokenTrack, wherePartsOf } from './voice-track.js';
 import { whereOfTrack } from '../song/spoken.js';
@@ -464,19 +464,30 @@ function newTrack(P, O, part, st, at, seed) {
   // the pattern: drums from a groove of the style the instrument does not play yet, composed parts that differ from the
   // instrument's ideas, else a preset it does not hold
   if (t.type === 'drums') {
-    const held = new Set(same.flatMap(x => Object.values(x.patterns || {})).map(p => JSON.stringify(rowsOf(p, n))));
-    const others = new Set(same.flatMap(x => Object.values(x.patterns || {})).flatMap(p => Object.keys(rowsOf(p, n))));
-    const pick = [];
+    const patternsOf = x => Object.values(x.patterns || {});
+    const held = new Set(same.flatMap(patternsOf).map(p => rowsKey(rowsOf(p, n))));
+    const others = new Set(same.flatMap(patternsOf).flatMap(p => Object.keys(rowsOf(p, n))));
+    // composed first when the session composes on air and the style declares drum material (kick-variety D4): the
+    // kick rows the instrument holds are left out of the four-floor draw
+    const pick = [], seen = new Set(), push = rows => { const key = rowsKey(rows); if (Object.keys(rows).length && !seen.has(key)) { seen.add(key); pick.push(rows); } };
+    if (composesOnAir(O) && R.drums && R.drums.material) {
+      const avoid = [...new Set(same.flatMap(patternsOf).map(p => rowsOf(p, n).bd).filter(Boolean))];
+      for (const rows of airGroove(R, part, airInputs(P, O, st, at), { avoid, others: same.length ? [...others] : [], seed })) push(rows);
+    }
+    // then the style's built-in grooves
     for (const g of r.shuffle((R.drums.grooves || []).slice())) {
       let rows = Object.fromEntries(Object.entries((GROOVES[g] || [])[1] || {}).filter(([k, v]) => String(v).includes('x') && (part === 'kick' ? k === 'bd' : k !== 'bd')).map(([k, v]) => [k, fitSteps(v, n)]));
       // a second beat keeps the rows the other beats do not play, when it can (hats against percussion)
       if (part === 'beat' && same.length) { const own = Object.fromEntries(Object.entries(rows).filter(([k]) => !others.has(k))); if (Object.keys(own).length) rows = own; }
-      if (Object.keys(rows).length && !pick.some(x => JSON.stringify(x) === JSON.stringify(rows))) pick.push(rows);
+      push(rows);
     }
-    // (another groove than every pattern of the instrument; else than the ones playing on the boundary)
-    const now = new Set(same.map(x => { const y = st.tracks.find(z => z.id === x.id); return y ? JSON.stringify(rowsOf((x.patterns || {})[(y.clips[0] || {}).pattern || 'A'], n)) : ''; }));
-    const fresh = pick.filter(x => !held.has(JSON.stringify(x))), notNow = pick.filter(x => !now.has(JSON.stringify(x)));
-    const list = fresh.length ? fresh : notNow.length ? notNow : pick;
+    // (another rhythm than every pattern of the instrument; else than the ones playing on the boundary; else the one
+    // the fewest tracks of the instrument play, first in the list on a tie)
+    // (a track added by an earlier "+" on this boundary is not in the state yet: it enters with its A)
+    const now = new Set(same.map(x => { const y = st.tracks.find(z => z.id === x.id); return rowsKey(rowsOf((x.patterns || {})[y ? (y.clips[0] || {}).pattern || 'A' : 'A'], n)); }));
+    const fresh = pick.filter(x => !held.has(rowsKey(x))), notNow = pick.filter(x => !now.has(rowsKey(x)));
+    const plays = x => same.filter(y => patternsOf(y).some(p => rowsKey(rowsOf(p, n)) === rowsKey(x))).length;
+    const list = fresh.length ? fresh : notNow.length ? notNow : pick.map((x, i) => [x, plays(x), i]).sort((a, b) => a[1] - b[1] || a[2] - b[2]).map(([x]) => x);
     if (list.length) t.patterns = { A: { rows: list[0] }, ...(list[1] ? { B: { rows: list[1] } } : {}) };
   } else if (compose_ && KIND_OF_TYPE_MELODIC.includes(t.type)) {
     const M = airInputs(P, O, st, at), avoid = same.flatMap(ideasOf);

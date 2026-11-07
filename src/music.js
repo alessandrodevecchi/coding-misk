@@ -96,6 +96,8 @@ export const BASS = {
   ottaveArcade: [{ it: 'Ottave arcade', en: 'Arcade octaves' }, null, .1, .3, null, '0 12 0 12 0 12 0 12 0 12 0 12 -2 10 -2 10'],
   // country: fondamentale e quinta alternate sui quarti
   boomchick: [{ it: 'Boom-chick (country)', en: 'Boom-chick (country)' }, null, .3, .2, null, '0 ~ ~ ~ 7 ~ ~ ~ 0 ~ ~ ~ -5 ~ ~ ~'],
+  // jazz in due (kick-variety 8.4): fondamentale sull'1, quinta sul 3, a minime
+  twoFeel: [{ it: 'In due (jazz)', en: 'Two-feel (jazz)' }, null, .9, .6, null, '0 ~ ~ ~ ~ ~ ~ ~ 7 ~ ~ ~ ~ ~ ~ ~'],
 };
 // figure come modelli: 0-3 sono le note dell'accordo dal basso verso l'alto
 export const ARPS = {
@@ -158,6 +160,8 @@ export const GUITAR_PATTERNS = {
   djent: ['Djent', 'x ~ ~ x ~ ~ x ~ x ~ ~ x ~ ~ x ~', true],
   quarter: [{ it: 'Quarti', en: 'Quarters' }, ['x', 'x']],
   held: [{ it: 'Tenuto', en: 'Held' }, ''],
+  // pennata country (kick-variety 8.1): accordi a ottavi con le pause del boom-chick
+  strum: [{ it: 'Pennata (country)', en: 'Strum (country)' }, 'x ~ x x ~ x x ~'],
 };
 export const VOWELS = [['', { it: 'Nessuna', en: 'None' }], ['<a e i o>', 'a e i o'], ['a', 'a'], ['o', 'o']];
 // [nome, ritmo, attack, decay, sustain, release, forma del volume (postgain), voicing]
@@ -173,6 +177,8 @@ export const PADS = {
   power: [{ it: 'Power chord a ottavi', en: 'Power chords, 8ths' }, ['[x x]', 'x'], .005, .25, .6, .1, null, 'power'],
   riff: [{ it: 'Riff power chord', en: 'Power chord riff' }, ['[x ~ x x]', '[x ~]'], .005, .2, .5, .1, null, 'power'],
   ring: [{ it: 'Power chord tenuto', en: 'Held power chord' }, '', .01, 0, 1, .6, null, 'power'],
+  // ambient (kick-variety 8.3): un accordo tenuto che entra in circa 2 secondi e si spegne lento
+  swell: [{ it: 'Onda lenta', en: 'Swell' }, '', 2, 0, 1, 3],
 };
 // 'vinyl' non è un campione: è fruscio sintetico
 export const TEXTURES = ['vinyl', 'numbers', 'industrial', 'metal', 'glitch', 'space', 'wind', 'crow'];
@@ -228,6 +234,21 @@ GROOVES.swing = ['Jazz swing', { bd: E16, cp: E16, sd: '..........x.....', hh: '
 // treno country: cassa su 1 e 3, rullante a ottavi, accento su 2 e 4
 GROOVES.train = [{ it: 'Treno (country)', en: 'Train beat (country)' }, { bd: 'x.......x.......', cp: '....x.......x...', sd: 'x.x.x.x.x.x.x.x.', hh: E16, oh: E16, rd: E16 }];
 GROOVES.rockChorus = [{ it: 'Rock ritornello', en: 'Rock chorus' }, { bd: 'x.x.....x.x.....', cp: E16, sd: '....x.......x...', hh: E16, oh: 'x.x.x.x.x.x.x.x.', rd: E16 }];
+// kick-variety D3: more kick rows for the styles whose grooves shared one (pickup, rolling, broken, push and sparse kicks);
+// each plays only rows its styles' grooves already play
+GROOVES.technoPickup = [{ it: 'Techno pickup', en: 'Techno pickup' }, { bd: 'x...x...x...x..x', cp: '............x...', sd: E16, hh: '..x...x...x...x.', oh: E16, rd: 'x.x.x.x.x.x.x.x.' }];
+GROOVES.technoRolling = [{ it: 'Cassa rotolante (techno)', en: 'Rolling kick (techno)' }, { bd: 'x..xx...x..xx...', cp: '....x.......x...', sd: E16, hh: '.xx..xx..xx..xx.', oh: E16, rd: E16 }];
+GROOVES.technoBroken = [{ it: 'Techno spezzata', en: 'Broken techno' }, { bd: 'x...x...x.....x.', cp: '....x.......x...', sd: '..........x..x..', hh: '..x...x...x.....', oh: '..............x.', rd: E16 }];
+GROOVES.trancePush = [{ it: 'Trance in spinta', en: 'Trance push' }, { bd: 'x...x...x...x.x.', cp: '....x.......x...', sd: E16, hh: '..xx..xx..xx..xx', oh: E16, rd: E16 }];
+GROOVES.trancePickup = [{ it: 'Trance pickup', en: 'Trance pickup' }, { bd: 'x...x...x...x..x', cp: '....x.......x...', sd: E16, hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }];
+GROOVES.housePickup = [{ it: 'House pickup', en: 'House pickup' }, { bd: 'x...x...x...x..x', cp: '....x.......x...', sd: E16, hh: '.x.x.x.x.x.x.x.x', oh: '..x...x...x...x.', rd: E16 }];
+GROOVES.houseRolling = [{ it: 'Cassa rotolante (house)', en: 'Rolling kick (house)' }, { bd: 'x..xx...x..xx...', cp: '....x.......x...', sd: '...........x....', hh: '..x...x...x...x.', oh: E16, rd: E16 }];
+GROOVES.drift = [{ it: 'Deriva (ambient)', en: 'Drift (ambient)' }, { bd: 'x.........x.....', cp: E16, sd: E16, hh: '....x.......x...', oh: E16, rd: E16 }];
+GROOVES.heartbeat = [{ it: 'Battito cardiaco (ambient)', en: 'Heartbeat (ambient)' }, { bd: 'x..x............', cp: E16, sd: E16, hh: '........x.......', oh: E16, rd: E16 }];
+GROOVES.phonkRoll = [{ it: 'Phonk rullato', en: 'Phonk roll' }, { bd: 'x......x..x...x.', cp: '....x.......x...', sd: E16, hh: 'x.xxx.xxx.xxx.xx', oh: '......x.......x.', rd: E16 }];
+GROOVES.phonkHalf = [{ it: 'Phonk half-time', en: 'Phonk half-time' }, { bd: 'x.........x..x..', cp: '........x.......', sd: E16, hh: 'x.x.x.x.xxxxx.x.', oh: E16, rd: E16 }];
+// kick-variety 8.5: a rock beat with a pushed kick for the styles without a drum generator (classic-rock, country)
+GROOVES.rockPush = [{ it: 'Rock in spinta', en: 'Rock push' }, { bd: 'x.......x.x...x.', cp: E16, sd: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.', oh: E16, rd: E16 }];
 // Presets as ideas (idea-model, #70): the material of each preset, read by the idea writer (src/song/ideas.js) and grown
 // by the Live coder profile. per "beat": a cell per beat (the half cell fills a half beat in 7/8); per "slot": tokens that
 // fill the note slots of each bar in turn; hold: the chord held for the bar; add per slot: a riff's semitones

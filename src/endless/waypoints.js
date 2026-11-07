@@ -204,9 +204,21 @@ function transitSong(prev, W, Wprev, B, off, o) {
     const s = stPrev.tracks.find(t => t.id === id), c = clipAt(ptrack(id), B - 1);
     before[id] = { s, c, on: !!s && !s.mute && !s.hush && !!c && s.type !== 'voice' };
   }
+  // the listener's tracks (kick-variety): one the written form plays from the boundary plays as written until it stops
+  // there, even when the arrival comes later (many moves push it into the outro, where the director takes added tracks
+  // out): it comes in on the boundary and leaves where the written form stops it, never silent and never taken out early
+  const mine = new Set(((o.plan && o.plan.added) || []).map(a => a.id)), runOf = {};
+  for (const id of ids) {
+    if (!mine.has(id) || !wtrack(id)) continue;
+    let x = Math.max(0, B - off);
+    for (; x < wBars; x++) { const st = stateAt(W, x).song, t = st.tracks.find(y => y.id === id); if (!t || !heardAt(st, t, x).on) break; }
+    if (x > B - off) runOf[id] = x + off;
+  }
   const plan = E0 => {
     const dE = E0 - off, Wst = stateAt(W, dE).song, Wpst = stateAt(Wprev, Math.min(dE, barsOf(Wprev) - 1)).song;
     const dest = Object.fromEntries(Wst.tracks.map(t => [t.id, { t, ...heardAt(Wst, t, dE) }]));
+    // (a listener's track silent at the arrival: the grown bar where the written form stops it, else 0)
+    const keepOf = Object.fromEntries(Object.entries(runOf).map(([id, x]) => [id, (dest[id] && dest[id].on) ? 0 : Math.min(x, E0)]).filter(([, x]) => x > B));
     // ---- the skeleton: the past as it was, the transit clips, the written form from the arrival ----
     const maps = {};
     const tracks = ids.map(id => {
@@ -229,8 +241,10 @@ function transitSong(prev, W, Wprev, B, off, o) {
       // as it is); a line that comes in (muted or hushed before) plays its new one
       const enters = d && d.on && !b.on && (!b.s || b.s.mute || b.s.hush || !pt || prevAdded.has(id));
       const goesOn = b.on && !(b.c.set && Object.keys(b.c.set).length) && past.length && past[past.length - 1].start === (b.c.start ?? 0) && past[past.length - 1].start + past[past.length - 1].bars === B;
-      if (goesOn) past[past.length - 1].bars = E0 - past[past.length - 1].start;
-      const mid = goesOn ? [] : b.on ? [{ start: B, bars: E0 - B, pattern: b.c.pattern }] : enters ? [{ start: B, bars: E0 - B, pattern: map[d.c.pattern] ?? d.c.pattern }] : [];
+      const keep = keepOf[id] || 0, stop = keep || E0;
+      if (goesOn) past[past.length - 1].bars = stop - past[past.length - 1].start;
+      const mid = goesOn ? [] : b.on ? [{ start: B, bars: stop - B, pattern: b.c.pattern }] : enters ? [{ start: B, bars: E0 - B, pattern: map[d.c.pattern] ?? d.c.pattern }]
+        : keep ? clipsIn(wt.clips, B - off, keep - off, off).map(c => ({ ...c, pattern: map[c.pattern] ?? c.pattern })) : [];
       const after = wt ? clipsIn(wt.clips, dE, wBars, off).map(c => ({ ...c, pattern: map[c.pattern] ?? c.pattern })) : [];
       t.clips = [...past, ...mid, ...after];
       return t;
@@ -242,11 +256,19 @@ function transitSong(prev, W, Wprev, B, off, o) {
     const N0 = { ...clone({ ...prev, build: undefined, tracks: undefined, sections: undefined }), sections, tracks, build: [...past, ...wsteps] };
     const st = stateAt(N0, B).song;
     // ---- the moves, track by track ----
-    const lanes = [], prelude = [], focus = [];
+    const lanes = [], prelude = [], focus = [], fixed = [];
     for (const id of ids) {
       const b = before[id], d = dest[id], t = st.tracks.find(x => x.id === id);
       if (!t || t.type === 'voice') continue;
       const dOn = !!(d && d.on);
+      if (keepOf[id]) {
+        // (a listener's track the written form stops before the arrival: in on the boundary when it was out, out where
+        // the written form stops it)
+        if (!b.on) lanes.push({ kind: 'track', track: id, units: [{ kind: 'enter', dir: 1, step: { add: id } }] });
+        fixed.push({ at: keepOf[id], remove: id, by: 'listener' });
+        focus.push(id);
+        continue;
+      }
       if (!b.on && !dOn) continue;
       // the listener's tracks: what this command changes at the arrival
       const wp = Wpst.tracks.find(x => x.id === id), hp = wp ? heardAt(Wpst, wp, Math.min(dE, barsOf(Wprev) - 1)) : { on: false };
@@ -318,7 +340,7 @@ function transitSong(prev, W, Wprev, B, off, o) {
     let path = waypointPath(lanes, o.rng.fork('path'), { chooser: chooserFor(o.chooser)(focus, bias) });
     // (a batch's new lines first, all on the boundary: the chooser placed them anywhere on the way, as late as the end of
     // a long growth, #82)
-    const first = o.together && o.together.length ? path.filter(u => u.kind === 'enter' && o.together.includes(u.track)) : [];
+    const first = path.filter(u => u.kind === 'enter' && (((o.together || []).includes(u.track)) || keepOf[u.track]));
     if (first.length) path = [...first, ...path.filter(u => !first.includes(u))];
     // (the bars the typing asked for, by move: the n-th move of a track)
     const seen = {};
@@ -326,7 +348,7 @@ function transitSong(prev, W, Wprev, B, off, o) {
     const gaps = path.map((u, i) => (i < Math.max(1, first.length) ? 0 : gapOf(u, path[i - 1]) + ((o.extra || {})[u.key] || 0)));
     const span = gaps.reduce((a, x) => a + x, 0);
     // (two bars at least between the last move and the arrival, when the song has them)
-    return { N0, st, dest, maps, path, gaps, span, prelude, focus, first: Math.max(1, first.length), fits: B + span <= E0 - 2 };
+    return { N0, st, dest, maps, path, gaps, span, prelude, fixed, focus, first: Math.max(1, first.length), fits: B + span <= E0 - 2 };
   };
   let p = plan(E);
   for (let guard = 0; guard < 12 && !p.fits && E < limitE && !o.fixE; guard++) { E = Math.min(limitE, E + ph); p = plan(E); }
@@ -348,7 +370,7 @@ function transitSong(prev, W, Wprev, B, off, o) {
   const units = p.path.map((u, i) => ({ ...u, at: (at += gaps[i]) }));
   // ---- the song: the past, the moves (the listener's), the written form; then what is left set right at the arrival ----
   const N = clone(p.N0);
-  N.build = [...N.build, ...p.prelude, ...units.map(u => ({ at: u.at, ...clone(u.step), by: 'listener' }))];
+  N.build = [...N.build, ...p.prelude, ...units.map(u => ({ at: u.at, ...clone(u.step), by: 'listener' })), ...p.fixed];
   const has = addsOf(N), dE = E - off;
   for (const t of N.tracks) {
     if (t.type === 'voice') continue;
