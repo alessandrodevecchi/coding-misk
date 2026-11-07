@@ -683,12 +683,13 @@ const CHECKS = {
       assert(onHead.length >= Math.ceil(r.commands.length / 2), `${x.id}: less than half on the head: ${r.commands.map(c => `${c.part}@${c.at}`).join(' ')}`);
       assert(head <= at + 3 * ph && last - head <= 2 * ph, `${x.id}: pressed on ${q}, entries ${ats.join(' ')}`);
       // (every added track the song plays comes into the code on the boundary of its command, or plays within a phrase
-      // of it when the part there leaves it out, a break for a kick; a track the director keeps silent is left aside)
+      // of it when the part there leaves it out, a break for a kick; kick-variety: no added track stays silent, every one
+      // plays from the phrase where it enters)
       const steps = buildSteps(r.song);
       for (const a of r.plan.added) {
         const B = a.at + airOffset(r.grown), on = b => soundAt(r.song, b).tracks.some(t => t.id === a.id);
         const first = Array.from({ length: 4 * ph }, (_, k) => B + k).find(on);
-        if (first === undefined && !steps.some(st => [].concat(st.add ?? []).includes(a.id))) continue;
+        assert(first !== undefined || steps.some(st => st.at === B && [].concat(st.add ?? []).includes(a.id)), `${x.id}: ${a.id}, added by hand on ${B}, never plays (${r.plan.added.map(y => y.id).join(' ')})`);
         assert((first !== undefined && first < B + ph) || steps.some(st => st.at === B && [].concat(st.add ?? []).includes(a.id)), `${x.id}: ${a.id} comes in on ${first} for its boundary ${B}`);
       }
       // a replay: the recorded commands (no pend) give the same song
@@ -697,6 +698,20 @@ const CHECKS = {
       sum += last - q; n++;
     }
     assert(n >= 2, `only ${n} songs took the batch; ${skipped.join('; ')}`);
+    // the owner's batch (kick-variety): three kicks, a beat and two melodies at once; every added track plays within a
+    // phrase of its boundary (none kept silent by the director, none taken out before the written form stops it)
+    let mixed = 0;
+    for (const x of airCases().slice(0, 6)) {
+      const G = x.g0.crescendo.growth, ph = x.plan.phrase, q = G + ph + 0.4, at = airBoundaries('more', q, x.plan, x.g0)[0];
+      if (at === undefined || at + 3 * ph > barsOf(x.g0) - ph) continue;
+      const r = steer(x, ['kick', 'kick', 'kick', 'beat', 'lead', 'lead'].map((part, k) => ({ kind: 'more', part, q, at, at0: at, min: at, pend: true, id: k + 1, batch: 1 })));
+      for (const a of r.plan.added) {
+        const B = a.at + airOffset(r.grown), first = Array.from({ length: ph }, (_, k) => B + k).find(b => soundAt(r.song, b).tracks.some(t => t.id === a.id));
+        assert(first !== undefined, `${x.id}: ${a.id}, added by hand on ${B}, silent for the phrase after it (${r.plan.added.map(y => y.id).join(' ')})`);
+      }
+      mixed++;
+    }
+    assert(mixed >= 2, `only ${mixed} songs took the mixed batch`);
     // a saved pattern as a new track, pressed inside a growth: its track plays from its boundary (it went to the end of
     // the growth before, the chooser placing its line anywhere on the way)
     const item = { id: 'mine-1', name: 'Basso mio', kind: 'basslines', type: 'bass', pattern: { preset: 'rolling' }, sound: 'sawtooth', settings: { wave: 'sawtooth', gain: 0.7 }, context: { key: 'A', chords: 'notturna', meter: '4/4', bpm: 128, mode: 'minor' } };
@@ -720,7 +735,8 @@ const CHECKS = {
     }
     if (WRITE) return;
     assert(saved && saved.classic, 'no radio fixtures: run npm run check:radio-profiles -- --write-fixtures');
-    for (const [name, h] of Object.entries(fixtures.classic)) assert(saved.classic[name] === h, `${name} gives ${h}, fixture ${saved.classic[name]}; if the change is intended, run with --write-fixtures`);
+    const moved = Object.entries(fixtures.classic).filter(([name, h]) => saved.classic[name] !== h);
+    assert(!moved.length, `${moved.map(([name, h]) => `${name} gives ${h}, fixture ${saved.classic[name]}`).join('; ')}; if the change is intended, run with --write-fixtures`);
   },
   'radio-arrangement 1.7: songs with two kicks, two beats and three pads grow in Crescendo and Live coder'() {
     let n = 0, steps = 0;
@@ -784,7 +800,8 @@ const CHECKS = {
     }
     if (WRITE) return;
     assert(saved && saved.grown, 'no grown radio fixtures: run npm run check:radio-profiles -- --write-fixtures');
-    for (const [name, h] of Object.entries(fixtures.grown)) assert(saved.grown[name] === h, `${name} gives ${h}, fixture ${saved.grown[name]}; if the change is intended, run with --write-fixtures`);
+    const moved = Object.entries(fixtures.grown).filter(([name, h]) => saved.grown[name] !== h);
+    assert(!moved.length, `${moved.map(([name, h]) => `${name} gives ${h}, fixture ${saved.grown[name]}`).join('; ')}; if the change is intended, run with --write-fixtures`);
   },
 };
 
