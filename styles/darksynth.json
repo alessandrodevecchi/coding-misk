@@ -45,7 +45,8 @@
     "kits": [
       "LinnDrum",
       "OberheimDMX",
-      "RolandTR909"
+      "RolandTR909",
+      "RolandTR707"
     ],
     "grooves": [
       "synthwave",
@@ -69,7 +70,8 @@
     ],
     "waves": [
       "sawtooth",
-      "square"
+      "square",
+      "gm_synth_bass_2"
     ],
     "settings": {
       "cutoff": [
@@ -107,7 +109,8 @@
     ],
     "waves": [
       "gm_lead_2_sawtooth",
-      "sawtooth"
+      "sawtooth",
+      "gm_lead_8_bass_lead"
     ],
     "modes": [
       "minor",
@@ -123,13 +126,16 @@
     ],
     "waves": [
       "supersaw",
-      "gm_synth_brass_1"
+      "gm_synth_brass_1",
+      "gm_synth_choir"
     ]
   },
   "guitar": {
     "patterns": [
       "power8",
-      "chug"
+      "chug",
+      "gallop",
+      "held"
     ],
     "types": [
       "distorted",
@@ -216,5 +222,9 @@
     "weight": 0.15,
     "ways": { "opening": 1, "refrain": 1, "chop": 1 },
     "vocab": "dark"
+  },
+  "growthShapes": {
+    "openings": { "bass": 2, "full-kick": 2, "melodic": 2, "filtered": 1, "slow": 1, "pad": 1 },
+    "kicks": { "four": 1, "two": 1, "one": 1 }
   }
 }

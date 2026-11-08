@@ -143,6 +143,19 @@ const CHECKS = {
     assert(newer.find(r => r.fp === '10-aa').title === 'New' && newer.find(r => r.fp === '10-aa').handle === handle, 'the newer record wins and keeps the local handle');
     assert(!('coding-misk-decodes' in makeBackup([['coding-misk-ui', 'hw']]).data), 'no decodes: no key');
   },
+  'allowed voice styles: export, import in an empty browser, merge per speaker, no key, a malformed value (voice-combos-ui 4.1)'() {
+    const K = 'coding-misk-voice-combos', kathy = ['clear', 'radio', 'deep'], fred = ['clear', 'echo'];
+    const b = makeBackup([[K, { format: 1, en: { kathy } }]]);
+    assert(JSON.stringify(b.data[K]) === JSON.stringify({ format: 1, en: { kathy } }), 'exported');
+    const empty = mergeBackup(b, () => null);
+    assert(JSON.stringify(empty.values[K].en.kathy) === JSON.stringify(kathy) && empty.counts.settings === 1, `empty browser: ${JSON.stringify(empty)}`);
+    const merged = mergeBackup(b, k => (k === K ? { format: 1, en: { kathy: ['clear'], fred }, it: { default: ['clear', 'radio'] } } : null)).values[K];
+    assert(JSON.stringify(merged.en.kathy) === JSON.stringify(kathy) && JSON.stringify(merged.en.fred) === JSON.stringify(fred) && JSON.stringify(merged.it.default) === JSON.stringify(['clear', 'radio']), `merge: Kathy from the backup, Fred and Alice kept: ${JSON.stringify(merged)}`);
+    assert(!(K in mergeBackup(makeBackup([['coding-misk-ui', 'hw']]), () => ({ format: 1, en: { fred } })).values), 'a backup without the key leaves it alone');
+    const bad = mergeBackup({ format: BACKUP_FORMAT, data: { [K]: { format: 1, en: { kathy: ['clear', 'robott', 'robot'], bob: ['deep'], fred: 'echo' }, it: { albert: ['deep'] }, fr: {} } } }, k => (k === K ? { format: 1, en: { fred } } : null)).values[K];
+    assert(JSON.stringify(bad) === JSON.stringify({ format: 1, en: { fred, kathy: ['clear', 'robot'] } }), `malformed parts dropped: ${JSON.stringify(bad)}`);
+    assert(JSON.stringify(mergeBackup({ format: BACKUP_FORMAT, data: { [K]: 'oops' } }, k => (k === K ? { format: 1, en: { fred } } : null)).values[K]) === JSON.stringify({ format: 1, en: { fred } }), 'a value that is not an object changes nothing');
+  },
   'a file that is not a backup is refused'() { assert(mergeBackup({ format: 'x' }, () => null).error, 'accepted'); },
 };
 let failed = 0;

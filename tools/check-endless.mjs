@@ -30,6 +30,7 @@ import { chordTonesOnly, degreesOnly } from '../src/endless/mutate.js';
 import { partsKey } from '../src/endless/mix.js';
 import { allPhrases } from '../src/endless/phrases.js';
 import { GROOVES, BASS, ARPS, HOOKS, meterSteps } from '../src/music.js';
+import { kickVariants } from '../src/material/drums.js';
 import { GESTURES, GESTURE_FAMILIES, RANGES as G_RANGES, gestureRate, notesPerBar } from '../src/endless/gestures.js';
 import { foldLevel } from '../src/song/rack.js';
 
@@ -98,22 +99,29 @@ function voiceless(x, { narrator = false } = {}) {
 // songs of director version 2 at complexity 0 (material-generator): complexity 0 must keep giving them
 // (hashes of director version 16: the explaining phrases of the director grew, #82 new-phrases, so the drawn lines moved)
 // (hashes of director version 17, real-voices: the drawn speakers moved; the songs without speaker fields are the same)
+// (hashes of director version 18, varied-openings: the styles list more kits and sounds, so the drawn ones moved)
+// (hashes of director version 19, siri-it-voice: the drawn speakers moved, nothing else)
+// (hashes of director version 20, kick-variety: the styles list more grooves and presets, so the drawn ones moved; with
+// the old style files the new director gives the same complexity 0 songs)
 const PLAIN_V2 = [
-  { seed: 'plain-a', styles: ['berlin-techno'], complexity: 0, songs: '49d8ad72' },
-  { seed: 'plain-b', styles: ['synthwave', 'jazz', 'country'], chaos: 1, complexity: 0, songs: 'cb69eb7f' },
-  { seed: 'plain-c', styles: ['trance', 'phonk', 'melodic-metal', 'drum-and-bass'], chaos: 0.6, complexity: 0, energy: 0.9, minutes: 20, songs: '375ecb97' },
-  { seed: 'plain-d', styles: ['ambient', 'lo-fi', 'industrial', 'classic-rock', 'acid', 'house'], chaos: 0.8, complexity: 0, energy: 0.3, minutes: 20, songs: 'a06d34fc' },
+  { seed: 'plain-a', styles: ['berlin-techno'], complexity: 0, songs: '24e1706e' },
+  { seed: 'plain-b', styles: ['synthwave', 'jazz', 'country'], chaos: 1, complexity: 0, songs: '1702acfd' },
+  { seed: 'plain-c', styles: ['trance', 'phonk', 'melodic-metal', 'drum-and-bass'], chaos: 0.6, complexity: 0, energy: 0.9, minutes: 20, songs: '3407e35b' },
+  { seed: 'plain-d', styles: ['ambient', 'lo-fi', 'industrial', 'classic-rock', 'acid', 'house'], chaos: 0.8, complexity: 0, energy: 0.3, minutes: 20, songs: 'e87b91f2' },
 ];
 // steered songs at complexity 0 and with the source "patterns" (radio-variation): Add and More complex keep today's presets.
 // Hashes recorded before radio-variation; talk 0 (a listener's Add used to fail when the voice commented it).
 // (director version 17, real-voices: the drawn speakers moved, nothing else; hashes recorded again)
+// (director version 18, varied-openings: more kits and sounds per style, and the longer KITS of the steering; recorded again)
+// (director version 19, siri-it-voice: the drawn speakers moved, nothing else; plain-steer-d recorded again)
+// (director version 20, kick-variety: longer groove and preset lists in the styles; a, b and d recorded again)
 const PLAIN_STEER = [
-  { seed: 'plain-steer-a', styles: ['berlin-techno'], complexity: 0, talk: 0, songs: '8c8e45a6' },
-  { seed: 'plain-steer-b', styles: ['ambient', 'jazz'], chaos: 1, complexity: 0, talk: 0, songs: '251c398e' },
+  { seed: 'plain-steer-a', styles: ['berlin-techno'], complexity: 0, talk: 0, songs: 'a44f4b86' },
+  { seed: 'plain-steer-b', styles: ['ambient', 'jazz'], chaos: 1, complexity: 0, talk: 0, songs: '039a5110' },
   // (gestures off, director-fold-ring: these cases are about the presets of Add and More complex; the effect gestures of
   // version 15 would move their recorded hashes, and the gestures have checks of their own)
-  { seed: 'plain-steer-c', styles: ['synthwave', 'drum-and-bass'], chaos: 0.5, complexity: 0.8, material: 'patterns', talk: 0, gestures: false, songs: '0bc11ba7' },
-  { seed: 'plain-steer-d', styles: ['trance', 'lo-fi', 'phonk'], chaos: 0.8, complexity: 0.5, material: 'patterns', talk: 0, gestures: false, songs: '6b870ef9' },
+  { seed: 'plain-steer-c', styles: ['synthwave', 'drum-and-bass'], chaos: 0.5, complexity: 0.8, material: 'patterns', talk: 0, gestures: false, songs: '7036a16b' },
+  { seed: 'plain-steer-d', styles: ['trance', 'lo-fi', 'phonk'], chaos: 0.8, complexity: 0.5, material: 'patterns', talk: 0, gestures: false, songs: 'e5180459' },
 ];
 // the steered songs of a PLAIN_STEER case: three songs, each with an Add of every type and a run of More complex
 function plainSteer({ seed, songs: _, ...o }) {
@@ -169,6 +177,15 @@ function arrSongs(n, tag = 'arr', extra = {}) {
 const outroFrom = plan => { let d = plan.plan.length; while (d > 0 && plan.plan[d - 1].role === 'outro') d--; return d; };
 const onAt = (sg, bar) => playing(stateAt(sg, bar).song);
 const steerArr = (g, commands, n = 0) => steerSong({ song: g.song, plan: g.plan, opts: g.opts, commands, seed: g.seed, n });
+// the drum rows of a pattern as steps of `x` and `.` (rows, or a composed idea's beat), and its kick row
+function rowsSteps(p, N) {
+  if (!p) return {};
+  if (p.rows) return Object.fromEntries(Object.entries(p.rows).filter(([, v]) => String(v).includes('x')).map(([k, v]) => [k, String(v).padEnd(N, '.').slice(0, N)]));
+  const beat = p.idea && p.idea.beat;
+  if (!beat) return {};
+  return Object.fromEntries(Object.entries(beat).filter(([k, v]) => k !== 'grid' && String(v).length).map(([k, v]) => { const on = new Set(String(v).split(',').map(Number)); return [k, Array.from({ length: beat.grid || N }, (_, i) => (on.has(i) ? 'x' : '.')).join('').padEnd(N, '.').slice(0, N)]; }));
+}
+const bdSteps = (p, N) => rowsSteps(p, N).bd || '';
 // "+" on instruments in turn on one boundary until the song plays 12 tracks
 // (one command at a time on the song so far, then the whole list once: the song a replay gives)
 function stack12(g, at) {
@@ -330,7 +347,8 @@ const CHECKS = {
     assert(mutated > 10, `only ${mutated} mutated patterns at complexity 1`);
   },
   'director: complexity 0 gives the songs of director version 2'() {
-    for (const c of PLAIN_V2) { const { songs, ...opts } = c; assert(sessionHash(voiceless(generateSession(loadStyles(), opts).songs)) === songs, `${c.seed} (${c.styles}): complexity 0 songs changed`); }
+    const moved = PLAIN_V2.map(c => { const { songs, ...opts } = c; return [c, sessionHash(voiceless(generateSession(loadStyles(), opts).songs))]; }).filter(([c, h]) => h !== c.songs);
+    assert(!moved.length, `complexity 0 songs changed: ${moved.map(([c, h]) => `${c.seed} ${h}`).join(', ')}`);
   },
   'director: a recipe asking for composed leads gets them in most songs'() {
     const recipes = loadStyles().map(r => (r.id === 'trance' ? { ...r, hook: { ...r.hook, weight: 1, material: { source: 'generated' } } } : r));
@@ -557,6 +575,9 @@ const CHECKS = {
     now.forEach((f, i) => assert(saved[i] && saved[i].hash === f.hash, `seed ${f.seed} (${f.styles}) gives ${f.hash}, fixture ${saved[i] && saved[i].hash}; if the change is intended, run npm run check:endless -- --write-fixtures`));
   },
   'gestures: off, the director gives the seed fixtures of version 14 (director-fold-ring D6)'() {
+    // (--write-v14: the file written again from the director with gestures off, when an intended change moves it with the
+    // director version)
+    if (process.argv.includes('--write-v14')) { fs.writeFileSync(FIXTURES_V14_FILE, JSON.stringify(FIXTURES.map(f => { const off = generateSession(loadStyles(), { ...f, gestures: false }); return { ...f, hash: sessionHash(off), music: sessionHash(voiceless(off, { narrator: true })) }; }), null, 2) + '\n'); console.log('      version 14 fixtures written'); }
     const v14 = JSON.parse(fs.readFileSync(FIXTURES_V14_FILE, 'utf8'));
     let drew = 0;
     FIXTURES.forEach((f, i) => {
@@ -1081,7 +1102,8 @@ const CHECKS = {
       }
     }
     assert(added >= 5 && more >= 5, `composed tracks: add ${added}, more complex ${more}`);
-    for (const c of PLAIN_STEER) assert(sessionHash(voiceless(plainSteer(c))) === c.songs, `${c.seed}: steered songs at complexity 0 or with patterns changed (${sessionHash(voiceless(plainSteer(c)))})`);
+    const moved = PLAIN_STEER.map(c => [c, sessionHash(voiceless(plainSteer(c)))]).filter(([c, h]) => h !== c.songs);
+    assert(!moved.length, `steered songs at complexity 0 or with patterns changed: ${moved.map(([c, h]) => `${c.seed} ${h}`).join(', ')}`);
   },
   'steering: curves and complexity shape composed material'() {
     const find = (seed, style, type) => { const ses = createSession(STYLES, seed); for (let i = 0; i < 30; i++) { const x = ses.next({ styles: [style] }); if (!whyNot({ kind: 'vary', type }, x.song, x.plan, 40)) return x; } return null; };
@@ -1174,7 +1196,10 @@ const CHECKS = {
     // (since director version 14 the voice tracks are left out, voiceless: 9475a713 is a6e28951 without them, on develop 0307b02)
     // (director version 16, #82 new-phrases: the director's explaining phrases grew, the drawn lines moved: 9475a713 became 23c4b440)
     // (director version 17, real-voices: the drawn speakers moved, nothing else: 23c4b440 became 37ce6a37)
-    assert(h === '37ce6a37', `old commands give other songs: ${h}`);
+    // (director version 18, varied-openings: more kits and sounds per style, the drawn ones moved: 37ce6a37 became 05f4158d)
+    // (director version 19, siri-it-voice: the drawn speakers moved, nothing else: 05f4158d became 6df0af41)
+    // (director version 20, kick-variety: longer groove and preset lists, four-floor kick variants: 6df0af41 became d2b12fe4)
+    assert(h === 'd2b12fe4', `old commands give other songs: ${h}`);
   },
   'arrangement: + and − per instrument, several tracks of one instrument'() {
     let checked = 0;
@@ -1250,7 +1275,9 @@ const CHECKS = {
         const rows = t => JSON.stringify(t === k2 ? bdOf(t.patterns.A) : bdOf(t.patterns[(cur.clips[0] || {}).pattern || 'A'] || t.patterns.A));
         const bds = new Set(g.plan.R.drums.grooves.map(x => (GROOVES[x] || [])[1]).filter(Boolean).map(x => x.bd).filter(x => x && x.includes('x')));
         kicks++;
-        if (bds.size > 1) { assert(rows(k1) !== rows(k2), `${g.style}: two kicks on the same steps`); other++; }
+        // (kick-variety D3: every style with a kick lists at least two kick rows)
+        assert(bds.size > 1, `${g.style}: one kick row among its grooves`);
+        assert(rows(k1) !== rows(k2), `${g.style}: two kicks on the same steps`); other++;
         assert(k2.settings.gain <= Math.round(k1.settings.gain * 75 + 1) / 100, `${g.style}: kick 2 gain ${k2.settings.gain}`);
       }
       // the cap: 12 tracks, then every + is disabled; the song's maximum follows the listener (on 15 songs)
@@ -1265,6 +1292,66 @@ const CHECKS = {
     }
     assert(kicks >= 20 && other >= 10 && capped >= 12, `kicks ${kicks}, on another groove ${other}, capped ${capped}`);
     console.log(`      ${kicks} second kicks (${other} on another groove), ${capped} songs stacked to ${TRACK_CAP} tracks`);
+  },
+  // kick-variety D4: "+ kick" and "+ beat" compose first (sessions that compose on air and styles with drum material),
+  // then the style's built-in grooves; rows differ from the instrument's tracks while any candidate does
+  'arrangement: three "+ kick" give different kick rows on every style with a kick (kick-variety)'() {
+    const FOUR = ['berlin-techno', 'acid', 'gated-trance', 'house', 'progressive-house', 'pure-trance', 'trance'];
+    const cases = [...FOUR.map(id => [id, id === 'berlin-techno' ? 20 : 4]), ['phonk', 6], ['ambient', 6], ['industrial', 4]];
+    let n = 0, four = 0;
+    for (const [id, count] of cases) for (const material of ['mix', 'patterns']) for (let i = 0; i < count; i++) {
+      const g = { ...createSession(STYLES, `kv-${id}-${i}`).next({ styles: [id], material }), seed: `kv-${id}-${i}` };
+      const at = applyBar('more', 2 * g.plan.phrase, g.plan), N = meterSteps(g.plan.meter);
+      const cmds = [0, 1, 2].map(() => ({ kind: 'more', part: 'kick', at }));
+      const r = steerArr(g, cmds), r2 = steerArr(g, cmds);
+      const added = r.plan.added.map(a => r.song.tracks.find(t => t.id === a.id));
+      assert(added.length === 3 && added.every(t => t && instrumentOf(t) === 'kick'), `${id} ${i}: ${added.length} kicks added`);
+      assert(JSON.stringify(added) === JSON.stringify(r2.plan.added.map(a => r2.song.tracks.find(t => t.id === a.id))), `${id} ${i}: a replay gave other kicks`);
+      // (the song's kick with its pattern on the boundary, also when the first "+" brought it in, then the new kicks' A)
+      const k1 = r.song.tracks.find(t => t.id === 'kick'), cur = k1 && stateAt(r.song, at).song.tracks.find(t => t.id === 'kick');
+      const playingRows = [...(k1 && cur ? [bdSteps(k1.patterns[(cur.clips[0] || {}).pattern || 'A'] || k1.patterns.A, N)] : []), ...added.filter(t => t !== k1).map(t => bdSteps(t.patterns.A, N))];
+      // the rows the style offers: its built-in grooves' kicks, and the four-floor variants when it composes on air
+      const builtIn = new Set(g.plan.R.drums.grooves.map(x => (GROOVES[x] || [])[1]).filter(Boolean).map(x => x.bd).filter(x => x && x.includes('x')).map(x => x.padEnd(N, '.').slice(0, N)));
+      const fam = (g.plan.R.drums.material || {}).families || [];
+      const offer = material !== 'patterns' && g.plan.R.drums.material ? new Set([...builtIn, ...(fam.includes('four-floor') ? kickVariants(g.plan.meter).map(v => v.row) : [])]) : builtIn;
+      const distinct = new Set(playingRows).size, want = Math.min(playingRows.length, offer.size);
+      assert(distinct >= want, `${id} ${material} ${i}: ${distinct} different kick rows of ${playingRows.length} (${offer.size} offered): ${playingRows.join(' ')}`);
+      if (FOUR.includes(id) && playingRows.length === 4 && offer.size >= 4) { assert(distinct === 4, `${id} ${material} ${i}: four kicks on ${distinct} rows`); four++; }
+      n++;
+    }
+    // a sixth kick on berlin-techno still enters (no cap per instrument) and repeats the rhythm the fewest kicks hold
+    let six = 0;
+    for (let i = 0; i < 6; i++) {
+      const g = { ...createSession(STYLES, `kv6-${i}`).next({ styles: ['berlin-techno'], material: i % 2 ? 'patterns' : 'mix' }), seed: `kv6-${i}` };
+      const at = applyBar('more', 2 * g.plan.phrase, g.plan), N = meterSteps(g.plan.meter);
+      const r = steerArr(g, Array.from({ length: 6 }, () => ({ kind: 'more', part: 'kick', at })));
+      const all = r.plan.added.map(a => r.song.tracks.find(t => t.id === a.id)), kicks = all.filter(t => t && t.id !== 'kick');
+      assert(all.length === 6 && all.every(t => t && instrumentOf(t) === 'kick') && kicks.length >= 5, `berlin-techno ${i}: ${all.length} kicks added of 6`);
+      const before = [r.song.tracks.find(t => t.id === 'kick'), ...kicks.slice(0, -1)].filter(Boolean);
+      const holds = row => before.filter(t => Object.values(t.patterns).some(p => bdSteps(p, N) === row)).length;
+      const rows = new Set(before.flatMap(t => Object.values(t.patterns).map(p => bdSteps(p, N))));
+      const last = bdSteps(kicks[kicks.length - 1].patterns.A, N);
+      assert(holds(last) <= Math.min(...[...rows].map(holds)), `berlin-techno ${i}: the sixth kick ${last} is held by ${holds(last)} kicks`);
+      assert(new Set(kicks.map(t => t.settings.kit)).size >= Math.min(kicks.length, (g.plan.R.drums.kits || []).length - 1), `berlin-techno ${i}: kits ${kicks.map(t => t.settings.kit)}`);
+      six++;
+    }
+    console.log(`      ${n} songs with three "+ kick" (${four} four-floor songs on four rows), ${six} with six`);
+  },
+  'arrangement: two "+ beat" give beats with different rows (kick-variety)'() {
+    let n = 0;
+    for (const id of ALL_STYLES) for (const material of ['mix', 'patterns']) for (let i = 0; i < 2; i++) {
+      const g = { ...createSession(STYLES, `kvb-${id}-${i}`).next({ styles: [id], material }), seed: `kvb-${id}-${i}` };
+      if (!partHas(g.plan.R, 'beat')) continue;
+      const at = applyBar('more', 2 * g.plan.phrase, g.plan), N = meterSteps(g.plan.meter);
+      const r = steerArr(g, [{ kind: 'more', part: 'beat', at }, { kind: 'more', part: 'beat', at }]);
+      const added = r.plan.added.map(a => r.song.tracks.find(t => t.id === a.id));
+      assert(added.length === 2, `${id} ${i}: ${added.length} beats added`);
+      const [a, b] = added.map(t => JSON.stringify(Object.entries(rowsSteps(t.patterns.A, N)).sort()));
+      const offered = new Set(g.plan.R.drums.grooves.map(x => (GROOVES[x] || [])[1]).filter(Boolean).map(x => JSON.stringify(Object.entries(x).filter(([k, v]) => k !== 'bd' && v.includes('x')).sort()))).size;
+      assert(a !== b || offered < 2, `${id} ${material} ${i}: two beats on the same rows ${a}`);
+      n++;
+    }
+    console.log(`      ${n} songs with two "+ beat"`);
   },
   "arrangement: the owner's test, a track added with + stays until the outro"() {
     let n = 0, sat = 0;

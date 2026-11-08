@@ -44,11 +44,15 @@
   "drums": {
     "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
-      "RolandTR909"
+      "RolandTR909",
+      "KorgM1",
+      "RolandTR707"
     ],
     "grooves": [
       "trance",
-      "rolling"
+      "rolling",
+      "trancePush",
+      "housePickup"
     ]
   },
   "bass": {
@@ -103,7 +107,8 @@
     "waves": [
       "supersaw",
       "gm_piano",
-      "gm_lead_2_sawtooth"
+      "gm_lead_2_sawtooth",
+      "gm_lead_4_chiff"
     ],
     "modes": [
       "minor"
@@ -119,7 +124,8 @@
     "waves": [
       "gm_piano",
       "supersaw",
-      "gm_string_ensemble_1"
+      "gm_string_ensemble_1",
+      "gm_pad_warm"
     ]
   },
   "riser": {},
@@ -186,5 +192,9 @@
     "weight": 0.1,
     "ways": { "refrain": 1, "chop": 1 },
     "vocab": "night"
+  },
+  "growthShapes": {
+    "openings": { "filtered": 1, "full-kick": 1, "slow": 2, "melodic": 2, "chord": 1, "pad": 1, "bass": 1, "top": 1 },
+    "kicks": { "four": 1, "one": 1, "push": 1, "two": 1 }
   }
 }

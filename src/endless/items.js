@@ -8,6 +8,7 @@ import { steerSong, biasSong } from './steering.js';
 import { recipeProfile, customControls } from './profile.js';
 import { growOnAir, leadOnAir, searchOf, playedOf } from './growth.js';
 import { steerOnAir, AIR_CHOOSER, AIR_CHOOSERS } from './waypoints.js';
+import { COMBOS_FILE } from '../voices/combos.js';
 
 // the options of song n in a recipe: the first options, then every change up to n; options without the Profile option
 // (saved before radio-profiles) replay as Classic
@@ -32,11 +33,15 @@ export const airChooserOf = recipe => {
   if (typeof c === 'string' && Object.hasOwn(AIR_CHOOSERS, c)) return c;
   return c === undefined && Number(recipe && recipe.growth) < 3 ? 'radio-1' : AIR_CHOOSER;
 };
-// the per-song choices a compilation keeps from the radio's controls (a clip keeps its length)
-export const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.profile !== undefined ? { profile: o.profile } : {}), ...(o.custom ? { custom: o.custom } : {}), ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}), ...(o.voice ? { voice: o.voice } : {}) });
+// the per-song choices a compilation keeps from the radio's controls (a clip keeps its length); the radio's Length
+// (`length`, `lengthHeard`) too, so a compilation's songs keep the asked minutes instead of their style's (#82)
+export const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.length !== undefined ? { length: o.length } : {}), ...(o.lengthHeard !== undefined ? { lengthHeard: o.lengthHeard } : {}), ...(o.profile !== undefined ? { profile: o.profile } : {}), ...(o.custom ? { custom: o.custom } : {}), ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}), ...(o.voice ? { voice: o.voice } : {}) });
 // the director options of song n: the compilation's draw, else the recipe's
 // my phrases (my-phrases D4): the snapshot a session recorded when it started, never with Mai
 export const withMine = (o, recipe) => (recipe && recipe.mine ? { ...o, mine: recipe.mine } : o);
+// the allowed voice styles (voice-combos-ui D5): the table a session recorded, else the committed file, never the
+// browser's current overrides, so a session, its Replay and its export draw as when it started
+export const withCombos = (o, recipe) => ({ ...o, combos: (recipe && recipe.combos) || COMBOS_FILE });
 export const directorOptions = (recipes, recipe, n, o = recipeOptionsAt(recipe, n)) => (o.compilation ? compilationOptions(recipe.seed, n, o.compilation, recipes, howOf(o)) : o);
 
 // recipes: the usable style recipes; recipe: { seed, options, changes, steering, lead }; count: songs wanted
@@ -58,7 +63,7 @@ export function sessionItems(recipes, recipe, count, until = null, { grow = grow
   const out = L ? [{ song: leadOnAir(L, shapes || Object.fromEntries(all.map(r => [r.id, r]))), entry: le }] : [];
   for (let n = out.length; out.length < count && !(until && until(out)); n++) {
     // (the session's choices on the director's song, radio-arrangement D10: the base the listener's commands steer)
-    const g = biasSong(recipe, n, ses.next(withMine(directorOptions(recipes, recipe, n), recipe))), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
+    const g = biasSong(recipe, n, ses.next(withCombos(withMine(directorOptions(recipes, recipe, n), recipe), recipe))), cmds = (recipe.steering || []).filter(c => c.song === n).map(({ song: _, ...c }) => c);
     // the transition into this song: planned on the entry before it (the lead's for the first song after it)
     const before = out.length ? out[out.length - 1].entry : null;
     const custom = recipeOptionsAt(recipe, n).custom;

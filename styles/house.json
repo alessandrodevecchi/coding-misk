@@ -43,11 +43,16 @@
   "drums": {
     "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
-      "RolandTR909"
+      "RolandTR909",
+      "RolandTR808",
+      "RolandTR707",
+      "KorgM1"
     ],
     "grooves": [
       "techno",
-      "pulse"
+      "pulse",
+      "housePickup",
+      "houseRolling"
     ],
     "settings": {
       "drive": [
@@ -65,7 +70,8 @@
     ],
     "waves": [
       "square",
-      "sawtooth"
+      "sawtooth",
+      "gm_synth_bass_1"
     ],
     "settings": {
       "cutoff": [
@@ -88,7 +94,9 @@
     "waves": [
       "gm_drawbar_organ",
       "supersaw",
-      "gm_epiano1"
+      "gm_epiano1",
+      "gm_piano",
+      "gm_percussive_organ"
     ],
     "weight": 0.9,
     "settings": {
@@ -181,7 +189,8 @@
     ]
   },
   "growthShapes": {
-    "openings": { "broken": 2, "muted-base": 2, "slow": 1 },
+    "openings": { "full-kick": 2, "filtered": 1, "slow": 2, "broken": 1, "chord": 2, "bass": 1, "top": 1, "muted-base": 1 },
+    "kicks": { "four": 2, "one": 1, "two": 1, "push": 1 },
     "paces": { "medium": 2, "fast": 1 }
   },
   "spoken": {

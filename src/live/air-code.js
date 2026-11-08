@@ -93,7 +93,7 @@ export function airCode(W, songs, { lang = () => 'en', files = () => ({}), cols 
   const classic = resolveProfile('classic');
   const ownVoice = C => (C ? { ...(C.narrator === false ? { narrator: false } : {}), ...(C.narratorStyle && C.narratorStyle !== 'auto' ? { narratorStyle: C.narratorStyle } : {}) } : {});
   const k0 = Math.max(0, songs.findIndex(s => s.show === 'air')), A = songs[k0];
-  const LA = liveCode(windowPart(W, songs, k0, { grown: true }), A.ctl, { lang, files, cols, widgets });
+  const partA = windowPart(W, songs, k0, { grown: true }), LA = liveCode(partA, A.ctl, { lang, files, cols, widgets });
   const others = songs.map((s, k) => ({ ...s, k })).filter(s => s.k !== k0).map(s => ({ ...s, tag: `n${s.n}_`, L: liveCode(windowPart(W, songs, s.k), Object.keys(ownVoice(s.ctl)).length ? resolveProfile('classic', ownVoice(s.ctl)) : classic, { lang, files }) }));
   const codeOf = (p, bar, keep) => apart(p.L.run ? p.L.run(p.L.codeAt(bar, keep)) : p.L.codeAt(bar, keep), p.tag);
   let lastBar = 0;
@@ -127,5 +127,8 @@ export function airCode(W, songs, { lang = () => 'en', files = () => ({}), cols 
     paste = bar => P(bar - A.start);
   }
   // prepare(): the song on air's written plan made a little at a time before the window goes on air (#82)
-  return { build, codeAt, run, standalone, buses: LA.buses, fns: LA.fns, paste, ctl: A.ctl, now: LA.now, inPlace: LA.inPlace, onAir: A, hidden: () => others.filter(p => p.show === 'hidden').map(p => p.n), prepare: (slice, alive) => (LA.prepare ? LA.prepare(slice, alive) : Promise.resolve()) };
+  // planWork(): what the plan is made from away from the page ({ build, ctl } for liveCode(build, ctl).plan()), or null
+  // when it is made already or there is none; setPlan(plan, lang): that plan put in place (#82)
+  const planWork = () => (LA.planReady() ? null : { build: partA, ctl: A.ctl });
+  return { build, codeAt, run, standalone, buses: LA.buses, fns: LA.fns, paste, ctl: A.ctl, now: LA.now, inPlace: LA.inPlace, onAir: A, hidden: () => others.filter(p => p.show === 'hidden').map(p => p.n), prepare: (slice, alive) => (LA.prepare ? LA.prepare(slice, alive) : Promise.resolve()), planWork, setPlan: (plan, k) => LA.setPlan(plan, k) };
 }

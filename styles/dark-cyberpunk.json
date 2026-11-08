@@ -45,12 +45,15 @@
     "kits": [
       "OberheimDMX",
       "LinnDrum",
-      "RolandTR909"
+      "RolandTR909",
+      "RolandTR808",
+      "RolandTR626"
     ],
     "grooves": [
       "synthwave",
       "techno",
-      "halftime"
+      "halftime",
+      "technoBroken"
     ],
     "settings": {
       "drive": [
@@ -109,7 +112,8 @@
     "waves": [
       "sawtooth",
       "square",
-      "gm_lead_2_sawtooth"
+      "gm_lead_2_sawtooth",
+      "gm_lead_7_fifths"
     ],
     "modes": [
       "phrygian",
@@ -126,7 +130,8 @@
     ],
     "waves": [
       "supersaw",
-      "gm_synth_brass_1"
+      "gm_synth_brass_1",
+      "gm_pad_metallic"
     ],
     "weight": 0.7
   },
@@ -222,5 +227,9 @@
       "Neón",
       "Sombra"
     ]
+  },
+  "growthShapes": {
+    "openings": { "pad": 2, "bass": 2, "melodic": 1, "broken": 1, "filtered": 1, "full-kick": 1, "typed": 1 },
+    "kicks": { "two": 2, "one": 1, "push": 1 }
   }
 }

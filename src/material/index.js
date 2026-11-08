@@ -17,7 +17,7 @@ import { melody, MELODY_RULES } from './melody.js';
 import { bassline, BASS_RULES, sharedRoots } from './bass.js';
 import { arpeggio, ARP_RULES } from './arp.js';
 import { chords, CHORD_RULES, modeProgression } from './chords.js';
-import { groove, FAMILIES } from './drums.js';
+import { groove, FAMILIES, KICK_VARIANTS, kickRow, kickVariants } from './drums.js';
 import { sound, SOUND_KINDS, SOUND_KIND_ALIASES, soundKind, FM_RANGES, fmInRange } from './sound.js';
 import { varyPreset, VARY_TYPES, presetOf } from './vary.js';
 
@@ -29,7 +29,7 @@ export const MATERIAL_TYPES = Object.keys(KIND_OF_TYPE);
 export const SOURCES = ['preset', 'generated', 'mix'];
 export const SESSION_SOURCES = ['patterns', 'varied', 'composed', 'mix'];
 export const RULES = { melody: MELODY_RULES, bass: BASS_RULES, arp: ARP_RULES, chords: CHORD_RULES };
-export { FAMILIES, SOUND_KINDS, SOUND_KIND_ALIASES, soundKind, FM_RANGES, fmInRange, sharedRoots, modeProgression, VARY_TYPES, presetOf };
+export { FAMILIES, KICK_VARIANTS, kickRow, kickVariants, SOUND_KINDS, SOUND_KIND_ALIASES, soundKind, FM_RANGES, fmInRange, sharedRoots, modeProgression, VARY_TYPES, presetOf };
 
 // the random stream of a kind for a seed: a melody never changes the drums of the same seed
 export const materialStream = (seed, kind) => stream(String(seed), `material:${kind}`);
@@ -47,7 +47,7 @@ export function compose(kind, opts = {}) {
     if (!v) return null;
     return { idea: v.idea, why: v.why, stats: {} };
   }
-  const o = { style: style || {}, harmony: harmony || {}, meter, energy: e, N, type, shape: shapeOf(opts.shape), ...(typeof opts.riff === 'boolean' ? { riff: opts.riff } : {}) };
+  const o = { style: style || {}, harmony: harmony || {}, meter, energy: e, N, type, shape: shapeOf(opts.shape), ...(typeof opts.riff === 'boolean' ? { riff: opts.riff } : {}), ...(Array.isArray(opts.avoidKicks) ? { avoidKicks: opts.avoidKicks } : {}) };
   if (kind === 'melody') return melody(r, o);
   if (kind === 'bass') return bassline(r, o);
   if (kind === 'arp') return arpeggio(r, o);

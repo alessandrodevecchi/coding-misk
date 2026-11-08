@@ -3,7 +3,7 @@
 // it "custom", based on it. Pure: checked in Node.
 import { COMMENT_PRESETS, commentPreset } from '../song/comments.js';
 import { FUNCTION_PRESETS, functionPreset } from '../song/writer.js';
-import { OPENINGS, PACES, DEVELOPMENTS } from '../song/shapes.js';
+import { OPENINGS, LEAD_OPENINGS, PACES, DEVELOPMENTS } from '../song/shapes.js';
 
 export const CONTROLS = {
   build: ['blocks', 'crescendo'],
@@ -127,7 +127,9 @@ export function growthRules(C, { styles } = {}) {
   if (C.growth === 'gradual') return { natural: true };
   if (C.growth === 'follow') return { follow: true, coder: true };
   if (C.growth === 'natural') return { natural: true, coder: true, free: C.duration === 'free', shape: { opening: C.opening || 'auto', pace: C.pace || 'auto', development: C.development || 'auto' }, ...(styles ? { styles } : {}) };
-  return {};
+  // Crescendo (varied-openings D9): the Opening control's lead opening steers the first track (a Live-coder-only
+  // opening reads as Auto); the style recipes give the opening weights
+  return { ...(LEAD_OPENINGS.includes(C.opening) ? { lead: C.opening } : {}), ...(styles ? { styles } : {}) };
 }
 // overrides saved before live-coder-growth: "natural" was the growth now called gradual
 export const PROFILE_STORE_VERSION = 2;

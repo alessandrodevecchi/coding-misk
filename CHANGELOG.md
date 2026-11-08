@@ -7,6 +7,11 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Italian speaker Siri 4 (`siri4`), spoken with the macOS system voice; `npm run voices` makes its samples with `say` without `-v`.
+- Draw styles grid on each voice card of the Voices tab: switch the voice styles automatic draws may give a voice, with a mark on changed styles, the count of allowed styles and Reset to defaults.
+- Voice style choices kept in the browser and in the settings backup; an import merges them per voice.
+- Radio sessions record the allowed voice styles they started with, so Replay, saved sessions and exports keep them.
+- Guide card for the Draw styles grid.
 - `src/voices/combos.json`: the voice styles automatic draws may use per speaker and language; it ships with every pair allowed.
 - Voice style pickers mark a style that is not allowed for the current speaker; it stays selectable.
 - Voices tab test bench line that says whether the chosen speaker and style are allowed.
@@ -37,6 +42,16 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - `npm run check:speakers`: every speaker is installed and sounds different from the default voice.
 - `npm run voices -- --jobs N` makes several samples at a time.
 - `node tools/voice.mjs --prune` lists the sample banks of removed speakers; `--prune --yes` deletes them.
+- Growth openings `bass`, `chord` and `top`: the bass, a chord part or the beat without its kick first.
+- Kick starts: the first kick of a build can be one kick, two, four on the floor, a push, the off-beat or the first two kicks of the groove, weighted per style with `growthShapes.kicks`.
+- More drum machines and sounds in every style.
+- New kits in the kit menu: `RolandR8`, `KorgM1`, `RolandMC303`, `RolandTR505`, `RolandTR626`, `BossDR110`, `AlesisSR16`, `YamahaRY30`, `RolandCompurhythm78`, `MPC1000`.
+- `npm run probe:openings` reports how radio songs open, `-- --check` checks the targets.
+- `npm run check:kit-rows`: every style kit has the drum rows its grooves play.
+- Four-on-the-floor kick variants in the drum generator: straight, pickup, push, rolling and broken, drawn by energy.
+- Twelve built-in grooves: Techno pickup, Rolling kick (techno), Broken techno, Trance push, Trance pickup, House pickup, Rolling kick (house), Drift, Heartbeat, Phonk roll, Phonk half-time and Rock push.
+- Presets Strum (country guitar), Swell (ambient pad) and Two-feel (jazz bass).
+- Radio: a countdown badge next to Extend until it enters ("Extend +16 s · in 24 s").
 
 ### Changed
 
@@ -59,12 +74,31 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - The speakers are Albert, Fred, Junior and Kathy, in English only; in Italian Alice speaks their lines.
 - A removed speaker in a saved song, session or style plays with the default voice.
 - `npm run voices` leaves out a speaker that speaks like the default voice.
+- Crescendo draws its first track from the style's opening weights instead of always starting on the kick.
+- The Compose Opening control also steers the first track in Crescendo, with the lead openings only.
+- Every style has its own opening weights; the default weight of the slow opening is 1.
+- Radio: «+ kick» and «+ beat» compose the new rows first when the session composes on air, then use the style's built-in grooves, and avoid the rhythms the instrument already plays.
+- Every style with a kick lists at least two kick rhythms; acid, ambient, berlin-techno, classic-rock, country, dark-cyberpunk, gated-trance, house, industrial, phonk, progressive-house, pure-trance and trance list more grooves.
+- Acid lists more arp, hook and bass presets, country and darksynth more guitar patterns, ambient a new pad and jazz a new bassline.
+- Radio sessions made before director version 20 may sound different.
 
 ### Fixed
 
+- A track added with «+» on a grown radio song plays from its phrase, also when several instruments are added at once.
+- A line typed in the radio console with Say now is heard with its own new sample, and no later line of the same voice plays a neighbouring sample.
 - An unsaved change in the phrase editor of the Voices tab is no longer lost when the tab redraws in the background.
 - Saving a phrase edit in the Voices tab no longer closes the next phrase form when the voice helper is slow.
 - Radio: Keep on a style invented by the compilation saves it with one click while Now playing is redrawn.
+- Radio: a line typed in the console is no longer lost when its sample decodes late; it plays on a later bar.
+- Shorter main-thread pause on the bar where a live build step changes the code (Classic Say now included).
+- Radio: Now playing is redrawn only when what it shows changes; the position marks move in place.
+- Radio: Skip no longer freezes the page while the next song grows; it shows "Skipping…" until the next song is ready.
+- Radio: the change to the next song at the end of a song no longer freezes the page; the next song's window and its code plan are made before the change.
+- Radio: a riser pressed inside the growth of a Live coder or Crescendo song comes within two phrases, not near the song's end.
+- Radio: console commands steer Classic songs and make the code plan of the window away from the page; the window is not made again while the steering runs.
+- Radio: adding a saved pattern redraws only the saved patterns panel after the press.
+- The code typing updates the editor at most 30 times a second, and the code panel's scroll no longer forces a layout each frame.
+- Song cards are updated each frame only while the Songs tab is shown.
 
 ### Removed
 

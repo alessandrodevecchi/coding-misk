@@ -33,6 +33,25 @@ function codes(id, profile, over = {}) {
 }
 const print = list => createHash('sha256').update(list.join('\n\u0000\n')).digest('hex').slice(0, 16);
 const CHECKS = {
+  '#82: the written plan made elsewhere (the radio\'s plan worker) from a copy of the build gives the same code at every step'() {
+    let n = 0;
+    for (const [id, over] of [['kellerlicht', {}], ['crescendo-notte-lunga', {}], ['kellerlicht', { functions: 'mixer' }]]) {
+      const C = resolveProfile('switch', { ...(OPENED[id] || {}), ...over }), b = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
+      const make = () => liveCode(b, C, { lang: () => 'en', files: () => files, cols: () => 80 });
+      const A = make(), B = make();
+      if (A.planReady()) continue;
+      // (as the worker makes it and sends it back: a structured copy in, the edits as a list out)
+      const away = liveCode(structuredClone(b), structuredClone(C), { lang: () => 'en', files: () => files }).plan(), msg = structuredClone({ edits: [...away.edits], ahead: away.ahead });
+      B.setPlan({ edits: new Map(msg.edits), ahead: msg.ahead }, 'en');
+      assert(B.planReady(), `${id}: the plan set is not taken`);
+      const bars = [0, ...new Set(buildSteps(A.build).map(x => x.at))];
+      for (const bar of bars) assert(A.codeAt(bar) === B.codeAt(bar), `${id} ${JSON.stringify(over)}: bar ${bar} differs with the plan made elsewhere`);
+      B.setPlan({ edits: new Map(), ahead: [] }, 'en');
+      assert(B.codeAt(bars[bars.length - 1]) === A.codeAt(bars[bars.length - 1]), `${id}: a plan set again replaced the one in place`);
+      n++;
+    }
+    assert(n >= 2, `only ${n} songs with a written plan`);
+  },
   'Classic and Crescendo keep their code'() {
     const now = Object.fromEntries(SONGS.flatMap(id => ['classic', 'crescendo'].map(p => [`${id} ${p}`, print(codes(id, p))])));
     if (process.argv.includes('--write')) { fs.writeFileSync(FIXTURES, JSON.stringify(now, null, 2) + '\n'); return; }
@@ -91,8 +110,11 @@ const CHECKS = {
 // reused-lines: a Live coder growth as Compose grows it (the built-in styles), with the default controls, its code at the
 // steps (80 columns)
 const STYLES = Object.fromEntries(fs.readdirSync('styles').filter(f => f.endsWith('.json')).map(f => JSON.parse(fs.readFileSync(`styles/${f}`, 'utf8'))).map(r => [r.id, r]));
+// the Live coder openings these checks were written for (varied-openings: the songs draw other openings now; the
+// checks are about the code, so their songs keep the opening they had)
+const OPENED = { kellerlicht: { opening: 'broken' }, 'crescendo-notte-lunga': { opening: 'melodic' } };
 function live(id, over = {}) {
-  const C = resolveProfile('switch', over), b = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
+  const C = resolveProfile('switch', { ...(OPENED[id] || {}), ...over }), b = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
   const L = liveCode(b, C, { lang: () => 'en', cols: () => 80 }), bars = [0, ...new Set(buildSteps(L.build).map(x => x.at))].sort((x, y) => x - y);
   return { L, bars, at: bar => chainLines(L.codeAt(bar)), before: bar => bars.filter(x => x < bar).pop() };
 }
@@ -159,7 +181,7 @@ const CHECKS_REUSED = {
 const WCALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(\)/g;
 const calls = code => [...code.matchAll(WCALL)].map(m => m[1]);
 function widgetCodes(id, profile, over = {}, opts = {}) {
-  const s = song(id), C = resolveProfile(profile), S = { on: true, ...over };
+  const s = song(id), C = resolveProfile(profile, profile === 'switch' ? OPENED[id] || {} : {}), S = { on: true, ...over };
   const b = C.build === 'crescendo' ? crescendoSong(s, { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) }) : { ...s, build: s.build || deriveBuild(s) };
   const W = liveCode(b, C, { lang: () => 'en', cols: () => 80, widgets: () => S }), P = liveCode(b, C, { lang: () => 'en', cols: () => 80 });
   const bars = opts.bars || [0, ...new Set(buildSteps(W.build).map(x => x.at))].sort((x, y) => x - y);
@@ -277,7 +299,7 @@ const CHECKS_WIDGETS = {
     assert(C.typist === 'human', 'Live coder types as a person');
     let waiting = 0, made = 0;
     for (const id of ['kellerlicht', 'settimo-cielo', 'switch-prima-luce']) {
-      const g = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
+      const g = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(resolveProfile('switch', OPENED[id] || {}), { styles: STYLES }) });
       const W = liveCode(g, C, { cols: () => 80, widgets: () => ({ on: true, max: 8 }) }), P = liveCode(g, C, { cols: () => 80 }), X = liveCode(g, { ...C, typist: 'exact' }, { cols: () => 80, widgets: () => ({ on: true, max: 8 }) });
       const bars = [0, ...new Set(buildSteps(W.build).map(x => x.at))].sort((x, y) => x - y), starts = new Set(sectionStarts(W.build)), sb = barSeconds(W.build);
       for (let i = 1; i < bars.length; i++) {

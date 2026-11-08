@@ -6,18 +6,24 @@
 // the language: the default voice's bank, real-voices D2).
 // The app plays them on the bar of their step. Files are git-ignored (Apple voices): run this again to make them.
 // Voice instrument (voice-instrument): the lines of the songs' spoken tracks, the styles' spoken lines and the
-// vocabulary (one sample per entry) for the speakers that speak them, and the poetic narrator's images (the
-// vocabulary's poetic group, the songs' and styles' own) for the narrator speakers. The length of every sample goes to
+// vocabulary (one sample per entry) for the speakers that speak them. The narrator's built-in lines (the director's
+// pool, the interlude comments and the poetic images: the vocabulary's poetic group, the songs' and styles' own) for the
+// default voice and every speaker in SPEAKERS, because the director can draw any speaker for the narrator of any style
+// (radio-narrator-speakers D1; combos.json does not narrow it, D2). The length of every sample goes to
 // public/samples/say_lengths.json, so lines are placed from the length of the sample in use.
-//   node tools/voice.mjs [--en Samantha] [--it Alice] [--force] [--default-only] [--song file.json …] [--list] [--jobs 4]
+//   node tools/voice.mjs [--en Samantha] [--it Alice] [--force] [--default-only] [--song file.json …] [--list]
+//                        [--list-narrator] [--jobs 4]
 //                        [--root public/samples]
 //   node tools/voice.mjs --prune [--yes] [--root public/samples]
 // --song: also a song exported from the browser (its spoken lines and steps); --list: print the samples it would
-// make, make none; --jobs N: make up to N samples at a time (default 4, at most the number of cores; real-voices D6).
+// make, make none; --list-narrator: print only the speakers' samples of narrator lines that no other line needs (what
+// check:samples --strict does not count, radio-narrator-speakers); --jobs N: make up to N samples at a time (default 4, at most the number of cores; real-voices D6).
 // A speaker that speaks like the default voice is not installed (real-voices D5): its lines are left out with a warning,
 // and a speaker sample that came out as a copy of the default voice's is deleted.
 // --prune: list the banks of removed speakers and of languages a speaker does not speak, with their size; --prune
 // --yes: delete exactly those banks (real-voices D7). Nothing else deletes banks.
+// A speaker in SYSTEM_SPEAKERS (tools/voice-sample.mjs, siri4: #82) speaks with the macOS system voice (`say` without
+// -v), for the voices `say -v` cannot name: set that voice as the system voice before running this, and keep it.
 // Needs macOS (`say`) and ffmpeg; the per-line part is tools/voice-sample.mjs (voice-full-controls).
 import fs from 'node:fs';
 import os from 'node:os';
@@ -28,14 +34,14 @@ import { CRESCENDO_PHRASES } from '../src/song/crescendo.js';
 import { loadStyles } from './styles-dir.mjs';
 import { allPhrases } from '../src/endless/phrases.js';
 import { INTERLUDE_SAY } from '../src/endless/transitions.js';
-import { SPEAKERS } from '../src/song/build.js';
+import { SPEAKERS, SPEAKER_LANGS } from '../src/song/build.js';
 import { lineOf, lineTexts, speakerOf, setSpokenContext } from '../src/song/spoken.js';
 import { vocabularyTexts, poeticTexts } from '../src/song/vocabulary.js';
 
-import { systemVoice, realVoice, makeSampleAsync, writeLengths, readTemp, writeTemp } from './voice-sample.mjs';
+import { systemVoice, realVoice, makeSampleAsync, writeLengths, readTemp, writeTemp, SYSTEM_SPEAKERS } from './voice-sample.mjs';
 
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
-const DEFAULT_VOICE = { en: opt('en', 'Samantha'), it: opt('it', 'Alice') }, force = args.includes('--force'), listOnly = args.includes('--list');
+const DEFAULT_VOICE = { en: opt('en', 'Samantha'), it: opt('it', 'Alice') }, force = args.includes('--force'), listOnly = args.includes('--list') || args.includes('--list-narrator'), narratorOnly = args.includes('--list-narrator');
 const ROOT = opt('root', path.join('public', 'samples'));
 const JOBS = Math.max(1, Math.min(os.cpus().length || 1, parseInt(opt('jobs', '4'), 10) || 4));
 
@@ -44,7 +50,7 @@ if (args.includes('--prune')) {
   const yes = args.includes('--yes'), banks = [];
   const dirSize = d => fs.readdirSync(d).reduce((a, f) => { const st = fs.statSync(path.join(d, f)); return { n: a.n + (st.isFile() ? 1 : 0), b: a.b + (st.isFile() ? st.size : 0) }; }, { n: 0, b: 0 });
   for (const d of fs.existsSync(ROOT) ? fs.readdirSync(ROOT).sort() : []) {
-    const m = /^say_([a-z]{2})_([a-z]+)$/.exec(d);
+    const m = /^say_([a-z]{2})_([a-z0-9]+)$/.exec(d);
     if (!m || speaks(m[1], m[2]) || !fs.statSync(path.join(ROOT, d)).isDirectory()) continue;
     banks.push({ bank: d, ...dirSize(path.join(ROOT, d)) });
   }
@@ -64,7 +70,9 @@ if (args.includes('--prune')) {
 const extraSongs = args.flatMap((a, i) => (a === '--song' && args[i + 1] ? [args[i + 1]] : []));
 // phrases per language and speaker: "en|rocko" → Set
 const phrases = new Map();
-const addSay = (say, speaker = '') => {
+// "lang|speaker|text" of the lines added by anything but the narrator (--list-narrator leaves them out)
+const notNarrator = new Set();
+const addSay = (say, speaker = '', narrator = false) => {
   if (!say) return;
   for (const lang of ['en', 'it']) {
     const text = typeof say === 'string' ? say : say[lang];
@@ -73,6 +81,7 @@ const addSay = (say, speaker = '') => {
     const key = `${lang}|${speaks(lang, speaker) ? speaker : ''}`;
     if (!phrases.has(key)) phrases.set(key, new Set());
     phrases.get(key).add(text);
+    if (!narrator) notNarrator.add(`${key}|${text}`);
   }
 };
 const allSongFiles = [...songFiles('songs'), ...extraSongs];
@@ -84,9 +93,11 @@ Object.values(PHRASES).forEach(s => addSay(s));
 // Crescendo builds (#64) pick their comments from their own list, spoken by the voice track of any song
 const songSpeakers = new Set(['', ...allSongFiles.flatMap(f => (JSON.parse(fs.readFileSync(f, 'utf8')).tracks || []).filter(t => t.type === 'voice').map(t => (t.settings && t.settings.speaker) || ''))]);
 for (const sp of songSpeakers) CRESCENDO_PHRASES.forEach(s => addSay(s, sp));
-// the director's pool, for the default voice and every speaker a style recipe names
-const speakers = new Set(['', ...loadStyles().map(r => (r.voice && r.voice.speaker) || '')]);
-for (const sp of speakers) [...allPhrases(), ...INTERLUDE_SAY.map(([en, it]) => ({ en, it }))].forEach(p => addSay(p, sp));
+// the director's pool and the interlude comments, for the default voice and every speaker (radio-narrator-speakers D1:
+// the director draws the narrator's speaker from a style's voice.speakers, and from all speakers by chance or by the
+// combos redraw)
+const narratorSpeakers = ['', ...SPEAKERS];
+for (const sp of narratorSpeakers) [...allPhrases(), ...INTERLUDE_SAY.map(([en, it]) => ({ en, it }))].forEach(p => addSay(p, sp, true));
 
 // voice instrument: each line of a song's spoken tracks with the track's speaker (its own, or the one drawn for it)
 const recipes = loadStyles();
@@ -109,12 +120,14 @@ for (const r of recipes.filter(x => x.spoken)) {
   for (const sp of list) Object.values(r.spoken.lines || {}).flat().forEach(p => addSay(p, sp));
 }
 for (const sp of spokenSpeakers) vocabularyTexts().forEach(p => addSay(p, sp));
-// the poetic narrator: its images for every narrator speaker (the songs' voice tracks, the styles', the default)
-const narrators = new Set([...songSpeakers, ...speakers]);
+// the poetic narrator: its images for every narrator speaker (D1)
 const poetic = [...poeticTexts(), ...songsAll.flatMap(s => (s.narrator && typeof s.narrator === 'object' && s.narrator.lines ? Object.values(s.narrator.lines).flat() : [])),
   ...recipes.flatMap(r => (r.narrator && typeof r.narrator === 'object' && r.narrator.lines ? Object.values(r.narrator.lines).flat() : []))];
-for (const sp of narrators) poetic.forEach(p => addSay(p, sp));
+for (const sp of narratorSpeakers) poetic.forEach(p => addSay(p, sp, true));
 
+// a speaker of the system voice (SYSTEM_SPEAKERS, #82): every text of the default voice of its languages too, so a voice
+// track or a live build that names it never falls back; its samples are made in one run, while the system voice is set
+for (const sp of SYSTEM_SPEAKERS) for (const lang of SPEAKER_LANGS[sp] || []) for (const text of phrases.get(`${lang}|`) || []) addSay({ [lang]: text }, sp, !notNarrator.has(`${lang}||${text}`));
 // --default-only: every text with the default voice only; the app falls back to it for any speaker
 if (args.includes('--default-only')) for (const [key, set] of [...phrases]) {
   const [lang, speaker] = key.split('|');
@@ -128,7 +141,10 @@ const missing = new Set(), copies = [], todo = [];
 for (const [key, set] of [...phrases].sort((a, b) => a[0].localeCompare(b[0]))) {
   const [lang, speaker] = key.split('|');
   if (!systemVoice(lang, speaker, DEFAULT_VOICE)) { missing.add(`${speaker} (${lang})`); continue; }
-  if (listOnly) { for (const text of set) console.log(path.join(sayBank(lang, speaker), `${saySlug(text)}.wav`)); continue; }
+  if (listOnly) {
+    for (const text of set) if (!narratorOnly || (speaker && !notNarrator.has(`${key}|${text}`))) console.log(path.join(sayBank(lang, speaker), `${saySlug(text)}.wav`));
+    continue;
+  }
   // (the probe of D5, once per speaker and language, before the pool starts)
   if (speaker && !realVoice(lang, speaker, DEFAULT_VOICE)) { missing.add(`${speaker} (${lang}: it speaks like the default voice)`); continue; }
   for (const text of set) todo.push({ text, lang, speaker });

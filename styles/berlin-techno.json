@@ -44,12 +44,17 @@
     "material": { "source": "mix", "share": 0.3, "families": ["four-floor"] },
     "kits": [
       "RolandTR909",
-      "OberheimDMX"
+      "OberheimDMX",
+      "RolandTR808",
+      "RolandTR606"
     ],
     "grooves": [
       "techno",
       "hard",
-      "rolling"
+      "rolling",
+      "technoPickup",
+      "technoRolling",
+      "technoBroken"
     ],
     "settings": {
       "drive": [
@@ -68,7 +73,8 @@
     ],
     "waves": [
       "sawtooth",
-      "square"
+      "square",
+      "gm_synth_bass_2"
     ],
     "settings": {
       "cutoff": [
@@ -138,7 +144,8 @@
     ],
     "waves": [
       "supersaw",
-      "gm_synth_strings_1"
+      "gm_synth_strings_1",
+      "gm_pad_metallic"
     ],
     "weight": 0.5,
     "settings": {
@@ -235,5 +242,9 @@
     "weight": 0.1,
     "ways": { "refrain": 1, "chop": 1 },
     "vocab": "machine"
+  },
+  "growthShapes": {
+    "openings": { "full-kick": 1, "filtered": 2, "slow": 2, "broken": 1, "top": 1, "bass": 1, "typed": 1 },
+    "kicks": { "four": 1, "one": 1, "off": 1, "two": 1 }
   }
 }

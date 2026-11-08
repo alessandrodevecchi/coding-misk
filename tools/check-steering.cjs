@@ -15,6 +15,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failed = 0;
 // wait for a condition, not a fixed pause: polls fn until it returns something truthy or ms pass (the page can be
 // slow under load); returns the last value
+// (#82: a console command is steered away from the page, Classic songs too: the song, its plan and the queue's names
+// change when the answer comes. The reads below wait for it, at most 5 s)
+let settled = async () => {};
+let queueText = async () => '';
 const until = async (fn, ms = 8000, step = 50) => { const t = Date.now(); for (;;) { let v = null; try { v = await fn(); } catch (e) {} if (v || Date.now() - t > ms) return v; await sleep(step); } };
 // "+" and "−" of an instrument are prepared ahead and enter on a phrase start (console-add-ahead): wait until no batch
 // is pending
@@ -35,7 +39,9 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
   await page.fill('#radio-seed', 'steer-check');
   await page.click('#radio-start'); await sleep(2500);
-  const ST = () => page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return s && { n: s.n, commands: s.commands, plan: s.plan, recipe: s.recipe, build: s.song.build.filter(x => x.by).map(x => ({ at: x.at, add: x.add, remove: x.remove, set: x.set, pattern: x.pattern })), patterns: Object.fromEntries(s.song.tracks.map(t => [t.id, t.patterns])) }; });
+  queueText = async () => { await settled(); return page.innerText('#radio-steer .steer-queue'); };
+  settled = () => until(() => page.evaluate(() => { const r = globalThis.codingMiskRadio.state; return !r || !r.stream[r.onAir].growing; }), 5000).then(() => sleep(60));
+  const ST = () => settled().then(() => page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return s && { n: s.n, commands: s.commands, plan: s.plan, recipe: s.recipe, build: s.song.build.filter(x => x.by).map(x => ({ at: x.at, add: x.add, remove: x.remove, set: x.set, pattern: x.pattern })), patterns: Object.fromEntries(s.song.tracks.map(t => [t.id, t.patterns])) }; }));
   const now = () => page.evaluate(() => { const r = globalThis.codingMiskRadio.state, it = r.stream[r.onAir]; return document.querySelector('strudel-editor').editor.repl.scheduler.now() - it.start; });
   const err = () => page.evaluate(() => String(document.querySelector('strudel-editor').editor.repl.state.evalError || ''));
 
@@ -122,7 +128,10 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   async function seedMany(n, lang = 'en') {
     await page.evaluate(async ({ n, lang }) => {
       const { builtinPatterns } = await import('/src/library/patterns.js');
-      const all = builtinPatterns(), word = ['notturno', 'scuro', 'teso', 'lento', 'rotto', 'acido', 'pieno', 'vuoto', 'storto'];
+      // (the catalogue as it was before kick-variety: its new grooves and presets would move the seeded lists, and
+      // with them the counts this check reads)
+      const later = new Set(['technoPickup', 'technoRolling', 'technoBroken', 'trancePush', 'trancePickup', 'housePickup', 'houseRolling', 'drift', 'heartbeat', 'phonkRoll', 'phonkHalf', 'rockPush'].map(id => `grooves/${id}`).concat(['riffs/twoFeel', 'riffs/strum', 'chords/swell']));
+      const all = builtinPatterns().filter(b => !later.has(b.key)), word =['notturno', 'scuro', 'teso', 'lento', 'rotto', 'acido', 'pieno', 'vuoto', 'storto'];
       const head = { hook: 'Melodia', bass: 'Basso', arp: 'Arpeggio', pad: 'Pad', drums: 'Groove', guitar: 'Riff' };
       const list = Array.from({ length: n }, (_, i) => { const b = all[(i * 7) % all.length]; return { id: `p-m${i}`, name: `${head[b.type] || b.type} ${word[i % 9]} ${i + 1}`, kind: b.kind, type: b.type, pattern: JSON.parse(JSON.stringify(b.pattern)), sound: null, settings: {}, context: { key: ['A', 'C#', 'F#', 'D'][i % 4], chords: 'notturna', meter: i % 12 === 5 ? '7/8' : (b.defaults.meter || '4/4'), bpm: [70, 90, 110, 124, 128, 140][i % 6], mode: 'minor' }, styles: i % 3 === 0 ? ['berlin-techno'] : i % 3 === 1 ? [] : ['jazz'], source: 'compose', created: `2026-10-${String(1 + (i % 28)).padStart(2, '0')}` }; });
       localStorage.setItem('coding-misk-patterns', JSON.stringify(list)); localStorage.setItem('coding-misk-lang', lang);
@@ -310,7 +319,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(sawYou, 'the code marks the change with "you:"');
   for (let k = 0; k < 40 && (await now()) < cmd.at + 0.3; k++) await sleep(150);
   await sleep(400);
-  check((await page.$$('#radio-steer .steer-queue [data-cancel]')).length === 0, 'applied commands leave the queue', `${await page.innerText('#radio-steer .steer-queue')} now ${(await now()).toFixed(1)}`);
+  check((await page.$$('#radio-steer .steer-queue [data-cancel]')).length === 0, 'applied commands leave the queue', `${await queueText()} now ${(await now()).toFixed(1)}`);
 
   // the curve: drag the last handle down
   // (the curve itself in view: the card is as tall as the controls column, taller than the window with the Voices group)
@@ -361,7 +370,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     await page.click('#radio-now [data-curve-reset="density"]'); await sleep(300);
     st = await ST();
     check(st.commands.some(x => x.kind === 'curve-reset' && x.curve === 'density') && st.plan.curves.every(x => x.density === undefined), 'reset makes the lane automatic again');
-    check(/density|densità/i.test(await page.innerText('#radio-steer .steer-queue')), 'curve commands in the queue');
+    check(/density|densità/i.test(await queueText()), 'curve commands in the queue');
   } else check(false, 'density handles shown');
   // phone width: the lanes fit the card
   if (await page.evaluate(() => !!globalThis.codingMiskRadio.on)) {
@@ -445,14 +454,14 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       await until(async () => (await ST()).commands.some(c => c.kind === 'vary'));
       await page.click('#radio-steer [data-cmd="vary"]');
       // the queue read as soon as it names the part (the command leaves it at its boundary)
-      const qv = await until(async () => { const t = await page.innerText('#radio-steer .steer-queue'); return /(Vary|Varia) \S+/.test(t) ? t : null; });
+      const qv = await until(async () => { const t = await queueText(); return /(Vary|Varia) \S+/.test(t) ? t : null; });
       await sleep(300);
       let x = await ST();
       const vs = x.commands.filter(c => c.kind === 'vary');
       check(vs.length === 1 && vs[0].type === on.p && x.commands.length === n0 + 1, 'two Vary of the same part for the same boundary count as one', JSON.stringify(vs));
       const v = vs[0];
       check(x.build.some(s => s.at === v.at && s.pattern && /^V\d+$/.test(s.pattern.to)), 'Vary writes a listener\'s pattern step', JSON.stringify(x.build.filter(s => s.pattern)));
-      const q = qv || await page.innerText('#radio-steer .steer-queue');
+      const q = qv || await queueText();
       check(new RegExp(`(Vary|Varia) \\S+`).test(q), 'the queue says "Vary <part>"', q.replace(/\n/g, ' | '));
       await page.click(`#radio-steer [data-cancel="${v.id}"]`);
       x = await until(async () => { const y = await ST(); return y.commands.some(c => c.kind === 'vary') ? null : y; }) || await ST();
@@ -569,7 +578,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       { const x = before.build.filter(k => k.at < c.at), y = a.song.build.filter(k => k.at < c.at), i = x.findIndex((k, j) => JSON.stringify(k) !== JSON.stringify(y[j]));
         check(pastOf(a.song, c.at) === pastOf(before, c.at), 'the steps before the boundary stay', i < 0 ? `${x.length} / ${y.length}` : `${JSON.stringify(x[i])} / ${JSON.stringify(y[i])}`); }
       check(mineOf(a.song, 0).every(x => x.at >= c.at && x.at < wp.to), 'the moves are the listener\'s, between the boundary and the arrival', JSON.stringify(mineOf(a.song, 0).map(x => x.at)));
-      check((await page.innerText('#radio-steer .steer-queue')).includes(String(c.at + 1)), 'the queue shows the boundary the typing needs', await page.innerText('#radio-steer .steer-queue'));
+      check((await queueText()).includes(String(c.at + 1)), 'the queue shows the boundary the typing needs', await queueText());
       if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'air-queue.png') });
       // Vary: the new part reached by notes edits of the line
       await seekTo(wp.to + 1);
@@ -591,8 +600,12 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'air-end.png') });
       // mute and volume on the next bars: typed in the code
       const at = Math.floor(await now()) + 2;
-      const on = a.song.tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken' && !t.mute && t.clips.some(k => k.start <= at && at < k.start + k.bars));
-      const t1 = (on.find(t => t.type !== 'drums') || on[0] || {}).id, t2 = (on.find(t => t.id !== t1) || {}).id;
+      // (tracks End keeps: a line End takes out may be gone by the time the command lands, and the growth decides which)
+      const outByEnd = new Set(a.song.build.filter(x => x.by === 'listener' && ec && x.at >= ec.at).flatMap(x => [x.remove, x.mute]).filter(x => x !== undefined));
+      const on0 = a.song.tracks.filter(t => t.type !== 'voice' && t.type !== 'spoken' && !t.mute && t.clips.some(k => k.start <= at && at < k.start + k.bars));
+      // (the volume goes to a kept line: on a line End takes out it has no arrival to turn toward; the mute to another)
+      const kept = on0.filter(t => !outByEnd.has(t.id)), on = kept.length ? kept : on0;
+      const t1 = (on.find(t => t.type !== 'drums') || on[0] || {}).id, t2 = (kept.find(t => t.id !== t1) || on0.find(t => t.id !== t1) || {}).id;
       const nameOf = id => { const t = a.song.tracks.find(x => x.id === id); return (t && (t.name || t.id)) || id; };
       // the lines of a track's block in the code shown (its header holds its name)
       const block = (cd, id) => { const ls = cd.split('\n'), i = ls.findIndex(l => l.startsWith('// ==========') && l.includes(` ${nameOf(id)} `)); if (i < 0) return []; const j = ls.findIndex((l, k) => k > i && l.startsWith('// ==========')); return ls.slice(i + 1, j < 0 ? undefined : j); };
@@ -601,7 +614,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       await sleep(300);
       a = await settled();
       const m = t2 && a.song.build.find(x => x.by === 'listener' && x.mute === t2), v = t1 && a.song.build.find(x => x.by === 'listener' && x.set && x.set.track === t1 && x.set.gain === 0.3);
-      check(!!m && !!v, 'mute and volume on a grown song: steps on the lines', JSON.stringify(mineOf(a.song, 0).slice(-5)));
+      check(!!m && !!v, 'mute and volume on a grown song: steps on the lines', `volume ${t1}, mute ${t2}: ${JSON.stringify(mineOf(a.song, 0).slice(-5))}`);
       if (v) { await seekTo(v.at - 1); check(await waitCode(v.at, cd => block(cd, t1).some(l => l.includes('.gain(0.3)'))), 'the volume shows as .gain(0.3) on the line', block(await code(), t1).join(' | ').slice(0, 200)); }
       if (m) { await seekTo(m.at - 1); check(await waitCode(m.at, cd => block(cd, t2).some(l => /^_\$:/.test(l))), 'the muted line shows "_$:"', block(await code(), t2).join(' | ').slice(0, 200)); }
       check(!(await err()), 'no evaluation error after the mixer commands', (await err()).slice(0, 120));
@@ -620,13 +633,13 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   // (a fresh session in berlin-techno; the plan and the song from the page's own modules)
   await page.click('#radio-start'); await sleep(300); await page.fill('#radio-seed', 'steer-arr'); await page.click('#radio-start'); await sleep(2500);
   {
-    const A = () => page.evaluate(async () => {
+    const A = async () => { await settled(); return page.evaluate(async () => {
       const R = globalThis.codingMiskRadio, s = R.steering, { stateAt } = await import('/src/song/build.js'), S = await import('/src/endless/steering.js');
       const st = R.state, it = st.stream[st.onAir], rel = document.querySelector('strudel-editor').editor.repl.scheduler.now() - it.start;
       const at = Math.min(s.plan.bars - 1, S.applyBar('more', rel, s.plan));
       const on = b => stateAt(s.song, b).song.tracks.filter(t => !t.mute && !['voice', 'spoken'].includes(t.type)).map(t => t.id);
       return { s, at, rel, on: on(at), commands: s.commands };
-    });
+    }); };
     const onAt = (b) => page.evaluate(async b => { const { stateAt } = await import('/src/song/build.js'), s = globalThis.codingMiskRadio.steering; return stateAt(s.song, b).song.tracks.filter(t => !t.mute && !['voice', 'spoken'].includes(t.type)).map(t => t.id); }, b);
     const shownParts = await page.$$eval('#radio-steer .arr-inst', xs => xs.map(x => x.dataset.arr));
     check(shownParts.length >= 5 && shownParts.every(p => ['kick', 'beat', 'bass', 'texture', 'arp', 'hook', 'guitar', 'pad'].includes(p)) && !shownParts.includes('guitar'), 'one − and + per instrument of the style, no guitar in berlin-techno', shownParts.join());
@@ -637,7 +650,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     const p0 = (await A()).on.filter(id => /^pad/.test(id)).length;
     await page.click('#radio-steer [data-cmd="more"][data-inst="pad"]'); await sleep(250);
     await page.click('#radio-steer [data-cmd="more"][data-inst="pad"]'); await sleep(300);
-    const qp = await page.innerText('#radio-steer .steer-queue');
+    const qp = await queueText();
     // (a kick in the same batch: two kicks from the same phrase; the queue's text kept as it changes)
     await page.click('#radio-steer [data-cmd="more"][data-inst="kick"]'); await sleep(100);
     await page.evaluate(() => { window.__q = []; new MutationObserver(() => { const q = document.querySelector('#radio-steer .steer-queue'); if (q) window.__q.push(q.innerText); }).observe(document.querySelector('#radio-steer'), { subtree: true, childList: true, characterData: true }); });
@@ -684,7 +697,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     // lock the pad: the mixer rows of the pads lock too; unlocking one row gives the half state
     // (each lock waits for its boundary, console-add-ahead D8: the queue row first, then the lock once it entered)
     await page.click('#radio-steer [data-lock-part="pad"]'); await sleep(300);
-    check(/pad: (locked|bloccato) · \d+ s/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "pad: locked" with the seconds left');
+    check(/pad: (locked|bloccato) · \d+ s/.test(await queueText()), 'the queue says "pad: locked" with the seconds left');
     await settle(); await sleep(600);
     a = await A();
     const padRows = await page.$$eval('#radio-steer [data-mix-lock]', xs => xs.filter(x => /^pad/.test(x.dataset.mixLock)).map(x => [x.dataset.mixLock, x.getAttribute('aria-pressed')]));
@@ -705,7 +718,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     a = await A();
     const r = a.s.plan.risers[0];
     check(r && r.bars === 4 && r.dir === 'up' && r.end === r.change && r.start === r.change - 4, 'a riser of 4 bars ends on the next part change', JSON.stringify(r));
-    check(/riser 4 (bars|battute), (up|sale)/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "riser 4 bars, up"');
+    check(/riser 4 (bars|battute), (up|sale)/.test(await queueText()), 'the queue says "riser 4 bars, up"');
     // the target of Vary and Swap (radio-arrangement phase 3): Auto and the pads by name; a named pad varies alone, the
     // queue names it; the target goes back to Auto when its track stops
     await page.click('#radio-steer [data-vary-part="pad"]'); await sleep(250);
@@ -718,12 +731,12 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     const vc = a.commands.filter(c => c.kind === 'vary').pop();
     const vsteps = a.s.song.build.filter(x => x.at === vc.at && x.by === 'listener' && x.pattern && /^V\d+$/.test(x.pattern.to)).map(x => x.pattern.track);
     check(vc.target === lastPad && vsteps.length === 1 && vsteps[0] === lastPad, 'a named target varies that track only', JSON.stringify({ vc, vsteps }));
-    check(new RegExp(`(Vary|Varia) pad \\(${opts3[opts3.length - 1][1]}\\)`).test(await page.innerText('#radio-steer .steer-queue')), 'the queue names the target', await page.innerText('#radio-steer .steer-queue'));
+    check(new RegExp(`(Vary|Varia) pad \\(${opts3[opts3.length - 1][1]}\\)`).test(await queueText()), 'the queue names the target', await queueText());
     await page.selectOption('#radio-steer [data-vary-target]', 'auto'); await sleep(200);
     await page.click('#radio-steer [data-cmd="swap"]').catch(() => {}); await sleep(400);
     a = await A();
     const sc = a.commands.filter(c => c.kind === 'swap').pop();
-    if (sc) check(sc.target === 'auto' && /(Swap|Scambia) pad \(/.test(await page.innerText('#radio-steer .steer-queue')), 'Auto swaps one pad and the queue says which', JSON.stringify(sc));
+    if (sc) check(sc.target === 'auto' && /(Swap|Scambia) pad \(/.test(await queueText()), 'Auto swaps one pad and the queue says which', JSON.stringify(sc));
     await page.selectOption('#radio-steer [data-vary-target]', lastPad); await sleep(200);
     await page.evaluate(p => globalThis.codingMiskRadio.command({ kind: 'less', part: 'pad' }), 'pad'); await sleep(400);
     const tg = await page.$eval('#radio-steer [data-vary-target]', x => x.value);
@@ -780,6 +793,17 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(/\(2\)/.test(head) && (await page.$$('#radio-steer .sp-list .sp-row')).length === 2 && /1 in another meter/.test(await page.innerText('#radio-steer .sp')), 'the panel lists the 2 patterns that fit, as rows, and counts the 7/8 one', `${head} | ${await page.innerText('#radio-steer .sp')}`);
     const painted = await page.$$eval('#radio-steer canvas[data-sp-pv]', cs => cs.map(c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; }));
     check(painted.length === 2 && painted.every(n => n > 20), 'each row has a preview drawing', JSON.stringify(painted));
+    // a row adds as a new track with its + (saved-list-add)
+    check((await page.$$('#radio-steer .sp-list .sp-row [data-sp-new]:not([disabled])')).length === 2, 'each row has an enabled + (Add as new track)');
+    // (the row + waits in the console's batch like a "+" since the batch entries of #82: a pending "+1" on the bass and
+    // its queue line first, the pattern recorded when it enters, within about three phrases)
+    const pressBar = await now();
+    await page.click('#radio-steer .sp-list [data-sp-new="p-bass"]'); await sleep(400);
+    const rowBadge = await page.evaluate(() => { const b = document.querySelector('#radio-steer .arr-inst[data-arr="bass"] .arr-pend-t'); return b ? b.textContent : ''; }), rowQueue = await page.innerText('#radio-steer .steer-queue');
+    check(/^\+1 · Enters in \d+ s$/.test(rowBadge) && /\+1 bass/.test(rowQueue), 'the row + queues the pattern in the batch: a pending "+1" on the bass and its queue line', `${rowBadge} | ${rowQueue}`);
+    for (let k = 0; k < 150 && (await page.evaluate(() => globalThis.codingMiskRadio.pendingAdds.length)); k++) await sleep(200);
+    const rowState = await ST(), rowCmd = rowState.commands.find(c => c.kind === 'pattern' && c.mode === 'new');
+    check(rowCmd && rowCmd.item.name === 'Basso mio' && rowCmd.at - pressBar <= 3 * rowState.plan.phrase && /\+ Basso mio \(/.test(await page.innerText('#radio-steer .steer-queue')), 'the row + enters within three phrases and the queue says "+ Basso mio (…)"', JSON.stringify({ press: pressBar, at: rowCmd && rowCmd.at, phrase: rowState.plan.phrase }));
     await page.click('#sp-view'); await sleep(300);
     check((await page.$$('#radio-steer .sp-card')).length === 2 && await page.isVisible('#radio-steer [data-sp-new="p-bass"]') && await page.isVisible('#radio-steer [data-sp-replace="p-bass"]'), 'open: cards with Add as new track and Replace');
     check(/feel different/.test(await page.innerText('#radio-steer .sp-cards')), 'a pattern saved at 60 BPM warns about the tempo');
@@ -822,13 +846,16 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check((await page.evaluate(() => globalThis.codingMiskRadioPreview.state && globalThis.codingMiskRadioPreview.state.riding)) && (await page.getAttribute('#radio-steer [data-sp-listen="p-bass"]', 'aria-pressed')) === 'false', 'another preview takes over');
     await page.click('#radio-steer [data-sp-listen="p-hook"]'); await sleep(500);
     check(!(await page.evaluate(() => globalThis.codingMiskRadioPreview.state)), 'a second press stops the preview');
-    // add as a new track: a bass track with the pattern; the queue names it
+    // add as a new track: a bass track with the pattern; the queue names it (it waits for its boundary with the "+" and
+    // "−" pressed for it, #82: a badge first, recorded when it enters)
     await page.click('#radio-steer [data-sp-new="p-bass"]'); await sleep(400);
+    check(/^\+1 · Enters in \d+ s$/.test(await page.evaluate(() => { const b = document.querySelector('#radio-steer .arr-inst[data-arr="bass"] .arr-pend-t'); return b ? b.textContent : ''; })), 'Add as new track: a pending "+1" on the bass until it enters');
+    for (let k = 0; k < 150 && (await page.evaluate(() => globalThis.codingMiskRadio.pendingAdds.length)); k++) await sleep(200);
     let x = await ST();
     const pc = x.commands.find(c => c.kind === 'pattern');
     const added = await page.evaluate(() => globalThis.codingMiskRadio.steering.plan.added.slice(-1)[0]);
     check(pc && pc.mode === 'new' && pc.item.name === 'Basso mio' && added && JSON.stringify(x.patterns[added.id].A) === JSON.stringify({ preset: 'rolling' }), 'Add as new track: a new bass with the saved bassline', JSON.stringify({ pc: pc && pc.mode, added }));
-    check(/\+ Basso mio \(/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "+ Basso mio (…)"', await page.innerText('#radio-steer .steer-queue'));
+    check(/\+ Basso mio \(/.test(await queueText()), 'the queue says "+ Basso mio (…)"', await queueText());
     // replace: the saved melody in place of a playing track of its type, when one plays
     const rep = await page.$('#radio-steer [data-sp-replace="p-hook"]:not([disabled])');
     if (rep) {
@@ -840,7 +867,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check(!(await err()), 'no evaluation error with saved patterns', (await err()).slice(0, 120));
     check(!(await page.$('#radio-steer .sp-tools')) && !(await page.$('#radio-steer .sp-group')) && !(await page.$('#radio-steer .sp-uses')), 'few saved patterns: no toolbar, no groups, no use line, as before (saved-patterns-list D3)');
     const uses = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-patterns')).map(p => `${p.id}:${p.uses || 0}`).join());
-    check(/p-bass:1/.test(uses) && /p-odd:0/.test(uses), 'Add as new track counts one use, the preview listen none (saved-patterns-list D5)', uses);
+    check(/p-bass:2/.test(uses) && /p-odd:0/.test(uses), 'Add as new track counts one use each (the row + and the card), the preview listen none (saved-patterns-list D5)', uses);
     if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'saved-en.png') });
     await page.evaluate(() => localStorage.removeItem('coding-misk-patterns'));
   }
@@ -860,7 +887,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       done = p; break;
     }
     const x = await ST(), vc = x.commands.find(c => c.kind === 'voicing');
-    const q = await page.innerText('#radio-steer .steer-queue');
+    const q = await queueText();
     check(!!done && vc && vc.treatment === 'auto' && x.build.some(b => b.at === vc.at && b.pattern && /^H\d+$/.test(b.pattern.to)) && /(Harmony|Armonia) \S+: (In thirds|Octave|Chord colour|Inversion)/.test(q), 'Part harmony Auto: an H pattern, the queue names the treatment', `${done} ${q.replace(/\n/g, ' | ')}`);
     // colour on a melody is off with its reason
     await page.click('#radio-steer [data-vary-part="lead"]'); await sleep(200);
@@ -874,11 +901,11 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     const n0 = (await ST()).commands.length;
     await page.selectOption('#radio-steer [data-harm-chords]', progs[progs.length - 1]); await sleep(250);
     const chBtn = await page.$('#radio-steer [data-cmd="progression"]:not([disabled])');
-    if (chBtn) { await page.click('#radio-steer [data-cmd="progression"]:not([disabled])'); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'progression' && c.chords === progs[progs.length - 1] && /(Change chords|Cambia accordi): /.test(await page.innerText('#radio-steer .steer-queue')), 'a chosen progression is recorded and named in the queue', JSON.stringify(c)); }
+    if (chBtn) { await page.click('#radio-steer [data-cmd="progression"]:not([disabled])'); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'progression' && c.chords === progs[progs.length - 1] && /(Change chords|Cambia accordi): /.test(await queueText()), 'a chosen progression is recorded and named in the queue', JSON.stringify(c)); }
     else check(/ · /.test(await page.getAttribute('#radio-steer [data-cmd="progression"]', 'title')), 'Change chords off with its reason (already playing those chords)');
     await page.selectOption('#radio-steer [data-harm-key]', 'up'); await sleep(250);
     const kb = await page.$('#radio-steer [data-cmd="key"]:not([disabled])');
-    if (kb) { await page.click('#radio-steer [data-cmd="key"]:not([disabled])'); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'key' && c.to === 'up' && /(a fifth up|una quinta sopra)/.test(await page.innerText('#radio-steer .steer-queue')), 'a key a fifth up from the menu', JSON.stringify(c)); }
+    if (kb) { await page.click('#radio-steer [data-cmd="key"]:not([disabled])'); await sleep(400); const c = (await ST()).commands.slice(-1)[0]; check(c.kind === 'key' && c.to === 'up' && /(a fifth up|una quinta sopra)/.test(await queueText()), 'a key a fifth up from the menu', JSON.stringify(c)); }
     check((await ST()).commands.length > n0 && !(await err()), 'no evaluation error with the harmony menu', (await err()).slice(0, 120));
     if (shots) await (await page.$('#radio-steer')).screenshot({ path: path.join(shots, 'harmony-en.png') });
   }
@@ -892,7 +919,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     let x = await ST();
     const c = x.commands.slice(-1)[0];
     check(c && c.kind === 'more' && c.scope === 'session' && (x.recipe.arrange || []).length === 1 && x.recipe.arrange[0].part === part, `"+ ${part}" for the session goes to the recipe`, JSON.stringify(x.recipe.arrange));
-    check(/for the session|per tutta la diretta/.test(await page.innerText('#radio-steer .steer-queue')), 'the queue says "for the session"');
+    check(/for the session|per tutta la diretta/.test(await queueText()), 'the queue says "for the session"');
     const tipV = await page.getAttribute('#radio-steer [data-cmd="vary"]', 'title');
     check(/this song only|solo per questo brano/.test(tipV), 'Vary says it is for this song only in session scope', tipV);
     await page.click(`#radio-steer [data-cancel="${c.id}"]`); await sleep(400);
@@ -951,7 +978,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
   await page.fill('#radio-seed', 'steer-voice'); await page.click('#radio-start'); await sleep(3000);
   {
-    const ST = () => page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return s && { n: s.n, commands: s.commands, recipe: s.recipe, song: { tracks: s.song.tracks, build: s.song.build } }; });
+    const ST = () => settled().then(() => page.evaluate(() => { const s = globalThis.codingMiskRadio.steering; return s && { n: s.n, commands: s.commands, recipe: s.recipe, song: { tracks: s.song.tracks, build: s.song.build } }; }));
     const vopts = () => page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio') || '{}').voice || {});
     check(await page.isVisible('#radio-steer .steer-voice [data-sv-apply]') && await page.isVisible('#radio-steer .steer-voice [data-sv-line]'), 'console Voice group: the narrator row, the voice track row with Apply, the line field');
     const v0 = JSON.stringify(await vopts());
@@ -973,7 +1000,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     // a typed line, Say now: queued on the next bar, written on the voice track, recorded
     await page.fill('#radio-steer [data-sv-line]', 'stay with me'); await page.click('#radio-steer [data-sv-say="now"]');
     // (a line on the next bar leaves the queue as soon as it sounds: the queue is read from the click on, often)
-    const q = await until(async () => { const t = await page.innerText('#radio-steer .steer-queue'); return /stay with me/.test(t) ? t : null; }, 3000, 20) || await page.innerText('#radio-steer .steer-queue');
+    const q = await until(async () => { const t = await queueText(); return /stay with me/.test(t) ? t : null; }, 3000, 20) || await queueText();
     await until(async () => (await ST()).commands.some(x => x.kind === 'say-live' && x.mode === 'now'));
     await sleep(300);
     st = await ST();

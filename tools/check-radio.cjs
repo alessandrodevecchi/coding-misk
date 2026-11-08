@@ -117,10 +117,14 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   {
     // (the narrator's lines only: orbit 15 and up, the voice track speaks on 13 and 14; read in the code evaluated, as the
     // narrator's code is hidden by default in the profiles that grow the song, voice-track-tuning)
-    const voiceBank = () => page.evaluate(() => (((globalThis.codingMiskEvaluated && globalThis.codingMiskEvaluated()) || document.querySelector('strudel-editor').editor.code).match(/s\("(say_[a-z_]+)"\)[^\n]*\.orbit\((?:1[5-9]|2\d)\)/) || [])[1] || '');
+    // (the code of the session just started only: until its first evaluation the page still holds the previous one's)
+    const evaluated = () => page.evaluate(() => (globalThis.codingMiskEvaluated && globalThis.codingMiskEvaluated()) || document.querySelector('strudel-editor').editor.code);
+    let stale = null;
+    const voiceBank = async () => { const code = await evaluated(); return code === stale ? '' : (code.match(/s\("(say_[a-z_]+)"\)[^\n]*\.orbit\((?:1[5-9]|2\d)\)/) || [])[1] || ''; };
     const banks = {};
     for (const style of ['industrial', 'country']) {
       await page.click('#radio-start'); await sleep(500);
+      stale = await evaluated();
       await pick([style]); await page.fill('#radio-seed', `voice-${style}`); await page.click('#radio-start');
       // (up to a minute: a voice-track line on bar 0 makes the narrator yield there, voice-track-tuning)
       for (let k = 0; k < 300 && !banks[style]; k++) { banks[style] = await voiceBank(); if (!banks[style]) await sleep(200); }
@@ -178,7 +182,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     if ((await R()).on) await page.click('#radio-start');
     await page.click('[data-song-length="medium"]'); await sleep(300);
     const o = (await R()).options, kept = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-radio')).length);
-    check(kept === 'medium' && o.length === 'medium' && o.lengthHeard === true && /next songs/.test(await page.innerText('#radio-length-line')), 'Durata Media: kept, sent to the director, its line', JSON.stringify({ kept, length: o.length }));
+    check(kept === 'medium' && o.length === 'medium' && o.lengthHeard === true && /not yet queued/.test(await page.innerText('#radio-length-line')), 'Durata Media: kept, sent to the director, its line', JSON.stringify({ kept, length: o.length }));
     await page.selectOption('#radio-profile', 'switch'); await sleep(300);
     await pick(['synthwave']); await page.fill('#radio-seed', 'durata'); await page.click('#radio-start'); await sleep(6000);
     const d = await R(), it = d.state.stream[0], pos = await page.innerText('#pb-pos'), m = /\/\s*(\d+):(\d\d)/.exec(pos), sec = m ? +m[1] * 60 + +m[2] : NaN;
@@ -190,6 +194,33 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     await page.selectOption('#radio-custom [data-custom="duration"]', 'free'); await sleep(300);
     const o2 = (await R()).options;
     check(planned === 'planned' && !o2.length && await page.isVisible('#radio-target-off') && (await page.getAttribute('[data-song-length="style"]', 'aria-pressed')) === 'true', 'the Custom free growth turns the Durata off, with its line', JSON.stringify({ planned, length: o2.length }));
+    await page.selectOption('#radio-profile', 'artist'); await sleep(300);
+  }
+
+  // the Durata with a compilation (#82): the song on air keeps the asked length (Short, then exactly 12 minutes), not its
+  // style's; a change while a song is queued says it applies from the song after the queued one
+  {
+    if ((await R()).on) await page.click('#radio-start');
+    await page.selectOption('#radio-profile', 'switch'); await sleep(300);
+    while ((await page.getAttribute('#radio-comp', 'aria-pressed')) !== 'true') { await page.click('#radio-comp'); await sleep(300); }
+    const total = async () => { const m = /\/\s*(\d+):(\d\d)/.exec(await page.innerText('#pb-pos')); return m ? +m[1] * 60 + +m[2] : NaN; };
+    for (const [len, lo, hi, seed] of [['short', 120, 150, 'comp-len-a'], [12, 720, 720, 'comp-len-b']]) {
+      if (len === 12) { await page.click('[data-song-length="exact"]'); await sleep(300); await page.fill('[data-song-minutes]', '12'); await page.click('[data-song-length="exact"]'); } else await page.click(`[data-song-length="${len}"]`);
+      await sleep(300);
+      await page.fill('#radio-seed', seed); await page.click('#radio-start'); await sleep(6000);
+      const d = await R(), sec = await total();
+      check(d.state.recipe.options.compilation && d.state.recipe.options.length === len && sec >= lo - 40 && sec <= hi + 40, `a compilation song with Durata ${len} lasts ${lo}-${hi} s, give or take a phrase`, `${sec} s, ${JSON.stringify(d.state.recipe.options.length)}`);
+      if (len === 12) {
+        await page.evaluate(b => globalThis.codingMiskRadio.seek(b), Math.floor(d.state.stream[0].bars * 0.45));
+        for (let end = Date.now() + 60000; Date.now() < end && (await R()).state.stream.length < 2;) await sleep(300);
+        await page.click('[data-song-length="medium"]'); await sleep(300);
+        const msg = await page.evaluate(() => (document.querySelector('.toast') || {}).textContent || '');
+        check(/after the one already queued/.test(msg), 'a Durata change with a song queued applies from the song after it', msg);
+      }
+      await page.click('#radio-start'); await sleep(500);
+    }
+    while ((await page.getAttribute('#radio-comp', 'aria-pressed')) === 'true') { await page.click('#radio-comp'); await sleep(300); }
+    await page.click('[data-song-length="style"]'); await sleep(300);
     await page.selectOption('#radio-profile', 'artist'); await sleep(300);
   }
 
@@ -248,10 +279,15 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     e = await ed(); const c1 = await code(), ob = await orbitsAhead();
     check(!e.err && names(c1, s0.title) && !c1.includes(s1.title) && !c1.includes('// ==> ') && !/^\/\/ ========== /m.test(c1), 'during the transition the panel holds only the song on air, with only its title as comments', `${c1.split('\n')[0]} ${e.err.slice(0, 80)}`);
     check(ob.some(o => o >= 20) && ob.some(o => o < 20), 'the incoming song plays hidden on its own orbits', `orbits ${ob.join(',')}`);
+    const ch0 = await page.evaluate(() => { const c = globalThis.codingMiskRadio.changed; return { ahead: c.ahead, here: c.here }; });
     const on1 = await waitFor(async () => (await R()).state.onAir === 1, 60000);
     await sleep(1500);
     e = await ed(); const c2 = await code();
     check(on1 && !e.err && names(c2, s1.title) && !c2.includes(s0.title) && /^\s*[_S]?\$:/m.test(c2), 'the next song appears whole when it goes on air', c2.split('\n')[0]);
+    // #82: the window of the natural change made ahead (its plan in the plan worker) and handed over at the change, the
+    // same code at every bar as the window made at the change
+    const ch = await page.evaluate(([b0, n]) => { const r = globalThis.codingMiskRadio, c = r.changed, w = r.airPlayable; let diff = 0; for (let b = b0; b < b0 + n; b++) if (c.p.codeAt(b) !== w.codeAt(b)) diff++; return { ahead: c.ahead, here: c.here, diff }; }, [s1.start, s1.bars]);
+    check(ch.ahead === ch0.ahead + 1 && ch.here === ch0.here && ch.diff === 0, 'the natural song change hands over the window made ahead, the same code as one made at the change', JSON.stringify(ch));
     // the incoming song in the panel: the visible option
     await page.selectOption('#radio-incoming', 'visible');
     r = await R();
@@ -441,6 +477,35 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
       }
     }
     check(changes >= 1, `long run: ${changes} song changes in ${long} minutes without errors`);
+  }
+  // the allowed voice styles of a session (voice-combos-ui D5): a session started with overrides records the table,
+  // Replay after the overrides change gives the same songs, a new session records the new table, none: no field
+  {
+    const C = (fn, ...a) => page.evaluate(([f, x]) => globalThis.codingMiskPhrases.combos[f](...x), [fn, a]);
+    const songs = rec => page.evaluate(r => JSON.stringify(globalThis.codingMiskRadio.rebuild(r, 4).map(x => x.song)), rec);
+    if ((await R()).on) { await page.click('#radio-start'); await sleep(500); }
+    await C('set', '', ['clear']);
+    await pick(['dark-cyberpunk', 'ambient']); await page.fill('#radio-seed', 'combos-replay'); await page.click('#radio-start'); await sleep(5000);
+    let r = await R();
+    const rec = r.state.recipe, ids = r.state.stream.slice(0, 2).map(x => x.id);
+    check(rec.combos && JSON.stringify(rec.combos.it.default) === '["clear"]' && JSON.stringify(rec.combos.en.default) === '["clear"]', 'combos: a session started with overrides records the effective table', JSON.stringify(rec.combos));
+    const heard = await songs(rec), plain = await songs({ ...rec, combos: undefined });
+    check(heard !== plain, 'combos: the recorded table changes the voices of the session (the test proves something)');
+    // the user changes the overrides on air: the session keeps its table, Replay gives the same songs
+    await C('reset', ''); await C('set', 'kathy', ['clear', 'echo']);
+    await page.click('#radio-skip'); await sleep(3000);
+    await page.click('#radio-replay'); await sleep(5000);
+    r = await R();
+    check(JSON.stringify(r.state.recipe.combos) === JSON.stringify(rec.combos) && await songs(r.state.recipe) === heard && r.state.stream[0].id === ids[0], 'combos: Replay after the overrides changed gives the same songs (recorded table)', `${r.state.stream[0].id} vs ${ids[0]}`);
+    // a new session: the new table; with no overrides: nothing recorded
+    await page.click('#radio-start'); await sleep(500); await page.click('#radio-start'); await sleep(4000);
+    r = await R();
+    check(r.state.recipe.combos && JSON.stringify(r.state.recipe.combos.en.kathy) === '["clear","echo"]' && JSON.stringify(r.state.recipe.combos.it.default) !== '["clear"]', 'combos: a new session records the new table', JSON.stringify(r.state.recipe.combos));
+    await C('reset', 'kathy');
+    await page.click('#radio-start'); await sleep(500); await page.click('#radio-start'); await sleep(4000);
+    r = await R();
+    check(!('combos' in r.state.recipe), 'combos: a session with no overrides records nothing');
+    await page.click('#radio-start'); await sleep(300);
   }
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();

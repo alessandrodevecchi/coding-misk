@@ -1869,6 +1869,24 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
 .vt-speaker h4 .mini { margin-left: auto; display: inline-grid; place-items: center; width: 26px; height: 26px; color: var(--ink); }
 .vt-langs { list-style: none; margin: 0; padding: 0; font-size: 13px; display: grid; gap: 4px; }
 .vt-styles { margin: 6px 0 14px; }
+.vt-grid { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
+.vt-grid summary { cursor: pointer; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 28px; }
+.vt-grid summary .lbl { margin: 0; }
+.vt-grid summary::-webkit-details-marker { display: none; }
+.vt-grid-chev { display: inline-grid; place-items: center; width: 14px; height: 14px; color: var(--muted); transition: transform .15s; }
+.vt-grid-chev svg { width: 12px; height: 12px; }
+.vt-grid[open] .vt-grid-chev { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .vt-grid-chev { transition: none; } }
+.vt-grid .hint { margin: 6px 0; }
+.vt-cs-chips { gap: 5px; }
+.vt-cs { position: relative; }
+.vt-cs[disabled] { opacity: 1; cursor: default; }
+.vt-cs.limited { border-style: dashed; }
+.vt-cs-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--s3); margin-left: 5px; vertical-align: 1px; }
+summary .vt-cs-dot { margin-left: 0; }
+.vt-cs-lim { color: var(--s3); }
+.vt-grid .actions { margin-top: 6px; }
+:root[data-ui="hw"] .vt-cs-dot { background: var(--led); box-shadow: 0 0 5px color-mix(in srgb, var(--led) 60%, transparent); }
 .vt-style svg { width: 13px; height: 13px; vertical-align: -2px; }
 .vt-space { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
 .vt-lcd { font-family: var(--mono); font-size: 18px; color: var(--a2); padding: 4px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel2); }
@@ -1988,3 +2006,4 @@ button.plain.link { background: none; border: 0; padding: 0; color: var(--a1); t
   .dc-secs { flex-wrap: wrap; }
   .dc-sec { flex-basis: 30%; }
 }
+.sp-row .sp-add { flex: none; font-weight: 700; }

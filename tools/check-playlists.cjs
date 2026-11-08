@@ -187,6 +187,11 @@ async function seed(page) {
     pl.lists.push({ id: 'p-mix2', name: 'Mix profiles', songs: ['u-m1', 'switch-test-breve'] });
     localStorage.setItem('coding-misk-playlists', JSON.stringify(pl));
     localStorage.setItem('coding-misk-playlist-mix', 'true');
+    // (varied-openings: the song now draws a typed opening, silent while its first line is typed; the Mix checks keep the
+    // sounding opening it had, through a trial of the song)
+    const tr = JSON.parse(localStorage.getItem('coding-misk-song-trials') || '{}');
+    tr['switch-test-breve'] = { profile: 'switch', live: true, options: { opening: 'full-kick' } };
+    localStorage.setItem('coding-misk-song-trials', JSON.stringify(tr));
   });
   await page.reload(); await sleep(3500);
   await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="playlist"]'); await sleep(300);

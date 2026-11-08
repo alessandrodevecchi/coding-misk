@@ -157,6 +157,18 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
     check((await marks()).every(x => x.robot === 'Robot' && !x.tip), 'combos: the marks follow the speaker (Kathy, no entry: every style allowed)', JSON.stringify(await marks()));
     if (shots) { await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'fred'); await sleep(400); await page.screenshot({ path: path.join(shots, 'combos-panel.png') }); }
     await setCombos(page, null); }
+  // (voice-combos-ui 2.3: a toggle of the Voices tab grid, through the browser's overrides, marks the pickers the same way)
+  { await page.evaluate(() => globalThis.codingMiskPhrases.combos.set('fred', ['clear', 'radio'])); await sleep(200);
+    const marks = () => page.evaluate(ti => [`#track-panel [data-ptrk="${ti}"] [data-vstyle]`, '[data-vsound-style="narrator"]'].map(q => { const o = document.querySelector(q).querySelector('option[value="robot"]'); return { robot: o.textContent, tip: o.title }; }), ti);
+    await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'kathy'); await sleep(400);
+    await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'fred'); await sleep(600);
+    const on = await marks();
+    await page.evaluate(() => globalThis.codingMiskPhrases.combos.reset('fred')); await sleep(200);
+    await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'kathy'); await sleep(400);
+    await page.selectOption(`#track-panel [data-ptrk="${ti}"] [data-set="speaker"]`, 'fred'); await sleep(600);
+    const off = await marks();
+    check(on.every(x => x.robot === 'Robot ·' && /Not in the allowed set/.test(x.tip)) && off.every(x => x.robot === 'Robot' && !x.tip), 'combos UI: an override marks Robot for Fred in both pickers, Reset clears the mark', JSON.stringify({ on, off }));
+    check(await page.evaluate(() => localStorage.getItem('coding-misk-voice-combos')) === null, 'combos UI: nothing stored after Reset'); }
   await page.click('#cfg-reset').catch(() => {}); await sleep(600);
 
   // ---------- Compose: the voice track ----------

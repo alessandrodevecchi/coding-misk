@@ -190,7 +190,8 @@ export function annotate(code, song, upTo, lang) {
 // the voice track a step speaks with: the one named by "voice", otherwise the first voice track (none: default settings)
 // the speakers and the languages each speaks (macOS system voices, real-voices D1); '' is the default voice (Samantha in
 // English, Alice in Italian). tools/voice-sample.mjs keeps a copy of this table (check:spoken asserts they agree).
-export const SPEAKER_LANGS = { albert: ['en'], fred: ['en'], junior: ['en'], kathy: ['en'] };
+// siri4 (#82) speaks Italian only, with the macOS system voice (see SYSTEM_SPEAKERS in tools/voice-sample.mjs).
+export const SPEAKER_LANGS = { albert: ['en'], fred: ['en'], junior: ['en'], kathy: ['en'], siri4: ['it'] };
 export const SPEAKERS = Object.keys(SPEAKER_LANGS);
 // removed by real-voices: they were never installed (#63); read as the default voice
 export const REMOVED_SPEAKERS = ['eddy', 'flo', 'grandma', 'grandpa', 'reed', 'rocko', 'sandy', 'shelley'];
@@ -331,7 +332,8 @@ function narration(song, upTo, lang) {
 // the narrator's lines in the code of a state (the first `upTo` steps applied): [{ at, voice: 'N', text, step, track,
 // bank, n }], after the filters of the code: its voice track muted, a bar where the voice instrument sounds (the
 // narrator yields), no sample. voiceCode writes these lines and spokenSchedule lists them, so they cannot disagree
-// all: every line, also the ones without a sample (n: -1, the speaker's bank), for spokenNeeds (D9)
+// all: every line, also the ones without a sample (n: -1), each with its speaker's own bank (also when the default
+// voice's sample would speak it), for spokenNeeds (D9; radio-narrator-speakers D3)
 export function narratorLines(song, state, upTo, lang, files, all = false) {
   // (the registry's precedence, D11: the narrator yields on the bars where the voice track sounds)
   const spokenAt = outranks('voice', 'narrator') && (state.tracks || []).some(t => t.type === 'spoken') ? spokenBars(state, lang) : null;
@@ -341,7 +343,7 @@ export function narratorLines(song, state, upTo, lang, files, all = false) {
     if (spokenAt && spokenAt.has(said.at)) return [];
     const { bank, n } = lineSample(track, lang, files, text);
     if (n < 0 && !all) return [];
-    return [{ at: said.at, voice: 'N', text, step, track, bank, n }];
+    return [{ at: said.at, voice: 'N', text, step, track, bank: all ? sayBank(lang, (track && track.settings && track.settings.speaker) || '') : bank, n }];
   });
 }
 export function voiceCode(song, state, upTo, total, lang, files) {
@@ -449,13 +451,16 @@ export const captionHold = (len, barSec) => (len === null || len === undefined ?
 // The lines of spokenNeeds to ask the voice helper for (radio-phrase-speaker D1), one rule for Compose and the radio:
 // a line whose speaker has no sample of its own, when its text is a phrase of mine (mineSlugs: their saySlugs; it gets
 // a sample in the bank of each speaker that says it, also when the default voice's sample exists and speaks it
-// meanwhile, phrase-any-voice D7) or no bank of its language has it (a built-in line), and at most MAX_WORDS words
-export function missingNeeds(list, files = {}, mineSlugs = null) {
-  const fl = files || {}, any = (bank, slug) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(fl[b], slug) >= 0);
+// meanwhile, phrase-any-voice D7) or no bank of its language has it (a built-in line), and at most MAX_WORDS words.
+// opts.speakers (the radio, radio-narrator-speakers D3): also any line of a speaker (not the default voice) with no
+// sample of its own, a built-in narrator line, voice-track line or vocabulary entry the default voice has among them
+export function missingNeeds(list, files = {}, mineSlugs = null, opts = {}) {
+  const fl = files || {}, any = (bank, slug) => [bank, bank.replace(/_[a-z0-9]+$/, '')].some(b => slugAt(fl[b], slug) >= 0);
+  const speakers = !!(opts && opts.speakers);
   return (list || []).filter(x => {
     if (x.has) return false;
     const slug = saySlug(x.text);
-    return ((mineSlugs && mineSlugs.has(slug)) || !any(x.bank, slug)) && x.text.split(/\s+/).length <= MAX_WORDS;
+    return ((speakers && x.speaker) || (mineSlugs && mineSlugs.has(slug)) || !any(x.bank, slug)) && x.text.split(/\s+/).length <= MAX_WORDS;
   });
 }
 // The captions of a song (spoken-text-on-stage D1): what is heard, from spokenSchedule, with its speaker and how long it

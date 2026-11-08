@@ -27,7 +27,7 @@ import { buildSteps, stateAt, checkBuild, stepTrack, buildMap } from '../src/son
 import { crescendoSong, patternVariants, waypointSong, CRESCENDO_VERSION, songSeconds } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules } from '../src/live/profiles.js';
 import { liveCode } from '../src/live/live-code.js';
-import { resolveShape, shapeFacts, canPlay, SHAPES_VERSION, OPENINGS } from '../src/song/shapes.js';
+import { resolveShape, resolveLead, resolveKick, shapeFacts, canPlay, SHAPES_VERSION, OPENINGS, LEAD_OPENINGS, KICKS } from '../src/song/shapes.js';
 import { audible, firstMinute, fullKick, typingLoad } from './growth-measure.mjs';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
@@ -260,6 +260,50 @@ export const CHECKS = [
     assert(se.some(e => e.path === 'growthShape.opening') && re.some(e => e.path === 'growthShapes.paces.fastest'), `${JSON.stringify(se)} ${JSON.stringify(re)}`);
     assert(!validateSong(s).errors.length && Object.values(styles).every(r => !validateRecipe(r).errors.length), 'built-in songs and recipes valid');
   } },
+  { name: 'lead and kick start (varied-openings): same draw twice, lead openings only, impossible ones left out, kick starts outside the groove only by style weight', unit() {
+    const s = byId('switch-prima-luce'), f = shapeFacts(s, styles);
+    for (let k = 0; k < 50; k++) {
+      const seed = `lead-${k}`, a = resolveLead(s, { styles, seed }), b = resolveLead(s, { styles, seed });
+      assert(JSON.stringify(a) === JSON.stringify(b) && LEAD_OPENINGS.includes(a.opening) && canPlay('opening', a.opening, f), `${seed}: ${JSON.stringify(a)} ${JSON.stringify(b)}`);
+      const x = resolveKick(s, f, { styles, seed }), y = resolveKick(s, f, { styles, seed });
+      assert(x === y && KICKS.includes(x), `${seed}: kick ${x} ${y}`);
+    }
+    assert(resolveLead({ ...s, growthShape: { opening: 'pad' } }, { styles }).opening === (canPlay('opening', 'pad', f) ? 'pad' : resolveLead(s, { styles }).opening), 'the song\'s lead opening wins');
+    assert(resolveLead({ ...s, growthShape: { opening: 'pad' } }, { styles, user: 'slow' }).from === (f.drums ? 'user' : 'song'), 'the user\'s lead opening wins');
+    // a song without a bass track never leads with the bass; a style that weighs only Live coder openings draws the defaults
+    const nob = { ...s, tracks: s.tracks.filter(t => t.type !== 'bass') }, only = { ...styles, [f.recipe ? f.recipe.id : 'x']: { ...(f.recipe || {}), growthShapes: { openings: { bass: 5, typed: 3 } } } };
+    for (let k = 0; k < 100; k++) assert(resolveLead(nob, { styles: only, seed: `b-${k}` }).opening !== 'bass', 'bass drawn without a bass track');
+    // a straight kick: off is never drawn under the default weights when the groove has no kick on beat three
+    const facts = { ...f, recipe: null, kickHits: [0, 10] }, drawn = new Set();
+    for (let k = 0; k < 200; k++) drawn.add(resolveKick(s, facts, { seed: `k-${k}` }));
+    assert(!drawn.has('off') && !drawn.has('four') && !drawn.has('two') && drawn.has('pair') && drawn.has('one'), [...drawn].join(','));
+    const styled = { ...facts, recipe: { growthShapes: { kicks: { four: 1, off: 1 } } } }, got = new Set();
+    for (let k = 0; k < 100; k++) got.add(resolveKick(s, styled, { seed: `k-${k}` }));
+    assert(got.has('four') && got.has('off') && got.size === 2, [...got].join(','));
+    const re = validateRecipe({ ...styles.acid, growthShapes: { kicks: { gallop: 2 } } }).errors;
+    assert(re.some(e => e.path === 'growthShapes.kicks.gallop' && /pair/.test(e.msg)), JSON.stringify(re));
+  } },
+  { name: 'kick starts (varied-openings): four on a house song and pair on a drum and bass kick, in Crescendo and in a slow Live coder opening, then the written kick', unit() {
+    const cases = [['switch-house-prova', 'four', 'x...x...x...x...'], ['prova-drum-and-bass', 'pair', 'x.........x.....']];
+    for (const [id, start, want] of cases) {
+      const s = byId(id), sid = s.tags.styles[0], st = { ...styles, [sid]: { ...styles[sid], growthShapes: { ...styles[sid].growthShapes, openings: { slow: 1 }, kicks: { [start]: 1 } } } };
+      for (const C of [resolveProfile('crescendo'), resolveProfile('switch', { opening: 'slow', pace: 'medium', development: 'by-type' })]) {
+        const c = crescendoSong(s, { rules: growthRules(C, { styles: st }) }), at = firstSound(c), on = heardTracks(c, at), who = `${id} ${C.id} ${start}`;
+        assert(c.crescendo.kick === start && on.length === 1 && on[0].type === 'drums', `${who}: kick ${c.crescendo.kick}, ${on.map(t => t.id)}`);
+        const bd = String(rowsOf(on[0]).bd || '').slice(0, 16);
+        assert(bd === want && Object.keys(rowsOf(on[0])).every(r => r === 'bd'), `${who}: first kick ${bd}`);
+        assert(ends(c), `${who}: does not end on the written song`);
+      }
+    }
+  } },
+  { name: 'Crescendo opening control (varied-openings D9): a chosen lead opening steers the first track, a Live-coder-only one reads as Auto', unit() {
+    const s = byId('luci-rosse');
+    const c = crescendoSong(s, { rules: growthRules(resolveProfile('crescendo', { opening: 'bass' }), { styles }) }), on = heardTracks(c, firstSound(c));
+    assert(c.crescendo.lead.opening === 'bass' && c.crescendo.lead.from === 'user' && on.length === 1 && on[0].type === 'bass', `${JSON.stringify(c.crescendo.lead)} ${on.map(t => t.type)}`);
+    const typed = growthRules(resolveProfile('crescendo', { opening: 'typed' }), { styles }), auto = growthRules(resolveProfile('crescendo'), { styles });
+    assert(!('lead' in typed) && JSON.stringify(crescendoSong(s, { rules: typed }).build) === JSON.stringify(crescendoSong(s, { rules: auto }).build), 'typed in Crescendo is not Auto');
+    assert(!crescendoSong(s, { rules: growthRules(resolveProfile('crescendo', { opening: 'bass' }), { styles }) }).crescendo.shape, 'Crescendo took a shape');
+  } },
   { name: 'shapes: Classic and Crescendo take no shape; the Live coder build records it', unit() {
     for (const s of songs.slice(0, 10)) assert(!crescendoSong(s).crescendo.shape && !crescendoSong(s, { rules: growthRules(resolveProfile('crescendo')) }).crescendo.shape, s.id);
     assert(shaped(coder(byId('switch-prima-luce'))) && coder(byId('switch-prima-luce')).crescendo.shape.version === SHAPES_VERSION, 'Live coder');
@@ -337,7 +381,11 @@ export const CHECKS = [
       const at = firstSound(c), on = heardTracks(c, at), who = `${s.id} ${opening}`;
       const kickOf = t => String(rowsOf(t, N).bd || '');
       if (['slow', 'full-kick', 'filtered', 'broken'].includes(opening)) assert(on.length === 1 && on[0].type === 'drums', `${who}: ${on.map(t => t.id)}`);
-      if (opening === 'slow' && /x/.test(kickOf(on[0]))) assert([...kickOf(on[0])].every((x, i) => x !== 'x' || i % 16 === 0) && Object.keys(rowsOf(on[0], N)).length === 1, `${who}: ${JSON.stringify(rowsOf(on[0], N))}`);
+      // (varied-openings: the slow kick starts from its kick start; one: the first beat only)
+      if (opening === 'slow' && /x/.test(kickOf(on[0]))) assert(c.crescendo.kick && Object.keys(rowsOf(on[0], N)).length === 1 && (c.crescendo.kick !== 'one' || [...kickOf(on[0])].every((x, i) => x !== 'x' || i % 16 === 0)), `${who}: ${c.crescendo.kick} ${JSON.stringify(rowsOf(on[0], N))}`);
+      if (opening === 'bass') assert(on.length === 1 && on[0].type === 'bass', `${who}: ${on.map(t => t.type)}`);
+      if (opening === 'chord') assert(on.length === 1 && ['pad', 'guitar'].includes(on[0].type), `${who}: ${on.map(t => t.type)}`);
+      if (opening === 'top') assert(on.length === 1 && on[0].type === 'drums' && !/x/.test(kickOf(on[0])) && Object.keys(rowsOf(on[0], N)).length >= 1, `${who}: ${on.map(t => t.id)} ${JSON.stringify(rowsOf(on[0], N))}`);
       if (opening === 'full-kick' || opening === 'filtered') assert(kickOf(on[0]) === String(baseRows(on[0], N).bd || '') && Object.keys(rowsOf(on[0], N)).every(r => r === 'bd'), `${who}: ${JSON.stringify(rowsOf(on[0], N))}`);
       if (opening === 'filtered') assert(on[0].settings.cutoff === 300 && !(on[0].hidden || []).includes('cutoff'), `${who}: cutoff ${on[0].settings.cutoff}`);
       if (opening === 'broken') assert(/x/.test(kickOf(on[0])) && [...kickOf(on[0])].some((x, i) => x === 'x' && i % 4 !== 0), `${who}: ${kickOf(on[0])}`);

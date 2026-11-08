@@ -10,7 +10,9 @@ import { GENRES } from '../song/format.js';
 
 // raise it when an intended change moves the seed fixtures (tests/snapshots/invented-styles.json), like DIRECTOR_VERSION
 // 2 (real-voices): the styles' speakers changed, and an invented style copies a style's voice part
-export const STYLE_MAKER_VERSION = 2;
+// 3 (varied-openings): the styles list more kits and sounds, so the lists an invented style trims from changed
+// 4 (kick-variety): the styles list more grooves and presets, and four-floor grooves draw kick variants
+export const STYLE_MAKER_VERSION = 4;
 export const MAX_TRIES = 8;
 // a style closer than this to an existing one is a copy: drawn again
 export const COPY_LIMIT = 0.8;

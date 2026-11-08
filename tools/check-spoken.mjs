@@ -47,7 +47,7 @@ import { stream } from '../src/endless/random.js';
 import { captionFrame, captionSettings } from '../src/captions/captions.js';
 import { SPEAKER_KINDS, kindOf, outranks, applyExclusive, captionRows } from '../src/song/speakers.js';
 import { barSeconds } from '../src/song/spoken.js';
-import { setCombos } from '../src/voices/combos.js';
+import { setCombos, COMBOS_FILE, effectiveCombos } from '../src/voices/combos.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const read = f => JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -111,6 +111,23 @@ const CHECKS = {
     assert(validateSong(r).errors.some(e => e.path === 'tracks[4].patterns.chop.rhythm'), 'a bad rhythm');
     const n = clone(EXAMPLE); n.narrator = 'loud';
     assert(validateSong(n).errors.some(e => e.path === 'narrator'), 'a bad narrator style');
+  },
+  'ways: a passage clip that covers no section of the window (a resume after a pause) starts on its clip, no throw'() {
+    let checked = 0;
+    for (const s of [...withSpoken, ...voiced({ phrases: '4-5', kind: 'different', presence: 'often' })]) {
+      const n = normalizeSong(s), tr = n.tracks.find(t => t.type === 'spoken');
+      for (const clip of tr.clips) {
+        const pat = (tr.patterns || {})[clip.pattern];
+        if (!pat || pat.way !== 'passage' || pat.before !== undefined) continue;
+        // the window's sections end before the clip, as in the part of a window the radio compiles on a resume
+        const cut = clone(s); cut.sections = n.sections.filter(x => x.start + x.bars <= clip.start).map(x => ({ ...x }));
+        if (!cut.sections.length) continue;
+        const p = placeSpoken(cut, 'en').find(x => x.track === tr.id && x.key === clip.pattern);
+        assert(p && p.starts.some(st => st.bar === clip.start), `${s.id} ${tr.id}/${clip.pattern}: ${JSON.stringify(p && p.starts)}`);
+        checked++;
+      }
+    }
+    assert(checked >= 1, `${checked} passage clips`);
   },
   'ways: an entry line ends one beat before its track comes in'() {
     let checked = 0;
@@ -759,16 +776,17 @@ const CHECKS = {
     assert(VS.sayBank('en', 'kathy') === 'say_en_kathy' && VS.sayBank('en', '') === 'say_en' && VS.MAX_WORDS === 12, 'banks');
   },
   'real voices (D1, D2): the speaker table, the language rule of sayBank, the same in tools/voice-sample.mjs'() {
-    assert(SPEAKERS.join() === 'albert,fred,junior,kathy' && SPEAKERS.every(s => SPEAKER_LANGS[s].join() === 'en'), `speakers ${SPEAKERS}`);
-    assert(sayBank('it', 'kathy') === 'say_it' && sayBank('en', 'kathy') === 'say_en_kathy' && sayBank('en', 'reed') === 'say_en' && sayBank('it', '') === 'say_it', 'sayBank');
+    assert(SPEAKERS.join() === 'albert,fred,junior,kathy,siri4' && SPEAKERS.every(s => SPEAKER_LANGS[s].join() === (s === 'siri4' ? 'it' : 'en')), `speakers ${SPEAKERS}`);
+    assert(sayBank('it', 'kathy') === 'say_it' && sayBank('en', 'kathy') === 'say_en_kathy' && sayBank('en', 'reed') === 'say_en' && sayBank('it', '') === 'say_it' && sayBank('it', 'siri4') === 'say_it_siri4' && sayBank('en', 'siri4') === 'say_en', 'sayBank');
     assert(JSON.stringify(VS.SPEAKER_LANGS) === JSON.stringify(SPEAKER_LANGS) && VS.SPEAKERS.join() === SPEAKERS.join(), 'the two speaker tables differ');
     for (const lang of ['en', 'it', 'es']) for (const s of ['', ...SPEAKERS, ...REMOVED_SPEAKERS, 'nobody']) {
       assert(VS.sayBank(lang, s) === sayBank(lang, s), `sayBank ${lang} ${s}: ${VS.sayBank(lang, s)} against ${sayBank(lang, s)}`);
       assert(VS.speaks(lang, s) === speaks(lang, s), `speaks ${lang} ${s}`);
     }
     assert(SPEAKERS.every(s => speakerId(s) === s) && REMOVED_SPEAKERS.every(s => speakerId(s) === '') && speakerId(undefined) === '', 'speakerId');
-    // (in Italian nobody but the default voice: a speaker's line is asked from say_it, never say_it_<speaker>)
-    assert(['', ...SPEAKERS].filter(s => !s || speaks('it', s)).join() === '', 'Italian speakers');
+    // (in Italian only siri4 besides the default voice (#82): an English speaker's line is asked from say_it, never
+    // say_it_<speaker>)
+    assert(SPEAKERS.filter(s => speaks('it', s)).join() === 'siri4', 'Italian speakers');
   },
   'real voices (D3): a removed speaker reads as the default voice: an old song, a user style, validation'() {
     const keep = { ...spokenContext };
@@ -791,7 +809,7 @@ const CHECKS = {
         const files = { [`say_${lang}`]: ['/samples/x/the_city.wav'], [`say_${lang}_reed`]: ['/samples/x/the_city.wav'] };
         const got = lineSample(nar, lang, files, 'the city');
         assert(got.bank === `say_${lang}` && got.n === 0, `${lang}: ${JSON.stringify(got)}`);
-        assert(voiceSamples(old, lang, files).every(x => x.s === `say_${lang}` || /^say_[a-z]{2}_(albert|fred|junior|kathy)$/.test(x.s)), `${lang}: a removed bank asked`);
+        assert(voiceSamples(old, lang, files).every(x => x.s === `say_${lang}` || /^say_[a-z]{2}_(albert|fred|junior|kathy|siri4)$/.test(x.s)), `${lang}: a removed bank asked`);
       }
       // an old frozen radio song with flo and grandpa: every bank of its lines is a default or listed one
       const frozen = { ...clone(EXAMPLE), tracks: clone(EXAMPLE).tracks.map(t => (t.type === 'voice' ? { ...t, settings: { ...t.settings, speaker: 'flo' } } : t.type === 'spoken' ? { ...t, settings: { ...t.settings, speaker: 'grandpa' } } : t)) };
@@ -1008,7 +1026,8 @@ const CHECKS = {
   },
   'narrator marks (narrator-ghost-row D2): the narrator lines of spokenSchedule (explaining and poetic), the narrator off counted as on, none on a voice-track bar, none from a muted narrator track, the same marks once the Narrator track is added; luci-rosse in Live coder: 19 lines heard, 17 in the growth'() {
     const pairs = l => JSON.stringify(l.map(x => [x.at, x.text]));
-    const C = resolveProfile('switch'), grown = crescendoSong({ ...read('songs/luci-rosse.json'), kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles: recipes }) });
+    // (varied-openings: the full-kick opening luci-rosse drew before, so the counts stay)
+    const C = resolveProfile('switch', { opening: 'full-kick' }), grown = crescendoSong({ ...read('songs/luci-rosse.json'), kind: 'composed' }, { narrated: C.narrated, rules: growthRules(C, { styles: recipes }) });
     const B = liveBuildOf(grown, C), G = grown.crescendo.growth, m = narratorMarks(B, C, 'it', ANY);
     assert(m.length === 19 && m.filter(x => x.at < G).length === 17, `luci-rosse: ${m.length} lines, ${m.filter(x => x.at < G).length} in the ${G} bars of the growth`);
     assert(m.every(x => x.track === null), 'a song without a narrator track: marks with no track');
@@ -1059,7 +1078,8 @@ const CHECKS = {
       }
       return { sch, cs };
     };
-    const explain = resolveProfile('switch'), A = liveBuildOf(grownOf('luci-rosse', explain), explain), a = same(A, explain, 'it', ANY);
+    // (varied-openings: the full-kick opening luci-rosse drew before, so the counts and bars stay)
+    const explain = resolveProfile('switch', { opening: 'full-kick' }), A = liveBuildOf(grownOf('luci-rosse', explain), explain), a = same(A, explain, 'it', ANY);
     // explain: every step line heard is the caption and never a tag
     assert(a.cs.filter(x => x.kind === 'narrator').length === 19, `luci-rosse explain: ${a.cs.filter(x => x.kind === 'narrator').length} captions`);
     for (const x of a.cs.filter(y => y.kind === 'narrator')) assert(!captionFrame(a.cs, x.at + 0.01, S).tag, `explain, bar ${x.at + 1}: a tag under "${x.text}"`);
@@ -1431,18 +1451,49 @@ const CHECKS = {
   },
   'voice combos (2.4): Crescendo and Live coder radio songs grown on air add no draw of their own'() {
     const T = { format: 1, en: Object.fromEntries(['default', ...SPEAKERS].map(s => [s, VOICE_STYLE_IDS.filter(x => x !== 'robot' && x !== 'dirty')])) };
-    const grown = profile => COMBO_STYLES.flatMap(style => [0, 1].flatMap(i => {
-      const rec = { seed: `combos-${profile}-${i}`, options: { styles: [style], chaos: 0.8, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile, voice: { presence: 'always' } }, changes: [], growth: GROWTH_ON_AIR };
+    // (voice-combos-ui D5: a radio session draws with the table its recipe recorded, never the module's)
+    const grown = (profile, combos = null) => COMBO_STYLES.flatMap(style => [0, 1].flatMap(i => {
+      const rec = { seed: `combos-${profile}-${i}`, options: { styles: [style], chaos: 0.8, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile, voice: { presence: 'always' } }, changes: [], growth: GROWTH_ON_AIR, ...(combos ? { combos } : {}) };
       return sessionItems(RADIO_RECIPES, rec, 3).map(it => it.song);
     }));
     let n = 0, freeHit = 0;
     for (const profile of ['crescendo', 'switch']) {
-      const lim = voiceTracks(withCombos(T, () => grown(profile))), free = voiceTracks(grown(profile));
+      const lim = voiceTracks(grown(profile, T)), free = voiceTracks(grown(profile));
       n += lim.length; freeHit += free.filter(t => hasChar(t.settings, 'robot') || hasChar(t.settings, 'dirty')).length;
       assert(lim.length && lim.every(t => !hasChar(t.settings, 'robot') && !hasChar(t.settings, 'dirty')), `${profile}: a robot or dirty voice with them not allowed`);
     }
     assert(freeHit > 0, 'no robot or dirty voice without the file (the test proves nothing)');
     console.log(`      ${n} voice tracks in grown songs, ${freeHit} robot or dirty without the file`);
+  },
+  'voice combos UI (3.1): opts.combos bounds the narrator and the voice instrument over 300 songs; the committed table given draws the songs of none'() {
+    const T = { format: 1, en: { fred: ['clear', 'deep'] } };
+    const lim = comboSongs({ combos: T, voice: { presence: 'always' } }), free = comboSongs({ voice: { presence: 'always' } });
+    const fred = lim.entries.filter(e => e.voice.speaker === 'fred');
+    assert(fred.length >= 10 && fred.every(e => e.voice.character === null || e.voice.character === 'deep'), `fred narrators: ${fred.length}, ${[...new Set(fred.map(e => e.voice.character))]}`);
+    const spoken = voiceTracks(lim.songs).filter(t => t.settings.speaker === 'fred');
+    assert(spoken.length && spoken.every(t => charsOf(t.settings).every(c => c === 'deep')), 'a Fred voice track with another character');
+    assert(voiceTracks(free.songs).some(t => t.settings.speaker === 'fred' && charsOf(t.settings).some(c => c !== 'deep')), 'the free draw never gives Fred another character (the test proves nothing)');
+    // (the module table narrowed does not reach a draw given the committed table: the browser's overrides stay out)
+    assert(JSON.stringify(withCombos({ format: 1, en: { fred: ['clear'] } }, () => comboSongs({ combos: COMBOS_FILE }, 60).songs)) === JSON.stringify(comboSongs({}, 60).songs), 'opts.combos with the committed table moved the songs');
+    console.log(`      ${lim.songs.length} songs, ${fred.length} with Fred narrating, ${spoken.length} Fred voice tracks`);
+  },
+  'voice combos UI (3.2): a radio recipe draws with its recorded table; none recorded: the committed table, whatever the module table'() {
+    const only = { format: 1, en: { fred: ['clear'] } }, base = { options: { styles: COMBO_STYLES, chaos: 0.8, energy: 0.6, complexity: 0.5, talk: 0.5, transition: 'artist', harmony: 'artist', profile: 'classic', voice: { presence: 'always' } }, changes: [], growth: GROWTH_ON_AIR };
+    const songs = (rec, n = 6) => sessionItems(RADIO_RECIPES, rec, n).map(it => it.song);
+    let fredFree = 0, fredLim = 0;
+    for (let i = 0; i < 12; i++) {
+      const rec = { ...base, seed: `combos-ui-${i}` }, recorded = { ...rec, combos: effectiveCombos(COMBOS_FILE, only) };
+      const a = JSON.stringify(songs(recorded)), b = JSON.stringify(withCombos({}, () => songs(recorded))), c = JSON.stringify(withCombos(only, () => songs(rec)));
+      // Replay after the user changes the overrides: the same songs
+      assert(a === b, `${rec.seed}: a recorded session moved with the module table`);
+      // a session recorded before (or without overrides): the committed table, not the module's
+      assert(c === JSON.stringify(songs(rec)), `${rec.seed}: a session without a table followed the module table`);
+      const fred = voiceTracks(songs(recorded)).filter(t => t.settings.speaker === 'fred');
+      fredLim += fred.length;
+      assert(fred.every(t => !charsOf(t.settings).length), `${rec.seed}: Fred with a character in a session limited to clear`);
+      fredFree += voiceTracks(songs(rec)).filter(t => t.settings.speaker === 'fred' && charsOf(t.settings).length).length;
+    }
+    assert(fredLim > 0 && fredFree > 0, `the test proves nothing: ${fredLim} Fred tracks limited, ${fredFree} with a character free`);
   },
   'speaker registry (spoken-text-on-stage D11): N and T mapped to kinds, the voice track outranks the narrator, one narrator line per bar; a fake third kind is captioned with no other change, exclusive quiets the lower ranks, multiCaption adds a row'() {
     assert(kindOf('N') === 'narrator' && kindOf('T') === 'voice' && SPEAKER_KINDS.singing.future && outranks('voice', 'narrator') && !outranks('narrator', 'voice'), 'registry');

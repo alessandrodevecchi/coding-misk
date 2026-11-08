@@ -43,11 +43,14 @@
     "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
       "RolandTR909",
-      "RolandTR808"
+      "RolandTR808",
+      "RolandTR606"
     ],
     "grooves": [
       "techno",
-      "hard"
+      "hard",
+      "technoPickup",
+      "technoRolling"
     ],
     "settings": {
       "drive": [
@@ -60,10 +63,12 @@
     "material": { "source": "mix", "share": 0.3, "rules": ["rolling", "sixteenths", "octaves"] },
     "presets": [
       "sub",
-      "rumble"
+      "rumble",
+      "rolling"
     ],
     "waves": [
-      "sawtooth"
+      "sawtooth",
+      "square"
     ],
     "settings": {
       "cutoff": [
@@ -79,7 +84,9 @@
   "arp": {
     "material": { "source": "mix", "share": 0.3, "rules": ["pedal", "skips", "random"] },
     "presets": [
-      "acid"
+      "acid",
+      "pulsar",
+      "spezzato"
     ],
     "waves": [
       "sawtooth",
@@ -108,7 +115,8 @@
     "material": { "source": "mix", "share": 0.3, "rules": ["polymeter", "tail", "dark"] },
     "presets": [
       "colpi",
-      "allarme"
+      "allarme",
+      "cyber"
     ],
     "waves": [
       "square"
@@ -195,7 +203,8 @@
     ]
   },
   "growthShapes": {
-    "openings": { "filtered": 3, "slow": 1, "typed": 1 },
+    "openings": { "filtered": 2, "full-kick": 1, "slow": 3, "bass": 3, "typed": 1 },
+    "kicks": { "one": 2, "two": 1, "four": 1, "push": 1 },
     "paces": { "medium": 3, "slow": 1 }
   },
   "spoken": {

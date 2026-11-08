@@ -11,6 +11,12 @@
 // phrase although the default voice has it, the next song's speaker sample must be fetched before that song's first bar,
 // and the phrase must play there from the speaker's bank, not from say_en. In Italian (the speakers speak English only)
 // no speaker bank is asked, and the helper answers fred in Italian from say_it. Without the voice helper: a skip note.
+// --speaker then runs a narrator step (radio-narrator-speakers D3) in a page of its own, without my phrases (a phrase
+// of All with Sempre takes every narrator line): a first pass, the helper answered 503, finds the first built-in
+// narrator line of the next song (in its first 40 bars) said by a speaker X (radio.needs({ every: true })); its say_en_X
+// sample, if there is one, is moved aside (and put back at the end). With the page loaded again and the CPU slowed, the
+// radio must ask the helper for it although say_en has it, fetch it before the next song's first bar and play it there
+// from say_en_X.
 // Needs the voice samples in public/samples/say_*.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voice-preload.cjs [--seed vp82a] [--rate 4] [--list] [--speaker]
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -23,6 +29,7 @@ let SPEAKER = process.argv.includes('--speaker');
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
 // (the app's saySlug)
+const os = require('node:os');
 const slugOf = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48);
 // a phrase no speaker bank has yet, so its speaker samples are made during the run
 function freshPhrase() {
@@ -35,6 +42,60 @@ function freshPhrase() {
     if (!banks.some(b => fs.existsSync(path.join(dir, b, `${slugOf(text)}.wav`)))) return { text, fresh: true };
   }
   return { text: `the ${A[k0 % 8]} rain falls on the ${B[Math.floor(k0 / 8)]}`, fresh: false };
+}
+
+// --speaker, the narrator step: a page of its own, without my phrases
+let aside = null;
+const putBack = () => { if (!aside) return; try { fs.copyFileSync(aside.to, aside.file); fs.unlinkSync(aside.to); fs.rmdirSync(path.dirname(aside.to)); } catch (e) { console.log(`warning: put ${aside.to} back to ${aside.file} by hand`); } aside = null; };
+process.on('exit', putBack);
+async function narratorStep(ctx) {
+  const RADIO = { styles: ['synthwave'], chaos: 0.3, energy: 0.5, complexity: 0.5, talk: 0.5, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song', profile: 'switch', compilation: 'off', voice: { presence: 'always', phrases: 'many', kind: 'mixed' } };
+  const page = await ctx.newPage(), errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  const st = () => page.evaluate(() => { const r = globalThis.codingMiskRadio.state; return r ? { onAir: r.onAir, bar: window.__bar(), stream: r.stream.map(x => ({ start: x.start, bars: x.bars, growing: x.growing })) } : null; });
+  const until = async (f, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await f()) return true; await sleep(250); } return false; };
+  const startToNext = async () => {
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', SEED); await page.click('#radio-start');
+    await until(async () => { const x = await st(); return x && x.bar >= 2; }, 60000);
+    const x = await st(), at = Math.ceil(x.stream[0].bars * 0.4) + 1;
+    await page.evaluate(b => globalThis.codingMiskRadio.seek(b), at);
+    return until(async () => { const y = await st(); return y.stream.length > 1 && !y.stream[1].growing; }, 180000);
+  };
+  await page.goto(`${BASE}/`); await sleep(2500);
+  await page.evaluate(o => { localStorage.clear(); localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-radio', JSON.stringify(o)); }, RADIO);
+  await page.reload(); await sleep(3500);
+  // the first pass: the helper answers 503, the next song's lines read as they are
+  await page.route('**/voice/say', r => r.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"first pass"}' }));
+  await startToNext();
+  const NAR = await page.evaluate(() => globalThis.codingMiskRadio.needs({ every: true }).filter(x => x.next && x.voice === 'N' && x.speaker && x.at < 40).sort((a, b) => a.at - b.at)[0]);
+  await page.click('#radio-start').catch(() => {});
+  await page.unroute('**/voice/say');
+  if (!NAR) { console.log('skip  narrator step: the next song has no narrator line of a speaker in its first 40 bars (try another --seed)'); await page.close(); return; }
+  const rel = `${NAR.bank}/${slugOf(NAR.text)}.wav`, file = path.join(__dirname, '..', 'public', 'samples', rel);
+  if (fs.existsSync(file)) { aside = { file, to: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cvp-')), path.basename(file)) }; fs.copyFileSync(file, aside.to); fs.unlinkSync(file); }
+  console.log(`      narrator step: "${NAR.text}" by ${NAR.speaker} on bar ${NAR.at + 1} of the next song${aside ? ', its sample moved aside' : ', no sample yet'}`);
+  // the run: the page loaded again (the manifest without the sample), the CPU slowed
+  await page.reload(); await sleep(3500);
+  const cdp = await ctx.newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: RATE });
+  const made = await startToNext();
+  check(made, 'narrator step: the next song is made');
+  const got = await until(() => page.evaluate(x => !globalThis.codingMiskRadio.needs().some(y => y.text === x.text && y.bank === x.bank), NAR), 240000);
+  const s1 = (await st()).stream[1];
+  check(got, 'narrator step: the speaker sample is made while the song on air plays', `${rel}, bar ${((await st()).bar + 1).toFixed(2)}`);
+  await until(async () => (await st()).bar >= s1.start + NAR.at + 2, 600000);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  const r = await page.evaluate(() => ({ ev: window.__ev, asked: window.__asked }));
+  const asked = r.asked.filter(x => x.text === NAR.text && x.speaker === NAR.speaker);
+  check(asked.length > 0, `narrator step: the radio asks the voice helper for the line's ${NAR.speaker} sample, say_en having it`, asked.map(x => `bar ${(x.bar + 1).toFixed(2)}`).join(', '));
+  const fetched = r.ev.find(e => e.k === 'fetch' && e.f === rel);
+  check(!!fetched && fetched.bar < s1.start, `narrator step: the sample is fetched before the next song's first bar (bar ${s1.start + 1})`, fetched ? `on bar ${(fetched.bar + 1).toFixed(2)}` : 'never');
+  const plays = r.ev.filter(e => e.k === 'play' && e.bar >= s1.start), mine = plays.filter(e => e.f === rel), def = plays.filter(e => e.f === `say_en/${slugOf(NAR.text)}.wav`);
+  check(mine.length > 0, `narrator step: the line plays from ${NAR.bank} in the next song`, `${mine.length} times${def.length ? `, ${def.length} from say_en` : ''}`);
+  check(!errors.length, 'narrator step: no page errors', errors.slice(0, 2).join(' | '));
+  await page.click('#radio-start').catch(() => {});
+  await page.close();
 }
 
 (async () => {
@@ -182,7 +243,9 @@ function freshPhrase() {
   console.log(`      scheduler: ${logs.long} "took too long", ${logs.late} "skip query: too late" (CPU slowed ${RATE}x)`);
   check(!errors.length, 'no page errors', errors.slice(0, 2).join(' | '));
   await page.click('#radio-start').catch(() => {});
+  if (SPEAKER) await narratorStep(ctx);
   await browser.close();
+  putBack();
   if (failed) { console.log(`\n${failed} failed`); process.exit(1); }
   console.log('\nall passed');
 })();

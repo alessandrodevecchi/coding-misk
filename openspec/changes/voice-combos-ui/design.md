@@ -103,8 +103,15 @@ Cost estimate: model and UI (a select per card, stored in the same override key 
 
 ## Open Questions
 
-1. Replay uses the recorded table (D5). Recommended: yes.
-2. A style change applies from the next session, not the on-air one (D5). Recommended: yes.
-3. The grid sits behind a per-card disclosure (D7). Recommended: yes.
-4. Fallback options (D8). Recommended: defer.
-5. Should the app also offer "Copy as combos.json" so a good set can be committed as the new defaults? Recommended: yes, later, small (about 1 h); not in these tasks.
+Answered by the owner (every recommendation taken):
+
+1. Replay uses the recorded table (D5). Yes.
+2. A style change applies from the next session, not the on-air one (D5). Yes, with the note while a session is on air.
+3. The grid sits behind a per-card disclosure (D7) with "n of 10 allowed". Yes.
+4. Fallback options (D8). Deferred: tasks 6.x stay open.
+5. "Copy as combos.json". Not needed: the owner sets the new defaults once, later, by copying the overrides from a backup into `src/voices/combos.json` by hand. No button.
+
+Implementation notes:
+
+- The Voices tab has one card for the default voice (Samantha in English, Alice in Italian), not two: it edits `en.default` and `it.default` together, as the spec says, and shows the draw result for the default voice (both lists).
+- Shared links: the app's only share link is the strudel.cc link of the code shown, which carries the written code, not a recipe, so `recipe.combos` needs no room there. Saved sessions, the radio history and the exports carry the recipe whole, `combos` included.

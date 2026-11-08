@@ -10,12 +10,16 @@
 // open, and a save with a slow helper; the test bench's line on allowed voice style pairs (voice-style-combos), in
 // Italian and English. With shots-dir: pictures of the tab, the phrase editor, the Settings card and the Chiedi notice
 // in neon, hardware and light, at desktop and 400 px.
-// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voices-tab.cjs [shots-dir]
+// The Draw styles grid of the voice cards (voice-combos-ui): toggles, the stored overrides, Reset, a reload, a corrupt
+// value, the bench, the on-air note, English and pictures (--grid runs only that).
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-voices-tab.cjs [shots-dir] [--grid]
 //   (dev server on PORT, default 5173, with the voice helper: macOS `say` and ffmpeg; samples in public/samples)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
 const PORT = process.env.PORT || 5173, URL = `http://localhost:${PORT}/`;
 const shots = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : null;
+// --grid: only the Draw styles grid of the voice cards (voice-combos-ui)
+const GRID_ONLY = process.argv.includes('--grid');
 const SAMPLES = path.join(__dirname, '..', 'public', 'samples');
 // a click through the element (the sticky top bar never takes it), found and clicked in one step: the tab draws itself
 // again when a sample is made, and page.$eval could click a button that drawing had just replaced (lost click)
@@ -54,11 +58,94 @@ async function radioOn(page, seed) {
 async function say(page, text) { await page.fill('#radio-steer [data-sv-line]', text); await tap(page, '#radio-steer [data-sv-say="now"]'); await sleep(900); }
 const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; const el = await page.$(sel); if (el) await el.screenshot({ path: path.join(shots, `${name}.png`) }); };
 
+// ---------- the Draw styles grid of the voice cards (voice-combos-ui) ----------
+// toggles per voice stored as overrides (only the changed speakers), clear off with its note, the last style on locked,
+// the changed mark, n of 10 allowed,
+// the note and the "limited by Alice" mark, Reset per voice, a reload, a corrupt stored value, the bench following the
+// effective table, the on-air note, English; pictures of a card open in neon, hardware and light at desktop and 400 px
+const KEY = 'coding-misk-voice-combos';
+const stored = page => page.evaluate(k => JSON.parse(localStorage.getItem(k) || 'null'), KEY);
+const card = sp => `.vt-speaker[data-vt-speaker="${sp}"]`;
+const chip = (sp, id) => `${card(sp)} [data-vt-cs="${id}"]`;
+const openGrid = (page, sp) => page.evaluate(s => { const d = document.querySelector(`.vt-speaker[data-vt-speaker="${s}"] [data-vt-grid]`); if (d && !d.open) d.querySelector('summary').click(); }, sp);
+const gridState = (page, sp) => page.evaluate(s => {
+  const c = document.querySelector(`.vt-speaker[data-vt-speaker="${s}"]`), g = c && c.querySelector('[data-vt-grid]');
+  if (!g) return null;
+  const chips = [...g.querySelectorAll('[data-vt-cs]')];
+  return { open: g.open, count: g.querySelector('[data-vt-grid-count]').textContent, on: chips.filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.vtCs), changed: chips.filter(b => b.classList.contains('changed')).map(b => b.dataset.vtCs), limited: chips.filter(b => b.classList.contains('limited')).map(b => b.dataset.vtCs), clear: (b => b && !b.disabled && b.getAttribute('aria-pressed') === 'true')(g.querySelector('[data-vt-cs="clear"]')), locked: chips.filter(b => b.disabled).map(b => b.dataset.vtCs), noClear: !!g.querySelector('[data-vt-cs-noclear]'), reset: !!g.querySelector('[data-vt-cs-reset]'), note: (g.querySelector('[data-vt-cs-note]') || {}).textContent || '', lim: (g.querySelector('[data-vt-cs-lim]') || {}).textContent || '', next: !!g.querySelector('[data-vt-cs-next]') };
+}, sp);
+async function gridChecks(page) {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await fresh(page, { lang: 'it' }); await openTab(page, 'voices');
+  let a = await gridState(page, 'albert');
+  check(a && !a.open && a.count === '10 su 10 consentiti' && a.clear && a.on.length === 10 && !a.reset && /In italiano parla Alice/.test(a.note), 'griglia: Albert closed by default, 10 su 10, clear on and free, no Reset, the note on Alice', JSON.stringify(a));
+  await openGrid(page, 'albert'); await tap(page, chip('albert', 'robot')); await sleep(300);
+  a = await gridState(page, 'albert');
+  check(a.open && !a.on.includes('robot') && a.changed.join() === 'robot' && a.reset && a.count === '9 su 10 consentiti', 'griglia: Robot off on Albert, marked, Reset shown, 9 su 10, the grid stays open', JSON.stringify(a));
+  check(JSON.stringify(await stored(page)) === JSON.stringify({ format: 1, en: { albert: ['clear', 'radio', 'distant', 'deep', 'bright', 'cathedral', 'echo', 'dirty', 'slow'] } }), 'griglia: only Albert stored, a full list in en', JSON.stringify(await stored(page)));
+  await tap(page, chip('albert', 'clear')); await sleep(300);
+  a = await gridState(page, 'albert');
+  check(!a.on.includes('clear') && a.noClear && a.count === '8 su 10 consentiti' && !(await stored(page)).en.albert.includes('clear'), 'griglia: clear can be turned off, with the always-an-effect note', JSON.stringify(a));
+  await tap(page, chip('albert', 'clear')); await sleep(300);
+  a = await gridState(page, 'albert');
+  check(a.on.includes('clear') && !a.noClear && a.count === '9 su 10 consentiti', 'griglia: clear on again', JSON.stringify(a));
+  await openGrid(page, 'kathy'); await tap(page, chip('kathy', 'echo')); await sleep(300);
+  // the bench follows the effective table (2.3): Kathy in English with echo off
+  await page.evaluate(() => localStorage.setItem('coding-misk-lang', 'en')); await page.reload(); await sleep(2500); await openTab(page, 'voices');
+  await page.selectOption('[data-vt-bench="speaker"]', 'kathy'); await page.selectOption('[data-vt-bench="style"]', 'echo'); await sleep(150);
+  const bench = await page.$eval('[data-vt-bench-status]', el => el.textContent);
+  check(bench === 'Not in the allowed set for Kathy (still playable)', 'bench: follows the override after a reload (Kathy, echo off)', bench);
+  let k = await gridState(page, 'kathy');
+  check(k && !k.on.includes('echo') && k.count === '9 of 10 allowed' && /In Italian Alice speaks for this voice/.test(k.note), 'grid in English: the toggle survives a reload, "9 of 10 allowed", the note', JSON.stringify(k));
+  check(await page.$eval(`${card('kathy')} summary .lbl`, el => el.textContent) === 'Draw styles', 'grid in English: "Draw styles"');
+  await page.evaluate(() => localStorage.setItem('coding-misk-lang', 'it')); await page.reload(); await sleep(2500); await openTab(page, 'voices');
+  // the default voice's card edits en.default and it.default; a style off there is off for Albert through Alice
+  await openGrid(page, ''); await tap(page, chip('', 'deep')); await sleep(300);
+  const st = await stored(page), d = await gridState(page, '');
+  check(st.en.default && st.it.default && !st.en.default.includes('deep') && !st.it.default.includes('deep') && /Cambia Samantha \(inglese\) e Alice \(italiano\)/.test(d.note), 'griglia: the default voice card edits en.default and it.default', JSON.stringify({ st, note: d.note }));
+  await openGrid(page, 'albert'); a = await gridState(page, 'albert');
+  check(a.on.includes('deep') && a.limited.join() === 'deep' && /Spenti dalla lista di Alice: Profonda|Spenti dalla lista di Alice: /.test(a.lim), 'griglia: Deep still on for Albert, marked limited by Alice', JSON.stringify(a));
+  await page.selectOption('[data-vt-bench="speaker"]', ''); await page.selectOption('[data-vt-bench="style"]', 'deep'); await sleep(150);
+  check(/Non tra gli stili consentiti per Alice/.test(await page.$eval('[data-vt-bench-status]', el => el.textContent)), 'banco: Alice with deep off');
+  // Reset clears only that voice
+  await tap(page, `${card('albert')} [data-vt-cs-reset]`); await sleep(300);
+  const after = await stored(page); a = await gridState(page, 'albert');
+  check(!after.en.albert && after.en.kathy && after.en.default && !a.reset && a.changed.length === 0 && a.on.length === 10, 'griglia: Reset clears Albert only (Kathy and the default voice kept)', JSON.stringify(after));
+  check(/predefiniti/.test(await toastText(page)), 'griglia: the reset toast', await toastText(page));
+  if (shots) { await openGrid(page, 'kathy'); await page.$eval(card('albert'), el => el.scrollIntoView()); await sleep(200); }
+  // pictures: a card with its grid open and an override, neon, hardware and light, desktop and 400 px
+  for (const [ui, w] of [['neon', 1300], ['hw', 1300], ['light', 1300], ['neon', 400], ['hw', 400], ['light', 400]]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await page.evaluate(u => { localStorage.setItem('coding-misk-ui', JSON.stringify(u)); localStorage.setItem('coding-misk-ui-follow', 'false'); }, ui);
+    await page.reload(); await sleep(2500); await openTab(page, 'voices');
+    await openGrid(page, 'kathy'); await openGrid(page, 'albert'); await sleep(200);
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `griglia ${ui} ${w} px: no sideways scroll`);
+    if (shots) { await page.$eval(card('kathy'), el => el.scrollIntoView({ block: 'center' })); await sleep(150); await shot(page, `combos-grid-${ui}-${w}`, card('kathy')); await shot(page, `combos-grid-albert-${ui}-${w}`, card('albert')); }
+  }
+  await page.setViewportSize({ width: 1300, height: 900 });
+  // a corrupt stored value: the committed table, no page error
+  await page.evaluate(k => localStorage.setItem(k, '{"format":1,"en":{"kathy":["bogus"'), KEY); await page.reload(); await sleep(2500); await openTab(page, 'voices');
+  k = await gridState(page, 'kathy');
+  check(k && k.on.length === 10 && !k.reset, 'griglia: a corrupt stored value gives the committed table', JSON.stringify(k));
+  await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ format: 1, en: { kathy: ['bogus', 'radio'] } })), KEY); await page.reload(); await sleep(2500); await openTab(page, 'voices');
+  k = await gridState(page, 'kathy');
+  check(k && k.on.join() === 'radio' && k.locked.join() === 'radio' && k.noClear, 'griglia: an unknown id is ignored, the rest used; the last style on is locked', JSON.stringify(k));
+  await openGrid(page, 'kathy'); await tap(page, chip('kathy', 'radio')); await sleep(200);
+  check((await gridState(page, 'kathy')).on.join() === 'radio', 'griglia: the last style on cannot be turned off');
+  // on air: the note that a change applies from the next session
+  await radioOn(page, 'griglia-1');
+  await openTab(page, 'voices'); await openGrid(page, 'fred');
+  check((await gridState(page, 'fred')).next, 'griglia: "Vale dalla prossima sessione radio" while a session is on air');
+  await tap(page, '#stop').catch(() => {}); await sleep(300);
+  await page.evaluate(k => localStorage.removeItem(k), KEY);
+}
+
 (async () => {
   const browser = await launch();
   const page = await browser.newPage({ viewport: { width: 1300, height: 900 } });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
+  if (GRID_ONLY) { await gridChecks(page); check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | ')); await browser.close(); console.log(failed ? `\n${failed} failed` : '\nall passed'); process.exit(failed ? 1 : 0); }
   // the radio's typed lines: a fake helper (the sample "is made" at once, the file does not exist)
   await page.route('**/voice/say', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"bank":"say_it","n":0,"seconds":1,"made":true}' }));
 
@@ -363,6 +450,7 @@ const shot = async (page, name, sel = '#tab-voci') => { if (!shots) return; cons
     const yes = await st();
     check(no === 'Not in the allowed set for Albert (still playable)' && yes === 'Allowed for Albert', 'bench in English: robot not allowed for Albert, deep allowed', `${no} | ${yes}`);
     await setCombos(page, null); }
+  await gridChecks(page);
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
   console.log(failed ? `\n${failed} failed` : '\nall passed');

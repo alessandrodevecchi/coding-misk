@@ -19,7 +19,7 @@ import { steerSong } from './endless/steering.js';
 import { VOCAB_GROUPS } from './song/vocabulary.js';
 import { PROFILES, PROFILE_IDS, resolveProfile, songProfile, cleanOverrides, growthRules, writtenOptions } from './live/profiles.js';
 import { TRIALS_KEY, configOf, controlsOf, cleanTrials, setTrial, withConfig, compactConfig, plannedOf, normalConfig, setDuration } from './live/song-config.js';
-import { OPENINGS, PACES, DEVELOPMENTS, resolveShape, shapeFacts, canPlay, SHAPES_VERSION } from './song/shapes.js';
+import { OPENINGS, LEAD_OPENINGS, PACES, DEVELOPMENTS, resolveShape, resolveLead, shapeFacts, canPlay, SHAPES_VERSION } from './song/shapes.js';
 import { liveCode } from './live/live-code.js';
 import { installHelpers, useFns, FUNCTION_PRESETS, FUNCTION_OPTIONS, functionOptions, writeCode, levelsOf, busesOf, functionContext, tail, preludeText } from './song/writer.js';
 import { upgradeLibrary } from './library/code-upgrade.js';
@@ -100,6 +100,7 @@ import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
 import { textIn } from './voices/phrases.js';
 import { createVoicesTab } from './voices/voices-tab.js';
+import { createCombosStore } from './voices/combos-store.js';
 import { narratorPick } from './voices/mine.js';
 import { setNarratorMine } from './song/build.js';
 import { PHRASES_MOMENT } from './voices/moments.js';
@@ -132,6 +133,8 @@ const store = {
   remove(k) { try { localStorage.removeItem(k); } catch (e) {} },
 };
 setLang(getLang());
+// the allowed voice styles (voice-combos-ui): the user's overrides over src/voices/combos.json, read before any draw
+const combosStore = createCombosStore(store);
 // my phrases (my-phrases D4): the narrator of the song in Compose may say phrases of the collection in place of lines
 // from the built-in pools, never the song's own written lines; a radio song draws from the snapshot it carries
 let phr = null;
@@ -243,7 +246,7 @@ function radioPlayable(W, songs = null) {
   const meta = parseSong(compileSong(stateAt(W, 0).song)), v = W.sections.flatMap(x => [x.bpm ?? 138, x.bpmEnd ?? x.bpm ?? 138]), lo = Math.min(...v), hi = Math.max(...v);
   meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
   // (soundCode: every sound of the window in one code, for the soundfonts loaded ahead; hidden: the songs not shown)
-  return { id: W.id, title: W.title, kind: 'composed', look: W.look, code: L.codeAt(0), meta, codeAt: L.codeAt, codeKeep: null, run: L.run, standalone: L.standalone, paste: L.paste, earlier: L.earlier, buses: L.buses, fns: L.fns, build: L.build, ctl: L.ctl, doc: L.build, air: true, hidden: L.hidden(), prepare: L.prepare, soundCode: () => compileSong({ ...W, build: undefined }) };
+  return { id: W.id, title: W.title, kind: 'composed', look: W.look, code: L.codeAt(0), meta, codeAt: L.codeAt, codeKeep: null, run: L.run, standalone: L.standalone, paste: L.paste, earlier: L.earlier, buses: L.buses, fns: L.fns, build: L.build, ctl: L.ctl, doc: L.build, air: true, hidden: L.hidden(), prepare: (slice, alive) => planAway(L, alive).then(ok => (ok ? undefined : L.prepare(slice, alive))), soundCode: () => compileSong({ ...W, build: undefined }) };
 }
 // a radio session's songs joined into one playable song, as its exports play it (radio-profiles D12). A session of
 // Classic songs is the joined song with Classic controls, as before. With a grown song (or the Custom profile) the file
@@ -290,24 +293,41 @@ function sessionPlayable(items, seed, options, id, air = null) {
 // the worker gets the voice instrument's context and the language of the page, so a song grows there as it would here
 // (a console change of the radio, console-add-ahead D4, goes to a worker of its own: in the growth worker it waited
 // behind the next song's growth, up to 20 s)
-const lanes = { grow: { worker: null, waits: new Map() }, console: { worker: null, waits: new Map() } };
+const lanes = { grow: { worker: null, waits: new Map() }, console: { worker: null, waits: new Map() }, plan: { worker: null, waits: new Map() } };
 let growN = 0;
 // (steering a grown song, radio-profiles stage 5: the commands as waypoints are worked out there too)
 // (and a Classic song's steering, console-add-ahead D4: classic holds steerSong's arguments; a steer with view also gives
 // the director's view of the grown song back. Without the worker both run in the page, in a task of their own)
-function growAway(song, ctx, steer = null, classic = null, lane = 'grow') {
+function laneWorker(L) {
+  if (L.worker || L.worker === false) return;
+  L.worker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
+  L.worker.onmessage = e => { const w = L.waits.get(e.data && e.data.id); if (!w) return; L.waits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.plan || e.data.song); };
+  L.worker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of L.waits.values()) w.reject(new Error('worker')); L.waits.clear(); L.worker = false; };
+}
+// the radio's workers started with a session (#82): a worker loads its modules on its first job, which then waited
+// for that (a Classic session's first command, its first window plan)
+function warmLanes() {
+  for (const k of ['grow', 'plan']) { const L = lanes[k]; if (L.worker) continue; try { laneWorker(L); if (L.worker) L.worker.postMessage({ warm: true }); } catch (e) { L.worker = false; } }
+}
+// the written plan of a radio window's song on air made in a worker of its own (#82): made in the page, in slices, it
+// took most of the time after a console command on a slow computer. Resolves true once the plan is in the window (or
+// it needs none), false when it could not be made there (the page makes it, as before)
+function planAway(L, alive) {
+  const job = L.planWork ? L.planWork() : null;
+  if (!job) return Promise.resolve(true);
+  const lang = getLang();
+  return growAway(null, null, null, null, 'plan', { plan: { build: job.build, ctl: job.ctl, lang, limits: globalThis.codingMiskAhead || null } })
+    .then(r => { if (!r || !Array.isArray(r.edits)) return false; if (alive() && getLang() === lang) L.setPlan({ edits: new Map(r.edits), ahead: r.ahead }, lang); return true; }, () => false);
+}
+function growAway(song, ctx, steer = null, classic = null, lane = 'grow', extra = null) {
   const here = () => (classic || (steer && steer.view) ? new Promise(r => setTimeout(r, 0)) : Promise.resolve()).then(() => (classic ? (({ song: s, plan, opts }) => ({ song: s, plan, opts }))(steerSong(classic)) : steer ? (r => ({ song: r.song, grown: r.grown, commands: r.commands, ...(steer.view ? { view: steerView(steer, r) } : {}) }))(steerOnAir(steer)) : growOnAir(song, ctx)));
   const L = lanes[lane];
   try {
-    if (!L.worker) {
-      L.worker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
-      L.worker.onmessage = e => { const w = L.waits.get(e.data && e.data.id); if (!w) return; L.waits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.song); };
-      L.worker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of L.waits.values()) w.reject(new Error('worker')); L.waits.clear(); L.worker = false; };
-    }
-    if (L.worker === false) return here();
+    laneWorker(L);
+    if (L.worker === false) return extra ? Promise.reject(new Error('worker')) : here();
     const id = ++growN, spoken = { files: spokenContext.files, lengths: spokenContext.lengths, lang: spokenContext.lang || getLang(), styles: spokenContext.styles };
-    return new Promise((resolve, reject) => { L.waits.set(id, { resolve, reject }); L.worker.postMessage({ id, song, ctx, spoken, steer, classic }); });
-  } catch (e) { return here(); }
+    return new Promise((resolve, reject) => { L.waits.set(id, { resolve, reject }); L.worker.postMessage({ id, song, ctx, spoken, steer, classic, ...(extra || {}) }); });
+  } catch (e) { return extra ? Promise.reject(e) : here(); }
 }
 // the page's own growths away from the page (grow-worker.js, a second worker so the radio never waits for them): the
 // song restored in Compose at start and the grown lengths of the song cards on screen. No worker: the promise fails and
@@ -478,6 +498,13 @@ function capsOf(sg) {
 }
 const NO_CAPTIONS = Object.freeze({ rows: [], tag: '', history: [] });
 let lastCapHtml = '', lastCapFit = '';
+// the stage's size for the captions' fit key, kept by a ResizeObserver (#82: read every frame, it forced a layout right
+// after a live build step changed the editor)
+let capStage = null;
+{
+  const wrap = document.getElementById('say') && document.getElementById('say').parentElement;
+  if (wrap && typeof ResizeObserver === 'function') new ResizeObserver(() => { capStage = `${wrap.clientWidth}x${wrap.clientHeight}`; }).observe(wrap);
+}
 // the caption lane's lines fitted in the room it has (the free side of Code over, the stage, a phone): shrunk, then on
 // two or three lines, cut with … only at the smallest size (fitCaption, the same rule as the videos). The room mirrors
 // the CSS: .say's max-width and padding, the lane at the bottom 3% under a whole-width code
@@ -871,10 +898,18 @@ function markMuted() {
 }
 // code-widgets D4, D5: the hidden parameter groups of the widgets, from the settings, the code theme's widget colours
 // (code-themes D7) and the panel
+// (#82: the panel's width kept by a ResizeObserver: read on each evaluation, right after a live build step changed the
+// editor, it forced a layout)
+let edhostW = null;
+{
+  const host = $('#edhost');
+  if (host && typeof ResizeObserver === 'function') new ResizeObserver(() => { edhostW = host.clientWidth; }).observe(host);
+}
 function widgetGroups() {
   const S = cwSettings(), W = codeThemes.current.roles.widget;
   const host = $('#edhost');
-  return widgetOptions(S, { fg: W.ink, accent: W.a1, accent2: W.a2, muted: W.muted }, host ? host.clientWidth - 72 : 500);
+  if (edhostW === null && host) edhostW = host.clientWidth;
+  return widgetOptions(S, { fg: W.ink, accent: W.a1, accent2: W.a2, muted: W.muted }, host ? edhostW - 72 : 500);
 }
 // code-widgets D9, D10: at a section boundary without a step the widgets move (a song as written, Classic's past
 // sections): the code of the boundary and one evaluation, as a step does. A typing in progress keeps its code: the
@@ -908,17 +943,27 @@ function followPause() {
   clearTimeout(followTimer); followTimer = setTimeout(followSync, FOLLOW_PAUSE_MS + 20);
   followSync();
 }
+// (#82: the geometry is read in CodeMirror's own measure phase, after the layout it makes anyway, once per frame; read
+// right after each typing frame's edit it forced a second layout of the editor every frame)
+let followHost = null;
+const followMeasure = { key: 'coding-misk-follow', i: 0, read: view => {
+  const host = followHost && followHost.isConnected ? followHost : (followHost = $('#edhost'));
+  if (!host) return null;
+  // lineBlockAt works for lines CodeMirror has not drawn yet (below the window), coordsAtPos does not
+  const blk = view.lineBlockAt(Math.min(followMeasure.i, view.state.doc.length)), box = host.getBoundingClientRect();
+  return { host, top: view.documentTop + blk.top, bottom: view.documentTop + blk.bottom, box, scroll: host.scrollTop };
+}, write: m => {
+  if (!m) return;
+  // the visible part of the panel: it can run below the window
+  const top = Math.max(m.box.top, 0), bottom = Math.min(m.box.bottom, innerHeight);
+  // glide there (live-typing): about 0.3 s, eased; a new target replaces the old one
+  if (m.top < top + 8 || m.bottom > bottom - 8) glideTo(m.host, m.scroll + m.top - top - (bottom - top) / 3);
+} };
 function followScroll(i) {
-  const view = ed && ed.editor, host = $('#edhost');
-  try {
-    // lineBlockAt works for lines CodeMirror has not drawn yet (below the window), coordsAtPos does not
-    if (!view) return;
-    const blk = view.lineBlockAt(Math.min(i, view.state.doc.length)), at = { top: view.documentTop + blk.top, bottom: view.documentTop + blk.bottom };
-    // the visible part of the panel: it can run below the window
-    const box = host.getBoundingClientRect(), top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight);
-    // glide there (live-typing): about 0.3 s, eased; a new target replaces the old one
-    if (at.top < top + 8 || at.bottom > bottom - 8) glideTo(host, host.scrollTop + at.top - top - (bottom - top) / 3);
-  } catch (e) {}
+  const view = ed && ed.editor;
+  if (!view) return;
+  followMeasure.i = i;
+  try { view.requestMeasure(followMeasure); } catch (e) {}
 }
 function followEdit(a, b) {
   let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
@@ -970,8 +1015,14 @@ const typingHuman = () => !!(song && song.ctl && song.ctl.typist === 'human');
 // typing mistakes on (typing-mistakes); a stretch of typing is 16 bars, so app and video draw the same mistake rate
 const typingMistakes = () => !(song && song.ctl && song.ctl.mistakes === 'off');
 const stretchOf = bar => Math.floor(bar / 16);
+// (#82: the typing shows at most 30 frames a second: each frame edits the editor, and every edit is a layout of the
+// panel; at 60 the typing took most of a slow computer's time)
+const TYPE_FRAME_MS = 1000 / 30 - 2;
 function typeFrame(T, cyc) {
   if (cyc < T.start) return;
+  const tNow = performance.now();
+  if (T.frameAt !== undefined && tNow - T.frameAt < TYPE_FRAME_MS) return;
+  T.frameAt = tNow;
   const at = (cyc - T.start) / T.cps, txt = T.plan.frame(at);
   typingCursor = T.plan.cursor ? T.plan.cursor(at) : null;
   // for browser checks (typing-mistakes): whether a mistake is on screen now
@@ -994,9 +1045,20 @@ function liveBuild(sg, s, cyc) {
   // (#82: the step's code holds the widgets of its bar, so the section boundaries up to it are done: widgetTick in the
   // same tick must not write an earlier bar's code over the step's)
   cwAt = Math.max(cwAt, next.at);
-  const t0 = performance.now();
-  setCodeRange(codeNow(sg, next.at)); ed.evaluate();
-  lastStepMs = performance.now() - t0;
+  // (#82: the editor's change in this frame, the evaluation in a task of its own right after it: together, with the
+  // frame's layout, they made one long task of 90 to 150 ms with the CPU slowed 4 times. The step is due 0.1 cycle
+  // before its bar, so a task later is still in time; a song stopped or changed, or code changed, in between is not
+  // evaluated here)
+  const t0 = performance.now(), txt = codeNow(sg, next.at);
+  setCodeRange(txt);
+  const t1 = performance.now();
+  setTimeout(() => {
+    if (song !== sg || !isPlaying() || (ed.code || '') !== txt) return;
+    codeBar = next.at; codeFresh = true;
+    const t2 = performance.now();
+    ed.evaluate();
+    lastStepMs = t1 - t0 + performance.now() - t2;
+  }, 0);
 }
 // (the main thread's cost of the last step, for the radio's entry of a console change, console-add-ahead D2)
 let lastStepMs = 0;
@@ -2266,8 +2328,9 @@ function renderArranger() {
   $('#live-legend').textContent = t(on ? 'liveBuild' : 'codeOptsLbl');
   $$('[data-live-only="on"]').forEach(el => { el.hidden = !on; });
   $$('[data-live-only="crescendo"]').forEach(el => { el.hidden = !crescendo; });
-  // the growth shape belongs to the natural growth (Live coder)
-  $('#live-shape').hidden = !crescendo || C.growth !== 'natural';
+  // the growth shape belongs to the natural growth (Live coder); the Crescendo growth shows its Opening only
+  // (varied-openings D9)
+  $('#live-shape').hidden = !crescendo || (C.growth !== 'natural' && C.growth !== 'crescendo');
   $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments; $('#live-fns').value = C.functions;
   // (voice and spoken: "V:N code" and "V:T code" in Options, voice-track-tuning D11)
   for (const k of ['tracks', 'notes', 'steps', 'voice', 'spoken']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
@@ -2282,6 +2345,9 @@ function renderArranger() {
 // the values it cannot play disabled, and the shape that plays with where each part comes from
 function renderShape(C, building) {
   const T2 = { ...T, kind: 'composed' }, f = shapeFacts(T2, SHAPE_STYLES);
+  const lead = C.growth === 'crescendo';
+  for (const p of ['pace', 'development']) $(`#live-${p}`).closest('.ctrl').hidden = lead;
+  if (lead) return renderLead(C, building, T2, f);
   // (the song held as written while it grows away at start: the shape drawn, until the growth comes back)
   const c = building && C.growth === 'natural' && !compiled.pending ? crescendoOf(T2) : null;
   const shape = (c && c.crescendo && c.crescendo.shape) || resolveShape(T2, { user: { opening: C.opening, pace: C.pace, development: C.development }, styles: SHAPE_STYLES });
@@ -2297,6 +2363,19 @@ function renderShape(C, building) {
   const from = p => t(`shapeFrom:${(shape.from || {})[p] || 'seed'}`);
   $('#live-shape-now').textContent = t('shapeNow', { v: ['opening', 'pace', 'development'].map(p => t(`${p}:${shape[p]}`)).join(' · ') });
   $('#live-shape-now').title = ['opening', 'pace', 'development'].map(p => `${t(`${p}Lbl`)}: ${t(`${p}:${shape[p]}`)} (${from(p)})`).join('\n');
+}
+// the Opening control of the Crescendo growth (varied-openings D9): Auto and the lead openings; a Live-coder-only value
+// reads as Auto here and stays stored for Live coder
+function renderLead(C, building, T2, f) {
+  const c = building && !compiled.pending ? crescendoOf(T2) : null;
+  const drawn = (c && c.crescendo && c.crescendo.lead) || resolveLead(T2, { styles: SHAPE_STYLES }) || null;
+  const own = LEAD_OPENINGS.includes(C.opening) ? C.opening : 'auto', now = (c && c.crescendo && c.crescendo.lead) || resolveLead(T2, { styles: SHAPE_STYLES, user: own }) || null;
+  const sel = $('#live-opening');
+  sel.innerHTML = [`<option value="auto">${esc(drawn ? t('shapeAutoIs', { v: t(`opening:${drawn.opening}`) }) : t('shapeAuto'))}</option>`,
+    ...LEAD_OPENINGS.map(v => { const ok = canPlay('opening', v, f); return `<option value="${v}"${ok ? '' : ' disabled'}${ok ? '' : ` title="${esc(t('shapeCannot'))}"`}>${esc(t(`opening:${v}`))}</option>`; })].join('');
+  sel.value = own;
+  $('#live-shape-now').textContent = now ? t('shapeNow', { v: t(`opening:${now.opening}`) }) : '';
+  $('#live-shape-now').title = now ? `${t('openingLbl')}: ${t(`opening:${now.opening}`)} (${t(`shapeFrom:${now.from || 'seed'}`)})` : '';
 }
 // ---------- growth and ending columns (timeline-growth D2-D4) ----------
 // the growth column: hidden (a narrow tab), compact (fixed width, default) or open (the written song's scale)
@@ -2721,9 +2800,30 @@ $$('[data-arr-mode]').forEach(b => b.addEventListener('click', () => {
 // la posizione si calcola sui blocchi delle sezioni, così funziona in entrambe le viste
 // one scale for the played song (timeline-growth D5): every column of the strip (growth, written sections, ending)
 // says where it starts and how many bars it holds; inside a column the scale is linear
-function rulerGeo() {
-  const track = $('#ruler-track'), tr = track.getBoundingClientRect();
-  return { tr, bars: playMap().bars, secs: $$('#arr-strip [data-col-start]').map(b => { const r = b.getBoundingClientRect(); return { left: r.left - tr.left, width: r.width, start: +b.dataset.colStart, bars: +b.dataset.colBars, grow: b.dataset.xcol === 'growth' }; }) };
+// (#82: updateRuler runs every frame, also right after a live build step changed the editor: measuring there forced a
+// layout of the whole page, 20 ms with the CPU slowed 4 times. The measure is kept until the strip or the ruler changes
+// size or content, or something scrolls; a click or a drag on the ruler measures afresh)
+let rulerMemo = null;
+const rulerDirty = () => { rulerMemo = null; };
+function rulerGeo(fresh = false) {
+  if (fresh || !rulerMemo) {
+    const track = $('#ruler-track'), tr = track.getBoundingClientRect();
+    rulerMemo = { tr, secs: $$('#arr-strip [data-col-start]').map(b => { const r = b.getBoundingClientRect(); return { left: r.left - tr.left, width: r.width, start: +b.dataset.colStart, bars: +b.dataset.colBars, grow: b.dataset.xcol === 'growth' }; }) };
+  }
+  return { ...rulerMemo, bars: playMap().bars };
+}
+{
+  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(rulerDirty) : null;
+  for (const id of ['#ruler-track', '#arr-strip']) { const el = $(id); if (!el) continue; if (ro) ro.observe(el); }
+  // (the columns drawn again or the strip's grid changed; not the play head's position, set inside it every frame)
+  const strip = $('#arr-strip'), track = $('#ruler-track');
+  if (strip && typeof MutationObserver === 'function') {
+    new MutationObserver(rulerDirty).observe(strip, { childList: true, subtree: true });
+    new MutationObserver(rulerDirty).observe(strip, { attributes: true, attributeFilter: ['style', 'class'] });
+  }
+  addEventListener('resize', rulerDirty);
+  // (a scroll that moves the ruler: the page's or a box around it, not the code panel's)
+  document.addEventListener('scroll', e => { const el = e.target; if (el === document || el === document.documentElement || !track || (el.contains && el.contains(track))) rulerDirty(); }, { capture: true, passive: true });
 }
 function barToX(g, bar) {
   const s = g.secs.find(x => bar < x.start + x.bars) || g.secs[g.secs.length - 1];
@@ -2740,7 +2840,7 @@ function xToBar(g, x) {
 }
 function renderRuler() {
   requestAnimationFrame(() => {
-    const g = rulerGeo(), P = playMap(), M = compiled.meta, every = P.bars > 96 ? 8 : 4;
+    const g = rulerGeo(true), P = playMap(), M = compiled.meta, every = P.bars > 96 ? 8 : 4;
     // the growth: minutes and its steps when compact, nothing in the hidden tab, bars like the song when open
     const inGrow = b => b < P.G, open = growView === 'open';
     let html = '';
@@ -2785,7 +2885,7 @@ globalThis.codingMiskCaptions = {
 let rulerDrag = null;
 $('#ruler-track').addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
-  const g = rulerGeo(); rulerDrag = { g, bar: xToBar(g, e.clientX - g.tr.left) };
+  const g = rulerGeo(true); rulerDrag = { g, bar: xToBar(g, e.clientX - g.tr.left) };
   $('#ruler-track').setPointerCapture(e.pointerId); e.preventDefault();
 });
 $('#ruler-track').addEventListener('pointermove', e => { if (rulerDrag) rulerDrag.bar = xToBar(rulerDrag.g, e.clientX - rulerDrag.g.tr.left); });
@@ -3092,7 +3192,7 @@ function sampleState(sp, texts) {
   const files = spokenContext.files, lang = getLang();
   if (files === null) return 'ok';
   const bank = sayBank(lang, speakerOf(T, sp));
-  const ok = x => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
+  const ok = x => [bank, bank.replace(/_[a-z0-9]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
   if (texts.every(ok)) return 'ok';
   return texts.some(x => sampleAsked.has(`${bank}/${saySlug(x)}`)) ? 'wait' : 'none';
 }
@@ -3201,7 +3301,7 @@ function typedInput(text, lang, sg) {
 }
 const lineSamples = () => {
   const out = [], lang = getLang(), files = spokenContext.files || {};
-  const has = (bank, x) => [bank, bank.replace(/_[a-z]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
+  const has = (bank, x) => [bank, bank.replace(/_[a-z0-9]+$/, '')].some(b => slugAt(files[b], saySlug(x)) >= 0);
   for (const sp of T.tracks.filter(x => x.type === 'spoken')) {
     const speaker = speakerIn(lang, speakerOf(T, sp)), bank = sayBank(lang, speaker);
     let rows = []; try { rows = phraseRows(T, sp.id, { lang }); } catch (e) { rows = []; }
@@ -3266,7 +3366,7 @@ function playLate(lines) {
     let at = Math.ceil(now * 4 + 0.01) / 4;
     if (at >= x.at + 1 || busy(at)) at = Math.floor(now) + 1;
     if (at >= x.at + 2 || busy(at)) continue;
-    const bank = [x.bank, x.bank.replace(/_[a-z]+$/, '')].find(b => slugAt(files[b], saySlug(x.text)) >= 0);
+    const bank = [x.bank, x.bank.replace(/_[a-z0-9]+$/, '')].find(b => slugAt(files[b], saySlug(x.text)) >= 0);
     if (!bank) continue;
     const n = slugAt(files[bank], saySlug(x.text)), tr = voiceOf(song.build), v = { gain: 1, tempo: 1, ...((tr && tr.settings) || {}) };
     try { globalThis.superdough({ s: bank, n, gain: v.gain, speed: v.tempo, orbit: 15 }, globalThis.getAudioContext().currentTime + (at - now) / cps, 2); } catch (e) { continue; }
@@ -4968,6 +5068,7 @@ try {
   const clock = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 100)'], { type: 'text/javascript' })));
   clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); if (preview) preview.tick(); if (radioPreview) radioPreview.tick(); if (labPreview) labPreview.tick(); } };
 } catch (e) {}
+const songsTab = $('#tab-brani');
 (function transport() {
   requestAnimationFrame(transport);
   applyMaster();
@@ -5021,7 +5122,7 @@ try {
   { const sayEl = $('#say'), f = playing && resumeTo === null && song && s ? stageCaptions(s.now(), { hand }) : NO_CAPTIONS;
     const html = look === 'claude' && capS.claude ? '' : captionHtml(f, capS, { label: capLabel, name: capName });
     // (fitted again when the stage changes size: full screen, the window, the Code over side or width)
-    const fitKey = html && `${html}|${sayEl.parentElement.clientWidth}x${sayEl.parentElement.clientHeight}|${coLane.on}${coLane.side}${coLane.width}`;
+    const fitKey = html && `${html}|${capStage || `${sayEl.parentElement.clientWidth}x${sayEl.parentElement.clientHeight}`}|${coLane.on}${coLane.side}${coLane.width}`;
     if (html && (html !== lastCapHtml || fitKey !== lastCapFit)) { sayEl.innerHTML = html; sayEl.dataset.rows = f.rows.length; fitLane(sayEl); lastCapFit = fitKey; }
     if (html) lastCapHtml = html;
     const where = capS.where === 'top' ? 'top' : 'bottom';
@@ -5041,7 +5142,8 @@ try {
     cols.forEach(x => x.classList.toggle('playing', x === b));
   }
   // avanzamento e pulsanti nelle card
-  $$('[data-song-card]').forEach(card => {
+  // (#82: only while the Songs tab shows its cards; every card was read and written every frame from any tab)
+  if (!songsTab || !songsTab.hidden) $$('[data-song-card]').forEach(card => {
     const c = cards[+card.dataset.songCard]; if (!c) return;
     const mine = song && song.id === c.tr.id;
     const active = playing && mine, isPaused = !playing && paused && mine;
@@ -5278,6 +5380,7 @@ RECIPES.splice(0, RECIPES.length, ...usableRecipes(stylesTab.usable()));
 // in Compose (marked changed, not saved)
 // the Voci tab (my-phrases D9)
 voicesTab = createVoicesTab({ root: $('#tab-voci'), phr, store, t, tx, esc, getLang, toast, helper: () => !!voiceHelper, files: () => customFiles,
+  combos: combosStore, radioOn: () => !!(radio && radio.on),
   recipes: RECIPES, songs: BUILTIN, library: () => librarySongs(), keys: except => sampleKeys(except), hear: x => hearLine(x),
   samplesChanged: async () => { await refreshSamples(); if (radio && radio.samplesArrived) radio.samplesArrived(); } });
 patternsTab = createPatternsTab({ root: $('#patterns'), t, tx, esc, store, toast, recipes: () => RECIPES,
@@ -5297,7 +5400,7 @@ patternsTab = createPatternsTab({ root: $('#patterns'), t, tx, esc, store, toast
 // for the browser checks (tools/check-patterns.cjs): the song open in Compose
 globalThis.codingMiskPatterns = { tab: patternsTab, compose: () => ({ T: JSON.parse(JSON.stringify(T)), sel, dirty }) };
 // for the browser check of my phrases (tools/check-voices-tab.cjs)
-globalThis.codingMiskPhrases = { phr, tab: voicesTab, code: () => (ed && ed.code) || '', manifest: () => customFiles, reload: () => refreshSamples(), keys: () => { const k = sampleKeys(); return { builtin: k.builtin.size, mine: [...k.mine], songs: k.songs.size }; } };
+globalThis.codingMiskPhrases = { phr, tab: voicesTab, combos: combosStore, code: () => (ed && ed.code) || '', manifest: () => customFiles, reload: () => refreshSamples(), keys: () => { const k = sampleKeys(); return { builtin: k.builtin.size, mine: [...k.mine], songs: k.songs.size }; } };
 // artists from artists/ plus the user's (Artists tab)
 const BUILTIN_ARTISTS = Object.values(import.meta.glob('../artists/*.json', { eager: true, import: 'default' })).sort((a, b) => a.name.localeCompare(b.name));
 artistsTab = createArtistsTab({ root: $('#tab-artisti'), t, tx, esc, store, builtins: BUILTIN_ARTISTS, styles: () => RECIPES, toast, onCompose: a => newSongFromArtist(a), onChange: () => { if (radio) radio.render(); renderArtistPick(); } });
@@ -5456,6 +5559,10 @@ radio = createRadio({
     steer: args => growAway(null, null, args),
     // a Classic song steered there too (console-add-ahead D4: the console's "+" and "−")
     steerClassic: args => growAway(null, null, null, args, 'console'),
+    // a Classic song steered there on a press of the console (#82), in the growth worker as a grown song's command
+    steerPlain: args => growAway(null, null, null, args),
+    // the growth and plan workers started ahead, with a session (#82)
+    warm: () => warmLanes(),
     // a grown song's console change steered there, with the director's view (console-add-ahead D4)
     steerAhead: args => growAway(null, null, args, null, 'console'),
     // (a Classic song of an old session that grows after its steering: grown there too)
@@ -5471,6 +5578,9 @@ radio = createRadio({
     start: (p, bar, o) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio', { voices: o && o.voices }); },
     // the next song's voice samples, as it will be written on air (#82)
     preloadVoices: list => queueVoices(list),
+    // a typed line's sample loaded and decoded at once ({ s, n }): resolves once its buffer is ready, so the line is
+    // put on a bar only then (#82: a sample still decoding on its bar was skipped, the line lost)
+    loadVoice: v => { const k = voicePath(v); if (voiceDone.has(k)) return Promise.resolve(); voiceQueued.add(k); return warmOne(v).then(() => { voiceQueued.delete(k); }); },
     // resume after a pause: by hand, the user's code goes on
     resumeAt: (p, bar) => playSong(p, bar, 'radio', { keepHand: true }),
     // a new window while the radio plays: the code on air does not change, the steps to come do

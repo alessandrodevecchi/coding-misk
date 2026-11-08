@@ -5,15 +5,30 @@
 // app and the Node checks resolve the same shape.
 import { stream } from '../endless/random.js';
 import { normalizeSong } from './format.js';
+import { meterSteps } from '../music.js';
+import { ideaRows } from './ideas.js';
 
 // raised when an intended change to the shape rules changes the steps of a checked Live coder build
 // (tools/check-crescendo.mjs, Live coder fixtures); saved growths carry it, so a new version grows them anew
-export const SHAPES_VERSION = 8;
+// 10 (kick-variety): the metamorphosis skin's four-floor drums draw a kick variant (switch-acid-prova, switch-prima-luce, switch-test-onda,
+// switch-test-stanza)
+export const SHAPES_VERSION = 10;
 // salt of the shape draws (resolveShape, shape search, growth stream): fixed at the value SHAPES_VERSION 5 used, so a
 // version raised for a rule fix (v6: blank lines in the typing alignment; v7: a melody rewrite turned by whole
 // mini-notation steps) keeps every song's drawn shapes; change it only when new draws are wanted
 export const SHAPES_SEED = 5;
-export const OPENINGS = ['slow', 'full-kick', 'typed', 'broken', 'filtered', 'melodic', 'pad', 'voice', 'muted-base', 'mid-set'];
+export const OPENINGS = ['slow', 'full-kick', 'typed', 'broken', 'filtered', 'melodic', 'pad', 'voice', 'muted-base', 'mid-set', 'bass', 'chord', 'top'];
+// the openings that name the track a build starts with (varied-openings D2): the drums with the kick, a melody, a pad,
+// the bass, a chord part, the drums without the kick. The Crescendo profile draws only these; in Live coder the openings
+// typed, muted-base and mid-set (and the voice's second track) draw their first track from them
+export const LEAD_OPENINGS = ['slow', 'full-kick', 'filtered', 'broken', 'melodic', 'pad', 'bass', 'chord', 'top'];
+export const KICK_LED = ['slow', 'full-kick', 'filtered', 'broken'];
+// kick starts (varied-openings D3): the first form of the kick when the drums lead slow or in Crescendo, as hits on a
+// bar of 16 steps; pair: the first two hits of the written kick
+export const KICKS = ['one', 'pair', 'two', 'four', 'push', 'off'];
+export const KICK_HITS = { one: [0], two: [0, 8], four: [0, 4, 8, 12], push: [0, 12], off: [8] };
+// the recipe field of the kick-start weights (growthShapes.kicks)
+export const KICK_KEY = 'kicks';
 export const PACES = ['slow', 'medium', 'fast'];
 export const DEVELOPMENTS = ['by-type', 'as-written', 'masks', 'parameters', 'second-section', 'metamorphosis'];
 export const SHAPE_PARTS = { opening: OPENINGS, pace: PACES, development: DEVELOPMENTS };
@@ -33,10 +48,12 @@ export function shapeCounts() {
 export const RECIPE_KEYS = { opening: 'openings', pace: 'paces', development: 'developments' };
 // weights when neither the song nor its style names a part (design D1)
 export const DEFAULT_WEIGHTS = {
-  opening: { slow: 2, 'full-kick': 1, typed: 1, broken: 1, filtered: 1, melodic: 1, pad: 1, voice: 0.5, 'muted-base': 1, 'mid-set': 1 },
+  opening: { slow: 1, 'full-kick': 1, typed: 1, broken: 1, filtered: 1, melodic: 1, pad: 1, voice: 0.5, 'muted-base': 1, 'mid-set': 1, bass: 1, chord: 1, top: 1 },
   pace: { slow: 1, medium: 2, fast: 2 },
   development: { 'by-type': 2, 'as-written': 2, masks: 1, parameters: 1, 'second-section': 1, metamorphosis: 0.5 },
 };
+// kick-start weights when the style names none (varied-openings D3)
+export const DEFAULT_KICKS = { one: 2, pair: 1, two: 1, four: 1, push: 1, off: 0.5 };
 const MELODIC_OPEN = ['arp', 'hook', 'guitar'];
 
 // a drum pattern with a kick: a written bd row, a bd list in a beat idea, or a preset groove
@@ -63,6 +80,11 @@ export function shapeFacts(song, styles = {}) {
   const types = new Set(dest.map(t => t.type));
   const ids = ((song.tags && song.tags.styles) || []).map(String);
   const recipe = ids.map(id => styles[id]).find(Boolean) || null;
+  // the drum rows of each drum track in the reference section, one bar (varied-openings: the top opening, kick starts)
+  const N = R ? meterSteps(R.meter) : 16;
+  const drumRows = dest.filter(t => t.type === 'drums').map(t => { const c = t.clips.find(x => over(x, R)), p = (t.patterns || {})[c && c.pattern] || {}; return p.rows || (p.idea ? ideaRows(p.idea, N) : {}); });
+  const bar = steps => String(steps || '').slice(0, N);
+  const kickRow = drumRows.map(r => bar(r.bd)).find(x => /x/.test(x)) || '';
   const siblings = recipe && recipe.family ? Object.values(styles).filter(r => r && r.id !== recipe.id && r.family === recipe.family) : [];
   return {
     count: dest.length, types,
@@ -75,6 +97,12 @@ export function shapeFacts(song, styles = {}) {
     // a voice that is part of the music (voice-instrument): a spoken track with an opening line; narrator voice tracks
     // never count
     voice: !!openingLine(n),
+    bass: types.has('bass'),
+    chord: types.has('pad') || types.has('guitar'),
+    // the drums without the kick: a row other than the kick with at least four hits in a bar
+    top: drumRows.some(r => Object.entries(r).some(([row, steps]) => row !== 'bd' && (bar(steps).match(/x/g) || []).length >= 4)),
+    // the written kick's hits on a bar of 16 steps (other grids scaled; a hit between two 16ths is left out)
+    kickHits: [...kickRow].map((c, i) => (c === 'x' ? (i * 16) / (kickRow.length || 16) : -1)).filter(i => i >= 0 && Number.isInteger(i)),
     material: dest.some(t => ['drums', 'bass', 'arp', 'hook', 'pad', 'guitar'].includes(t.type)),
     recipe, siblings,
   };
@@ -90,6 +118,9 @@ export function canPlay(part, value, f) {
     if (value === 'pad') return f.pad;
     if (value === 'voice') return f.voice;
     if (['muted-base', 'mid-set'].includes(value)) return f.count >= 3;
+    if (value === 'bass') return f.bass;
+    if (value === 'chord') return f.chord;
+    if (value === 'top') return f.top;
     return value === 'typed';
   }
   if (part === 'development') {
@@ -123,6 +154,40 @@ export function resolveShape(song, { user = {}, styles = {}, seed, weights: arti
   return out;
 }
 
+// the lead opening of a build (varied-openings D2): the first track of a Crescendo build, and of a Live coder build whose
+// opening names no track (typed, muted-base, mid-set, and the voice's second track). The user's lead opening (the
+// Compose control) wins, then the song's own `growthShape.opening`, then a draw from the artist's weights, the style's
+// weights (else the default weights), restricted to the lead openings the song can play. Stream "lead-1".
+// → { opening, from: 'user' | 'song' | 'artist' | 'style' | 'seed' } or null (nothing playable: the type order stays)
+export function resolveLead(song, { user = null, styles = {}, seed, weights: artistWeights = null, deny = null } = {}) {
+  const f = shapeFacts(song, styles), own = (song && song.growthShape) || {}, sw = (f.recipe && f.recipe.growthShapes) || {};
+  const rng = stream(String(seed ?? (song && song.id) ?? 'song'), 'lead-1');
+  const ok = v => LEAD_OPENINGS.includes(v) && canPlay('opening', v, f) && !(deny && (deny.opening || []).includes(v));
+  const draw = (w, sub) => { const cands = LEAD_OPENINGS.filter(v => ok(v) && Number((w || {})[v]) > 0); return cands.length ? rng.fork(sub).weighted(cands, cands.map(v => Number(w[v]))) : null; };
+  let v;
+  if (user && user !== 'auto' && ok(user)) return { opening: user, from: 'user' };
+  if (ok(own.opening)) return { opening: own.opening, from: 'song' };
+  if (artistWeights && (v = draw(artistWeights.openings, 'artist'))) return { opening: v, from: 'artist' };
+  if ((v = draw(sw.openings, 'style'))) return { opening: v, from: 'style' };
+  if ((v = draw(DEFAULT_WEIGHTS.opening, 'seed'))) return { opening: v, from: 'seed' };
+  return null;
+}
+// the kick start of a build (varied-openings D3): a start is playable when its hits are among the written kick's (pair:
+// at least two written hits), or when the style weights it explicitly (its first form only; the kick then grows from
+// the written kick thinned). The style's `growthShapes.kicks`, else the default weights; `one` is the fallback.
+// Stream "kick-1". facts: shapeFacts(song, styles) → a kick start id
+export function resolveKick(song, facts, { styles = {}, seed } = {}) {
+  const f = facts || shapeFacts(song, styles), hits = f.kickHits || [];
+  if (!hits.length) return 'one';
+  const style = f.recipe && f.recipe.growthShapes && f.recipe.growthShapes[KICK_KEY], w = style || DEFAULT_KICKS;
+  const fits = k => (k === 'pair' ? hits.length >= 2 : KICK_HITS[k].every(h => hits.includes(h)));
+  const cands = KICKS.filter(k => Number(w[k]) > 0 && (k === 'one' || fits(k) || (!!style && k !== 'pair')));
+  if (!cands.length) return 'one';
+  return stream(String(seed ?? (song && song.id) ?? 'song'), 'kick-1').weighted(cands, cands.map(k => Number(w[k])));
+}
+// the hits of a kick start on a bar of 16 steps (pair: the first two of the written kick)
+export const kickStartHits = (start, kickHits = []) => (start === 'pair' ? kickHits.slice(0, 2) : KICK_HITS[start] || [0]);
+
 // checks for a song's `growthShape` and a recipe's `growthShapes`; err takes (path, message)
 export function checkGrowthShape(v, err) {
   if (v === undefined) return;
@@ -134,8 +199,8 @@ export function checkGrowthShape(v, err) {
 }
 export function checkGrowthShapes(v, err) {
   if (v === undefined) return;
-  if (!v || typeof v !== 'object' || Array.isArray(v)) { err('growthShapes', 'an object with weights per part: { "openings": { "full-kick": 3 }, "paces": { "fast": 2 }, "developments": { "by-type": 1 } }'); return; }
-  const parts = Object.fromEntries(Object.entries(RECIPE_KEYS).map(([part, key]) => [key, SHAPE_PARTS[part]]));
+  if (!v || typeof v !== 'object' || Array.isArray(v)) { err('growthShapes', 'an object with weights per part: { "openings": { "full-kick": 3 }, "paces": { "fast": 2 }, "developments": { "by-type": 1 }, "kicks": { "four": 2 } }'); return; }
+  const parts = { ...Object.fromEntries(Object.entries(RECIPE_KEYS).map(([part, key]) => [key, SHAPE_PARTS[part]])), [KICK_KEY]: KICKS };
   for (const [k, w] of Object.entries(v)) {
     if (!parts[k]) { err(`growthShapes.${k}`, `unknown part; parts: ${Object.keys(parts).join(', ')}`); continue; }
     if (!w || typeof w !== 'object' || Array.isArray(w)) { err(`growthShapes.${k}`, 'weights by id, for example { "fast": 2, "medium": 1 }'); continue; }

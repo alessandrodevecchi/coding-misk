@@ -9,7 +9,14 @@ import { execFileSync, execFile } from 'node:child_process';
 // imports src/ would restart the dev server at every edit; check:spoken asserts they stay the same)
 export const saySlug = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 48);
 // (the speaker table of src/song/build.js, the same way: the speakers and the languages each speaks, real-voices D1, D2)
-export const SPEAKER_LANGS = { albert: ['en'], fred: ['en'], junior: ['en'], kathy: ['en'] };
+export const SPEAKER_LANGS = { albert: ['en'], fred: ['en'], junior: ['en'], kathy: ['en'], siri4: ['it'] };
+// the speakers spoken with the macOS system voice (`say` without -v): voices that `say -v` cannot name, such as the
+// Italian "Voce 4" set as the system voice in System Settings, Accessibility, Spoken Content (#82). The guard of D5
+// still applies: when the system voice speaks like the default voice, the speaker is not installed.
+export const SYSTEM_SPEAKERS = ['siri4'];
+export const SYSTEM_VOICE = '(system voice)';
+// the arguments of `say` for a voice: -v <name>, none for the system voice
+export const voiceArgs = v => (v === SYSTEM_VOICE ? [] : ['-v', v]);
 export const SPEAKERS = Object.keys(SPEAKER_LANGS);
 export const speaks = (lang, s) => (SPEAKER_LANGS[s] || []).includes(lang);
 export const sayBank = (lang, speaker) => (speaker && speaks(lang, speaker) ? `say_${lang}_${speaker}` : `say_${lang}`);
@@ -35,6 +42,7 @@ export function canSpeak() {
 export function systemVoice(lang, speaker, defaults = DEFAULT_VOICE) {
   if (!speaker) return defaults[lang];
   if (!speaks(lang, speaker)) return null;
+  if (SYSTEM_SPEAKERS.includes(speaker)) return SYSTEM_VOICE;
   const want = lang === 'it' ? ['it_IT'] : ['en_US', 'en_GB'], is = n => { const x = n.toLowerCase(); return x === speaker || x.startsWith(`${speaker} (`); };
   for (const loc of want) { const v = installedVoices().find(x => x.locale === loc && is(x.name)); if (v) return v.name; }
   return null;
@@ -63,19 +71,21 @@ export function sameAudio(a, b) { const x = audioData(a), y = audioData(b); retu
 export const PROBE = { en: 'the city is still awake', it: 'la città è ancora sveglia' };
 const probes = new Map();
 // two renders of the probe line, compared (a sync and an async form: the voice helper must not block)
-const render = (dir, lang, voice, defaults) => [['a', voice], ['b', defaults[lang]]].map(([n, v]) => ({ v, aiff: path.join(dir, `${n}.aiff`), wav: path.join(dir, `${n}.wav`) }));
+// (the system voice is also compared with the other languages' default voices: a system voice set back to one of
+// them is not the speaker either)
+const render = (dir, lang, voice, defaults) => [['a', voice], ['b', defaults[lang]], ...(voice === SYSTEM_VOICE ? Object.keys(defaults).filter(l => l !== lang && defaults[l] !== defaults[lang]).map(l => [`c${l}`, defaults[l]]) : [])].map(([n, v]) => ({ v, aiff: path.join(dir, `${n}.aiff`), wav: path.join(dir, `${n}.wav`) }));
 async function probe(lang, voice, defaults) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coding-misk-probe-')), r = render(dir, lang, voice, defaults);
   try {
-    for (const x of r) { await run('say', ['-v', x.v, '-o', x.aiff, PROBE[lang]]); await run('ffmpeg', FFMPEG(x.aiff, x.wav)); }
-    return !sameAudio(r[0].wav, r[1].wav);
+    for (const x of r) { await run('say', [...voiceArgs(x.v), '-o', x.aiff, PROBE[lang]]); await run('ffmpeg', FFMPEG(x.aiff, x.wav)); }
+    return r.slice(1).every(x => !sameAudio(r[0].wav, x.wav));
   } catch (e) { return false; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 function probeSync(lang, voice, defaults) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coding-misk-probe-')), r = render(dir, lang, voice, defaults);
   try {
-    for (const x of r) { execFileSync('say', ['-v', x.v, '-o', x.aiff, PROBE[lang]]); execFileSync('ffmpeg', FFMPEG(x.aiff, x.wav)); }
-    return !sameAudio(r[0].wav, r[1].wav);
+    for (const x of r) { execFileSync('say', [...voiceArgs(x.v), '-o', x.aiff, PROBE[lang]]); execFileSync('ffmpeg', FFMPEG(x.aiff, x.wav)); }
+    return r.slice(1).every(x => !sameAudio(r[0].wav, x.wav));
   } catch (e) { return false; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 // whether a system voice sounds different from the default voice of the language (false: listed, not installed).
@@ -126,7 +136,7 @@ export function makeSample(text, lang, speaker = '', { root = path.join('public'
   fs.mkdirSync(dir, { recursive: true });
   const tmp = path.join(dir, `.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.aiff`);
   try {
-    execFileSync('say', ['-v', voice, '-o', tmp, text]);
+    execFileSync('say', [...voiceArgs(voice), '-o', tmp, text]);
     execFileSync('ffmpeg', FFMPEG(tmp, out));
   } finally { fs.rmSync(tmp, { force: true }); }
   if (speaker && dropCopy(root, lang, speaker, text)) return { bank, file: null, made: false, copy: true };
@@ -141,7 +151,7 @@ export async function makeSampleAsync(text, lang, speaker = '', { root = path.jo
   fs.mkdirSync(dir, { recursive: true });
   const tmp = path.join(dir, `.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.aiff`);
   try {
-    await run('say', ['-v', voice, '-o', tmp, text]);
+    await run('say', [...voiceArgs(voice), '-o', tmp, text]);
     await run('ffmpeg', FFMPEG(tmp, out));
   } finally { fs.rmSync(tmp, { force: true }); }
   if (speaker && dropCopy(root, lang, speaker, text)) return { bank, file: null, made: false, copy: true };
@@ -175,14 +185,14 @@ export function writeLengths(root = path.join('public', 'samples'), only = null)
 
 // ---------- my-phrases: sample housekeeping (D5, D6, D8), shared with the dev server's voice helper ----------
 // A sample's path relative to public/samples: say_<lang>[_<speaker>]/<slug>.wav, nothing else
-export const SAMPLE_PATH = /^say_([a-z]{2})(_[a-z]+)?\/([a-z0-9_]{1,48})\.wav$/;
+export const SAMPLE_PATH = /^say_([a-z]{2})(_[a-z0-9]+)?\/([a-z0-9_]{1,48})\.wav$/;
 // "say_en_fred/x.wav" → "en|x": the key a page protects (by language and slug, every bank of that language)
 export const protectKey = rel => { const m = SAMPLE_PATH.exec(rel); return m ? `${m[1]}|${m[3]}` : null; };
 // Every say_* bank with its files and sizes (GET /voice/usage): { say_it: [{ f: 'x.wav', b: 81234 }] }
 export function sampleUsage(root = path.join('public', 'samples')) {
   const out = {};
   if (!fs.existsSync(root)) return out;
-  for (const bank of fs.readdirSync(root).filter(d => /^say_[a-z]{2}(_[a-z]+)?$/.test(d)).sort()) {
+  for (const bank of fs.readdirSync(root).filter(d => /^say_[a-z]{2}(_[a-z0-9]+)?$/.test(d)).sort()) {
     const dir = path.join(root, bank);
     if (!fs.statSync(dir).isDirectory()) continue;
     out[bank] = fs.readdirSync(dir).filter(f => f.endsWith('.wav')).sort().map(f => ({ f, b: fs.statSync(path.join(dir, f)).size }));

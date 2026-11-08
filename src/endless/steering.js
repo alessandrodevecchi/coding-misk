@@ -6,7 +6,7 @@ import { stream } from './random.js';
 import { stateAt, buildSteps } from '../song/build.js';
 import { playing, curveParts, CURVES } from './energy.js';
 import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, GROOVES, PROGS, meterSteps, fitSteps } from '../music.js';
-import { airIdea, composesOnAir, sessionSource, readyParts } from './material.js';
+import { airIdea, airGroove, rowsKey, composesOnAir, sessionSource, readyParts } from './material.js';
 import { presetOf, compose } from '../material/index.js';
 import { rewriteSpoken, nextQuiet, newSpokenTrack, wherePartsOf } from './voice-track.js';
 import { whereOfTrack } from '../song/spoken.js';
@@ -243,6 +243,45 @@ export function riserTarget(plan, at, cmd = {}) {
   return { change, start: dir === 'up' ? change - bars : change, end: dir === 'up' ? change : change + bars, bars, dir, sound: RISER_SOUNDS.includes(cmd.sound) ? cmd.sound : 'noise' };
 }
 
+// A riser pressed inside the growth of a grown radio song (#82): the written form's next part change comes after the
+// growth there (a growth of 280 bars over 272 written ones put a riser pressed on bar 30 on bar 256), so it goes on the
+// grown song itself, as a typed line does. It ends (up) or starts (down) on the first phrase start or growth step within
+// two phrases of the press bar `from` (grown bars) where its length fits, its first bar at least a bar and a half after
+// the press (time to prepare its window); the wanted length first, else a shorter one. → { start, end, bars, dir } or null (none fits: the director's way)
+export function riserAirTarget(song, plan, from, cmd = {}) {
+  const total = (song.sections || []).reduce((a, x) => a + x.bars, 0), dir = cmd.dir === 'down' ? 'down' : 'up';
+  const own = Number(((plan.R && plan.R.riser && plan.R.riser.settings) || {}).bars) || 8;
+  const want = Number.isFinite(Number(cmd.bars)) && Number(cmd.bars) > 0 ? Number(cmd.bars) : own;
+  const limit = from + 2 * plan.phrase, steps = buildSteps(song).map(x => x.at);
+  for (let b = Math.ceil(from / plan.phrase) * plan.phrase; b <= limit; b += plan.phrase) steps.push(b);
+  const cands = [...new Set(steps)].filter(b => b > from && b <= limit && b < total).sort((x, y) => x - y);
+  const fits = (c, n) => c % n === 0 && (dir === 'up' ? c - n >= from + 1.5 : c >= from + 1.5 && c + n <= total);
+  for (const lens of [[want], [8, 4, 2].filter(n => n < want)]) {
+    for (const c of cands) { const n = lens.find(x => fits(c, x)); if (n) return { start: dir === 'up' ? c - n : c, end: dir === 'up' ? c : c + n, bars: n, dir }; }
+  }
+  return null;
+}
+// the risers placed by riserAirTarget on a grown song, as placeRisers does on a directed one: the riser track (the
+// song's own, the plan's, else the listener's) comes in with the length and direction on the first bar and goes on the
+// last, taking back its own values
+export function riserAir(song, plan, list, rng) {
+  let tracks = song.tracks.slice(), build = (song.build || []).slice();
+  const total = (song.sections || []).reduce((a, x) => a + x.bars, 0);
+  for (const r of list) {
+    let tr = tracks.find(x => x.type === 'riser');
+    if (!tr) {
+      const src = (plan.tracks || []).find(x => x.type === 'riser') || trackForPart(plan.R, 'riser', plan.meter, 0.5, rng);
+      tr = { ...JSON.parse(JSON.stringify(src)), clips: [{ start: 0, bars: total, pattern: Object.keys(src.patterns || { A: {} })[0] || 'A' }] };
+      const v = tracks.findIndex(x => x.type === 'voice' || x.type === 'spoken');
+      if (v < 0) tracks.push(tr); else tracks.splice(v, 0, tr);
+    }
+    const base = tr.settings || {}, back = { bars: base.bars ?? '8', dir: base.dir ?? 'up' };
+    build.push({ at: r.start, set: { track: tr.id, bars: String(r.bars), dir: r.dir }, by: 'listener' }, { at: r.start, add: tr.id, by: 'listener' });
+    if (r.end < total) build.push({ at: r.end, remove: tr.id, by: 'listener' }, { at: r.end, set: { track: tr.id, ...back }, by: 'listener' });
+  }
+  return { ...song, tracks, build: build.map((x, i) => [x, i]).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x) };
+}
+
 const KIND_OF = { drums: ['drums'], bass: ['bass'], lead: ['hook', 'arp', 'guitar'], pad: ['pad'], texture: ['texture'] };
 const styleHas = (plan, type) => (KIND_OF[type] || []).some(k => plan.R[k]);
 
@@ -425,19 +464,30 @@ function newTrack(P, O, part, st, at, seed) {
   // the pattern: drums from a groove of the style the instrument does not play yet, composed parts that differ from the
   // instrument's ideas, else a preset it does not hold
   if (t.type === 'drums') {
-    const held = new Set(same.flatMap(x => Object.values(x.patterns || {})).map(p => JSON.stringify(rowsOf(p, n))));
-    const others = new Set(same.flatMap(x => Object.values(x.patterns || {})).flatMap(p => Object.keys(rowsOf(p, n))));
-    const pick = [];
+    const patternsOf = x => Object.values(x.patterns || {});
+    const held = new Set(same.flatMap(patternsOf).map(p => rowsKey(rowsOf(p, n))));
+    const others = new Set(same.flatMap(patternsOf).flatMap(p => Object.keys(rowsOf(p, n))));
+    // composed first when the session composes on air and the style declares drum material (kick-variety D4): the
+    // kick rows the instrument holds are left out of the four-floor draw
+    const pick = [], seen = new Set(), push = rows => { const key = rowsKey(rows); if (Object.keys(rows).length && !seen.has(key)) { seen.add(key); pick.push(rows); } };
+    if (composesOnAir(O) && R.drums && R.drums.material) {
+      const avoid = [...new Set(same.flatMap(patternsOf).map(p => rowsOf(p, n).bd).filter(Boolean))];
+      for (const rows of airGroove(R, part, airInputs(P, O, st, at), { avoid, others: same.length ? [...others] : [], seed })) push(rows);
+    }
+    // then the style's built-in grooves
     for (const g of r.shuffle((R.drums.grooves || []).slice())) {
       let rows = Object.fromEntries(Object.entries((GROOVES[g] || [])[1] || {}).filter(([k, v]) => String(v).includes('x') && (part === 'kick' ? k === 'bd' : k !== 'bd')).map(([k, v]) => [k, fitSteps(v, n)]));
       // a second beat keeps the rows the other beats do not play, when it can (hats against percussion)
       if (part === 'beat' && same.length) { const own = Object.fromEntries(Object.entries(rows).filter(([k]) => !others.has(k))); if (Object.keys(own).length) rows = own; }
-      if (Object.keys(rows).length && !pick.some(x => JSON.stringify(x) === JSON.stringify(rows))) pick.push(rows);
+      push(rows);
     }
-    // (another groove than every pattern of the instrument; else than the ones playing on the boundary)
-    const now = new Set(same.map(x => { const y = st.tracks.find(z => z.id === x.id); return y ? JSON.stringify(rowsOf((x.patterns || {})[(y.clips[0] || {}).pattern || 'A'], n)) : ''; }));
-    const fresh = pick.filter(x => !held.has(JSON.stringify(x))), notNow = pick.filter(x => !now.has(JSON.stringify(x)));
-    const list = fresh.length ? fresh : notNow.length ? notNow : pick;
+    // (another rhythm than every pattern of the instrument; else than the ones playing on the boundary; else the one
+    // the fewest tracks of the instrument play, first in the list on a tie)
+    // (a track added by an earlier "+" on this boundary is not in the state yet: it enters with its A)
+    const now = new Set(same.map(x => { const y = st.tracks.find(z => z.id === x.id); return rowsKey(rowsOf((x.patterns || {})[y ? (y.clips[0] || {}).pattern || 'A' : 'A'], n)); }));
+    const fresh = pick.filter(x => !held.has(rowsKey(x))), notNow = pick.filter(x => !now.has(rowsKey(x)));
+    const plays = x => same.filter(y => patternsOf(y).some(p => rowsKey(rowsOf(p, n)) === rowsKey(x))).length;
+    const list = fresh.length ? fresh : notNow.length ? notNow : pick.map((x, i) => [x, plays(x), i]).sort((a, b) => a[1] - b[1] || a[2] - b[2]).map(([x]) => x);
     if (list.length) t.patterns = { A: { rows: list[0] }, ...(list[1] ? { B: { rows: list[1] } } : {}) };
   } else if (compose_ && KIND_OF_TYPE_MELODIC.includes(t.type)) {
     const M = airInputs(P, O, st, at), avoid = same.flatMap(ideasOf);

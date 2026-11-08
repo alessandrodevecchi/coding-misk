@@ -38,7 +38,7 @@ for (const sp of SPEAKERS) for (const lang of SPEAKER_LANGS[sp]) {
 }
 
 // 3. the banks the prune would list (removed speakers, languages a speaker does not speak): a warning only
-const old = (fs.existsSync(ROOT) ? fs.readdirSync(ROOT) : []).filter(d => { const m = /^say_([a-z]{2})_([a-z]+)$/.exec(d); return m && !speaks(m[1], m[2]) && fs.statSync(path.join(ROOT, d)).isDirectory(); }).sort();
+const old = (fs.existsSync(ROOT) ? fs.readdirSync(ROOT) : []).filter(d => { const m = /^say_([a-z]{2})_([a-z0-9]+)$/.exec(d); return m && !speaks(m[1], m[2]) && fs.statSync(path.join(ROOT, d)).isDirectory(); }).sort();
 if (old.length) {
   const some = old.slice(0, 4).map(b => { const f = wavs(path.join(ROOT, b)), lang = b.slice(4, 6), c = f.filter(x => sameAudio(path.join(ROOT, b, x), path.join(ROOT, `say_${lang}`, x))).length; return `${b} (${c} of ${f.length} copies of the default voice)`; });
   warn(`${old.length} old bank(s) of removed speakers or other languages: ${some.join(', ')}${old.length > 4 ? ', …' : ''}; list them with node tools/voice.mjs --prune, delete them with node tools/voice.mjs --prune --yes`);

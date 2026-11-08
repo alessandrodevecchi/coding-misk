@@ -4,7 +4,7 @@
 // order picked by a chooser separate from the moves. A passage between two waypoints may hold detours: something an
 // earlier waypoint added is commented out, rewritten or muted, and comes back later. A track may come in as a clone of
 // a playing one (its block copied, then changed). Pure and seeded: the same song grows the same way.
-// growth-shapes: a shape ({ opening, development, kickEarly, masks, passing, moves }) changes when tracks come in
+// growth-shapes: a shape ({ opening, lead, development, kickEarly, masks, passing, moves }) changes when tracks come in
 // (all in the first two waypoints for "parameters", drums late for the melodic opening, two tracks in solo for
 // "mid-set"), how a written track comes in (a muted line loses its "_"), masks per phrase, a passing melody, and moves
 // (a beat step moved, a prepared variant, seg(16) on a held chord).
@@ -45,6 +45,11 @@ export function coderPath(dest, plans, rng, { detours = DETOURS, chooser = choos
   const sh = shape || {}, srng = shape ? rng.fork('shape') : null;
   if (sh.development === 'parameters') for (let i = 1; i < n; i++) enterAt[i] = Math.min(enterAt[i], 2);
   if (sh.opening === 'melodic') dest.forEach((t, i) => { if (i > 0 && t.type === 'drums') enterAt[i] = Math.max(enterAt[i], Math.min(K, 3)); });
+  // varied-openings D1: the drums with a kick enter no earlier than the third waypoint after a bass or chord lead, the
+  // kick track at the second after a top lead
+  const hasKick = t => t.type === 'drums' && Object.values(t.patterns || {}).some(p => (p.rows ? /x/.test(String(p.rows.bd || '')) : !!(p.idea && p.idea.beat && p.idea.beat.bd)));
+  if (['bass', 'chord'].includes(sh.lead)) dest.forEach((t, i) => { if (i > 0 && hasKick(t)) enterAt[i] = Math.max(enterAt[i], Math.min(K, 3)); });
+  if (sh.lead === 'top') dest.forEach((t, i) => { if (i > 0 && hasKick(t)) enterAt[i] = Math.max(enterAt[i], Math.min(K, 2)); });
   if (sh.opening === 'mid-set') dest.forEach((t, i) => { enterAt[i] = i < 2 ? 1 : Math.min(K, 3); });
   // a fast pace: the first minute is the anchor's small moves, the second track waits for the second waypoint
   else if (sh.early === 'all' && second) enterAt[1] = Math.min(K, 2);

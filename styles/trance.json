@@ -37,11 +37,15 @@
   "drums": {
     "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
     "kits": [
-      "RolandTR909"
+      "RolandTR909",
+      "RolandMC303",
+      "RolandTR808"
     ],
     "grooves": [
       "trance",
-      "rolling"
+      "rolling",
+      "trancePush",
+      "trancePickup"
     ]
   },
   "bass": {
@@ -116,7 +120,9 @@
     ],
     "waves": [
       "supersaw",
-      "gm_pad_warm"
+      "gm_pad_warm",
+      "gm_synth_strings_1",
+      "gm_pad_halo"
     ],
     "settings": {
       "cutoff": [
@@ -189,5 +195,9 @@
     "weight": 0.1,
     "ways": { "refrain": 1, "chop": 1 },
     "vocab": "machine"
+  },
+  "growthShapes": {
+    "openings": { "full-kick": 3, "filtered": 2, "slow": 1, "pad": 1, "melodic": 1, "top": 0.5, "typed": 0.5 },
+    "kicks": { "four": 2, "one": 1, "two": 1, "push": 1 }
   }
 }

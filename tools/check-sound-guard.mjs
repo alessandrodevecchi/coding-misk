@@ -1,7 +1,8 @@
 // Checks for the sound guard (#54): the register of broken sounds and its stand-ins, the error kinds it learns, zone
-// learning from a font file, the sound wrapper and the decode guard. No browser.
+// learning from a font file, the sound wrapper and the decode guard; the voice helper's local say_* banks never learned
+// (#82). No browser.
 //   npm run check:sound-guard      exit 1 when any check fails
-import { createRegister, isBrokenError, indexOf, zoneOf, guardSounds, guardDecode, HEALTH_KEY, fixSampleUrl, fixSampleBank } from '../src/sounds/sound-guard.js';
+import { createRegister, isBrokenError, indexOf, zoneOf, guardSounds, guardDecode, HEALTH_KEY, fixSampleUrl, fixSampleBank, isLocalBank, servesAudio, freshUrl } from '../src/sounds/sound-guard.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const memStore = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
@@ -66,6 +67,48 @@ const CHECKS = {
     assert(map.get().late.data.cmGuard, 'sounds registered later are wrapped');
     assert(replaced.length >= 2, 'stand-ins reported');
     stop();
+  },
+  'local say_* banks: never learned, stored entries dropped on load (#82)'() {
+    assert(isLocalBank('say_en_kathy') && isLocalBank('say_it') && !isLocalBank('bd') && !isLocalBank('gm_say'), 'say_* only');
+    const store = memStore();
+    store.setItem(HEALTH_KEY, JSON.stringify({ version: 'v1', broken: [{ name: 'say_en_kathy', index: 324 }, { name: 'x', index: 0 }, { name: 'say_it', index: 3 }] }));
+    const r = createRegister({ version: 'v1', store, known: [] });
+    assert(!r.broken('say_en_kathy', 324) && r.standIn('say_en_kathy', 400, 324, null) === 324, 'poisoned entry dropped');
+    assert(r.broken('x', 0), 'other entries kept');
+    assert(JSON.parse(store.getItem(HEALTH_KEY)).broken.map(e => e.name).join() === 'x', 'store healed');
+    assert(!r.add({ name: 'say_en', index: 2 }) && !r.broken('say_en', 2) && !store.getItem(HEALTH_KEY).includes('say_'), 'never added');
+  },
+  async 'wrapper: a local say_* sample retried once from a fresh address, never a neighbour (#82)'() {
+    const urls = [];
+    let fail = 1;
+    const say = { onTrigger: async (t, v) => { const n = indexOf(v.n, 3); urls.push(say.data.samples[n]); if (fail-- > 0) throw Object.assign(new Error('Unable to decode audio data'), { name: 'EncodingError' }); return { n }; }, data: { type: 'sample', samples: ['/samples/say_en/a.wav', '/samples/say_en/b.wav', '/samples/say_en/c.wav'] } };
+    const map = soundMapOf({ say_en: say });
+    const register = createRegister({ version: 't', known: [] }), replaced = [];
+    guardSounds({ soundMap: map, registerSound: (k, f, d) => { say.data = d; map.setKey(k, { onTrigger: f, data: d }); }, register, onReplace: (...a) => replaced.push(a), probe: async () => true });
+    const r = await map.get().say_en.onTrigger(0, { n: 1 }, () => {});
+    assert(r.n === 1 && !replaced.length && !register.learned().length, 'own sample, nothing learned');
+    assert(urls[0] === '/samples/say_en/b.wav' && /\/b\.wav\?cmRetry=\d+$/.test(urls[1]), 'fresh address: ' + urls.join());
+    fail = 5;
+    let threw = false; try { await map.get().say_en.onTrigger(0, { n: 2 }, () => {}); } catch (e) { threw = true; }
+    assert(threw && !register.learned().length && !replaced.length, 'still failing: an error, no neighbour, nothing learned');
+    assert(freshUrl('/a.wav?cmRetry=1', 2) === '/a.wav?cmRetry=2' && freshUrl('/a?x=1', 3) === '/a?x=1&cmRetry=3', 'freshUrl');
+  },
+  async 'wrapper: a page answered for a sample is not a broken sample (#82)'() {
+    const bad = { onTrigger: async () => { throw Object.assign(new Error('Unable to decode audio data'), { name: 'EncodingError' }); }, data: { type: 'sample', samples: ['/samples/mine/a.wav', '/samples/mine/b.wav'] } };
+    const map = soundMapOf({ mine: bad });
+    const register = createRegister({ version: 't', known: [] });
+    let answer = { ok: true, headers: { get: () => 'text/html; charset=utf-8' } };
+    const probe = url => servesAudio(url, async () => answer);
+    guardSounds({ soundMap: map, registerSound: (k, f, d) => map.setKey(k, { onTrigger: f, data: d }), register, probe });
+    let threw = false; try { await map.get().mine.onTrigger(0, { n: 0 }, () => {}); } catch (e) { threw = true; }
+    assert(threw && !register.learned().length, 'HTML not learned');
+    answer = { ok: false, status: 404, headers: { get: () => 'text/plain' } };
+    threw = false; try { await map.get().mine.onTrigger(0, { n: 0 }, () => {}); } catch (e) { threw = true; }
+    assert(threw && !register.learned().length, '404 not learned');
+    assert(await servesAudio('x', async () => { throw new TypeError('Failed to fetch'); }) === null, 'offline: unknown');
+    answer = { ok: true, headers: { get: () => 'audio/wav' } };
+    await map.get().mine.onTrigger(0, { n: 0 }, () => {}).catch(() => {});
+    assert(register.broken('mine', 0), 'audio that does not decode is learned');
   },
   'sample addresses: VCSL from jsDelivr, tom_mallet path, # and % encoded'() {
     const R = 'https://raw.githubusercontent.com/sgossner/VCSL/master/', C = 'https://cdn.jsdelivr.net/gh/sgossner/VCSL@master/';
