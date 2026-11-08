@@ -182,8 +182,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       if (S !== mine || item.growToken !== token || item.commands.length || !g || !g.onAir) return;
       const i = S.stream.indexOf(item);
       if (i <= S.onAir || (performance.now() - t0) / 1000 > WIDE_WAIT || secondsTo(item) < WIDE_MARGIN) return;
+      // (the window made ready before it goes on: its plan away from the page, #82)
       item.g0 = g; setSong(item, g); record(item.n, 'wide');
-      player.swap(windowPlayable()); render();
+      swapSoon(windowPlayable(), item.start); render();
     }, () => {});
   }
   // then: called once the growth away from the page is ready (the window on air swaps to the grown song)
@@ -660,7 +661,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // steered again away from the page swaps the window on air when it is ready, so the song being prepared plays the
   // choice (#86)
   function rebias(k) {
-    const swap = () => { player.swap(windowPlayable()); renderNow(); };
+    const swap = () => { swapSoon(windowPlayable(), (S.stream.find(x => x.n > k) || {}).start ?? Infinity); renderNow(); };
     for (const x of S.stream) {
       if (x.n <= k || !x.base0 || x.frozen) continue;
       const b = biasSong(S.recipe, x.n, x.base0);
