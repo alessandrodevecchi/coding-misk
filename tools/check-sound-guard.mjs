@@ -1,7 +1,8 @@
 // Checks for the sound guard (#54): the register of broken sounds and its stand-ins, the error kinds it learns, zone
 // learning from a font file, the sound wrapper and the decode guard; the voice helper's local say_* banks never learned
-// (#82). No browser.
+// (#82); the reverb impulse responses kept and reused (#82). No browser.
 //   npm run check:sound-guard      exit 1 when any check fails
+import { createIrCache, installReverbCache } from '../src/sounds/reverb-cache.js';
 import { createRegister, isBrokenError, indexOf, zoneOf, guardSounds, guardDecode, HEALTH_KEY, fixSampleUrl, fixSampleBank, isLocalBank, servesAudio, freshUrl } from '../src/sounds/sound-guard.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
@@ -129,6 +130,42 @@ const CHECKS = {
     let errCalled = false;
     await proto.decodeAudioData(new ArrayBuffer(1), () => {}, () => { errCalled = true; }).catch(() => {});
     assert(errCalled, 'own error callbacks untouched');
+  },
+  'reverb cache: a small LRU by count and length'() {
+    const buf = s => ({ length: s * 100, sampleRate: 100 }), c = createIrCache({ max: 3, maxSeconds: 10 });
+    c.put('a', buf(2)); c.put('b', buf(2)); c.put('c', buf(2)); c.get('a'); c.put('d', buf(2));
+    assert(c.size === 3 && c.get('b') === null && c.get('a'), 'the least used goes first');
+    c.put('e', buf(6));
+    assert(c.seconds <= 10 && c.get('e') && c.get('c') === null && c.size === 3, `bounded by length (${c.seconds} s, ${c.keys()})`);
+    c.put('f', buf(11));
+    assert(c.get('f') === null, 'a response longer than the bound is not kept');
+  },
+  async 'reverb cache: per context, the same response reused, the newest asked wins, superdough kept aside'() {
+    class Ctx { constructor(rate) { this.sampleRate = rate; } createConvolver() { return { connect() {} }; } adjustLength(d, ir) { return { adjusted: ir, d }; } }
+    let made = 0;
+    const pending = [];
+    const generate = (p, cb) => { made++; const b = { length: p.decayTime * 1.5 * p.audioContext.sampleRate, sampleRate: p.audioContext.sampleRate, p }; pending.push(() => cb(b)); };
+    const flush = () => { while (pending.length) pending.shift()(); };
+    const proto = Ctx.prototype, theirs = function () { return 'theirs'; };
+    proto.createReverb = theirs;
+    const rc = installReverbCache({ proto, generate });
+    assert(rc && proto.__reverbCache.theirs.value === theirs, 'superdough before: kept aside');
+    proto.createReverb = function () { return 'later'; };
+    assert(proto.createReverb !== theirs && proto.__reverbCache.theirs() === 'later', 'superdough after: kept aside too');
+    const a = new Ctx(48000), b = new Ctx(44100);
+    const r1 = a.createReverb(2, 0.1, 15000, 1000); flush();
+    const first = r1.buffer;
+    assert(made === 1 && first && r1.duration === 2 && r1.lp === 15000 && r1.dim === 1000, 'made once, fields as superdough sets them');
+    const r2 = a.createReverb(2, 0.1, 15000, 1000);
+    assert(made === 1 && r2.buffer === undefined, 'asked again: not made again, not set in the same task');
+    await tick();
+    assert(r2.buffer === first, 'the same response, in a task of its own');
+    const r3 = b.createReverb(2, 0.1, 15000, 1000); flush();
+    assert(made === 2 && r3.buffer !== first, 'another context makes its own');
+    r1.generate(3, 0.1, 15000, 1000); r1.generate(2, 0.1, 15000, 1000); flush(); await tick();
+    assert(r1.buffer === first && r1.duration === 2, 'the newest asked wins over an older one still being made');
+    const r4 = a.createReverb(2, 0.1, 15000, 1000, 'file', 1, 0);
+    assert(r4.buffer && r4.buffer.adjusted === 'file', 'a response from a file is made as before');
   },
 };
 let failed = 0;

@@ -1,7 +1,7 @@
 ---
 id: sound-and-levels
 related: [sounds, songs, material, export, checks, pitfalls]
-code: [src/song/rack.js, src/sounds/limiter.js, src/sounds/sound-guard.js, src/sounds/soundfont-fix.js, tools/output-peak.cjs, tools/check-levels.cjs, tools/snapshot-levels.cjs, tests/snapshots/levels.json]
+code: [src/song/rack.js, src/sounds/limiter.js, src/sounds/sound-guard.js, src/sounds/reverb-cache.js, src/sounds/soundfont-fix.js, tools/output-peak.cjs, tools/check-levels.cjs, tools/snapshot-levels.cjs, tests/snapshots/levels.json]
 checks: [node tools/check-levels.cjs, node tools/snapshot-levels.cjs, node tools/check-export.cjs, npm run check:sound-guard, node tools/check-sounds.cjs]
 ---
 
@@ -55,6 +55,7 @@ Ring per note is fine on one or two tracks; on every line of a dense song it bre
 - **Material** ([material.md](material.md)): composed FM sounds stay inside `FM_RANGES` so they stay under clipping.
 - **Export** ([export.md](export.md)): exports take the master level, the push and the limiter, so the app volume never changes a file.
 - **Checks** ([checks.md](checks.md)): level snapshots need the dev server and are never rewritten without a reason.
+- **Reverbs** (`src/sounds/reverb-cache.js`, #82): the page replaces superdough's `createReverb`. Impulse responses are kept per audio context (an LRU of 8, 60 s in all) and reused for the same room size, fade, lowpass and dim; a reused one is put on the reverb in a task of its own, a few to tens of ms sooner than a new one, which waits for its offline filter (superdough drew a new random response each time, so the sound is the same kind of noise). Replacing a playing convolver's buffer can still wait up to 400 ms on the main thread in Chrome under audio load (a new ConvolverNode per response was tried and made Classic song changes slower). A response read from a file is made as before. The fast export's render page keeps superdough's own reverb.
 
 ## Options
 
