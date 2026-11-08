@@ -2757,3 +2757,13 @@ Ramo `fix/82-natural-change` da `develop` (885bb05).
 - **Da sapere:** a 4× il primo cambio Classic del seed di prova ha a volte (3 prove su 6) un task di 130 ms 3,9 s prima del cambio: è il passo della transizione (eco, battuta 158) che scrive nell'editor il codice del brano in arrivo (11 kB), c'era già prima e non è il passaggio della finestra. Restano 0-1 «too late» proprio al cambio in alcuni cambi Classic e Crescendo: è il codice nuovo messo nell'editor e valutato nel frame del cambio. `check-add-lag` fallisce, prima e dopo, su «Classic, 5 tracks, + arp e − bass» (292 ms prima, 228-274 ms dopo, 11 s dopo la pressione): è lo `swapSoon` dell'entrata del lotto della console, non il cambio di brano.
 - **Nuovo controllo** in `check-radio`: il cambio naturale di una sessione Live coder passa la finestra fatta prima, con lo stesso codice a ogni battuta di una fatta al cambio.
 - **Prove:** `check:endless` (96), `check:radio-profiles` (31), `check:live-code` (25), `check:crescendo` rapido (42), `check:knowledge`, `check:guide`, `npm run build`; nel browser (porta 5297) `check-radio` e `check-steering` ok, `check-add-lag` ok salvo il caso sopra. Fixture invariate, nessuna nuova versione del regista.
+
+## 2026-11-08 piano: pianoroll a una riga (#82)
+
+Ramo `docs/82-pianoroll-one-row` da `develop` (6895b24). Solo pianificazione, nessun codice dell'app.
+
+- **Cosa:** cambio OpenSpec `pianoroll-one-row` (proposta, spec `app/one-row-pianoroll`, design, task) con la scelta approvata dal proprietario sul prototipo del 1 novembre. Vale solo per un pianoroll con una riga sola; con due righe o più resta com'è.
+- **Volume uguale:** pianoroll basso (metà altezza) con tacche sottili; un'impostazione tiene i blocchi pieni di oggi. **Volume che varia:** altezza normale, barre larghe come oggi, volume come altezza, trasparenza, entrambe o a caso per sezione dal seed del brano (default), uguale in replay ed export.
+- **Definizioni:** volume di un colpo = gain × velocity della riga; "uguale" se il colpo più piano udibile è almeno il 95 % del più forte, su un intervallo di riferimento (i primi 8 cicli della riga nella sezione, dal suo codice attuale). Scala rispetto al colpo più forte di quell'intervallo, non della finestra visibile: niente salti di altezza o di misura mentre scorre.
+- **Ovunque uguale:** editor, pannelli del palco e video; il video veloce riceve dalla pagina di render la forma di ogni riga per segmento, sezione e seed li ha già.
+- **Stima:** circa 4 ore agente. Domande aperte con la raccomandazione nel design.
