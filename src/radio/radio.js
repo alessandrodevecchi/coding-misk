@@ -78,7 +78,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   if (!Array.isArray(history)) history = [];
   let seedField = '';
   // the session on air: stream of songs with their start bar; onAir = index in the stream
-  let S = null;
+  let S = null, sessionN = 0;
+  // the song of the session a steering is for: the workers keep its steering's results under it, and drop them when the
+  // song leaves the air (incremental-steering D6)
+  const ownerOf = item => (S && item ? `${S.sid}:${item.n}` : null);
+  const leftAir = item => { if (item && player.forgetSteer) player.forgetSteer(ownerOf(item)); };
   const saveOpts = () => options.save();
   // the chooser on air of a new session (radio-chooser-versions D2, D4): the Settings choice, recorded in the recipe only
   // when it is not the default, so default recipes stay as they were; a session on air keeps the one it started with
@@ -226,16 +230,16 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   }
   // a grown song steered with waypoints, away from the page when async (the worker grows it first when needed)
   function steerAir(item, { async = false, then = null } = {}) {
-    const token = item.growToken = (item.growToken || 0) + 1, s0t = performance.now(), n0 = item.commands.length;
+    const token = item.growToken = (item.growToken || 0) + 1;
     // (#82: the director's view with the new commands, for the console until the answer, in a task of its own after the
     // press; the answer brings the view made in the worker)
     const hasView = async && !!player.steer;
     if (item.g0) { if (hasView) setTimeout(() => { if (S && item.growToken === token && item.growing) airView(item); }, 0); else airView(item); }
-    const args = { grown: item.g0 || null, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe), ...(hasView ? { view: true } : {}) };
+    const args = { grown: item.g0 || null, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe), owner: ownerOf(item), ...(hasView ? { view: true } : {}) };
     // (the answer to a typed line gives the song already on air: that one is kept, so the window is not written again
     // and its plan not made twice, #82)
     const view = r => { if (r.view) { item.plan = r.view.plan; item.opts = r.view.opts; item.plain = r.view.song; } else airView(item); };
-    const done = r => { if (item.growToken !== token || !S) return; if (async) item.steerSeen = { ms: performance.now() - s0t, n: n0 }; delete item.growing; delete item.finish; item.g0 = r.grown; airSettle(item, r.commands); view(r); const same = item.said && item.said === item.song && JSON.stringify(r.song) === JSON.stringify(item.song); delete item.said; setSong(item, same ? item.song : r.song); };
+    const done = r => { if (item.growToken !== token || !S) return; delete item.growing; delete item.finish; item.g0 = r.grown; airSettle(item, r.commands); view(r); const same = item.said && item.said === item.song && JSON.stringify(r.song) === JSON.stringify(item.song); delete item.said; setSong(item, same ? item.song : r.song); };
     item.finish = () => { done(steerOnAir(args)); item.growToken++; };
     if (!async || !player.steer) { item.finish(); return; }
     item.growing = player.steer(args).then(done, () => { if (item.growToken === token) item.finish(); });
@@ -319,7 +323,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const session = createSession(recipes, s, { ...(le ? { lead: le } : {}), extra });
     // a new session records the growth marker (radio-profiles stage 4): its Crescendo and Live coder songs grow on air,
     // and its replays grow them the same; a recipe saved before has none and replays in blocks
-    S = { session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: { ...current(), ...searchRecord() }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...mineRecord(), ...comboRecord(), ...(L ? { lead: leadRecord(L) } : {}), ...trialRecord() }, lastOptions: null, lastCard: 0 };
+    // (a new session: the steering's kept results of the last one dropped in the workers, incremental-steering D6)
+    if (player.forgetSteer) player.forgetSteer('*');
+    S = { sid: ++sessionN, session, stream: [], onAir: 0, pending: false, replay: !!recipe, recipe: recipe ? clone(recipe) : { seed: session.seed, options: { ...current(), ...searchRecord() }, changes: [], growth: GROWTH_ON_AIR, ...chooserRecord(), ...mineRecord(), ...comboRecord(), ...(L ? { lead: leadRecord(L) } : {}), ...trialRecord() }, lastOptions: null, lastCard: 0 };
     S.recipe.seed = session.seed;
     // a replay shows the code with the display controls set when it starts (the console's Custom profile), not with each
     // change made while the session was heard (radio-profiles 9.1)
@@ -454,7 +460,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       // (a song still growing away from the page grows here: it goes on air now)
       const ahead = S.ahead; delete S.ahead;
       growNow(S.stream[S.onAir + 1]);
-      S.onAir++;
+      S.onAir++; leftAir(S.stream[S.onAir - 1]);
       if (!S.limit) remember(S.stream[S.onAir]);
       // (#82: the window made ready ahead, when nothing it is made of changed since; else made here, as before)
       const items = S.stream.slice(S.onAir, S.onAir + 2), made = !!(ahead && ahead.p && sameWindow(ahead.key, windowKey(items)));
@@ -557,7 +563,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     growNow(S.stream[S.onAir + 1]);
     cur.bars = Math.max(1, cut - cur.start); cur.cut = true;
     relayout();
-    S.onAir++;
+    S.onAir++; leftAir(S.stream[S.onAir - 1]);
     remember(S.stream[S.onAir]);
     player.jump(p || windowPlayable(), S.stream[S.onAir].start, { voices: airVoices() });
     // (the radio drawn in a task of its own)
@@ -636,7 +642,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     grow(item, r.song, { async, then });
   }
   function steerPlainAway(item, then) {
-    const token = item.growToken = (item.growToken || 0) + 1, args = { ...item.base, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n };
+    const token = item.growToken = (item.growToken || 0) + 1, args = { ...item.base, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n, owner: ownerOf(item) };
     const done = r => { if (item.growToken !== token || !S) return; delete item.growing; delete item.finish; item.plan = r.plan; item.opts = r.opts; item.plain = r.song; setSong(item, r.song); };
     item.finish = () => { done(steerSong(args)); item.growToken++; };
     item.growing = player.steerPlain(args).then(done, () => { if (item.growToken === token) item.finish(); });
@@ -759,7 +765,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // after its bar, so later entries go to the next phrase start.)
   const ADD_LEAD = 2, ADD_SETTLE = 250, ADD_BOUND = 30, ADD_QUIET = 2000, ADD_TASK = 50, ADD_STEP = 100, ADD_MARGIN = 0.34;
   const load = createLoadMonitor();
-  let batches = [], batchN = 0, addPrep = 1, addTimer = null, addsDone = [];
+  let batches = [], batchN = 0, addPrep = 1, addRest = 0.5, addTimer = null, addsDone = [];
   // the longest piece of the batches' own work on the main thread, per kind (tools/check-add-lag.cjs)
   const addCost = {};
   const cost = (k, t0) => { const d = performance.now() - t0; if (d > (addCost[k] || 0)) addCost[k] = Math.round(d); };
@@ -773,21 +779,29 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     for (let d = Math.max(0, (Math.floor((rel - off) / ph) + 1) * ph); d <= last; d += ph) if (d + off > rel) out.push(d + off);
     return out;
   }
-  // the boundary a change pressed now takes: the first phrase start after `after` that leaves ADD_LEAD seconds plus the
-  // expected preparation (the last batch's time on this page, 1 s before the first), or null near the end of the song
-  function addAt(item, after = -Infinity) {
-    const rel = relNow(), need = ADD_LEAD + addPrep;
+  // the boundary a change pressed now takes: the first phrase start after `after` that leaves ADD_LEAD seconds plus this
+  // song's expected preparation of a batch of k commands (expectedPrep), or null near the end of the song
+  function addAt(item, after = -Infinity, k = 1) {
+    const rel = relNow(), need = ADD_LEAD + expectedPrep(item, k);
     return addStarts(item, rel).find(b => b > after && (b - rel) * barSecOf(item.song, b) >= need) ?? null;
   }
-  // the expected preparation of a batch of k commands on a song (D2): the last batch's time on this song, else the
-  // page's; a grown song's steering on air replays every command, so its time is also guessed from what it took to grow
-  // and from its last steering, as the square of the commands (measured: 0.3 × the growth per command squared)
-  function expectedPrep(item, k) {
+  // the expected preparation of a batch of k commands on a song (D2; incremental-steering D9). Classic: the last batch's
+  // time on this song, else the page's (1 s before the first). A grown song: the steering reuses the commands before the
+  // batch, so it grows with the batch's new commands only: the steering time per command measured on this song
+  // (steerPer: its last batch's steering over the commands the worker steered; 0.3 × its growth time before one is
+  // measured), times k, with a margin, plus the rest of its last preparation (addRest: window, plan, sounds). A steering
+  // still running when its batch moved holds the estimate up until a batch is ready (addHold). At most ADD_BOUND.
+  function expectedPrep(item, k = 1) {
     const own = item.addPrep ?? addPrep;
     if (!(airSteer(item) && item.g0)) return own;
-    const n = item.commands.length + k, g = item.growMs ? 0.3 * item.growMs * n * n / 1000 : 0, w = item.steerSeen && item.steerSeen.n ? item.steerSeen.ms * (n / Math.max(1, item.steerSeen.n)) ** 2 / 1000 : 0;
-    return Math.min(ADD_BOUND, Math.max(own, 1.3 * Math.max(g, w) + 0.5));
+    const per = item.steerPer ?? (item.growMs ? 0.3 * item.growMs / 1000 : null);
+    if (per === null) return own;
+    return Math.min(ADD_BOUND, Math.max(item.addHold || 0, 1.3 * per * k + (item.addRest ?? addRest) + 0.5));
   }
+  // the commands of a batch: its net counts, saved patterns and locks
+  const sizeOf = b => Math.max(1, Object.values(b.parts).reduce((a, n) => a + Math.abs(n), 0) + b.pats.length + Object.keys(b.locks).length);
+  // a batch's preparation that ran long holds this song's estimate up (a grown song: addHold, Classic: addPrep)
+  const holdPrep = (item, s) => { const v = Math.min(ADD_BOUND, s); if (airSteer(item) && item.g0) item.addHold = Math.max(item.addHold || 0, v); else item.addPrep = Math.max(item.addPrep ?? addPrep, v); };
   const batchesOf = item => batches.filter(b => b.item === item).sort((a, b) => a.at - b.at);
   // the instruments of the batches that entered with some new track still to come (#82)
   const trailsOf = item => (S && item === S.stream[S.onAir] && item.trails ? item.trails.filter(x => x.ats.some(a => a > relNow())) : []);
@@ -938,8 +952,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const alive = () => b.seq === seq && batches.includes(b) && S === b.S && S.stream[S.onAir] === item;
     const fresh = () => alive() && item.commands === b.base && item.song === b.song0;
     const all = [...item.commands, ...cmds].map(c => ({ ...c }));
-    const job = air ? (player.steerAhead || player.steer)({ grown: item.g0, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: all, seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe), view: true })
-      : (player.steerClassic ? player.steerClassic({ ...item.base, commands: all, seed: S.recipe.seed, n: item.n }) : new Promise(r => setTimeout(r, 0)).then(() => steerSong({ ...item.base, commands: all, seed: S.recipe.seed, n: item.n })))
+    const job = air ? (player.steerAhead || player.steer)({ grown: item.g0, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: all, seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe), view: true, owner: ownerOf(item) })
+      : (player.steerClassic ? player.steerClassic({ ...item.base, commands: all, seed: S.recipe.seed, n: item.n, owner: ownerOf(item) }) : new Promise(r => setTimeout(r, 0)).then(() => steerSong({ ...item.base, commands: all, seed: S.recipe.seed, n: item.n })))
         .then(r => (item.growCtx && player.grow ? (player.growAhead || player.grow)(r.song, item.growCtx).then(g => ({ ...r, plain: r.song, song: g })) : { ...r, plain: r.song }));
     paintPending();
     b.times = {};
@@ -948,8 +962,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       b.times.steer = Math.round(performance.now() - started);
       if (b.seq === seq) b.inflight = false;
       if (!alive()) return;
-      if (air) item.steerSeen = { ms: performance.now() - started, n: all.length };
-      if (b.retarget) { b.retarget = false; item.addPrep = Math.max(item.addPrep ?? addPrep, Math.min(ADD_BOUND, (performance.now() - started) / 1000 * 1.2 + 0.5)); const at2 = addAt(item, b.at - 1); if (at2 === null) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; } if (at2 !== b.at) { b.at = at2; b.flash = performance.now() + 600; b.pushes++; } restartBatch(b, 0); return; }
+      // (this song's steering time per command the worker steered, D9; the commands of the batch when it does not say)
+      if (air) item.steerPer = (performance.now() - started) / 1000 / Math.max(1, Number.isFinite(r.work) ? r.work : cmds.length);
+      if (b.retarget) { b.retarget = false; holdPrep(item, (performance.now() - started) / 1000 * 1.2 + 0.5); const at2 = addAt(item, b.at - 1, cmds.length); if (at2 === null) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; } if (at2 !== b.at) { b.at = at2; b.flash = performance.now() + 600; b.pushes++; } restartBatch(b, 0); return; }
       if (!fresh()) { restartBatch(b); return; }
       let at = b.at;
       if (air) {
@@ -973,8 +988,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
           if (!alive()) return;
           if (!fresh()) { restartBatch(b); return; }
           b.state = 'ready'; b.ready = { p, r, cmds, air };
-          // (the expected preparation of the next press: this song's own time, else the page's last)
+          // (the expected preparation of the next press: this song's own time, else the page's last; a grown song's part
+          // after its steering, D9)
           addPrep = item.addPrep = Math.max(0.5, Math.min(ADD_BOUND, (performance.now() - started) / 1000));
+          if (air) { addRest = item.addRest = Math.max(0.2, (performance.now() - started - b.times.steer) / 1000); delete item.addHold; }
           paintPending();
         }, () => { if (alive()) restartBatch(b); });
       }, 0);
@@ -983,8 +1000,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // a batch moves to the next phrase start that leaves time to prepare it again (D2), or is dropped at the song's end
   function pushBatch(b, why) {
     // (not ready: the preparation takes at least as long as it ran, so the next boundary leaves that much again)
-    if (b.state === 'prep' && b.started) b.item.addPrep = Math.max(b.item.addPrep ?? addPrep, Math.min(ADD_BOUND, (performance.now() - b.started) / 1000 * 1.25));
-    const at = addAt(b.item, b.at);
+    if (b.state === 'prep' && b.started) holdPrep(b.item, (performance.now() - b.started) / 1000 * 1.25);
+    const at = addAt(b.item, b.at, sizeOf(b));
     if (at === null) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; }
     console.info(`[radio] console change moved from bar ${b.at + 1} to bar ${at + 1} (${why})`);
     b.at = at; b.flash = performance.now() + 600; b.pushes++;
@@ -1185,7 +1202,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     growNow(S.stream[S.onAir + 1]);
     cur.bars = bar - cur.start; cur.cut = true;
     relayout();
-    S.onAir++;
+    S.onAir++; leftAir(S.stream[S.onAir - 1]);
     remember(S.stream[S.onAir]);
     player.jump(windowPlayable(), S.stream[S.onAir].start, { voices: airVoices() });
     render();

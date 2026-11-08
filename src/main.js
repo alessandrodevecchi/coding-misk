@@ -5567,9 +5567,14 @@ radio = createRadio({
     steerAhead: args => growAway(null, null, args, null, 'console'),
     // (a Classic song of an old session that grows after its steering: grown there too)
     growAhead: (song, ctx) => growAway(song, ctx, null, null, 'console'),
-    // a console change dropped while its steering runs (a newer press, a push): the worker stops it, so the next one does
-    // not wait behind it (its promise fails with "cancelled")
-    cancelAhead: () => { const L = lanes.console; if (!L.worker || !L.waits.size) return; L.worker.terminate(); for (const w of L.waits.values()) w.reject(new Error('cancelled')); L.waits.clear(); L.worker = null; },
+    // a console change dropped while its steering runs (a newer press, a push): its promise fails with "cancelled" and
+    // its answer is left out. (incremental-steering D6: the worker is not stopped, as it keeps the song's steering
+    // results; the next steering waits behind it and reuses what it steered, instead of steering every command again in
+    // a new worker)
+    cancelAhead: () => { const L = lanes.console; if (!L.worker || !L.waits.size) return; for (const w of L.waits.values()) w.reject(new Error('cancelled')); L.waits.clear(); },
+    // the kept steering results of a song that left the air (its owner tag), or of every song ('*'), dropped in the
+    // workers that steer (incremental-steering D6)
+    forgetSteer: tag => { for (const k of ['grow', 'console']) { const L = lanes[k]; if (L.worker) L.worker.postMessage({ forget: tag }); } },
     // the sounds of the tracks a console change brings in, loaded and warmed at gain 0 before its bar (console-add-ahead
     // D4): resolves when done (each sound in a task of its own; a sound that never answers is given up after 4 s)
     warmTracks: tracks => warmTracks(tracks),

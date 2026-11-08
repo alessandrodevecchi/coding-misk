@@ -17,11 +17,16 @@ import { steerOnAir, steerView } from './waypoints.js';
 import { steerSong } from './steering.js';
 import { setSpokenContext, spokenContext } from '../song/spoken.js';
 import { liveCode } from '../live/live-code.js';
+import { setOwner, forget as forgetSteer, work } from './steer-memo.js';
 
 self.onmessage = e => {
-  const { id, song, ctx, spoken, steer, classic, crescendo, duration, plan, warm } = e.data || {};
+  const { id, song, ctx, spoken, steer, classic, crescendo, duration, plan, warm, forget } = e.data || {};
   // (started ahead by the page: the modules are loaded, nothing to do)
   if (warm) return;
+  // (incremental-steering D6: a song that left the air, or '*' for a new session: its kept steering results dropped)
+  if (forget) { forgetSteer(forget); return; }
+  // (the song of the session a steering is for: the kept results are tagged with it)
+  setOwner((steer && steer.owner) || (classic && classic.owner) || null);
   try {
     if (spoken) setSpokenContext(spoken);
     // the written plan of a radio window's song on air (#82): the plan the page would make in slices, from the same
@@ -34,8 +39,9 @@ self.onmessage = e => {
     }
     if (crescendo) { self.postMessage({ id, crescendo: composeGrowth(crescendo.song, crescendo.opts) }); return; }
     if (duration) { self.postMessage({ id, duration: grownDuration(duration, spokenContext.styles) }); return; }
-    if (classic) { const r = steerSong(classic); self.postMessage({ id, steered: { song: r.song, plan: r.plan, opts: r.opts } }); return; }
-    if (steer) { const r = steerOnAir(steer); self.postMessage({ id, steered: { song: r.song, grown: r.grown, commands: r.commands, ...(steer.view ? { view: steerView(steer, r) } : {}) } }); return; }
+    // (work: the commands steered, not reused, for the radio's expected preparation, D9)
+    if (classic) { const r = steerSong(classic); self.postMessage({ id, steered: { song: r.song, plan: r.plan, opts: r.opts, work: work.computed } }); return; }
+    if (steer) { const r = steerOnAir(steer), w = work.computed; self.postMessage({ id, steered: { song: r.song, grown: r.grown, commands: r.commands, work: w, ...(steer.view ? { view: steerView(steer, r) } : {}) } }); return; }
     self.postMessage({ id, song: growOnAir(song, ctx) });
   } catch (err) { self.postMessage({ id, error: String((err && err.message) || err) }); }
 };
