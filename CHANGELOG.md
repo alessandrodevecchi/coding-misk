@@ -52,6 +52,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Twelve built-in grooves: Techno pickup, Rolling kick (techno), Broken techno, Trance push, Trance pickup, House pickup, Rolling kick (house), Drift, Heartbeat, Phonk roll, Phonk half-time and Rock push.
 - Presets Strum (country guitar), Swell (ambient pad) and Two-feel (jazz bass).
 - Radio: a countdown badge next to Extend until it enters ("Extend +16 s · in 24 s").
+- `npm run check:steer-memo`: the radio steering with kept results compared with a full steering.
+- `tools/steer-bench.mjs`: steering time per console press.
 
 ### Changed
 
@@ -81,6 +83,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Every style with a kick lists at least two kick rhythms; acid, ambient, berlin-techno, classic-rock, country, dark-cyberpunk, gated-trance, house, industrial, phonk, progressive-house, pure-trance and trance list more grooves.
 - Acid lists more arp, hook and bass presets, country and darksynth more guitar patterns, ambient a new pad and jazz a new bassline.
 - Radio sessions made before director version 20 may sound different.
+- Radio console changes on Live coder and Crescendo songs are steered in about the time of the new command, not of every command before it.
+- The first boundary a console change on a grown radio song takes follows that song's measured steering time per command.
 
 ### Fixed
 

@@ -111,7 +111,7 @@ The options were compared on what they skip, what their key costs and how they c
 
 `steerSong` looks up the longest prefix of its commands with a kept result and runs `rewrite` only for the commands after it. It keeps the result after each command it runs. The key is the base key plus the commands of the prefix, serialized (`JSON.stringify`, the exact objects `rewrite` receives).
 
-- **Base key.** A hash of the base song, plan and options, the seed and the song index `n`, computed once per base object (a `WeakMap`). In the worker each message has fresh objects, so the page sends a `baseKey` with the request: a hash the radio computes once per item when its base is set, and again when the base changes (a new song, `rebias`, an extended song). Without a `baseKey` the worker hashes the base itself.
+- **Base key.** An id given per realm to the exact content of the base song, plan and options (`baseId` over their JSON, a `Map` from the content to the id, the 12 most recent kept), then the seed and the song index `n`. _Implemented (8 November) instead of a hash or a `baseKey` from the page:_ a hash can collide and give another song's result, and a key the page assigns goes stale if one place that changes the base forgets to change it. The worker names the base once per steering (`steerOnAir` passes the id to its `steerSong` calls); the JSON of a 10-minute grown song costs a few ms, against hundreds per press. The page tags each steering with its song of the session (`owner`, `<session>:<n>`), used only by `forget` (D6).
 - **Context version.** A counter raised by `setSpokenContext` when the context changes, by the language and by `setNarratorMine`. It is part of the key. `globalThis.codingMiskAhead` turns the reuse off while it is set.
 - **Kept values are never changed.** `rewrite` already builds new objects. The check freezes every kept value deeply (D7), so a caller that writes into one fails at once. Outside the check nothing is frozen, because freezing costs time.
 
@@ -134,7 +134,7 @@ Not part of this change (owner, 5 November). See "Rejected / later".
 `compileNow` gets the code of `full` (the bar's state with the shown muted tracks) from a cache keyed by its content, and calls `compileSong` only on a miss. `parseCode` still runs per call, because its result is mutable and cheap.
 
 - **Key.** `JSON.stringify(full)` plus the context version (`compileSong` reads the language, the voice context and the my-phrases pick for spoken lines). The prototype shows keys of about 10 kB on a 10-minute song.
-- **Bound in bytes.** The cache is a least-recently-used `Map` per realm bounded at 48 MB of keys plus code (counted as string lengths), not by entries, because the entry size grows with the song. A 10-minute session of twelve presses filled 23 MB.
+- **Bound in bytes (owner decision of 8 November).** The cache is a least-recently-used `Map` per realm bounded at 48 MB of keys plus code (counted as string lengths, about bytes for this text), not by entries, because the entry size grows with the song. A 10-minute session of twelve presses filled 23 MB; the heaviest song measured on 8 November reached the bound (1747 entries).
 - _Alternative considered:_ a hash as the key, to save memory. A collision would return the code of another state and break the same-output guarantee, so the full content stays the key. If memory becomes the limit, the caller can pass a cheaper exact key (the bar's step prefix plus the shown tracks).
 
 ### D5. The written plan reused by content (behind a gate)
@@ -144,8 +144,9 @@ After D1, D2 and D4, the timing script (task 5.1) measures the presses of D8 on 
 ### D6. Lifetime and invalidation
 
 - **Per realm, per worker.** The caches live in the module where they are used. The console worker and the growth worker keep them across presses, which is where reuse pays. The page's main thread, which steers only as a fallback and for `airView`, keeps the reuse off (owner decision 1).
-- **Bounds.** D1: 128 prefix results. D2: 64 loop states, each holding a grown song (about 40 kB as JSON on a 10-minute song). D4: 48 MB. Each is a least-recently-used `Map`. Task 5.2 records the heap after a session of 20 presses on three 10-minute songs and moves the bounds if needed.
-- **`forget`.** When a song leaves the air or is skipped, the radio sends `{ forget: baseKey }` to the console worker, which drops that base's D1 and D2 entries. A new session (`startSession`) clears all.
+- **Bounds.** D1: 128 prefix results. D2: 64 loop states, each holding a grown song (about 40 kB as JSON on a 10-minute song). D4: 48 MB. Bases: 12, an evicted base drops its D1 and D2 entries. Each is a least-recently-used `Map`. Task 5.2 records the heap after a session of 20 presses on three 10-minute songs and moves the bounds if needed.
+- **`forget`.** When a song leaves the air (the natural change, a skip, the end of a hand-coded song), the radio sends `{ forget: owner }` to the console and growth workers, which drop that song's bases with their D1 and D2 entries and the compile entries made while steering it. A new session sends `{ forget: '*' }`, which clears all.
+- **A dropped console change no longer stops the console worker** (_added on 8 November_). `cancelAhead` stopped the worker so the next steering did not wait behind a long one; it now only leaves the answer out, because a new worker starts with nothing kept and steers every command again, while the queued steering reuses what the dropped one steered.
 - **What changes a key:** the base (new song, regrown `g0`, extended song, session bias), the context version (spoken context, language, my phrases), the controls and the chooser (`AIR_CHOOSER` version), and any command in the prefix.
 - **Turned off** while `globalThis.codingMiskAhead` is set (the growth probe's overrides), and by `STEER_MEMO=0` in Node for comparisons.
 
@@ -177,7 +178,14 @@ The 4× CPU row follows from the first one: 1.5 s in Node is about 6 s with the 
 
 ### D9. The expected preparation follows the new cost
 
-`expectedPrep` drops the square. For a grown song it uses the last measured steering of this song (`steerSeen.ms`), scaled by the number of new commands in the batch and not by the standing ones, and `0.3 × growMs` per new command until a steering is seen. The 30 s bound stays. This changes only when a live batch enters (the boundary is recorded with the command), so recorded recipes and replays are unchanged. It reverses owner decision 4 of 5 November, which assumed the estimate would follow the measured time; the `growMs × n²` term does not (see Context).
+`expectedPrep` drops the square. For a grown song it uses the last measured steering of this song (`steerSeen.ms`), scaled by the number of new commands in the batch and not by the standing ones, and `0.3 × growMs` per new command until a steering is seen. The 30 s bound stays.
+
+_Implemented (owner decision of 8 November)._ Today `expectedPrep` was never called: `addAt` used the page's last batch time (`addPrep`), which caused the 11-move "not ready" chain of `console-add-waves` (finding 2). Now `addAt(item, after, k)` leaves `ADD_LEAD` plus `expectedPrep(item, k)`:
+
+- Classic: this song's last preparation (`item.addPrep`), else the page's.
+- Grown: `1.3 × steerPer × k + addRest + 0.5` s, at most 30 s. `steerPer` is this song's last batch steering divided by the commands the worker steered (it reports them, `work`); before one, `0.3 × growMs`. `addRest` is the rest of this song's last preparation (window, plan, sounds), else the page's, 0.5 s at first. Only console batches measure it (the growth worker's queue would inflate it).
+- A batch moved while its steering still runs (`pushBatch`, a retarget) holds the estimate up (`addHold`, the elapsed time × 1.25, or × 1.2 + 0.5) until a batch of the song is ready.
+- `k` is 1 at the first press, the batch's commands on a push or a retarget. This changes only when a live batch enters (the boundary is recorded with the command), so recorded recipes and replays are unchanged. It reverses owner decision 4 of 5 November, which assumed the estimate would follow the measured time; the `growMs × n²` term does not (see Context).
 
 ## Risks / Trade-offs
 
@@ -197,6 +205,15 @@ No data changes. Replays give the same songs. The reuse can be switched off (`ST
 - **Director checkpoints (former D3).** `directSong` would keep the song state at the start of each boundary and evaluate each candidate move from it (`stateFrom`, copy on write), instead of `stateAt` from bar 0. Dropped on 5 November (owner: "lascerei perdere"). With D1, a warm Classic press on a 10-minute song takes 64 to 255 ms under load, and the director is 15% of a cold Live coder press.
 - **Memoizing `stateAt` by (song, bar).** The working song changes with every step taken, so the key would be the whole step list. The hit rate is low, and the key costs about as much as the replay.
 
+## Owner decisions (8 November)
+
+The open questions below were answered on 8 November:
+
+1. **Compile cache bound:** by bytes, 48 MB per worker, least recently used first (replaces the 3000 entries of decision 3).
+2. **`expectedPrep` linear (D9): yes, in this change.** The estimate for a grown song is measured on that song and grows with the batch's new commands only; `addAt` uses this song's estimate, not the page's last batch time.
+3. **Target:** a press on a 10-minute grown song with 11 commands standing costs under 1.5 s (90th percentile) on a quiet machine in Node, about 6 s with the CPU slowed 4 times.
+4. **`check:steer-memo` is its own script**, not part of `check:endless`: run before a merge that touches the steering, the director, the waypoints or the compiler.
+
 ## Owner decisions (5 November)
 
 1. **The reuse runs in the workers and in Node only.** The page's main thread keeps it off.
@@ -206,9 +223,9 @@ No data changes. Replays give the same songs. The reuse can be switched off (`ST
 5. **The reference machine is the owner's Mac with no checks running** (load average under 4), recorded by the timing script. Under load the script reports ratios only.
 6. **Director checkpoints are dropped.**
 
-## Open questions (8 November)
+## Open questions (8 November, answered)
 
-These change the tasks, so they go to the owner before implementation.
+Answered by the owner on 8 November (see "Owner decisions (8 November)"); kept as asked.
 
 1. **Bound of the compile cache.** 3000 entries (decision 3) can reach about 60 MB on a 10-minute song, because one key is about 10 kB. Recommended: a bound of 48 MB per worker, counted as string length.
 2. **`expectedPrep` linear (D9).** Recommended: yes, in this change; without it a faster steering still waits up to 30 s on long songs.
