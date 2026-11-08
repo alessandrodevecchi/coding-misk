@@ -32,7 +32,24 @@ export const SPOKEN_ORBIT = 13;
 // so the code does not depend on the machine. lengths: { "say_en_eddy/the_city.wav": seconds } (tools/voice.mjs).
 // lang: the language of the lines (default: the app's). styles: { id: recipe }, for the style's lines and speakers.
 export const spokenContext = { files: null, lengths: {}, lang: null, styles: {} };
-export function setSpokenContext(o) { Object.assign(spokenContext, o); }
+// (incremental-steering: the steering's kept results name the context by spokenVersion, raised when a value changes in
+// content, so a worker given the same context with every message keeps them; a direct assignment raises it too)
+let spokenN = 0, spokenRefs = null;
+const spokenSeen = {};
+const spokenRefsNow = () => [spokenContext.files, spokenContext.lengths, spokenContext.lang, spokenContext.styles];
+export function setSpokenContext(o) {
+  for (const [k, v] of Object.entries(o || {})) {
+    let s; try { s = JSON.stringify(v === undefined ? null : v); } catch (e) { s = null; }
+    if (s === null || spokenSeen[k] !== s) { spokenSeen[k] = s; spokenN++; }
+  }
+  Object.assign(spokenContext, o);
+  spokenRefs = spokenRefsNow();
+}
+export function spokenVersion() {
+  const now = spokenRefsNow();
+  if (!spokenRefs || now.some((x, i) => x !== spokenRefs[i])) { spokenRefs = now; spokenN++; }
+  return spokenN;
+}
 
 const words = s => String(s || '').trim().split(/\s+/).filter(Boolean).length;
 export const isSpoken = tr => !!tr && tr.type === 'spoken';

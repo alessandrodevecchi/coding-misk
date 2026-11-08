@@ -15,6 +15,7 @@
 // The writer keeps every event: a shorter form is used only when Strudel makes the same events from it (same onsets,
 // lengths and values; drum samples may get longer steps, since a sample plays to its end).
 import { CHORDS } from '../music.js';
+import { bumpMemoContext } from '../endless/memo-context.js';
 
 // ---------- mini-notation: the part we read and write ----------
 // top-level tokens: "a [b c] <d e> f(3,8)" → ["a", "[b c]", "<d e>", "f(3,8)"]
@@ -541,7 +542,7 @@ const nonWhole = text => {
 const ROOT = /^[A-G][#b]?/;
 let symbols = null;
 // chord qualities Strudel's default voicings know (ireal), with their aliases (m for -, M for ^, aug for +)
-export function setChordSymbols(list) { symbols = new Set(list); }
+export function setChordSymbols(list) { symbols = new Set(list); bumpMemoContext(); }
 const QUALITIES = ['', '2', '5', '6', '7', '9', '11', '13', '69', 'add9', '+', 'o', 'h', 'sus', '^', '-', '^7', '-7', '7sus', 'h7', 'o7', '^9', '^13', '^7#11', '^9#11', '^7#5', '-6', '-69', '-^7', '-^9', '-9', '-add9', '-11', '-7b5', 'h9', '-b6', '-#5', '7b9', '7#9', '7#11', '7b5', '7#5', '9#11', '9b5', '9#5', '7b13', '7#9#5', '7#9b5', '7#9#11', '7b9#11', '7b9b5', '7b9#5', '7b9#9', '7b9b13', '7alt', '13#11', '13b9', '13#9', '7b9sus', '7susadd3', '9sus', '13sus', '7b13sus'];
 const knownQuality = q => (symbols || new Set(QUALITIES.flatMap(x => [x, x.replace('-', 'm'), x.replace('^', 'M'), x.replace('+', 'aug')]))).has(q);
 export const SCALES = ['minor', 'major', 'phrygian', 'dorian', 'mixolydian', 'locrian', 'lydian', 'ionian', 'aeolian', 'chromatic', 'harmonic minor', 'melodic minor', 'minor pentatonic', 'major pentatonic', 'blues', 'whole tone'];

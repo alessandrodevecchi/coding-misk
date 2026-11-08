@@ -3,6 +3,7 @@
 // in order, so cancelling a command or replaying a session gives exactly the same song.
 import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, trackForPart, liftOf, OPTION_DEFAULTS, TRACK_CAP } from './director.js';
 import { stream } from './random.js';
+import { memoOn, baseId, contextVersion, caches, keep, work, timed } from './steer-memo.js';
 import { stateAt, buildSteps } from '../song/build.js';
 import { playing, curveParts, CURVES } from './energy.js';
 import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, GROOVES, PROGS, meterSteps, fitSteps } from '../music.js';
@@ -960,16 +961,31 @@ export function biasSong(recipe, n, g) {
 
 // The song after every command, from the original. commands: [{ kind, at, type?, track?, d?, value? }] in order.
 // seed and n name the random streams, so the same commands always give the same song.
-export function steerSong({ song, plan, opts, commands, seed, n }) {
-  let cur = { song: clone(song), plan, opts };
+// (incremental-steering D1: the result after each command is kept per realm, keyed by the base and the commands up to
+// it, so a steering that shares its first commands with an earlier one starts from there; equal to a full steering, as
+// the fold is pure. memoBase: the base's id when the caller has it (steerOnAir), else it is named here)
+export function steerSong({ song, plan, opts, commands, seed, n, memoBase = null }) {
+  let cur = { song: clone(song), plan, opts }, start = 0;
+  const memo = memoOn() && commands.length > 0, keys = [];
+  if (memo) {
+    let k = `${memoBase || baseId(JSON.stringify([song, plan, opts]))}|${seed}|${n}|${contextVersion()}|`;
+    for (const c of commands) { k += `${prefixKey(c)},`; keys.push(k); }
+    for (let j = commands.length; j > 0; j--) { const hit = caches.prefix.get(keys[j - 1]); if (hit) { cur = hit; start = j; break; } }
+  }
   commands.forEach((cmd, i) => {
+    if (i < start) return;
     // (seed, n, i: composed and swapped material is seeded by the song and the command's index, vary:<song>:<index>,
     // swap:<song>:<index>)
     const rng = { moves: stream(seed, `steer:${n}:${i}:moves`), comments: stream(seed, `steer:${n}:${i}:comments`), seed: String(seed), n, i };
-    cur = rewrite(cur.song, cur.plan, cur.opts, cmd, rng);
+    cur = timed('director', () => rewrite(cur.song, cur.plan, cur.opts, cmd, rng));
+    if (memo) caches.prefix.set(keys[i], keep(cur));
   });
+  work.computed = commands.length - start; work.reused = start;
   return cur;
 }
+// a command in a prefix key: as given, without `min` (the earliest boundary of a pending console change, which the
+// director never reads: the radio drops it once the change is placed, and the kept result stays the same)
+const prefixKey = c => { if (!c || c.min === undefined) return JSON.stringify(c); const { min, ...x } = c; return JSON.stringify(x); };
 
 // the most tracks a song can play at once: its candidate tracks (riser left out), at most its track maximum
 export const densityMax = plan => Math.min(plan.hardMax, plan.tracks.filter(t => t.type !== 'riser').length);

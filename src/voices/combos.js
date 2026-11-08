@@ -5,6 +5,7 @@
 // style, and "clear" may be left out (a draw then always gives the voice a character). Manual choices are never
 // restricted: the pickers only mark a pair that is not listed. Pure: the app and the Node checks read the same file.
 import COMBOS from './combos.json' with { type: 'json' };
+import { bumpMemoContext } from '../endless/memo-context.js';
 import { VOICE_STYLE_IDS, VOICE_CHARACTERS } from '../song/format.js';
 import { SPEAKERS, speaks, speakerId } from '../song/build.js';
 
@@ -18,6 +19,7 @@ let table = COMBOS;
 export function setCombos(next) {
   const old = table;
   table = next && typeof next === 'object' ? next : COMBOS;
+  bumpMemoContext();
   return old;
 }
 export const combos = () => table;

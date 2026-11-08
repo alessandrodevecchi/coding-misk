@@ -4,6 +4,7 @@
 // the same bar, so the compact code plays exactly what the standard code plays. Tracks the live build keeps silent
 // are written with Strudel's `_$:` (muted, code kept), so the listener sees what is coming.
 import { compileSong } from './compile.js';
+import { memoOn, contextVersion, caches, currentOwner, timed } from '../endless/steer-memo.js';
 import { rle } from '../music.js';
 import { t } from '../i18n.js';
 import { typingPlan, mulberry, lineLike } from './typing.js';
@@ -185,12 +186,24 @@ import { normalizeSong } from './format.js';
 // line (id: its track's header, its key and the bar it returns at) shown in its return form from that bar on; a layer
 // of a block typed ahead, muted, from `from` until it sounds at `to`. info: an array filled with the pattern lines of
 // the code ({ kind: 'play' | 'return' | 'ahead', header, key, text, id?, was?, ret? }), for the plan (live-code.js).
+// (incremental-steering D4: the code of a song state compiled once per realm, keyed by the state's content and the
+// context version, least recently used first within a byte bound (48 MB of keys and code, as string lengths); parseCode
+// runs per call, as its result is changed by the caller. Workers and Node only, steer-memo.js)
+function compiled(full) {
+  if (!memoOn()) return timed('compile', () => compileSong(full));
+  const k = `${contextVersion()}|${JSON.stringify(full)}`;
+  const hit = caches.compile.get(k);
+  if (hit !== undefined) return hit;
+  const code = timed('compile', () => compileSong(full));
+  caches.compile.set(k, code, k.length + code.length, currentOwner());
+  return code;
+}
 export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHeaders = [], inPlace = false, hidden = null, gated = false, bounds = null, returning = Infinity, shownText = x => x, plan = null, info = null } = {}) {
   const n = normalizeSong(song), secs = n.sections;
   const i = Math.max(0, secs.findIndex(s => bar >= s.start && bar < s.start + s.bars));
   const shown = new Set(shownMuted.filter(id => (song.tracks || []).some(tr => tr.id === id && tr.mute)));
   const full = { ...song, tracks: song.tracks.map(tr => (shown.has(tr.id) ? { ...tr, mute: false } : tr)) };
-  const p = parseCode(compileSong(full), { gated }), used = new Set();
+  const p = parseCode(compiled(full), { gated }), used = new Set();
   // the bars of section k the code is for: the whole section, or (bounds) the part of it that holds `bar`
   const win = k => {
     const s = secs[k];

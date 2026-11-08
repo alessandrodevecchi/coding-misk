@@ -12,6 +12,7 @@ import { steerSong, sayAir, COMMANDS, patternPart, riserAirTarget, riserAir } fr
 import { writtenForm, growOnAir, airControls } from './growth.js';
 import { energyOf } from './energy.js';
 import { stream } from './random.js';
+import { memoOn, baseId, contextVersion, caches, keep, work, timed } from './steer-memo.js';
 import { stateAt, buildSteps } from '../song/build.js';
 import { waypointPath, choose } from '../song/coder.js';
 import { topTokens } from '../song/ideas.js';
@@ -187,7 +188,8 @@ function heardAt(st, t, bar) {
 // extra: { move key: bars the typing asked for }, minE: the arrival at the earliest, fixE: the arrival as given, lean:
 // fewer moves, together: ids of the tracks a batch of console changes adds on this boundary (#82): their lines come in
 // on the boundary itself, before every other move }. → { song, B, E (the arrival), units: [{ at, key, kind, track, step }], focus }
-function transitSong(prev, W, Wprev, B, off, o) {
+const transitSong = (...a) => timed('transit', () => transitSongNow(...a));
+function transitSongNow(prev, W, Wprev, B, off, o) {
   const ph = o.phrase, wBars = barsOf(W), end = wBars + off, G = prev.crescendo ? prev.crescendo.growth : 0;
   const isEnd = o.kind === 'end';
   const limitE = Math.min(end - 1, Math.max(B + 1, isEnd ? B + ph : end - ph));
@@ -427,7 +429,8 @@ function barSecondsAt(song, bar) {
 // each later edit from the step before it, at most as fast as a person. → { fits (the boundary's edit), late: [{ at,
 // bars }] (moves that need more bars before them), need, usable: the boundary's seconds of typing and to type in };
 // hurry: how many times a person's pace still fits; head: the boundary's edit only (no late)
-function typingFrom(N, B, q, E, C, { hurry = 1, head = false } = {}) {
+const typingFrom = (...a) => timed('typing', () => typingFromNow(...a));
+function typingFromNow(N, B, q, E, C, { hurry = 1, head = false } = {}) {
   const L = liveCode(N, C, { cols: () => 80 }), seed = N.id || '';
   const bars = [...new Set(buildSteps(L.build).map(s => s.at))].sort((a, b) => a - b);
   const codes = new Map(), code = b => { if (!codes.has(b)) codes.set(b, L.codeAt(b)); return codes.get(b); };
@@ -474,6 +477,16 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
   const typed = c => c.kind === 'say-live' || airRiser(c, g0), director = list => list.filter(c => !typed(c)).map(toDirector);
   let N = g0, Wprev = writtenForm(song), P = plan, R = { song, plan, opts };
   const done = [];
+  // (incremental-steering D2: the loop state after each command or batch is kept per realm, keyed by the base, the grown
+  // song, the controls, the chooser and the commands up to it; a steering that shares its first commands with an earlier
+  // one starts from there. The resolved commands are rebuilt from the commands given, each with what the steering put
+  // on it (`patches`); a pending command or batch, once placed, is kept under its placed form too, as the radio sends
+  // it with the next press)
+  const cJ = memoOn() && typeof chooser !== 'function' ? plainJSON(C) : null, memo = cJ !== null;
+  const sBase = memo ? baseId(JSON.stringify([song, plan, opts])) : null;
+  const airBase = memo ? `${baseId(`${sBase}|${JSON.stringify(g0)}`)}|${seed}|${n}|${contextVersion()}|${cJ}|${chooser ?? ''}|` : '';
+  const patches = [];
+  const place = (cmd, gi, patch) => { const { pend, ...kept } = cmd; done.push({ ...kept, ...patch }); patches.push([gi, patch]); };
   // the moves that need more bars get them, the arrival kept (three times at most); when some still has to hurry (the
   // arrival's edit, the written form's lines of its section, among them) the arrival moves a phrase later
   const settle = (t, ty, B, W, o, q) => {
@@ -499,15 +512,15 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
     const cands = cmd.pend && !typed(cmd) ? airBoundaries(cmd.kind, Number.isFinite(cmd.q) ? cmd.q : cmd.at - 1, P, g0).filter(b => !Number.isFinite(cmd.min) || b >= cmd.min) : [cmd.at];
     if (airRiser(cmd, g0)) {
       const r = cmd.air || riserAirTarget(g0, plan, Number.isFinite(cmd.q) ? cmd.q : cmd.at - 1, cmd);
-      if (r) { const { pend, ...kept } = cmd; done.push({ ...kept, at: r.start, air: { start: r.start, end: r.end, bars: r.bars, dir: r.dir } }); }
+      if (r) place(cmd, i, { at: r.start, air: { start: r.start, end: r.end, bars: r.bars, dir: r.dir } });
       return;
     }
-    if (typed(cmd)) { if (cands.length) { const { pend, ...kept } = cmd; done.push({ ...kept, at: cands[0] }); } return; }
+    if (typed(cmd)) { if (cands.length) place(cmd, i, { at: cands[0] }); return; }
     const rng = stream(seed, `waypoint:${n}:${i}`);
     let pick = null;
     for (let j = 0; j < cands.length; j++) {
       const B = cands[j];
-      const r = steerSong({ song, plan, opts, commands: director([...done, { ...cmd, at: B }]), seed, n });
+      const r = steerSong({ song, plan, opts, commands: director([...done, { ...cmd, at: B }]), seed, n, memoBase: sBase });
       const W = writtenForm(r.song), o = { kind: cmd.kind, track: cmd.track, rng, chooser, phrase: plan.phrase, plan: r.plan };
       let t = transitSong(N, W, Wprev, B, off, o);
       const last = j === cands.length - 1;
@@ -519,8 +532,7 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
     }
     if (!pick) return;
     N = pick.t.song; Wprev = pick.W; P = pick.r.plan; R = pick.r;
-    const { pend, ...kept } = cmd;
-    done.push({ ...kept, at: pick.B });
+    place(cmd, i, { at: pick.B });
   };
   // A batch of console changes (commands with the same `batch`, console-add-ahead, #82): pending, its head takes the
   // first boundary, from the bar it was pressed and up to BATCH_TRIES phrases on, where most of its new lines can be
@@ -533,7 +545,7 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
     const rng = stream(seed, `waypoint:${n}:${i0}`), o0 = { kind: list[0].kind, rng, chooser, phrase: plan.phrase };
     // the commands on one boundary on top of the song so far: the steered written form and the transit to it
     const onB = (B, cmds) => {
-      const r = steerSong({ song, plan, opts, commands: director([...done, ...cmds.map(c => ({ ...c, at: B }))]), seed, n });
+      const r = steerSong({ song, plan, opts, commands: director([...done, ...cmds.map(c => ({ ...c, at: B }))]), seed, n, memoBase: sBase });
       const W = writtenForm(r.song), together = (r.plan.added || []).filter(a => a.at === B - off).map(a => a.id);
       const o = { ...o0, plan: r.plan, together };
       return { r, W, o, t: transitSong(N, W, Wprev, B, off, o) };
@@ -574,24 +586,63 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
       const cmds = list.filter(c => at.get(c) === B), x = onB(B, cmds);
       const t = settle(x.t, typingFrom(x.t.song, B, cmds[0].q, x.t.E, C), B, x.W, x.o, cmds[0].q);
       N = t.song; Wprev = x.W; P = x.r.plan; R = x.r;
-      for (const c of cmds) { const { pend, ...kept } = c; done.push({ ...kept, at: B }); }
+      for (const c of cmds) place(c, i0 + list.indexOf(c), { at: B });
     }
   };
   const batched = c => c.batch !== undefined && c.batch !== null && !typed(c);
+  const units = [];
   for (let i = 0; i < commands.length;) {
     const c = commands[i];
-    if (!batched(c)) { one(c, i); i++; continue; }
+    if (!batched(c)) { units.push([i, i + 1]); i++; continue; }
     let j = i + 1;
     while (j < commands.length && batched(commands[j]) && commands[j].batch === c.batch) j++;
-    group(commands.slice(i, j), i);
+    units.push([i, j]);
     i = j;
   }
+  // the key of each unit's state: the commands up to it as given; the longest one kept is where the loop starts
+  const keys = [];
+  let from = 0;
+  if (memo) {
+    let k = airBase;
+    for (const [i, j] of units) { for (let x = i; x < j; x++) k += `${airKey(commands[x])},`; k += `#${i};`; keys.push(k); }
+    for (let u = units.length; u > 0; u--) {
+      const hit = caches.air.get(keys[u - 1]);
+      if (!hit) continue;
+      ({ N, Wprev, P, R } = hit);
+      for (const [gi, patch] of hit.patches) { const { pend, ...kept } = commands[gi]; done.push({ ...kept, ...patch }); patches.push([gi, patch]); }
+      from = u;
+      break;
+    }
+  }
+  // (the placed form of the commands so far, while each unit placed every command it was given)
+  let placed = memo ? airBase : null, computed = 0;
+  for (let u = 0; u < units.length; u++) {
+    const [i, j] = units[u];
+    if (u >= from) { if (j - i === 1 && !batched(commands[i])) one(commands[i], i); else group(commands.slice(i, j), i); computed += j - i; }
+    if (!memo) continue;
+    const mine = patches.filter(([gi]) => gi >= i && gi < j);
+    if (placed !== null && mine.length === j - i) {
+      const at = new Map(mine.map(([gi, p]) => [gi, p]));
+      for (let x = i; x < j; x++) { const { pend, ...c } = commands[x]; placed += `${airKey({ ...c, ...at.get(x) })},`; }
+      placed += `#${i};`;
+    } else placed = null;
+    if (u < from) continue;
+    const state = keep({ N, Wprev, P, R, patches: patches.slice() });
+    caches.air.set(keys[u], state);
+    if (placed !== null && placed !== keys[u]) caches.air.set(placed, state);
+  }
+  work.computed = computed; work.units = units.length - from; work.reused = commands.length - computed;
   const risen = done.filter(c => c.kind === 'riser' && c.air);
   if (risen.length) N = riserAir(N, plan, risen.map(c => c.air), stream(seed, `waypoint:${n}:riser`));
   const said = done.filter(c => c.kind === 'say-live');
   if (said.length) N = sayAir(N, said.map(c => ({ at: c.at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' })));
   return { song: N, grown: g0, commands: done, plan: R.plan, opts: R.opts, plain: R.song };
 }
+// a command in a key of the loop state: as given; a command already placed without `min` (its earliest boundary,
+// read only while it is pending: the radio drops it once the change is placed)
+const airKey = c => { if (c.pend || c.min === undefined) return JSON.stringify(c); const { min, ...x } = c; return JSON.stringify(x); };
+// the controls as JSON, or null when they hold a function (then nothing is kept)
+const plainJSON = v => { let fn = false; const s = JSON.stringify(v === undefined ? null : v, (k, x) => { if (typeof x === 'function') fn = true; return x; }); return fn ? null : s; };
 // the director's view of a steered grown song (its plan, options and song as steered), from commands with their
 // boundaries in the grown song's bars: what the console reads
 export function directorView({ song, plan, opts, commands, seed, n, grown }) {
