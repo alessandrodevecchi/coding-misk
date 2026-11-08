@@ -916,7 +916,7 @@ function widgetGroups() {
 // next step brings the widgets
 let cwAt = 0;
 function widgetTick(sg, s) {
-  if (!sg || !sg.meta || hand || resumeTo !== null || typing || sg.loop || !cwSettings().on) return;
+  if (!sg || !sg.meta || hand || resumeTo !== null || typing || typingSoon || freshSoon || sg.loop || !cwSettings().on) return;
   const ahead = s.lastEnd + .1 * s.cps, b = sg.meta.sections.map(x => x.start).filter(x => x > cwAt && x <= ahead).pop();
   if (b === undefined) return;
   cwAt = b;
@@ -979,7 +979,9 @@ function glideTo(host, y) {
   glide = requestAnimationFrame(step);
 }
 // live build in progress: steps already in the editor, and the edit being typed towards the next step
-let built = 0, typing = null;
+// typingSoon: the typing of the next step being planned in a task of its own; freshSoon: a radio window whose code goes
+// into the editor in a task of its own (#82)
+let built = 0, typing = null, typingSoon = null, freshSoon = null;
 // hand live coding (#20): the user typed in the code during a live build. Steps, comments and the stop at the end
 // wait until "resume live build"; the user's code plays meanwhile. resumeTo: the bar where the build takes over again.
 let hand = false, lastHand = null, resumeTo = null, handFrom = 0;
@@ -1036,12 +1038,27 @@ function liveBuild(sg, s, cyc) {
   // step's bar: everything from the bar on comes from the new code. The edit may be typed from half a bar after the
   // previous step; only the line of the section that plays at the step is typed, the other sections' lines change at once
   const due = s.lastEnd + .1 * s.cps >= next.at;
+  // (#82: the typing of the next step is planned in a task of its own, not in the frame: after a big step, such as a
+  // Classic transition bringing in the next song's code, its plan took 40 ms with the CPU slowed 4 times, on top of the
+  // frame and the layout of the new code. A plan still waiting when the step is due is dropped: the step's code goes in
+  // at once, as it does when there is no time to type it)
   if (!typing && !due) {
-    const prevAt = built > 0 && steps[built - 1] ? steps[built - 1].at : -Infinity, to = codeFor(sg, next.at);
-    typing = makeTyping(settleOthers(ed.code || '', to, next.at), to, Math.max(cyc, prevAt + .5), next.at - .2 * s.cps, s.cps, typingHuman(), stretchOf(next.at), sg.paste ? sg.paste(next.at) : Infinity, sg.earlier ? sg.earlier(next.at) : null);
+    if (typingSoon && typingSoon.sg === sg && typingSoon.at === next.at) return;
+    const me = typingSoon = { sg, at: next.at };
+    setTimeout(() => {
+      if (typingSoon !== me) return;
+      typingSoon = null;
+      const s2 = sched();
+      if (song !== sg || typing || !s2 || !isPlaying() || hand || resumeTo !== null || freshSoon) return;
+      const st = buildSteps(sg.build), nx = st[built];
+      if (!nx || nx.at !== me.at || s2.lastEnd + .1 * s2.cps >= nx.at) return;
+      const prevAt = built > 0 && st[built - 1] ? st[built - 1].at : -Infinity, to = codeFor(sg, nx.at);
+      typing = makeTyping(settleOthers(ed.code || '', to, nx.at), to, Math.max(s2.now(), prevAt + .5), nx.at - .2 * s2.cps, s2.cps, typingHuman(), stretchOf(nx.at), sg.paste ? sg.paste(nx.at) : Infinity, sg.earlier ? sg.earlier(nx.at) : null);
+    }, 0);
+    return;
   }
   if (!due) { typeFrame(typing, cyc); return; }
-  typing = null; built = steps.filter(x => x.at <= next.at).length;
+  typing = null; typingSoon = null; built = steps.filter(x => x.at <= next.at).length;
   // (#82: the step's code holds the widgets of its bar, so the section boundaries up to it are done: widgetTick in the
   // same tick must not write an earlier bar's code over the step's)
   cwAt = Math.max(cwAt, next.at);
@@ -5055,7 +5072,7 @@ function songTick() {
   // the loop of the Patterns tab: it never ends; a change plays from the next bar
   if (song.loop) { if (loopNext && s.lastEnd + .1 * s.cps >= loopNext.at) { song = loopNext.p; loopNext = null; source = { kind: 'pattern', name: song.title }; renderSource(); ed.setCode(codeFor(song, 0)); ed.evaluate(); } return; }
   if (resumeTo !== null) resumeBuild(song, s, cyc);
-  else if (song.build && !hand) liveBuild(song, s, cyc);
+  else if (song.build && !hand && !freshSoon) liveBuild(song, s, cyc);
   if (mode === 'radio' && radio && !hand && resumeTo === null) radio.tick(cyc);
   widgetTick(song, s);
   mixTick(cyc);
@@ -5590,11 +5607,17 @@ radio = createRadio({
       const s = sched(), cyc = s ? s.now() : 0;
       // (a window whose song on air changed while songs are shown one by one, radio-profiles D7: the new song's code
       // appears whole now, in its own view)
-      const fresh = (p.air || song.air) && p.id !== song.id && !hand;
-      song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length; cwAt = Math.floor(cyc);
+      // (a window still waiting to put its code in the editor is replaced by this one, which puts its own)
+      const fresh = ((p.air || song.air) && p.id !== song.id || !!freshSoon) && !hand;
+      song = p; typing = null; typingSoon = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length; cwAt = Math.floor(cyc);
       // (the soundfonts of the window loaded in a task of its own: finding them writes the code of every step, #82)
       warmVoices(p); setTimeout(() => { if (song === p) preloadSounds(p); }, 0); source = { kind: 'radio', name: p.title }; renderSource();
-      if (fresh) { ed.setCode(codeNow(p, Math.floor(cyc))); ed.evaluate(); }
+      // (#82: the new code goes into the editor and is evaluated in a task of its own, not in the frame of the song
+      // change: the window holds the next song already, so the sound is the same; the steps and widgets wait for it)
+      if (fresh) {
+        const me = freshSoon = { p, bar: Math.floor(cyc) };
+        setTimeout(() => { if (freshSoon !== me) return; freshSoon = null; if (mode !== 'radio' || song !== p || hand) return; ed.setCode(codeNow(p, me.bar)); ed.evaluate(); }, 0);
+      }
     },
     // skip: the new window takes over now, its first song starts on "bar"
     // (its first bars' voice samples loaded first, #82: at most 100 ms, and never past the bar it starts on)
