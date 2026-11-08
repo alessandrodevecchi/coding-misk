@@ -279,10 +279,15 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     e = await ed(); const c1 = await code(), ob = await orbitsAhead();
     check(!e.err && names(c1, s0.title) && !c1.includes(s1.title) && !c1.includes('// ==> ') && !/^\/\/ ========== /m.test(c1), 'during the transition the panel holds only the song on air, with only its title as comments', `${c1.split('\n')[0]} ${e.err.slice(0, 80)}`);
     check(ob.some(o => o >= 20) && ob.some(o => o < 20), 'the incoming song plays hidden on its own orbits', `orbits ${ob.join(',')}`);
+    const ch0 = await page.evaluate(() => { const c = globalThis.codingMiskRadio.changed; return { ahead: c.ahead, here: c.here }; });
     const on1 = await waitFor(async () => (await R()).state.onAir === 1, 60000);
     await sleep(1500);
     e = await ed(); const c2 = await code();
     check(on1 && !e.err && names(c2, s1.title) && !c2.includes(s0.title) && /^\s*[_S]?\$:/m.test(c2), 'the next song appears whole when it goes on air', c2.split('\n')[0]);
+    // #82: the window of the natural change made ahead (its plan in the plan worker) and handed over at the change, the
+    // same code at every bar as the window made at the change
+    const ch = await page.evaluate(([b0, n]) => { const r = globalThis.codingMiskRadio, c = r.changed, w = r.airPlayable; let diff = 0; for (let b = b0; b < b0 + n; b++) if (c.p.codeAt(b) !== w.codeAt(b)) diff++; return { ahead: c.ahead, here: c.here, diff }; }, [s1.start, s1.bars]);
+    check(ch.ahead === ch0.ahead + 1 && ch.here === ch0.here && ch.diff === 0, 'the natural song change hands over the window made ahead, the same code as one made at the change', JSON.stringify(ch));
     // the incoming song in the panel: the visible option
     await page.selectOption('#radio-incoming', 'visible');
     r = await R();

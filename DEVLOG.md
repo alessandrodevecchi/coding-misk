@@ -2736,3 +2736,24 @@ Ramo `fix/82-console-lag` da `develop` (1ed6acb), poi con `develop` 977d31f unit
 
 - **Da sapere:** a 1× la finestra «idle» di Live coder (niente premuto) ha avuto una volta un task di 256 ms, non ripetuto in due profili della stessa finestra; probabilmente una finestra cambiata in sottofondo che faceva il piano sul thread principale (ora passa da `swapSoon`). Il cambio di brano a fine brano (`tick`) manda ancora in onda una finestra con il piano fatto in pagina: non è un comando, resta come prima. `check-add-lag` ha avuto una volta un task di 307 ms 11 s dopo la pressione in Classic, non ripetuto rilanciando Classic.
 - **Prove:** `check:endless` (96), `check:radio-profiles` (31), `check:live-code` (25), `check:crescendo` rapido (42), `check:knowledge`, `check:guide`, `npm run build`; nel browser (porta 5296) `check-radio`, `check-steering`, `check-add-lag`, `check-say-lag`, tutti ok. Fixture invariate.
+
+## 2026-11-08 cambio di brano naturale senza blocchi (#82)
+
+Ramo `fix/82-natural-change` da `develop` (885bb05).
+
+- **Problema:** alla fine di un brano `tick` faceva la finestra del brano dopo in un blocco solo sulla pagina (`player.swap(windowPlayable())`), con il piano scritto di un brano Live coder o Crescendo: un task di 220-460 ms a ogni cambio con la CPU rallentata 4 volte, fino a 8 note «too late».
+- **Cosa cambia:** la finestra che parte dal brano dopo si prepara prima (`nextWindow`, condivisa con Salta): appena il brano dopo è pronto e mancano meno di 16 s (almeno 4 battute) al cambio, in un task suo, con il piano dal worker del piano (`changeAhead`). Si rifà se cambia qualcosa di cui è fatta (brano, inizio, battute, transizione, controlli, controlli di visualizzazione, opzione «in arrivo»: confronto per riferimento, `windowKey`). Al cambio `tick` la passa al player; se non combacia più la fa lì, come prima. Il disegno della radio dopo il cambio va in un task suo. Salta tiene le sue decisioni (taglio scelto alla pressione, attesa del brano dopo, «Salto…»); il cambio naturale tiene transizione e sovrapposizione. Stessi brani, stesse note: le finestre sono le stesse, fatte prima.
+- **Scartato:** passare la finestra prima con `swapSoon`: una finestra che parte dal brano dopo taglierebbe le ultime battute e la transizione del brano in onda. `remember` (cronologia) al cambio costa 1-3 ms anche con 50 brani: resta dov'è.
+- **Brano dopo ancora in crescita al cambio:** resta la crescita in pagina (`growNow`) come ultima risorsa; nelle misure non è mai successo (il brano dopo parte al 40 %).
+- **Misure** (`natural-change.cjs` nello scratchpad: task > 50 ms entro ±2 battute dal cambio, 5 cambi per profilo, berlin-techno, transizione dell'artista, seek 12 battute prima della fine):
+
+| 4× | prima: task più lungo | prima: cambi con un task > 100 ms | prima: «too late» | dopo: task più lungo | dopo: cambi con un task > 100 ms | dopo: «too late» |
+| --- | --- | --- | --- | --- | --- | --- |
+| Classic | 114 ms | 2 su 5 | 0 | 92 ms | 0 su 5 | 1 |
+| Crescendo | 280 ms | 5 su 5 | 3 | 80 ms | 0 su 5 | 1 |
+| Live coder | 462 ms | 5 su 5 | 21 | 64 ms | 0 su 5 | 0 |
+
+  A 1× prima Live coder aveva un task di 55-117 ms a ogni cambio (1 «too late»), Classic e Crescendo nessuno; dopo nessun task in 15 cambi, salvo una volta 271 ms 3,8 s prima del primo cambio Crescendo, non ripetuto in quattro prove (nessun lavoro della radio sulle finestre in quel momento). Il lavoro della radio al cambio è 1-14 ms.
+- **Da sapere:** a 4× il primo cambio Classic del seed di prova ha a volte (3 prove su 6) un task di 130 ms 3,9 s prima del cambio: è il passo della transizione (eco, battuta 158) che scrive nell'editor il codice del brano in arrivo (11 kB), c'era già prima e non è il passaggio della finestra. Restano 0-1 «too late» proprio al cambio in alcuni cambi Classic e Crescendo: è il codice nuovo messo nell'editor e valutato nel frame del cambio. `check-add-lag` fallisce, prima e dopo, su «Classic, 5 tracks, + arp e − bass» (292 ms prima, 228-274 ms dopo, 11 s dopo la pressione): è lo `swapSoon` dell'entrata del lotto della console, non il cambio di brano.
+- **Nuovo controllo** in `check-radio`: il cambio naturale di una sessione Live coder passa la finestra fatta prima, con lo stesso codice a ogni battuta di una fatta al cambio.
+- **Prove:** `check:endless` (96), `check:radio-profiles` (31), `check:live-code` (25), `check:crescendo` rapido (42), `check:knowledge`, `check:guide`, `npm run build`; nel browser (porta 5297) `check-radio` e `check-steering` ok, `check-add-lag` ok salvo il caso sopra. Fixture invariate, nessuna nuova versione del regista.

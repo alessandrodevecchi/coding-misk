@@ -452,12 +452,58 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       if (S.limit && S.onAir + 1 >= S.limit) return endLimited();
       if (S.stream.length <= S.onAir + 1 && !generate()) return endLimited();
       // (a song still growing away from the page grows here: it goes on air now)
+      const ahead = S.ahead; delete S.ahead;
       growNow(S.stream[S.onAir + 1]);
       S.onAir++;
       if (!S.limit) remember(S.stream[S.onAir]);
-      player.swap(windowPlayable());
-      render();
-    } else if (performance.now() - S.lastCard > 250) { S.lastCard = performance.now(); renderNow(cyc); }
+      // (#82: the window made ready ahead, when nothing it is made of changed since; else made here, as before)
+      const items = S.stream.slice(S.onAir, S.onAir + 2), made = !!(ahead && ahead.p && sameWindow(ahead.key, windowKey(items)));
+      changed = { ahead: changed.ahead + (made ? 1 : 0), here: changed.here + (made ? 0 : 1), p: made ? ahead.p : windowPlayable() };
+      player.swap(changed.p);
+      // (the radio drawn in a task of its own)
+      setTimeout(() => render(), 0);
+    } else {
+      changeAhead(cyc);
+      if (performance.now() - S.lastCard > 250) { S.lastCard = performance.now(); renderNow(cyc); }
+    }
+  }
+  // the window that starts at the next song (items: it and the song after it, as they will be on air), its song's
+  // written plan made away from the page (#82). Shared by the skip and the natural song change; each hands it to the
+  // player on its own bar. alive(): false drops the preparation; ready once the plan is made, ms the time it took
+  function nextWindow(items, alive) {
+    const w = { p: windowPlayable(null, items), key: windowKey(items), ready: false, ms: null }, t0 = performance.now();
+    const prepared = () => { w.ready = true; w.ms = performance.now() - t0; };
+    (w.p.prepare ? w.p.prepare(12, alive) : Promise.resolve()).then(prepared, prepared);
+    return w;
+  }
+  // what windowPlayable makes a window of: compared by reference, so a change to a song, its start, its transition,
+  // its controls or the display controls makes the window again
+  const windowKey = items => [S.display, opts.incoming, ...items.flatMap(x => [x.song, x.n, x.start, x.bars, x.entry, x.entry.transition, x.cut, x.custom, x.ctl, x.hush, x.display])];
+  const sameWindow = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+  // the natural song change made ready ahead (#82: the window of the next song on air was made at the change, its
+  // Live coder plan included, in one block on the page): once the next song is ready and its change is less than
+  // AHEAD_SECONDS (at least AHEAD_BARS) away, its window is made in a task of its own and its plan in the plan worker;
+  // made again when something it is made of changes. At the change tick hands it to the player, as it handed the
+  // window made there
+  const AHEAD_SECONDS = 16, AHEAD_BARS = 4;
+  // the natural changes with the window made ahead and made at the change, and the last window handed (check-radio)
+  let changed = { ahead: 0, here: 0, p: null };
+  function changeAhead(cyc) {
+    const cur = S.stream[S.onAir], nx = S.stream[S.onAir + 1], end = cur.start + cur.bars;
+    if (!nx || nx.growing || S.pending || S.skipping || (S.limit && S.onAir + 1 >= S.limit)) return;
+    if (end - cyc > AHEAD_BARS && (end - cyc) * barSecOf(cur.song, Math.max(0, Math.floor(cyc - cur.start))) > AHEAD_SECONDS) return;
+    const items = S.stream.slice(S.onAir + 1, S.onAir + 3), a = S.ahead;
+    if (a && (a.queued || sameWindow(a.key, windowKey(items)))) return;
+    const mine = S, me = S.ahead = { queued: true, key: [] };
+    setTimeout(() => {
+      if (S !== mine || S.ahead !== me) return;
+      const its = S.stream.slice(S.onAir + 1, S.onAir + 3);
+      if (!its.length || its[0].growing) { delete S.ahead; return; }
+      // (dropped once the change has gone by, another window is made, or something it is made of changed)
+      const key = windowKey(its);
+      let w = null;
+      w = S.ahead = nextWindow(its, () => S === mine && (S.ahead === me || S.ahead === w) && sameWindow(key, windowKey(S.stream.slice(S.onAir + 1, S.onAir + 3))));
+    }, 0);
   }
   // skip: the song on air ends with this bar, the next one starts on the next bar
   // (#82: a next song still growing away from the page, or not made yet, grew here, on the main thread: up to seconds
@@ -483,19 +529,23 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   function skipPrepare(nx, token, alive, drop) {
     const cur = S.stream[S.onAir], now = player.now(), bs = barSecOf(cur.song, Math.max(0, Math.floor(now - cur.start)));
     const cut = Math.max(Math.floor(now) + 1, Math.ceil(now + (SKIP_LEAD + skipPrep) / bs));
-    const p = windowPlayable(null, [{ ...nx, start: cut }]), t0 = performance.now(), song0 = nx.song;
-    let done = false, ready = false;
+    const song0 = nx.song;
+    let done = false;
     const go = () => {
       done = true;
       // (too late for its bar, or the next song changed meanwhile: on the next bar, with a window made now)
       if (player.now() > cut - 0.05 || nx.song !== song0) { skipNow(); return; }
-      skipNow(cut, p);
+      skipNow(cut, w.p);
     };
     // (on air in the last half bar before the cut, as a skip on the next bar did; not ready a third of a bar before it,
     // it goes on air anyway and its plan is finished at once)
-    const watch = () => { if (done) return; if (!alive()) { done = true; drop(); return; } const now = player.now(); if ((ready && now >= cut - 0.5) || now >= cut - 0.34) go(); else setTimeout(watch, 30); };
-    const prepared = () => { ready = true; skipPrep = Math.max(0.3, Math.min(8, (performance.now() - t0) / 1000 * 1.3)); };
-    (p.prepare ? p.prepare(12, () => !done && alive()) : Promise.resolve()).then(prepared, prepared);
+    const w = nextWindow([{ ...nx, start: cut }], () => !done && alive());
+    let seen = false;
+    const watch = () => {
+      if (done) return; if (!alive()) { done = true; drop(); return; }
+      if (w.ready && !seen) { seen = true; skipPrep = Math.max(0.3, Math.min(8, w.ms / 1000 * 1.3)); }
+      const now = player.now(); if ((w.ready && now >= cut - 0.5) || now >= cut - 0.34) go(); else setTimeout(watch, 30);
+    };
     watch();
   }
   // the skip itself: the song on air cut at `cut` (the next bar without one), the next song on air from there
@@ -503,6 +553,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     delete S.skipping;
     const cyc = player.now(), cur = S.stream[S.onAir];
     if (cut === null) cut = Math.floor(cyc) + 1;
+    delete S.ahead;
     growNow(S.stream[S.onAir + 1]);
     cur.bars = Math.max(1, cut - cur.start); cur.cut = true;
     relayout();
@@ -2267,6 +2318,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // the player stopped the radio (Compose started, stop pressed)
     stopped() { if (S) { S = null; render(); } },
     get on() { return !!S; },
+    // the song on air's index, cheap enough to read every few ms (measurements of the natural song change, #82)
+    get onAirN() { return S ? S.onAir : -1; },
+    get changed() { return changed; },
     // the window on air as the player gets it (tools/check-radio.cjs evaluates its code at chosen bars)
     get airPlayable() { return S ? windowPlayable() : null; },
     get state() { return S && { paused: S.paused, seed: S.recipe.seed, recipe: clone(S.recipe), onAir: S.onAir, stream: S.stream.map(x => ({ n: x.n, start: x.start, bars: x.bars, title: x.song.title, id: x.song.id, transition: x.entry.transition || null, profile: profileOf(x), grown: !!(x.song && x.song.onAir), growing: !!x.growing, show: x === S.stream[S.onAir] ? 'air' : showOf(x), shape: x.song && x.song.crescendo && x.song.crescendo.shape ? { ...x.song.crescendo.shape } : null, knobs: x.base ? Object.fromEntries(KNOBS.map(k => [k, x.base.opts[k]])) : null })), transition: S.stream[S.onAir].entry.transition || null }; },
