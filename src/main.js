@@ -321,14 +321,15 @@ function planAway(L, alive) {
   return growAway(null, null, null, null, 'plan', { plan: { build: job.build, ctl: job.ctl, lang, limits: globalThis.codingMiskAhead || null } })
     .then(r => { if (!r || !Array.isArray(r.edits)) return false; if (alive() && getLang() === lang) L.setPlan({ edits: new Map(r.edits), ahead: r.ahead }, lang); return true; }, () => false);
 }
-function growAway(song, ctx, steer = null, classic = null, lane = 'grow', extra = null) {
+// (keep: a job cancelAhead leaves alone, the steering of the song on air in the console worker)
+function growAway(song, ctx, steer = null, classic = null, lane = 'grow', extra = null, keep = false) {
   const here = () => (classic || (steer && steer.view) ? new Promise(r => setTimeout(r, 0)) : Promise.resolve()).then(() => (classic ? (({ song: s, plan, opts }) => ({ song: s, plan, opts }))(steerSong(classic)) : steer ? (r => ({ song: r.song, grown: r.grown, commands: r.commands, ...(steer.view ? { view: steerView(steer, r) } : {}) }))(steerOnAir(steer)) : growOnAir(song, ctx)));
   const L = lanes[lane];
   try {
     laneWorker(L);
     if (L.worker === false) return extra ? Promise.reject(new Error('worker')) : here();
     const id = ++growN, spoken = { files: spokenContext.files, lengths: spokenContext.lengths, lang: spokenContext.lang || getLang(), styles: spokenContext.styles };
-    return new Promise((resolve, reject) => { L.waits.set(id, { resolve, reject }); L.worker.postMessage({ id, song, ctx, spoken, steer, classic, ...(extra || {}) }); });
+    return new Promise((resolve, reject) => { L.waits.set(id, { resolve, reject, keep }); L.worker.postMessage({ id, song, ctx, spoken, steer, classic, ...(extra || {}) }); });
   } catch (e) { return extra ? Promise.reject(e) : here(); }
 }
 // the page's own growths away from the page (grow-worker.js, a second worker so the radio never waits for them): the
@@ -5629,6 +5630,10 @@ radio = createRadio({
     grow: (song, ctx) => growAway(song, ctx),
     // and a grown song is steered there (radio-profiles stage 5: commands as waypoints)
     steer: args => growAway(null, null, args),
+    // the song on air steered in the console worker (incremental-steering D6): its console changes are steered there, so
+    // the results kept for its other commands (a cancel, a typed line, the console's other buttons) serve them too, and
+    // the other way round; never cancelled by a newer console change
+    steerOnAir: args => growAway(null, null, args, null, 'console', null, true),
     // a Classic song steered there too (console-add-ahead D4: the console's "+" and "−")
     steerClassic: args => growAway(null, null, null, args, 'console'),
     // a Classic song steered there on a press of the console (#82), in the growth worker as a grown song's command
@@ -5643,7 +5648,7 @@ radio = createRadio({
     // its answer is left out. (incremental-steering D6: the worker is not stopped, as it keeps the song's steering
     // results; the next steering waits behind it and reuses what it steered, instead of steering every command again in
     // a new worker)
-    cancelAhead: () => { const L = lanes.console; if (!L.worker || !L.waits.size) return; for (const w of L.waits.values()) w.reject(new Error('cancelled')); L.waits.clear(); },
+    cancelAhead: () => { const L = lanes.console; if (!L.worker || !L.waits.size) return; for (const [id, w] of L.waits) if (!w.keep) { w.reject(new Error('cancelled')); L.waits.delete(id); } },
     // the kept steering results of a song that left the air (its owner tag), or of every song ('*'), dropped in the
     // workers that steer (incremental-steering D6)
     forgetSteer: tag => { for (const k of ['grow', 'console']) { const L = lanes[k]; if (L.worker) L.worker.postMessage({ forget: tag }); } },

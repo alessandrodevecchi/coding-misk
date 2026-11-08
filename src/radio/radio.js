@@ -242,7 +242,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const done = r => { if (item.growToken !== token || !S) return; delete item.growing; delete item.finish; item.g0 = r.grown; airSettle(item, r.commands); view(r); const same = item.said && item.said === item.song && JSON.stringify(r.song) === JSON.stringify(item.song); delete item.said; setSong(item, same ? item.song : r.song); };
     item.finish = () => { done(steerOnAir(args)); item.growToken++; };
     if (!async || !player.steer) { item.finish(); return; }
-    item.growing = player.steer(args).then(done, () => { if (item.growToken === token) item.finish(); });
+    // (the song on air in the console worker, where its console changes are steered and their results kept, D6)
+    item.growing = (S.stream[S.onAir] === item && player.steerOnAir ? player.steerOnAir : player.steer)(args).then(done, () => { if (item.growToken === token) item.finish(); });
     if (then) item.growing.then(() => { if (S && S.stream.includes(item)) then(); });
   }
   // the song an item plays; its bars move the songs after it
