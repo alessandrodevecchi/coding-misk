@@ -30,6 +30,7 @@
     "check:invent": "node --no-warnings tools/check-invent.mjs",
     "check:compilation": "node --no-warnings tools/check-compilation.mjs",
     "check:radio-profiles": "node --no-warnings tools/check-radio-profiles.mjs",
+    "check:steer-memo": "node --no-warnings tools/check-steer-memo.mjs",
     "check:video": "node --no-warnings tools/check-video.mjs",
     "check:export": "node --no-warnings tools/check-export.mjs",
     "check:live": "node --no-warnings tools/check-live.mjs",
