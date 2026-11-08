@@ -1,0 +1,98 @@
+diff --git a/src/endless/waypoints.js b/src/endless/waypoints.js
+index 2e839a9..2cedff5 100644
+--- a/src/endless/waypoints.js
++++ b/src/endless/waypoints.js
+@@ -550,7 +550,9 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
+       const need = Math.min(order.length, Math.max(fams.length, Math.ceil(order.length / 2)));
+       const memo = new Map(), probe = (B, k) => { const key = `${B}:${k}`; if (!memo.has(key)) { const x = onB(B, [...rest, ...order.slice(0, k)]); memo.set(key, typingFrom(x.t.song, B, q, x.t.E, C, { hurry: BATCH_HURRY, head: true })); } return memo.get(key); };
+       let B = null, k = need;
++      const _t0 = Date.now(), _tried = [];
+       for (const b of cands) {
++        { const pr = probe(b, need); _tried.push({ b, fits: pr.fits, need: Math.round(pr.need * 10) / 10, usable: Math.round(pr.usable * 10) / 10 }); }
+         if (!probe(b, need).fits) continue;
+         B = b;
+         if (need < order.length) {
+@@ -568,13 +570,15 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
+       // (the rest on the next phrase; more of them than the head came with: half there, half on the phrase after)
+       const half = tail.length <= k ? tail.length : Math.ceil(tail.length / 2);
+       tail.forEach((c, j) => at.set(c, next.length ? (j < half ? next[0] : next[next.length - 1]) : B));
++      const _diag = { q, min, cands, tried: _tried, need, n: order.length, B, k, fallback: !_tried.some(x => x.fits), ms: Date.now() - _t0, probes: memo.size, phrase: P.phrase };
++      list.forEach(c => { at.set(c, at.get(c)); c._diagRef = _diag; });
+     }
+     // the boundaries in order, each with its commands (in the order given)
+     for (const B of [...new Set(list.map(c => at.get(c)))].sort((a, b) => a - b)) {
+       const cmds = list.filter(c => at.get(c) === B), x = onB(B, cmds);
+       const t = settle(x.t, typingFrom(x.t.song, B, cmds[0].q, x.t.E, C), B, x.W, x.o, cmds[0].q);
+       N = t.song; Wprev = x.W; P = x.r.plan; R = x.r;
+-      for (const c of cmds) { const { pend, ...kept } = c; done.push({ ...kept, at: B }); }
++      for (const c of cmds) { const { pend, _diagRef, ...kept } = c; done.push({ ...kept, at: B, ...(_diagRef ? { _diag: _diagRef } : {}) }); }
+     }
+   };
+   const batched = c => c.batch !== undefined && c.batch !== null && !typed(c);
+diff --git a/src/radio/radio.js b/src/radio/radio.js
+index 8c56057..8c1d1d2 100644
+--- a/src/radio/radio.js
++++ b/src/radio/radio.js
+@@ -835,6 +835,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
+       if (!b.parts[part]) delete b.parts[part];
+     }
+     b.session = opts.scope === 'session';
++    b.presses.push({ t: Math.round(performance.now() - b.t0), rel: Math.round(relNow() * 100) / 100, part, kind, atNow: b.at, secsLeft: Math.round(secsTo(item, b.at) * 10) / 10 });
+     restartBatch(b, ADD_SETTLE);
+     paintPending();
+     addWatch();
+@@ -848,7 +849,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
+     const at = addAt(item);
+     if (at === null) return null;
+     b = batchesOf(item).find(x => x.at === at) || null;
+-    if (!b) { b = { id: ++batchN, S, item, at, at0: at, parts: {}, pats: [], locks: {}, t0: performance.now(), q: Math.round(relNow() * 100) / 100, state: 'settle', seq: 0, pushes: 0, flash: 0, session: false }; batches.push(b); }
++    if (!b) { b = { id: ++batchN, S, item, at, at0: at, parts: {}, pats: [], locks: {}, t0: performance.now(), q: Math.round(relNow() * 100) / 100, state: 'settle', seq: 0, pushes: 0, flash: 0, session: false, moves: [], presses: [], diag0: { addPrep, itemPrep: item.addPrep ?? null, exp1: expectedPrep(item, 1), cmds: item.commands.length } }; batches.push(b); }
+     return b;
+   }
+   const emptyBatch = b => !Object.keys(b.parts).length && !b.pats.length && !Object.keys(b.locks).length;
+@@ -949,7 +950,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
+       if (b.seq === seq) b.inflight = false;
+       if (!alive()) return;
+       if (air) item.steerSeen = { ms: performance.now() - started, n: all.length };
+-      if (b.retarget) { b.retarget = false; item.addPrep = Math.max(item.addPrep ?? addPrep, Math.min(ADD_BOUND, (performance.now() - started) / 1000 * 1.2 + 0.5)); const at2 = addAt(item, b.at - 1); if (at2 === null) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; } if (at2 !== b.at) { b.at = at2; b.flash = performance.now() + 600; b.pushes++; } restartBatch(b, 0); return; }
++      if (b.retarget) { b.retarget = false; item.addPrep = Math.max(item.addPrep ?? addPrep, Math.min(ADD_BOUND, (performance.now() - started) / 1000 * 1.2 + 0.5)); const at2 = addAt(item, b.at - 1); if (at2 === null) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; } if (at2 !== b.at) { b.moves.push({ from: b.at, to: at2, why: 'retarget', prepMs: Math.round(performance.now() - started), addPrep, itemPrep: item.addPrep, t: Math.round(performance.now() - b.t0) }); b.at = at2; b.flash = performance.now() + 600; b.pushes++; } restartBatch(b, 0); return; }
+       if (!fresh()) { restartBatch(b); return; }
+       let at = b.at;
+       if (air) {
+@@ -958,7 +959,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
+         const got = cmds.map(c => r.commands.find(x => x.id === c.id));
+         if (got.some(x => !x)) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; }
+         at = Math.min(...got.map(x => x.at));
+-        if (at !== b.at) { b.at = at; b.flash = performance.now() + 600; b.pushes++; }
++        const dg = got.find(x => x._diag); b.lastDiag = dg ? dg._diag : null; b.steerMs = Math.round(performance.now() - started);
++        if (at !== b.at) { b.moves.push({ from: b.at, to: at, why: 'typing', diag: b.lastDiag, prepMs: b.steerMs, t: Math.round(performance.now() - b.t0) }); b.at = at; b.flash = performance.now() + 600; b.pushes++; }
++        for (const x of r.commands) delete x._diag;
+       }
+       const ats = air ? new Set(r.commands.filter(x => cmds.some(c => c.id === x.id)).map(x => x.at - airOffset(r.grown))) : new Set([at]);
+       const plain = air ? r.view.song : r.plain, plan = air ? r.view.plan : r.plan, ids = new Set((plan.added || []).filter(a => ats.has(a.at)).map(a => a.id));
+@@ -987,6 +990,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
+     const at = addAt(b.item, b.at);
+     if (at === null) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; }
+     console.info(`[radio] console change moved from bar ${b.at + 1} to bar ${at + 1} (${why})`);
++    b.moves.push({ from: b.at, to: at, why, state: b.state, prepMs: b.started ? Math.round(performance.now() - b.started) : null, addPrep, itemPrep: b.item.addPrep, inflight: !!b.inflight, t: Math.round(performance.now() - b.t0) });
+     b.at = at; b.flash = performance.now() + 600; b.pushes++;
+     // (a steering still running is left to finish: it says how long this song's steering takes, and the batch is
+     // steered again for its new boundary when it answers; stopping it would start the same long work again)
+@@ -1043,7 +1047,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
+     const placed = cmds.map(c => ({ c, at: air ? ((r.commands.find(x => x.id === c.id) || {}).at ?? b.at) : b.at })), fams = {};
+     for (const { c, at } of placed) { const part = c.kind === 'pattern' ? patternPart(c.item) : c.kind === 'more' ? c.part : null; if (part) (fams[part] = fams[part] || []).push(at); }
+     item.trails = [...(item.trails || []).filter(x => x.ats.some(a => a > relNow())), ...Object.entries(fams).map(([part, ats]) => ({ id: b.id, part, ats: ats.sort((x, y) => x - y) }))];
+-    addsDone = [...addsDone.slice(-19), { id: b.id, at0: b.at0, at: b.at, ats: placed.map(x => x.at), pats: b.pats.length, parts: { ...b.parts }, locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), pushes: b.pushes, underLoad, waited: Math.round(performance.now() - b.t0) }];
++    addsDone = [...addsDone.slice(-19), { id: b.id, at0: b.at0, at: b.at, ats: placed.map(x => x.at), pats: b.pats.length, parts: { ...b.parts }, locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), pushes: b.pushes, underLoad, waited: Math.round(performance.now() - b.t0), moves: b.moves, presses: b.presses, diag0: b.diag0, lastDiag: b.lastDiag || null, steerMs: b.steerMs ?? (b.times && b.times.steer), times: { ...(b.times || {}) } }];
+     // (the whole session: the kinds that go to the session, as command() gives them; a mixer lock stays on this song)
+     const recs = cmds.map(c => (b.session && SESSION_KINDS.includes(c.kind) ? { ...c, scope: 'session' } : c));
+     item.growToken = (item.growToken || 0) + 1; delete item.growing; delete item.finish;
+@@ -2298,7 +2302,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
+     // the console alone drawn again: my phrases changed (a typed row's save button, #82)
+     renderConsole() { renderSteer(true); },
+     // the console changes pending (tools/check-add-lag.cjs): per batch its boundary, counts, state and pushes
+-    get pendingAdds() { return batches.map(b => ({ id: b.id, at: b.at, at0: b.at0, parts: { ...b.parts }, pats: b.pats.map(x => x.part), locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), state: b.state, pushes: b.pushes, t0: b.t0, times: { ...(b.times || {}) } })); },
++    get pendingAdds() { return batches.map(b => ({ id: b.id, at: b.at, at0: b.at0, parts: { ...b.parts }, pats: b.pats.map(x => x.part), locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), state: b.state, pushes: b.pushes, t0: b.t0, times: { ...(b.times || {}) }, moves: b.moves, presses: b.presses, diag0: b.diag0 })); },
+     // the last batches that entered: boundary planned and taken, pushes, whether under load, ms from the first press
+     get addCost() { return { ...addCost }; },
+     resetAddCost() { for (const k of Object.keys(addCost)) delete addCost[k]; },
