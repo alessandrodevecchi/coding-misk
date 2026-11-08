@@ -77,6 +77,39 @@ The "today" cells here are the grown song plus the view, measured next to the re
 
 The 5 November prototype on the older code (before the batches of `console-add-ahead` and the Classic worker) gave the same picture: 6 to 8 times lower totals, every result equal, and `typingFrom` 83% of a Live coder press.
 
+### After the change (8 November)
+
+`node --expose-gc tools/steer-bench.mjs --songs 3` (energy-up presses, as "Today" above), load average 5 to 7 on 10 cores, so not the reference machine: compare ratios. Press 12 (press 11 or 12 on the shorter songs), with the kept results against a full steering in the same run:
+
+| Song                                    | Reuse, press 12  | Full, press 12   |
+| --------------------------------------- | ---------------- | ---------------- |
+| Live coder, style length (80 to 152)    | 4 to 129 ms      | 55 to 2026 ms    |
+| Live coder, 10 min (176 to 320 bars)    | 11 to 822 ms     | 160 to 21595 ms  |
+| Crescendo, style length (64 to 152)     | 1 to 86 ms       | 18 to 5480 ms    |
+| Crescendo, 10 min (160 to 328 bars)     | 2 to 231 ms      | 130 to 17504 ms  |
+| Classic, style length (112 to 144)      | 1 to 6 ms        | 83 to 173 ms     |
+| Classic, 10 min (288 to 320 bars)       | 19 to 36 ms      | 275 to 404 ms    |
+
+- **Targets of D8.** Press 12 on the 10-minute grown songs: 0.82 s at the 90th percentile (target 1.5 s; about 3.3 s with the CPU slowed 4 times). Classic, 10 minutes: 19 to 36 ms (target 150 ms). Press 12 against press 1: under 1.5 times on 10 of 12 grown songs; 2.5 and 4.2 times on two songs whose press 1 was fast (51 and 196 ms). The rest is the new command's own typing measurement (`typingFrom`, 804 of 822 ms on the slowest song), which grows with the written steps of the song, not with the standing commands. The slowest single press was 2.4 s (press 9 of a 10-minute Live coder song).
+- **The gate of D5 stays shut**: the 90th percentile is under 1.5 s, so the written plan is not reused by content.
+- **Memory (task 5.2).** One process as a worker, 20 presses on each of three 10-minute songs (two Live coder, one Crescendo, mixed commands), nothing forgotten: the heap grew by 81, 91 and 85 MB after each song, the compile cache at its 48 MB bound (1048 to 1940 entries), 64 loop states, 33 to 98 prefix results. With `forget` at each new song: 81, 90, 59 MB. After `forget('*')`: 7 MB. The bounds stay.
+- **`check:steer-memo`**: 35 songs, 311 steerings compared byte for byte (251 reused a kept prefix), 35 replays with nothing kept, 216 s with 5 workers. A key without the song index, the chooser or the context version fails it.
+
+The baseline of `console-add-waves` (`baseline/run.sh`, instrumentation adapted to this code, dev server at normal CPU speed, load 4 to 7), before (results of 8 November on `6895b24`) and after:
+
+| Profile    | Earlier commands | Batches | Head within 2 phrases, before → after | Worst head (phrases) | Batches moved | Median steering |
+| ---------- | ---------------- | ------- | ------------------------------------- | -------------------- | ------------- | --------------- |
+| Classic    | none             | 8       | 8 → 8                                 | 1.82 → 1.03          | 1 → 0         | 0.0 → 0.0 s     |
+| Classic    | standing         | 8       | 8 → 8                                 | 1.90 → 0.90          | 1 → 0         | 0.1 → 0.0 s     |
+| Crescendo  | none             | 8       | 8 → 8                                 | 0.92 → 0.92          | 0 → 0         | 0.7 → 0.2 s     |
+| Crescendo  | standing         | 7       | 6 → 6                                 | 2.69 → 2.70          | 2 → 2         | 2.4 → 0.4 s     |
+| Live coder | none             | 6       | 5 → 5                                 | 2.83 → 2.83          | 4 → 3         | 0.3 → 0.2 s     |
+| Live coder | standing         | 8       | 4 → 5                                 | 11.77 → 3.84         | 6 → 6         | 4.4 → 0.3 s     |
+
+Moves by reason, all batches: before typing 9, not ready 12 (11 in one batch), busy page 3; after typing 12, not ready 1, busy page 0. The 11-move chain is gone: that batch now enters 1.8 phrases after its press (a typing move), with a steering of 1.7 s instead of 12.2 s. Every move left but one comes from the head's typing rule, which is `console-add-waves`' to change. The estimate at the first press (D9) against the preparation measured on grown songs: within 1.5 times or under on 15 of 29 batches, over it on 14, all of them preparations of 0.1 to 0.4 s where the estimate stays at 0.7 to 1.7 s (the 0.5 s margin and the rest of the preparation); the largest underestimate was 0.7 s for 1.1 s.
+
+A first run of the kit showed the first "+" after eight other commands steering 7 to 8 s: those commands had been steered in the growth worker, so the console worker had nothing kept. The song on air is now steered in the console worker for every command (`player.steerOnAir`, never cancelled by a newer console change); the second run above is after that.
+
 ## Goals / Non-Goals
 
 **Goals:**
