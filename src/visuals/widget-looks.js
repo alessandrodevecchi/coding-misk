@@ -8,7 +8,8 @@
 //   notes(inst, c0, c1), level(inst), flash(inst), silent(inst), wave(inst) → samples or null, columns(inst) → spectrum
 //   columns, pitches(inst) → the pitches of the section (low first), range() → { lo, hi } of the melodic notes,
 //   label(inst), dim ('dimmed' | 'hidden'), full (notes at full opacity), lanes: the drum instruments of Rullo,
-//   melodic: the melodic instruments of Rullo, app (stage-app-widgets: the app widgets' settings, context and notes:
+//   melodic: the melodic instruments of Rullo, roll(inst) → the one-row look { look, top } of a pianoroll or null
+//   (pianoroll-one-row), app (stage-app-widgets: the app widgets' settings, context and notes:
 //   { S, ctx, notes(c0, c1), memo(kind) }), render (the stage's render: the app widgets' cell forms) }
 import * as paint from './widget-painters.js';
 import { instColour } from './widget-palettes.js';
@@ -147,6 +148,10 @@ export function drawWidget(g, box, p, F, col) {
   }
   if (w === 'spectrum') { paint.spectrogram(g, box, F.columns(p.inst), { color: col, bands: 24 }); return; }
   const list = F.notes(p.inst, cyc - 2.5, cyc + 2.5);
+  // pianoroll-one-row (D2, D4): an instrument with one row in the section's span takes the section's one-row look, Thin
+  // as a centred band of half the box (F.roll: { look, top } or null, until the span is known or with two rows)
+  const one = w === 'pianoroll' && F.roll ? F.roll(p.inst) : null;
+  if (one) { paint.roll(g, box, list, cyc, { span: 4, look: one.look, top: one.top, half: true, on: col, off: fadeOf(col), head: pal.ink, px: 1, minW: 2 }); return; }
   if (w === 'pianoroll' || w === 'punchcard') {
     // a faint pitch grid behind the notes
     const pitches = F.pitches(p.inst), rows = Math.max(1, pitches.length);

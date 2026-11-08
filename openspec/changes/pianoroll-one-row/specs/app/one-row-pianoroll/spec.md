@@ -46,12 +46,17 @@ The hits of a one-row roll SHALL count as equal volume when the quietest audible
 
 ### Requirement: Equal-volume look
 
-A one-row roll with equal volume SHALL draw as set by "One-row pianoroll, equal volume": Thin (default) draws the widget at half the row height (at least 12 px) with thin ticks of equal size at each hit; Full draws full-height bars of today's width at full strength.
+A one-row roll with equal volume SHALL draw as set by "One-row pianoroll, equal volume": Thin (default) draws the widget at half the row height (at least 12 px) with thin ticks of equal size at each hit; Full draws full-height bars of today's width at full strength. On a stage panel, Thin SHALL draw the ticks in a centred band of half the panel's widget height, inside the same panel (decided by the owner, 2026-11-08).
 
 #### Scenario: Default thin
 
 - **WHEN** code widgets are on with default settings and a one-row equal-volume line has a pianoroll
 - **THEN** the widget is half the row height and each hit is a thin tick
+
+#### Scenario: Thin on a stage panel
+
+- **WHEN** a hats instrument with one row and equal volume has a pianoroll panel on Monitor
+- **THEN** the panel keeps its size and the ticks fill a centred band of half its widget height
 
 #### Scenario: Full
 
@@ -79,7 +84,7 @@ A one-row roll with varying volume SHALL have the row height and bars of today's
 
 ### Requirement: Random look per section
 
-With "One-row pianoroll, varying volume" set to Random (default), the look SHALL be one of Height, Transparency and Both, chosen per section from the song seed, never the same in three sections in a row. Every one-row varying roll of a section SHALL use the same look, and the same song with the same settings SHALL give the same looks in every play, replay and export.
+With "One-row pianoroll, varying volume" set to Random (default), the look SHALL be one of Height, Transparency and Both, chosen per section from the song seed, never the same in three sections in a row. Every one-row varying roll of a section SHALL use the same look (one look per section for all one-row rolls, decided by the owner, 2026-11-08), and the same song with the same settings SHALL give the same looks in every play, replay and export.
 
 #### Scenario: Same song twice
 
@@ -90,6 +95,15 @@ With "One-row pianoroll, varying volume" set to Random (default), the look SHALL
 
 - **WHEN** a song has at least three sections
 - **THEN** the looks of any three sections in a row are not all the same
+
+### Requirement: Unchanged forms
+
+The punchcard (with "Pianoroll or punchcard" set to punchcard) and the ASCII and Terminal forms of the stage SHALL draw as before this change (decided by the owner, 2026-11-08).
+
+#### Scenario: Punchcard
+
+- **WHEN** a one-row line has a punchcard widget
+- **THEN** it draws the dots of before
 
 ### Requirement: Widget notes setting
 

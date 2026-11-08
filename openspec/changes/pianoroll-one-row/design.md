@@ -96,13 +96,19 @@ A change of either setting rebuilds `globalThis.miskWidgets` and re-evaluates no
 
 No data migration: the two settings default when absent. The prototype worktree `coding-misk-pianoroll` and branch `proto/pianoroll-one-row` are deleted after this change is merged (owner's call).
 
-## Open Questions
+## Decided Questions
 
-Each has a recommended option; the specs and tasks assume it.
+The owner approved every recommended option on 2026-11-08.
 
-1. **Random look: one per section for all one-row rolls, or one per section and line?** Recommended: one per section for all, so a section reads as one style; per line would mix heights and opacities side by side.
-2. **Thin on the stage: smaller box or a band in the same box?** Recommended: a centred band of half the box, so the Monitor grid does not reflow.
-3. **ASCII and Terminal stage forms.** Recommended: leave as today in this change; a follow-up can map height to half blocks if the owner wants it.
-4. **Punchcard (when "Pianoroll or punchcard" is set to punchcard).** Recommended: unchanged; dots of one row already read as a rhythm.
-5. **Tolerance for equal volume.** Recommended: 5% relative (D3). A stricter 1% would turn humanised velocities (±3%) into a tall varying roll.
-6. **Reference span length.** Recommended: 8 cycles (D2). 4 cycles (the prototype) misses `<…>` lists of eight bars; the whole section is not available to the fast video.
+1. **Random look: one per section for all one-row rolls, or one per section and line?** Decided: one per section for all, so a section reads as one style; per line would mix heights and opacities side by side.
+2. **Thin on the stage: smaller box or a band in the same box?** Decided: a centred band of half the panel's height inside the same panel, so the Monitor grid does not reflow (owner: keep it simple).
+3. **ASCII and Terminal stage forms.** Decided: unchanged in this change; a follow-up can map height to half blocks if the owner wants it.
+4. **Punchcard (when "Pianoroll or punchcard" is set to punchcard).** Decided: unchanged; dots of one row already read as a rhythm.
+5. **Tolerance for equal volume.** Decided: 5% relative (D3). A stricter 1% would turn humanised velocities (±3%) into a tall varying roll.
+6. **Reference span length.** Decided: 8 cycles (D2). 4 cycles (the prototype) misses `<…>` lists of eight bars; the whole section is not available to the fast video.
+
+## Implementation Notes
+
+- The stage has no line, only instruments: its span starts at the section's start, and an instrument with two lines of different sounds in a section (two rows) keeps the roll of before on its panel while the editor's line shows a one-row look.
+- The editor's shape is read from the line's own pattern; the notes it draws, and the render page's notes and shapes, come from the code evaluated with the hidden mixer. A mixer lane that changes a line's velocity inside the span (a fade) can make the fast video's shape differ from the editor's. The fast video of luci-rosse (Classic, Live build on) matched the editor at every section checked.
+- A Classic song without the Live build has one segment in the fast video, so its code (and its widgets) stay those of bar 0 for the whole video, as before this change; the one-row looks follow the line shown.
