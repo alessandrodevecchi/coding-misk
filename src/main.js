@@ -86,6 +86,8 @@ import { segmentsOf, timelineOf, renderInBlocks } from './export/fast.js';
 import { renderVideo } from './export/fast-video.js';
 import { askDiskFile, LONG_SECONDS } from './export/disk.js';
 import { guardDecode, guardSounds, createRegister, HEALTH_KEY, soundfontsIn, preloadFonts } from './sounds/sound-guard.js';
+import { installReverbCache } from './sounds/reverb-cache.js';
+import reverbGen from 'superdough/reverbGen.mjs';
 import soundfonts from '@strudel/soundfonts/package.json';
 import { createLiveLink } from './live/link.js';
 import { tempoClock } from './render/tempo.js';
@@ -789,6 +791,8 @@ ready.then(whenSamples).then(load => load('github:tidalcycles/dirt-samples')).ca
 // the sound guard (#54): a decode that fails ends in an error, not a silent wait; broken sounds play from a stand-in,
 // remembered in the browser (the render page of the fast export reads the same register)
 guardDecode();
+// reverb impulse responses kept per audio context and reused (#82, src/sounds/reverb-cache.js)
+if (typeof BaseAudioContext !== 'undefined') installReverbCache({ proto: BaseAudioContext.prototype, generate: reverbGen.generateReverb });
 const soundRegister = createRegister({ version: soundfonts.version, store: localStorage });
 { const seen = new Set(), iv = setInterval(() => {
   if (!globalThis.soundMap || !globalThis.soundMap.listen || !globalThis.registerSound) return;
