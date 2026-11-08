@@ -151,8 +151,8 @@ A keystroke that edits (or a paste, cut or drop) in `#edhost` during a live buil
 The radio is a third player mode, `radio`, next to `track` and `free`. It plays a window song (`windowSong`: the song on air and the next one, on absolute stream bars), so the scheduler never restarts. `transport()` calls `radio.tick(cyc)` every frame and, in radio mode, does not stop at the end of the window. The radio:
 
 - generates the next song in an idle callback once the song on air has played 40 % of it, then hands the player a new window (`swap`: steps already played are not repeated);
-- moves the window when a song ends, and adds the new song to the history;
-- on skip, cuts the song on air at the next bar and evaluates the new window at once (`jump`).
+- moves the window when a song ends, and adds the new song to the history. The window that starts at the next song is made ahead (`nextWindow`): once the next song is ready and its change is less than 16 s (at least 4 bars) away, in a task of its own, with the song's written plan from the plan worker; it is made again when a song, a start, a transition or a control it is made of changes. At the change `tick` hands it to the player (`swap`), or makes the window there when it no longer matches (#82);
+- on skip, waits for the next song when it is not ready ("Skipping…"), makes its window with `nextWindow` on a cut far enough ahead for the preparation, and evaluates it on that bar (`jump`).
 
 Starting any other playback, the header pause or stop, or "open in Compose" stops the radio: they share one editor and scheduler. Recipes reach the browser through `import.meta.glob('../styles/*.json')`; invalid ones are left out. Browser storage keys: `coding-misk-radio` (controls), `coding-misk-radio-history` (last 50 songs with their JSON and session recipe).
 
