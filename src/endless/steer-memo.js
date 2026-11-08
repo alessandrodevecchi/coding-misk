@@ -93,7 +93,7 @@ export function clearMemo() { forget('*'); for (const c of Object.values(caches)
 
 // ---------- what the last steering did (the radio's expected preparation, D9; the timing script) ----------
 // computed: commands steered (not reused) by the last steerOnAir or steerSong call; units: loop units steered
-export const work = { computed: 0, units: 0, reused: 0 };
+export const work = { computed: 0, units: 0, reused: 0, heads: [] };
 
 // a kept value frozen deeply (the check only)
 export function deepFreeze(v) {

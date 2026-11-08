@@ -652,7 +652,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   function relayoutFrom(i) {
     for (let k = i + 1; k < S.stream.length; k++) { const p = S.stream[k - 1]; S.stream[k].start = p.start + p.bars - (p.cut ? 0 : overlapOf(p.entry.transition)); }
   }
-  const relNow = () => { const it = S.stream[S.onAir]; return Math.max(0, player.now() - it.start); };
+  // (the bar now: where the radio was paused while it is, #82: a paused scheduler reads bar 0, so the console listed
+  // every command of the song as still to come and counted the badges from the start of the session, "273 s")
+  const nowBar = () => (S && S.paused !== undefined ? S.paused : player.now());
+  const relNow = () => { const it = S.stream[S.onAir]; return Math.max(0, nowBar() - it.start); };
   // bars at the end of a song where the next song already plays (the transition overlap past the song's own bars)
   const tailOf = item => (item.cut || !item.entry.transition ? 0 : Math.max(0, overlapOf(item.entry.transition) - extraOf(item.entry.transition)));
   const secs = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
@@ -772,7 +775,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   const cost = (k, t0) => { const d = performance.now() - t0; if (d > (addCost[k] || 0)) addCost[k] = Math.round(d); };
   // the seconds of one bar of a song at a bar (4/4 bars, as leadOf reads them)
   const barSecOf = (song, bar) => { let a = 0, bpm = 120; for (const x of song.sections) { bpm = x.bpm || 120; if (bar < a + x.bars) break; a += x.bars; } return 240 / bpm; };
-  const secsTo = (item, at) => (item.start + at - player.now()) * barSecOf(item.song, at);
+  const secsTo = (item, at) => (item.start + at - nowBar()) * barSecOf(item.song, at);
   // the phrase starts of the song on air after bar rel, in its bars (a grown song: the director's phrases moved by its
   // offset, as airBoundaries gives them, without its limit of two)
   function addStarts(item, rel) {
@@ -897,7 +900,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const item = S.stream[S.onAir];
     if (!item.plan) { toast(t(item.frozen ? 'steerWhy:frozen' : 'steerWhy:lead')); return false; }
     const last = batchesOf(item).filter(x => x.locks[key]).pop();
-    if (last && item.start + last.at - player.now() > ADD_MARGIN) {
+    if (last && item.start + last.at - nowBar() > ADD_MARGIN) {
       delete last.locks[key];
       restartBatch(last, ADD_SETTLE);
       paintPending();
@@ -930,7 +933,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // (a grown song: the steering on air takes the batch together, `batch`, from the bar it was pressed, q, and its
     // boundary at the earliest, min: its head on the first boundary where most of it can be typed in time, the rest over
     // the next phrases, #82)
-    const batch = cmdN + 1, extra = () => ({ at: b.at, id: ++cmdN, ...(air ? { at0: b.at, q: b.q, pend: true, min: b.at, batch } : {}) });
+    const batch = cmdN + 1, extra = () => ({ at: b.at, id: ++cmdN, ...(air ? { at0: b.at, q: b.q, pend: true, min: b.min ?? b.at, batch } : {}) });
     for (const kind of ['less', 'more']) for (const part of INSTRUMENTS) {
       const n = b.parts[part] || 0;
       if ((kind === 'more') !== (n > 0)) continue;
@@ -948,6 +951,12 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const item = b.item;
     if (S.stream[S.onAir] !== item) { batches = batches.filter(x => x !== b); return; }
     if (S.paused !== undefined) { b.timer = setTimeout(() => prepBatch(b), 300); return; }
+    // (the earliest boundary its steering may take, #82: the first that leaves time to prepare the batch as it is now,
+    // or its bar when that is earlier. Its own head moved later by the typing never holds a new steering back: a batch
+    // steered again for a new press took the head of the last steering as its earliest boundary, the typing moved it
+    // on again, and a batch that kept taking presses drifted phrase after phrase)
+    const tgt = addAt(item, -Infinity, sizeOf(b));
+    b.min = tgt === null ? b.at : Math.min(b.at, tgt);
     const seq = ++b.seq, air = airSteer(item) && item.g0, cmds = batchCommands(b, air), started = performance.now();
     b.state = 'prep'; b.base = item.commands; b.song0 = item.song; b.win = windowItems(); b.started = started; b.inflight = true;
     const alive = () => b.seq === seq && batches.includes(b) && S === b.S && S.stream[S.onAir] === item;
@@ -960,12 +969,23 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     b.times = {};
     job.then(r => { const t1 = performance.now(); try { steered(r); } finally { cost('answer', t1); } }, err => { if (b.seq === seq) b.inflight = false; if (alive() && !/cancelled/.test(String(err && err.message))) { console.warn('[radio] console change not prepared', err); restartBatch(b, 300); } else if (batches.includes(b) && b.seq === seq) restartBatch(b, 0); });
     function steered(r) {
-      b.times.steer = Math.round(performance.now() - started);
+      b.times.steer = Math.round(performance.now() - started); b.times.own = r.ms;
       if (b.seq === seq) b.inflight = false;
       if (!alive()) return;
       // (this song's steering time per command the worker steered, D9; the commands of the batch when it does not say)
-      if (air) item.steerPer = (performance.now() - started) / 1000 / Math.max(1, Number.isFinite(r.work) ? r.work : cmds.length);
-      if (b.retarget) { b.retarget = false; holdPrep(item, (performance.now() - started) / 1000 * 1.2 + 0.5); const at2 = addAt(item, b.at - 1, cmds.length); if (at2 === null) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; } if (at2 !== b.at) { b.at = at2; b.flash = performance.now() + 600; b.pushes++; } restartBatch(b, 0); return; }
+      if (air) item.steerPer = (Number.isFinite(r.ms) ? r.ms : performance.now() - started) / 1000 / Math.max(1, Number.isFinite(r.work) ? r.work : cmds.length);
+      if (b.retarget) {
+        b.retarget = false; holdPrep(item, (performance.now() - started) / 1000 * 1.2 + 0.5);
+        const at2 = addAt(item, b.at - 1, cmds.length);
+        if (at2 === null) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; }
+        // (#82: a grown song's steering whose head is at or after the boundary the push gave is kept as it is: steered
+        // again, it took as long once more and was pushed again)
+        const got = air && fresh() ? cmds.map(c => r.commands.find(x => x.id === c.id)) : null, head = got && got.every(Boolean) ? Math.min(...got.map(x => x.at)) : null;
+        if (head === null || head < at2) {
+          if (at2 !== b.at) { console.info(`[radio] console change moved from bar ${b.at + 1} to bar ${at2 + 1} (steering of ${Math.round(performance.now() - started)} ms answered after a push)`); b.at = at2; b.flash = performance.now() + 600; b.pushes++; }
+          restartBatch(b, 0); return;
+        }
+      }
       if (!fresh()) { restartBatch(b); return; }
       let at = b.at;
       if (air) {
@@ -974,16 +994,29 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         const got = cmds.map(c => r.commands.find(x => x.id === c.id));
         if (got.some(x => !x)) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; }
         at = Math.min(...got.map(x => x.at));
-        if (at !== b.at) { b.at = at; b.flash = performance.now() + 600; b.pushes++; }
+        if (at !== b.at) {
+          const h = (r.heads || []).find(x => x.batch === cmds[0].batch);
+          console.info(`[radio] console change moved from bar ${b.at + 1} to bar ${at + 1} (typing${h ? `: ${h.k} of ${h.n} lines on the head, ${h.cands.join(' ')}` : ''})`);
+          b.at = at; b.flash = performance.now() + 600; b.pushes++;
+        }
       }
       const ats = air ? new Set(r.commands.filter(x => cmds.some(c => c.id === x.id)).map(x => x.at - airOffset(r.grown))) : new Set([at]);
       const plain = air ? r.view.song : r.plain, plan = air ? r.view.plan : r.plan, ids = new Set((plan.added || []).filter(a => ats.has(a.at)).map(a => a.id));
-      const fresh0 = plain.tracks.filter(x => ids.has(x.id));
+      // (the sounds to load ahead, #82: the new tracks', those of a track silent now that plays from the batch's bars
+      // (a "+" can bring back a kick that never played, on a drum machine never loaded) and those of a track the
+      // steering changed (another machine), in the director's bars)
+      const off = air ? airOffset(r.grown) : 0, nowB = relNow() - off, heads = [...ats].flatMap(a => [a, a + 1]);
+      const plays = (tr, bar) => !!tr && !tr.mute && (tr.clips || []).some(c => c.start <= bar && c.start + c.bars > bar);
+      const was = new Map(((item.plain || item.base.song).tracks || []).map(x => [x.id, x])), sig = x => JSON.stringify([x.settings, x.sound, x.bank]);
+      const fresh0 = plain.tracks.filter(x => ids.has(x.id) || !was.has(x.id) || sig(was.get(x.id)) !== sig(x) || (!plays(was.get(x.id), nowB) && heads.some(a => plays(x, a))));
       // (the window made in a task of its own, then its plan in slices; the sounds one per task)
       setTimeout(() => {
         if (!alive() || !fresh()) { if (alive()) restartBatch(b); return; }
         const w0 = performance.now(), p = windowPlayable({ item, song: r.song });
         b.times.window = Math.round(performance.now() - w0); cost('window', w0);
+        // (the voice samples of the song with the batch queued ahead, in a task of their own, #82: a steering can move the
+        // voice track's lines, and their samples loaded on the entry bar)
+        if (player.preloadVoices) setTimeout(() => { if (!alive()) return; const v0 = performance.now(); try { player.preloadVoices(voicesOf({ ...item, song: r.song })); } catch (e) {} cost('voices', v0); }, 0);
         const ready = [p.prepare ? p.prepare(12, () => alive()).then(() => { b.times.plan = Math.round(performance.now() - started); }) : Promise.resolve(), player.warmTracks ? player.warmTracks(fresh0).then(n => { b.times.sounds = Math.round(performance.now() - started); b.times.nSounds = n; }) : Promise.resolve()];
         Promise.all(ready).then(() => {
           if (!alive()) return;
@@ -1089,7 +1122,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   function cancelPend(id, part) {
     const b = batches.find(x => x.id === id);
     if (!b || !(part in b.parts || part in b.locks || b.pats.some(x => x.part === part))) return;
-    if (b.item.start + b.at - player.now() <= ADD_MARGIN) return;
+    if (b.item.start + b.at - nowBar() <= ADD_MARGIN) return;
     delete b.parts[part]; delete b.locks[part]; b.pats = b.pats.filter(x => x.part !== part);
     restartBatch(b, 0);
     paintPending();
@@ -1101,7 +1134,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     for (const b of batchesOf(item)) for (const part of INSTRUMENTS) {
       const n = netOf(b, part);
       if (!n) continue;
-      const s = Math.max(0, Math.ceil(secsTo(item, b.at))), left = item.start + b.at - player.now();
+      const s = Math.max(0, Math.ceil(secsTo(item, b.at))), left = item.start + b.at - nowBar();
       out.push({ id: b.id, part, n: `${n > 0 ? '+' : '−'}${Math.abs(n)}`, s, bar: b.at + 1, state: b.state, flash: b.flash > performance.now(), entering: left <= ADD_MARGIN });
     }
     // (a batch that entered: each instrument's badge until all of its new tracks play, "1 of 2 in", #82)
@@ -1112,7 +1145,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     }
     // (the locks after the instruments, D8: one row each, with the button's key)
     for (const b of batchesOf(item)) for (const [key, L] of Object.entries(b.locks)) {
-      const s = Math.max(0, Math.ceil(secsTo(item, b.at))), left = item.start + b.at - player.now(), tr = L.track && item.song.tracks.find(x => x.id === L.track);
+      const s = Math.max(0, Math.ceil(secsTo(item, b.at))), left = item.start + b.at - nowBar(), tr = L.track && item.song.tracks.find(x => x.id === L.track);
       out.push({ id: b.id, part: key, lock: L.kind, what: t(`steer:${L.kind}`, { part: L.part ? instName(L.part) : '', track: tr ? tr.name || tr.id : L.track }), s, bar: b.at + 1, state: b.state, flash: b.flash > performance.now(), entering: left <= ADD_MARGIN });
     }
     return out;

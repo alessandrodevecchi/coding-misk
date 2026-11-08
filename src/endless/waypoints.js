@@ -32,8 +32,10 @@ const KNOBS = ['cutoff', 'reso', 'drive', 'grit', 'room', 'delay', 'gain'];
 // structural commands), the next bars for the mixer
 const PHRASE_TRIES = 2, BAR_TRIES = 4;
 // a batch of console changes (console-add-ahead, #82: commands with the same `batch`): the boundaries its head may take,
-// from the bar it was pressed, and the phrases after the head where the rest of its new lines may enter
-const BATCH_TRIES = 4, BATCH_TAIL = 2;
+// from its earliest one, and the phrases after the head where the rest of its new lines may enter. (Two, #82: inside a
+// growth the song has a step about every bar, so the head's typing never fitted the bar before a boundary and the head
+// went to the third or fourth phrase, minutes later on a slow 10-minute song; now it is typed in a hurry within two)
+const BATCH_TRIES = 2, BATCH_TAIL = 2;
 // how much faster than a person a batch's head may be typed (#82): a Live coder song has a step of its own about every
 // phrase, so the lines of a batch have about a phrase to be typed in; at a person's pace one line fits, two at most
 const BATCH_HURRY = 5;
@@ -462,6 +464,7 @@ function typingFromNow(N, B, q, E, C, { hurry = 1, head = false } = {}) {
 // chooser.
 // → { song, grown, commands (with their boundaries; a command no boundary is left for is dropped), plan, opts, plain }
 export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed, n, ctx = {}, controls = null, chooser = null }) {
+  work.heads = [];
   const g0 = grown || growOnAir(song, ctx);
   if (!commands.length) return { song: g0, grown: g0, commands: [], plan, opts, plain: song };
   // (a song that did not grow: the commands rewrite it as in Classic, then it grows as it can)
@@ -535,7 +538,7 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
     place(cmd, i, { at: pick.B });
   };
   // A batch of console changes (commands with the same `batch`, console-add-ahead, #82): pending, its head takes the
-  // first boundary, from the bar it was pressed and up to BATCH_TRIES phrases on, where most of its new lines can be
+  // first boundary, from its earliest one and up to BATCH_TRIES phrase starts on, where most of its new lines can be
   // typed in time (at least one of each instrument, at least half of them); the rest come in over the next BATCH_TAIL
   // phrases. The lines that come in on a boundary come in on it together (transitSong's `together`). A replay gives
   // the commands their recorded boundaries and builds them the same way.
@@ -574,6 +577,8 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
       // (no boundary leaves time for the head even in a hurry: the first one with about the most time to type it, so
       // the lines come in soon, typed as fast as they must)
       if (B === null) { const most = Math.max(...cands.map(b => probe(b, need).usable)); B = cands.find(b => probe(b, need).usable >= most * 0.75); }
+      // (why the head took its boundary, for the radio's log: never part of the result)
+      work.heads.push({ batch: list[0].batch, q, min, B, k, n: order.length, need, cands: [...memo].map(([key, x]) => `${key}:${x.fits ? 'fits' : 'no'}:${r3(x.need)}/${r3(x.usable)}`) });
       const tail = order.slice(k);
       const next = airBoundaries(list[0].kind, B, P, g0, 0.5, BATCH_TAIL);
       at = new Map(list.map(c => [c, B]));

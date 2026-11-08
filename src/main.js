@@ -295,7 +295,19 @@ function sessionPlayable(items, seed, options, id, air = null) {
 // the worker gets the voice instrument's context and the language of the page, so a song grows there as it would here
 // (a console change of the radio, console-add-ahead D4, goes to a worker of its own: in the growth worker it waited
 // behind the next song's growth, up to 20 s)
-const lanes = { grow: { worker: null, waits: new Map() }, console: { worker: null, waits: new Map() }, plan: { worker: null, waits: new Map() } };
+// (the console lane holds its jobs in the page, #82: a worker runs its messages one after another and cannot drop one
+// it was sent, so a console change pressed again while its steering ran queued a steering per press, each run to the
+// end although cancelled, and the last one answered seconds late. One job at a time is sent; a cancelled job still
+// waiting here is never sent)
+const lanes = { grow: { worker: null, waits: new Map() }, console: { worker: null, waits: new Map(), serial: true, queue: [], busy: null }, plan: { worker: null, waits: new Map() } };
+// the next job of a serial lane sent to its worker, when none runs there
+function lanePump(L) {
+  if (!L.serial || L.busy !== null || !L.worker) return;
+  const job = L.queue.shift();
+  if (!job) return;
+  L.busy = job.id;
+  L.worker.postMessage(job.msg);
+}
 let growN = 0;
 // (steering a grown song, radio-profiles stage 5: the commands as waypoints are worked out there too)
 // (and a Classic song's steering, console-add-ahead D4: classic holds steerSong's arguments; a steer with view also gives
@@ -303,8 +315,13 @@ let growN = 0;
 function laneWorker(L) {
   if (L.worker || L.worker === false) return;
   L.worker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
-  L.worker.onmessage = e => { const w = L.waits.get(e.data && e.data.id); if (!w) return; L.waits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.plan || e.data.song); };
-  L.worker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of L.waits.values()) w.reject(new Error('worker')); L.waits.clear(); L.worker = false; };
+  L.worker.onmessage = e => {
+    const id = e.data && e.data.id;
+    // (the job that ran: the next one goes, also after a cancelled one)
+    if (L.serial && id === L.busy) { L.busy = null; lanePump(L); }
+    const w = L.waits.get(id); if (!w) return; L.waits.delete(id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.plan || e.data.song);
+  };
+  L.worker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of L.waits.values()) w.reject(new Error('worker')); L.waits.clear(); if (L.serial) { L.queue = []; L.busy = null; } L.worker = false; };
 }
 // the radio's workers started with a session (#82): a worker loads its modules on its first job, which then waited
 // for that (a Classic session's first command, its first window plan)
@@ -329,7 +346,8 @@ function growAway(song, ctx, steer = null, classic = null, lane = 'grow', extra 
     laneWorker(L);
     if (L.worker === false) return extra ? Promise.reject(new Error('worker')) : here();
     const id = ++growN, spoken = { files: spokenContext.files, lengths: spokenContext.lengths, lang: spokenContext.lang || getLang(), styles: spokenContext.styles };
-    return new Promise((resolve, reject) => { L.waits.set(id, { resolve, reject, keep }); L.worker.postMessage({ id, song, ctx, spoken, steer, classic, ...(extra || {}) }); });
+    const msg = { id, song, ctx, spoken, steer, classic, ...(extra || {}) };
+    return new Promise((resolve, reject) => { L.waits.set(id, { resolve, reject, keep }); if (L.serial) { L.queue.push({ id, msg }); lanePump(L); } else L.worker.postMessage(msg); });
   } catch (e) { return extra ? Promise.reject(e) : here(); }
 }
 // the page's own growths away from the page (grow-worker.js, a second worker so the radio never waits for them): the
@@ -5548,32 +5566,53 @@ async function voicesFirst(voices, bar, wait = 100) {
   queueVoices(due, true);
   if (wait === COLD_WAIT) queueVoices(voices.filter(v => v.at < Math.floor(bar)).sort((a, b) => a.at - b.at));
 }
-// the sounds of tracks brought in by a console change (console-add-ahead D4): every string of the tracks that names a
-// sound of the sound map, and the hits of a drum machine they name; soundfonts get every zone loaded (preloadFonts),
-// samples one silent hit each. One sound per task; fonts already loaded this way are not loaded again
-const warmedFonts = new Set();
+// the sounds of tracks brought in by a console change (console-add-ahead D4): every string of the tracks (values and
+// keys: a drum row's key names its hit) that names a sound of the sound map, and the hits of a drum machine they name;
+// soundfonts get every zone loaded (preloadFonts), samples one silent hit per sample of the bank (a texture plays
+// `n("3 7")` of its bank; up to WARM_N of them). The loads run together, each started in a task of its own; fonts
+// already loaded this way are not loaded again. (#82: no drum machine was ever loaded ahead, see soundsOfTracks, and only
+// the first sample of a bank: both loaded on the entry bar, late)
+const warmedFonts = new Set(), WARM_N = 12;
 function soundsOfTracks(tracks) {
-  const map = (globalThis.soundMap && globalThis.soundMap.get && globalThis.soundMap.get()) || {}, keys = Object.keys(map), out = new Set();
-  const walk = v => { if (typeof v === 'string') { if (map[v]) out.add(v); else if (v.length > 2 && keys.length) for (const k of keys) if (k.startsWith(`${v}_`)) out.add(k); } else if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') Object.values(v).forEach(walk); };
+  // (the sound map keeps a drum machine's sounds in lower case, "rolandtr808_bd", while a track names "RolandTR808":
+  // compared as written, no hit of a machine was ever loaded ahead, #82)
+  const map = (globalThis.soundMap && globalThis.soundMap.get && globalThis.soundMap.get()) || {}, keys = Object.keys(map), names = new Set(), banks = new Set(), words = new Set();
+  const walk = v => {
+    if (typeof v === 'string') { const w = v.toLowerCase(); words.add(w); if (map[v]) names.add(v); else if (map[w]) names.add(w); else if (w.length > 2 && keys.length && keys.some(k => k.startsWith(`${w}_`))) banks.add(w); }
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { words.add(k.toLowerCase()); walk(x); }
+  };
   for (const t of tracks || []) walk({ settings: t.settings, sound: t.sound, bank: t.bank, patterns: t.patterns });
-  return [...out].slice(0, 24);
+  // (a drum machine: the hits the tracks name; all of its sounds only when they name none)
+  const hits = [];
+  for (const b of banks) { const all = keys.filter(k => k.startsWith(`${b}_`)), named = all.filter(k => words.has(k.slice(b.length + 1))); hits.push(...(named.length ? named : all)); }
+  return [...new Set([...hits, ...names])].slice(0, 48);
 }
 async function warmTracks(tracks) {
   let names = [];
   try { names = soundsOfTracks(tracks); } catch (e) { return 0; }
   const map = (globalThis.soundMap && globalThis.soundMap.get()) || {}, ac = globalThis.getAudioContext && globalThis.getAudioContext();
   if (!ac || !globalThis.superdough) return 0;
-  const play = v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + .2, .05);
-  let n = 0;
+  // (a silent hit 3 s ahead: one scheduled sooner than its sample loads logs "took too long", which the checks read as
+  // a sound loaded late on its bar)
+  const play = v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + 3, .05);
+  // (the samples of a bank: as many as it has, at most WARM_N; a voice bank is loaded by the voice queue)
+  const count = s => { const d = s && s.data && s.data.samples; return Array.isArray(d) ? d.length : d && typeof d === 'object' ? Math.max(1, ...Object.values(d).map(x => (Array.isArray(x) ? x.length : 1))) : 1; };
+  // (each started in a task of its own; the loads run together, a sound that never answers given up after 4 s)
+  const loads = [];
   for (const name of names) {
     const s = map[name];
-    await new Promise(r => setTimeout(r, 0));
-    const one = s && s.data && Array.isArray(s.data.fonts) ? (warmedFonts.has(name) ? Promise.resolve() : preloadFonts([name], { soundMap: globalThis.soundMap, play }).then(() => warmedFonts.add(name)))
-      : Promise.resolve().then(() => play({ s: name, gain: 0 }));
-    await Promise.race([one.catch(() => {}), new Promise(r => setTimeout(r, 4000))]);
-    n++;
+    const fonts = s && s.data && Array.isArray(s.data.fonts);
+    const all = fonts || name.startsWith('say_') ? 1 : Math.min(WARM_N, count(s));
+    for (let i = 0; i < all; i++) {
+      await new Promise(r => setTimeout(r, 0));
+      const one = fonts ? (warmedFonts.has(name) ? Promise.resolve() : preloadFonts([name], { soundMap: globalThis.soundMap, play }).then(() => warmedFonts.add(name)))
+        : Promise.resolve().then(() => play({ s: name, n: i, gain: 0 }));
+      loads.push(Promise.race([one.catch(() => {}), new Promise(r => setTimeout(r, 4000))]));
+    }
   }
-  return n;
+  await Promise.all(loads);
+  return names.length;
 }
 globalThis.codingMiskVoiceQueue = { get pending() { return voiceQueue.length + (voicePumping ? 1 : 0); } };
 const warmVoices = sg => { try { queueVoices(voiceSamples(sg.build, getLang(), customFiles), true); } catch (e) {} };
@@ -5648,7 +5687,8 @@ radio = createRadio({
     // its answer is left out. (incremental-steering D6: the worker is not stopped, as it keeps the song's steering
     // results; the next steering waits behind it and reuses what it steered, instead of steering every command again in
     // a new worker)
-    cancelAhead: () => { const L = lanes.console; if (!L.worker || !L.waits.size) return; for (const [id, w] of L.waits) if (!w.keep) { w.reject(new Error('cancelled')); L.waits.delete(id); } },
+    // (a cancelled job still waiting in the page is never sent, #82)
+    cancelAhead: () => { const L = lanes.console; if (!L.worker || !L.waits.size) return; for (const [id, w] of L.waits) if (!w.keep) { w.reject(new Error('cancelled')); L.waits.delete(id); } L.queue = L.queue.filter(j => L.waits.has(j.id)); },
     // the kept steering results of a song that left the air (its owner tag), or of every song ('*'), dropped in the
     // workers that steer (incremental-steering D6)
     forgetSteer: tag => { for (const k of ['grow', 'console']) { const L = lanes[k]; if (L.worker) L.worker.postMessage({ forget: tag }); } },

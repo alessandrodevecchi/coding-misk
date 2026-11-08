@@ -22,14 +22,23 @@
 //   instrument's badge reads "k of n in" until all of its tracks play; in Live coder a saved pattern added as a new
 //   track inside the growth of an 11-minute song waits in one batch with two "+" and they enter within about three
 //   phrases, never at the end of the growth.
-// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-add-lag.cjs [--budget 100] [--profiles classic,crescendo,switch] [--rate 4] [--style berlin-techno] [--standing n] [--quick]
+// - the owner's session (#82, 8 November): a Live coder song of exactly 10 minutes at a slow tempo (ambient, berlin
+//   techno, darksynth and acid), about twelve commands over the song: two "+" together, a lock, an energy change, a
+//   "−", a "+" cancelled from the queue, a curve, then five "+" on three instruments and two more a few seconds later.
+//   Every batch's head enters within 4 phrases of its first press (most within 2), the badge once the batch is ready
+//   names the bar it enters on (within one phrase), every move says why, the batches' own work stays under the
+//   budget, and the new tracks' sounds are loaded before their entry (no "took too long"); a burst with the CPU slowed
+//   4 times keeps its own work under the budget.
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-add-lag.cjs [--budget 100] [--profiles classic,crescendo,switch] [--rate 4] [--style berlin-techno] [--standing n] [--quick] [--owner]
+// --owner: only the owner's session (it also runs after the Live coder cases without --quick)
 // --standing n: the commands standing before the late cases (default 8 in Classic, 3 on a grown song)
 // --quick: only the late "+", the burst, the net counts and the locks, at normal CPU speed
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
 const BUDGET = +arg('--budget', 100), RATE = +arg('--rate', 4), PROFILES = arg('--profiles', 'classic,crescendo,switch').split(','), STYLE = arg('--style', 'berlin-techno');
-const QUICK = process.argv.includes('--quick'), STANDING = arg('--standing', null) === null ? null : +arg('--standing', 0);
+const QUICK = process.argv.includes('--quick'), OWNER = process.argv.includes('--owner'), STANDING = arg('--standing', null) === null ? null : +arg('--standing', 0);
+const OWNER_SEED = arg('--owner-seed', '69qgtn');
 const NAMES = { switch: 'Live coder', classic: 'Classic', crescendo: 'Crescendo' };
 // (src/radio/radio.js: ADD_LEAD seconds at least before the boundary, the click's own budget)
 const ADD_LEAD = 2, CLICK_BUDGET = 20;
@@ -53,7 +62,9 @@ const table = [];
   const errors = [], logs = [];
   let late = [];
   page.on('pageerror', e => errors.push(e.message));
-  page.on('console', m => { const x = m.text(); if (x === 'skip query: too late') late.push(Date.now()); if (/^\[radio\] (entered under load|console change)/.test(x)) logs.push(x); });
+  // (a sample that loaded after its note: the sampler's "took too long")
+  const slow = [];
+  page.on('console', m => { const x = m.text(); if (x === 'skip query: too late') late.push(Date.now()); if (/^\[radio\] (entered under load|console change)/.test(x)) logs.push(x); if (/loading sound ".*" took too long/.test(x)) slow.push((x.match(/sound "([^"]+)"/) || [])[1]); });
   const cdp = await ctx.newCDPSession(page);
   await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
   const R = (fn, a) => page.evaluate(fn, a);
@@ -126,7 +137,65 @@ const table = [];
     check(m.late === 0, `${name}: no "skip query: too late"`, `${m.late}`);
     check(ownMax(m) <= BUDGET, `${name}: the batch's own work on the main thread stays under ${BUDGET} ms`, ownText(m));
   };
-  for (const profile of PROFILES) {
+  // the owner's session (#82): see the header
+  const ownerCase = async () => {
+    const name = 'Live coder, owner\'s session';
+    await R(() => { localStorage.clear(); localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['ambient', 'berlin-techno', 'darksynth', 'acid'], chaos: 0.6, energy: 0.45, complexity: 0.7, talk: 0, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song', profile: 'switch', compilation: 'off', length: 10 })); });
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', OWNER_SEED); await page.click('#radio-start');
+    check(await waitReady(), `${name}: the song is ready`);
+    await sleep(2000);
+    const s0 = await steering(), ph = s0.phrase, bs = await barSec(), grown = await R(() => { const s = globalThis.codingMiskRadio.steering.song; return s.crescendo ? s.crescendo.growth : 0; });
+    console.log(`info  ${name}: ${s0.bars} bars, phrase ${ph} (${(ph * bs).toFixed(0)} s), growth ${grown}`);
+    // (inside the growth, as the owner pressed: Voltaggio's intro, bar 20 of 176)
+    await freshPhrase(Math.min(2 * ph, Math.max(ph, s0.bars - 12 * ph)));
+    // every batch: its first press (bar), its bar once ready (the badge then), its entry (addsDone)
+    const seen = {}, own = {};
+    let watching = true;
+    const poll = (async () => { while (watching) { try { const [p, r, c] = await Promise.all([pending(), rel(), R(() => globalThis.codingMiskRadio.addCost)]); for (const b of p) { const x = seen[b.id] || (seen[b.id] = { q: r, ready: null }); x.ready = b.state === 'ready' ? (x.ready ?? b.at) : null; } for (const [k, v] of Object.entries(c)) own[k] = Math.max(own[k] || 0, v); } catch (e) {} await sleep(150); } })();
+    const pick = async (pref, k = 'more') => { const o = await instOn(); return (pref.map(p => o.find(x => x.p === p && x[k])).find(Boolean) || o.find(x => x[k]) || {}).p; };
+    const press = async (kind, part) => { if (part) await page.click(pressSel(kind, part)).catch(() => {}); };
+    const P = ph * bs, wait = x => sleep(x * 1000);
+    slow.length = 0; logs.length = 0;
+    await R(() => globalThis.codingMiskRadio.resetAddCost());
+    await press('more', await pick(['kick'])); await wait(1.5); await press('more', await pick(['hook', 'arp']));
+    await wait(0.6 * P); await press('lock', await pick(['bass', 'pad', 'kick'], 'less'));
+    await wait(0.4 * P); await R(() => globalThis.codingMiskRadio.command({ kind: 'energy-up' }));
+    await wait(0.4 * P); await press('less', await pick(['arp', 'bass', 'beat'], 'less'));
+    await wait(0.5 * P);
+    // (a batch that held only the cancelled "+" is gone, never entered)
+    const gone = new Set();
+    { const x = await pick(['texture']); await press('more', x); await wait(2); for (const b of await pending()) if (Object.keys(b.parts).join() === x && !b.pats.length && !Object.keys(b.locks).length) gone.add(b.id); await R(part => { const b = document.querySelector(`#radio-steer [data-pend-cancel$=":${part}"]`); if (b && !b.disabled) b.click(); }, x); }
+    await wait(0.3 * P);
+    { const r = await rel(); await R(c => globalThis.codingMiskRadio.command(c), { kind: 'curve', d: Math.floor(r / (2 * ph)) + 2, value: 0.85 }); }
+    await wait(0.4 * P);
+    for (const [p, gap] of [['beat', 0.8], ['beat', 1.5], ['texture', 1], ['pad', 0.8], ['pad', 5], ['kick', 1], ['hook', 0]]) { await press('more', await pick([p])); await wait(gap); }
+    const tEnd = Date.now(); while (Date.now() - tEnd < 12 * P * 1000 && (await pending()).length) await sleep(500);
+    watching = false; await poll;
+    const done = (await R(() => globalThis.codingMiskRadio.addsDone)).filter(d => seen[d.id]);
+    const rows = done.map(d => { const x = seen[d.id]; return { id: d.id, q: x.q, at: d.at, head: (d.at - x.q) / ph, last: (Math.max(...d.ats) - x.q) / ph, ready: x.ready, pushes: d.pushes }; });
+    table.push(`${name}: ${rows.map(r => `#${r.id} press ${r.q.toFixed(1)}, entry ${r.at} (head ${r.head.toFixed(2)} phrases, last ${r.last.toFixed(2)}, ready badge ${r.ready ?? '—'}, moves ${r.pushes})`).join('; ')}`);
+    const want = Object.keys(seen).filter(id => !gone.has(+id)).length;
+    check(rows.length >= 2 && rows.length === want && !(await pending()).length, `${name}: every batch entered (but the cancelled one)`, `${rows.length} entered of ${want}`);
+    check(rows.every(r => r.head <= 4), `${name}: every batch's head enters within 4 phrases of its first press`, rows.map(r => r.head.toFixed(2)).join(' '));
+    check(rows.filter(r => r.head <= 2).length >= Math.ceil(rows.length / 2), `${name}: most heads enter within 2 phrases`, rows.map(r => r.head.toFixed(2)).join(' '));
+    check(rows.every(r => r.ready !== null && Math.abs(r.ready - r.at) <= ph), `${name}: the badge of a ready batch names its entry bar, within a phrase`, rows.map(r => `${r.ready}→${r.at}`).join(' '));
+    check(Math.max(0, ...Object.values(own)) <= BUDGET, `${name}: the batches' own work on the main thread stays under ${BUDGET} ms`, Object.entries(own).map(([k, v]) => `${k} ${v}`).join(', '));
+    const moved = logs.filter(x => /moved/.test(x));
+    check(moved.every(x => /\((not ready|busy page|late|typing|steering)/.test(x)), `${name}: every move says why`, moved.join(' | ') || 'no move');
+    console.log(`info  ${name}: ${moved.length} moves${moved.length ? `: ${moved.join(' | ')}` : ''}`);
+    check(!slow.length, `${name}: no sound loaded after its note ("took too long")`, slow.join(', '));
+    // the CPU slowed: a burst on this long song, its own work under the budget until it is ready
+    if (!QUICK) {
+      await freshPhrase((await rel()) + 1);
+      const a = await pick(['arp', 'pad', 'beat']), b = await pick(['bass', 'kick', 'texture']);
+      if (a && b) { const m = await measure([['more', a, 300], ['more', b, 0]], { cpu: RATE, untilReady: true }); check(ownMax(m) <= BUDGET, `${name}: with the CPU slowed ${RATE} times the batch's own work stays under ${BUDGET} ms`, ownText(m)); table.push(`${name}, CPU ${RATE}×: own work ${ownText(m)}, longest ${longest(m)} ms (the page, for comparison)`); }
+    }
+    await page.click('#radio-start').catch(() => {}); await sleep(500);
+  };
+  if (OWNER) await ownerCase();
+  for (const profile of OWNER ? [] : PROFILES) {
     const name = NAMES[profile] || profile;
     await R(([p, st]) => { localStorage.clear(); localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: [st], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song', profile: p, compilation: 'off' })); }, [profile, STYLE]);
     await page.reload(); await sleep(3500);
@@ -404,7 +473,11 @@ const table = [];
         const s = await steering(), n = await R(async () => {
           const R0 = globalThis.codingMiskRadio, { stateAt } = await import('/src/song/build.js'), S0 = await import('/src/endless/steering.js');
           const count = (song, bar) => stateAt(song, bar).song.tracks.filter(t => !t.mute && !['voice', 'spoken', 'riser'].includes(t.type)).length;
-          for (let j = 0; j < 40; j++) { const s = R0.steering, last = s.commands[s.commands.length - 1]; if (last && count(s.song, last.at) >= 11) break; R0.command({ kind: 'more', part: S0.INSTRUMENTS[j % S0.INSTRUMENTS.length] }); }
+          // (each command's steering answers away from the page: counted once it did, so the song stops at 11 and keeps a
+          // "+" free under the cap of 12)
+          const settled = async () => { for (let k = 0; k < 100; k++) { const st = R0.state; if (!st.stream[st.onAir].growing) return; await new Promise(r => setTimeout(r, 50)); } };
+          for (let j = 0; j < 40; j++) { await settled(); const s = R0.steering, last = s.commands[s.commands.length - 1]; if (last && count(s.song, last.at) >= 11) break; R0.command({ kind: 'more', part: S0.INSTRUMENTS[j % S0.INSTRUMENTS.length] }); }
+          await settled();
           const s = R0.steering, last = s.commands[s.commands.length - 1]; return count(s.song, last.at);
         });
         await sleep(1000);
@@ -416,6 +489,7 @@ const table = [];
     }
     await page.click('#radio-start').catch(() => {});
     await sleep(500);
+    if (profile === 'switch' && !QUICK) await ownerCase();
   }
   check(!errors.length, 'no page errors', errors.slice(0, 2).join(' | '));
   console.log(`\nper case:\n  ${table.join('\n  ')}`);
