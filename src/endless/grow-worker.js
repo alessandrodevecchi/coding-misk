@@ -41,7 +41,9 @@ self.onmessage = e => {
     if (duration) { self.postMessage({ id, duration: grownDuration(duration, spokenContext.styles) }); return; }
     // (work: the commands steered, not reused, for the radio's expected preparation, D9)
     if (classic) { const r = steerSong(classic); self.postMessage({ id, steered: { song: r.song, plan: r.plan, opts: r.opts, work: work.computed } }); return; }
-    if (steer) { const r = steerOnAir(steer), w = work.computed; self.postMessage({ id, steered: { song: r.song, grown: r.grown, commands: r.commands, work: w, ...(steer.view ? { view: steerView(steer, r) } : {}) } }); return; }
+    // (ms: the steering's own time, without the wait behind other jobs; heads: why each batch's head took its boundary,
+    // for the radio's log)
+    if (steer) { const t0 = performance.now(), r = steerOnAir(steer), w = work.computed, heads = work.heads, view = steer.view ? steerView(steer, r) : null; self.postMessage({ id, steered: { song: r.song, grown: r.grown, commands: r.commands, work: w, heads, ms: Math.round(performance.now() - t0), ...(view ? { view } : {}) } }); return; }
     self.postMessage({ id, song: growOnAir(song, ctx) });
   } catch (err) { self.postMessage({ id, error: String((err && err.message) || err) }); }
 };
