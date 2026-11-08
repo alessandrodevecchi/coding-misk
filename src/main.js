@@ -246,7 +246,7 @@ function radioPlayable(W, songs = null) {
   const meta = parseSong(compileSong(stateAt(W, 0).song)), v = W.sections.flatMap(x => [x.bpm ?? 138, x.bpmEnd ?? x.bpm ?? 138]), lo = Math.min(...v), hi = Math.max(...v);
   meta.bpmLabel = lo === hi ? `${lo}` : `${lo}→${hi}`;
   // (soundCode: every sound of the window in one code, for the soundfonts loaded ahead; hidden: the songs not shown)
-  return { id: W.id, title: W.title, kind: 'composed', look: W.look, code: L.codeAt(0), meta, codeAt: L.codeAt, codeKeep: null, run: L.run, standalone: L.standalone, paste: L.paste, earlier: L.earlier, buses: L.buses, fns: L.fns, build: L.build, ctl: L.ctl, doc: L.build, air: true, hidden: L.hidden(), prepare: L.prepare, soundCode: () => compileSong({ ...W, build: undefined }) };
+  return { id: W.id, title: W.title, kind: 'composed', look: W.look, code: L.codeAt(0), meta, codeAt: L.codeAt, codeKeep: null, run: L.run, standalone: L.standalone, paste: L.paste, earlier: L.earlier, buses: L.buses, fns: L.fns, build: L.build, ctl: L.ctl, doc: L.build, air: true, hidden: L.hidden(), prepare: (slice, alive) => planAway(L, alive).then(ok => (ok ? undefined : L.prepare(slice, alive))), soundCode: () => compileSong({ ...W, build: undefined }) };
 }
 // a radio session's songs joined into one playable song, as its exports play it (radio-profiles D12). A session of
 // Classic songs is the joined song with Classic controls, as before. With a grown song (or the Custom profile) the file
@@ -293,24 +293,41 @@ function sessionPlayable(items, seed, options, id, air = null) {
 // the worker gets the voice instrument's context and the language of the page, so a song grows there as it would here
 // (a console change of the radio, console-add-ahead D4, goes to a worker of its own: in the growth worker it waited
 // behind the next song's growth, up to 20 s)
-const lanes = { grow: { worker: null, waits: new Map() }, console: { worker: null, waits: new Map() } };
+const lanes = { grow: { worker: null, waits: new Map() }, console: { worker: null, waits: new Map() }, plan: { worker: null, waits: new Map() } };
 let growN = 0;
 // (steering a grown song, radio-profiles stage 5: the commands as waypoints are worked out there too)
 // (and a Classic song's steering, console-add-ahead D4: classic holds steerSong's arguments; a steer with view also gives
 // the director's view of the grown song back. Without the worker both run in the page, in a task of their own)
-function growAway(song, ctx, steer = null, classic = null, lane = 'grow') {
+function laneWorker(L) {
+  if (L.worker || L.worker === false) return;
+  L.worker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
+  L.worker.onmessage = e => { const w = L.waits.get(e.data && e.data.id); if (!w) return; L.waits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.plan || e.data.song); };
+  L.worker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of L.waits.values()) w.reject(new Error('worker')); L.waits.clear(); L.worker = false; };
+}
+// the radio's workers started with a session (#82): a worker loads its modules on its first job, which then waited
+// for that (a Classic session's first command, its first window plan)
+function warmLanes() {
+  for (const k of ['grow', 'plan']) { const L = lanes[k]; if (L.worker) continue; try { laneWorker(L); if (L.worker) L.worker.postMessage({ warm: true }); } catch (e) { L.worker = false; } }
+}
+// the written plan of a radio window's song on air made in a worker of its own (#82): made in the page, in slices, it
+// took most of the time after a console command on a slow computer. Resolves true once the plan is in the window (or
+// it needs none), false when it could not be made there (the page makes it, as before)
+function planAway(L, alive) {
+  const job = L.planWork ? L.planWork() : null;
+  if (!job) return Promise.resolve(true);
+  const lang = getLang();
+  return growAway(null, null, null, null, 'plan', { plan: { build: job.build, ctl: job.ctl, lang, limits: globalThis.codingMiskAhead || null } })
+    .then(r => { if (!r || !Array.isArray(r.edits)) return false; if (alive() && getLang() === lang) L.setPlan({ edits: new Map(r.edits), ahead: r.ahead }, lang); return true; }, () => false);
+}
+function growAway(song, ctx, steer = null, classic = null, lane = 'grow', extra = null) {
   const here = () => (classic || (steer && steer.view) ? new Promise(r => setTimeout(r, 0)) : Promise.resolve()).then(() => (classic ? (({ song: s, plan, opts }) => ({ song: s, plan, opts }))(steerSong(classic)) : steer ? (r => ({ song: r.song, grown: r.grown, commands: r.commands, ...(steer.view ? { view: steerView(steer, r) } : {}) }))(steerOnAir(steer)) : growOnAir(song, ctx)));
   const L = lanes[lane];
   try {
-    if (!L.worker) {
-      L.worker = new Worker(new URL('./endless/grow-worker.js', import.meta.url), { type: 'module' });
-      L.worker.onmessage = e => { const w = L.waits.get(e.data && e.data.id); if (!w) return; L.waits.delete(e.data.id); if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data.steered || e.data.song); };
-      L.worker.onerror = e => { console.warn('[radio] growth worker failed, growing in the page', e.message || e); for (const w of L.waits.values()) w.reject(new Error('worker')); L.waits.clear(); L.worker = false; };
-    }
-    if (L.worker === false) return here();
+    laneWorker(L);
+    if (L.worker === false) return extra ? Promise.reject(new Error('worker')) : here();
     const id = ++growN, spoken = { files: spokenContext.files, lengths: spokenContext.lengths, lang: spokenContext.lang || getLang(), styles: spokenContext.styles };
-    return new Promise((resolve, reject) => { L.waits.set(id, { resolve, reject }); L.worker.postMessage({ id, song, ctx, spoken, steer, classic }); });
-  } catch (e) { return here(); }
+    return new Promise((resolve, reject) => { L.waits.set(id, { resolve, reject }); L.worker.postMessage({ id, song, ctx, spoken, steer, classic, ...(extra || {}) }); });
+  } catch (e) { return extra ? Promise.reject(e) : here(); }
 }
 // the page's own growths away from the page (grow-worker.js, a second worker so the radio never waits for them): the
 // song restored in Compose at start and the grown lengths of the song cards on screen. No worker: the promise fails and
@@ -926,17 +943,27 @@ function followPause() {
   clearTimeout(followTimer); followTimer = setTimeout(followSync, FOLLOW_PAUSE_MS + 20);
   followSync();
 }
+// (#82: the geometry is read in CodeMirror's own measure phase, after the layout it makes anyway, once per frame; read
+// right after each typing frame's edit it forced a second layout of the editor every frame)
+let followHost = null;
+const followMeasure = { key: 'coding-misk-follow', i: 0, read: view => {
+  const host = followHost && followHost.isConnected ? followHost : (followHost = $('#edhost'));
+  if (!host) return null;
+  // lineBlockAt works for lines CodeMirror has not drawn yet (below the window), coordsAtPos does not
+  const blk = view.lineBlockAt(Math.min(followMeasure.i, view.state.doc.length)), box = host.getBoundingClientRect();
+  return { host, top: view.documentTop + blk.top, bottom: view.documentTop + blk.bottom, box, scroll: host.scrollTop };
+}, write: m => {
+  if (!m) return;
+  // the visible part of the panel: it can run below the window
+  const top = Math.max(m.box.top, 0), bottom = Math.min(m.box.bottom, innerHeight);
+  // glide there (live-typing): about 0.3 s, eased; a new target replaces the old one
+  if (m.top < top + 8 || m.bottom > bottom - 8) glideTo(m.host, m.scroll + m.top - top - (bottom - top) / 3);
+} };
 function followScroll(i) {
-  const view = ed && ed.editor, host = $('#edhost');
-  try {
-    // lineBlockAt works for lines CodeMirror has not drawn yet (below the window), coordsAtPos does not
-    if (!view) return;
-    const blk = view.lineBlockAt(Math.min(i, view.state.doc.length)), at = { top: view.documentTop + blk.top, bottom: view.documentTop + blk.bottom };
-    // the visible part of the panel: it can run below the window
-    const box = host.getBoundingClientRect(), top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight);
-    // glide there (live-typing): about 0.3 s, eased; a new target replaces the old one
-    if (at.top < top + 8 || at.bottom > bottom - 8) glideTo(host, host.scrollTop + at.top - top - (bottom - top) / 3);
-  } catch (e) {}
+  const view = ed && ed.editor;
+  if (!view) return;
+  followMeasure.i = i;
+  try { view.requestMeasure(followMeasure); } catch (e) {}
 }
 function followEdit(a, b) {
   let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
@@ -988,8 +1015,14 @@ const typingHuman = () => !!(song && song.ctl && song.ctl.typist === 'human');
 // typing mistakes on (typing-mistakes); a stretch of typing is 16 bars, so app and video draw the same mistake rate
 const typingMistakes = () => !(song && song.ctl && song.ctl.mistakes === 'off');
 const stretchOf = bar => Math.floor(bar / 16);
+// (#82: the typing shows at most 30 frames a second: each frame edits the editor, and every edit is a layout of the
+// panel; at 60 the typing took most of a slow computer's time)
+const TYPE_FRAME_MS = 1000 / 30 - 2;
 function typeFrame(T, cyc) {
   if (cyc < T.start) return;
+  const tNow = performance.now();
+  if (T.frameAt !== undefined && tNow - T.frameAt < TYPE_FRAME_MS) return;
+  T.frameAt = tNow;
   const at = (cyc - T.start) / T.cps, txt = T.plan.frame(at);
   typingCursor = T.plan.cursor ? T.plan.cursor(at) : null;
   // for browser checks (typing-mistakes): whether a mistake is on screen now
@@ -5035,6 +5068,7 @@ try {
   const clock = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 100)'], { type: 'text/javascript' })));
   clock.onmessage = () => { if (document.hidden) { applyMaster(); songTick(); if (preview) preview.tick(); if (radioPreview) radioPreview.tick(); if (labPreview) labPreview.tick(); } };
 } catch (e) {}
+const songsTab = $('#tab-brani');
 (function transport() {
   requestAnimationFrame(transport);
   applyMaster();
@@ -5108,7 +5142,8 @@ try {
     cols.forEach(x => x.classList.toggle('playing', x === b));
   }
   // avanzamento e pulsanti nelle card
-  $$('[data-song-card]').forEach(card => {
+  // (#82: only while the Songs tab shows its cards; every card was read and written every frame from any tab)
+  if (!songsTab || !songsTab.hidden) $$('[data-song-card]').forEach(card => {
     const c = cards[+card.dataset.songCard]; if (!c) return;
     const mine = song && song.id === c.tr.id;
     const active = playing && mine, isPaused = !playing && paused && mine;
@@ -5524,6 +5559,10 @@ radio = createRadio({
     steer: args => growAway(null, null, args),
     // a Classic song steered there too (console-add-ahead D4: the console's "+" and "−")
     steerClassic: args => growAway(null, null, null, args, 'console'),
+    // a Classic song steered there on a press of the console (#82), in the growth worker as a grown song's command
+    steerPlain: args => growAway(null, null, null, args),
+    // the growth and plan workers started ahead, with a session (#82)
+    warm: () => warmLanes(),
     // a grown song's console change steered there, with the director's view (console-add-ahead D4)
     steerAhead: args => growAway(null, null, args, null, 'console'),
     // (a Classic song of an old session that grows after its steering: grown there too)

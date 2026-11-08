@@ -182,8 +182,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       if (S !== mine || item.growToken !== token || item.commands.length || !g || !g.onAir) return;
       const i = S.stream.indexOf(item);
       if (i <= S.onAir || (performance.now() - t0) / 1000 > WIDE_WAIT || secondsTo(item) < WIDE_MARGIN) return;
+      // (the window made ready before it goes on: its plan away from the page, #82)
       item.g0 = g; setSong(item, g); record(item.n, 'wide');
-      player.swap(windowPlayable()); render();
+      swapSoon(windowPlayable(), item.start); render();
     }, () => {});
   }
   // then: called once the growth away from the page is ready (the window on air swaps to the grown song)
@@ -226,11 +227,15 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // a grown song steered with waypoints, away from the page when async (the worker grows it first when needed)
   function steerAir(item, { async = false, then = null } = {}) {
     const token = item.growToken = (item.growToken || 0) + 1, s0t = performance.now(), n0 = item.commands.length;
-    if (item.g0) airView(item);
-    const args = { grown: item.g0 || null, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe) };
+    // (#82: the director's view with the new commands, for the console until the answer, in a task of its own after the
+    // press; the answer brings the view made in the worker)
+    const hasView = async && !!player.steer;
+    if (item.g0) { if (hasView) setTimeout(() => { if (S && item.growToken === token && item.growing) airView(item); }, 0); else airView(item); }
+    const args = { grown: item.g0 || null, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe), ...(hasView ? { view: true } : {}) };
     // (the answer to a typed line gives the song already on air: that one is kept, so the window is not written again
     // and its plan not made twice, #82)
-    const done = r => { if (item.growToken !== token || !S) return; if (async) item.steerSeen = { ms: performance.now() - s0t, n: n0 }; delete item.growing; delete item.finish; item.g0 = r.grown; airSettle(item, r.commands); airView(item); const same = item.said && item.said === item.song && JSON.stringify(r.song) === JSON.stringify(item.song); delete item.said; setSong(item, same ? item.song : r.song); };
+    const view = r => { if (r.view) { item.plan = r.view.plan; item.opts = r.view.opts; item.plain = r.view.song; } else airView(item); };
+    const done = r => { if (item.growToken !== token || !S) return; if (async) item.steerSeen = { ms: performance.now() - s0t, n: n0 }; delete item.growing; delete item.finish; item.g0 = r.grown; airSettle(item, r.commands); view(r); const same = item.said && item.said === item.song && JSON.stringify(r.song) === JSON.stringify(item.song); delete item.said; setSong(item, same ? item.song : r.song); };
     item.finish = () => { done(steerOnAir(args)); item.growToken++; };
     if (!async || !player.steer) { item.finish(); return; }
     item.growing = player.steer(args).then(done, () => { if (item.growToken === token) item.finish(); });
@@ -238,7 +243,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   }
   // the song an item plays; its bars move the songs after it
   function setSong(item, song) {
-    item.song = song; item.curves = null;
+    // (ver: the console is drawn again when the song changes, #82: a command's steering answers after its press)
+    item.song = song; item.curves = null; item.ver = (item.ver || 0) + 1;
     const bars = barsOf(song) + (item.cut ? 0 : item.extra || 0);
     if (bars !== item.bars && !item.cut) { item.bars = bars; const i = S ? S.stream.indexOf(item) : -1; if (i >= 0) relayoutFrom(i); }
   }
@@ -248,8 +254,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the window and its songs, each with its own controls (radio-profiles D7, D8): the song on air in its profile's view,
   // the next one shown (Classic, as before) or hidden (a grown song) as the incoming option says
   // over: { item, song } the window with that song on that item, without changing it (a typed line tried first, #82)
-  function windowPlayable(over = null) {
-    const items = S.stream.slice(S.onAir, S.onAir + 2).map(x => (over && x === over.item ? { ...x, song: over.song } : x));
+  // (items: the window's items, the song on air first; a skip makes the window of the next song before it goes on air)
+  function windowPlayable(over = null, list = null) {
+    const items = (list || S.stream.slice(S.onAir, S.onAir + 2)).map(x => (over && x === over.item ? { ...x, song: over.song } : x));
     const W = windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start, transition: x.entry.transition, cut: x.cut })));
     return player.makePlayable(W, items.map((x, i) => ({ n: x.n + 1, prefix: `s${x.n + 1}-`, start: x.start, song: x.song, title: x.song.title, profile: profileOf(x), custom: !!x.custom || !!displayOn(x), ctl: liveControlsOf(x), show: i === 0 ? 'air' : showOf(x) })));
   }
@@ -329,6 +336,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     }
     else generate();
     if (!limit) remember(S.stream[0]);
+    if (player.warm) player.warm();
     player.start(windowPlayable(), L ? Math.min(L.from || 0, S.stream[0].bars - 1) : 0, { voices: airVoices() });
     render();
   }
@@ -427,6 +435,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const mine = S;
     idle(() => {
       if (S !== mine) return;
+      // (a skip pressed meanwhile made the next song already, #82)
+      if (S.stream.length > S.onAir + 1) { S.pending = false; return; }
       // (the window with the next song made ready a little at a time: the song on air's plan is made again, #82)
       // (the next song's voice samples then load one at a time, in a task of their own, #82)
       const it = generate(true), ready = () => { if (S !== mine) return; S.pending = false; const nx = S.stream[S.onAir + 1]; swapSoon(windowPlayable(), nx ? nx.start : Infinity); render(); setTimeout(() => { if (S === mine && player.preloadVoices && nx) player.preloadVoices(voicesOf(nx)); }, 0); };
@@ -450,18 +460,66 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     } else if (performance.now() - S.lastCard > 250) { S.lastCard = performance.now(); renderNow(cyc); }
   }
   // skip: the song on air ends with this bar, the next one starts on the next bar
+  // (#82: a next song still growing away from the page, or not made yet, grew here, on the main thread: up to seconds
+  // of frozen page and late notes. Now the skip waits for it, "Skipping…", while the song on air plays on; then the
+  // next song's window is made ready, its plan away from the page, and it goes on air on the first bar after that)
   function skip() {
-    if (!S || S.paused !== undefined) return;
+    if (!S || S.paused !== undefined || S.skipping) return;
     if (S.limit && S.onAir + 1 >= S.limit) return endLimited();
-    const cyc = player.now(), cur = S.stream[S.onAir], cut = Math.floor(cyc) + 1;
-    if (S.stream.length <= S.onAir + 1) generate();
+    if (S.stream.length <= S.onAir + 1 && !generate(true)) return endLimited();
+    const mine = S, nx = S.stream[S.onAir + 1], token = S.skipping = { at: performance.now() };
+    paintSkip();
+    const alive = () => S === mine && S.skipping === token && S.paused === undefined && S.stream[S.onAir + 1] === nx;
+    const drop = () => { if (S === mine && S.skipping === token) { delete S.skipping; render(); } };
+    // (a newer growth or steering of the next song meanwhile is waited for too)
+    const grown = () => { if (!alive()) return drop(); if (nx.growing) { nx.growing.then(grown, grown); return; } skipPrepare(nx, token, alive, drop); };
+    grown();
+  }
+  // the next song's window, its first bar at least SKIP_LEAD seconds plus the expected preparation ahead, made ready (the
+  // plan of its song away from the page), then handed to the player on that bar; when the bar is reached first, the
+  // skip goes on at the next bar with the window made here (as before)
+  const SKIP_LEAD = 0.5;
+  let skipPrep = 1;
+  function skipPrepare(nx, token, alive, drop) {
+    const cur = S.stream[S.onAir], now = player.now(), bs = barSecOf(cur.song, Math.max(0, Math.floor(now - cur.start)));
+    const cut = Math.max(Math.floor(now) + 1, Math.ceil(now + (SKIP_LEAD + skipPrep) / bs));
+    const p = windowPlayable(null, [{ ...nx, start: cut }]), t0 = performance.now(), song0 = nx.song;
+    let done = false, ready = false;
+    const go = () => {
+      done = true;
+      // (too late for its bar, or the next song changed meanwhile: on the next bar, with a window made now)
+      if (player.now() > cut - 0.05 || nx.song !== song0) { skipNow(); return; }
+      skipNow(cut, p);
+    };
+    // (on air in the last half bar before the cut, as a skip on the next bar did; not ready a third of a bar before it,
+    // it goes on air anyway and its plan is finished at once)
+    const watch = () => { if (done) return; if (!alive()) { done = true; drop(); return; } const now = player.now(); if ((ready && now >= cut - 0.5) || now >= cut - 0.34) go(); else setTimeout(watch, 30); };
+    const prepared = () => { ready = true; skipPrep = Math.max(0.3, Math.min(8, (performance.now() - t0) / 1000 * 1.3)); };
+    (p.prepare ? p.prepare(12, () => !done && alive()) : Promise.resolve()).then(prepared, prepared);
+    watch();
+  }
+  // the skip itself: the song on air cut at `cut` (the next bar without one), the next song on air from there
+  function skipNow(cut = null, p = null) {
+    delete S.skipping;
+    const cyc = player.now(), cur = S.stream[S.onAir];
+    if (cut === null) cut = Math.floor(cyc) + 1;
     growNow(S.stream[S.onAir + 1]);
     cur.bars = Math.max(1, cut - cur.start); cur.cut = true;
     relayout();
     S.onAir++;
     remember(S.stream[S.onAir]);
-    player.jump(windowPlayable(), S.stream[S.onAir].start, { voices: airVoices() });
-    render();
+    player.jump(p || windowPlayable(), S.stream[S.onAir].start, { voices: airVoices() });
+    // (the radio drawn in a task of its own)
+    setTimeout(() => render(), 0);
+  }
+  // the Skip button while the skip waits for the next song
+  function paintSkip() {
+    const b = root.querySelector('#radio-skip');
+    if (!b) return;
+    const on = !!(S && S.skipping);
+    b.disabled = on || !S || S.paused !== undefined;
+    b.textContent = `⏭ ${t(on ? 'radioSkipping' : 'radioSkip')}`;
+    if (on) b.setAttribute('aria-busy', 'true'); else b.removeAttribute('aria-busy');
   }
   // ---------- recording (#30) ----------
   // the session as audio, from now until stopped (pauses leave no gap), with the recipe and a track list
@@ -518,10 +576,20 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // when async: the window swaps when it is ready; since stage 5 a grown song's commands are waypoints, steerAir)
   function resteer(item, { async = false, then = null } = {}) {
     if (airSteer(item)) return steerAir(item, { async, then });
+    // (#82: a Classic song is steered away from the page too, as a grown one: on the press it took the main thread; the
+    // window swaps when the answer comes, and a song needed before that is steered here, growNow)
+    if (async && !item.growCtx && player.steerPlain) return steerPlainAway(item, then);
     const r = steerSong({ ...item.base, commands: item.commands, seed: S.recipe.seed, n: item.n });
     item.plan = r.plan; item.opts = r.opts; item.plain = r.song;
     if (!item.growCtx) { setSong(item, r.song); return; }
     grow(item, r.song, { async, then });
+  }
+  function steerPlainAway(item, then) {
+    const token = item.growToken = (item.growToken || 0) + 1, args = { ...item.base, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n };
+    const done = r => { if (item.growToken !== token || !S) return; delete item.growing; delete item.finish; item.plan = r.plan; item.opts = r.opts; item.plain = r.song; setSong(item, r.song); };
+    item.finish = () => { done(steerSong(args)); item.growToken++; };
+    item.growing = player.steerPlain(args).then(done, () => { if (item.growToken === token) item.finish(); });
+    if (then) item.growing.then(() => { if (S && S.stream.includes(item)) then(); });
   }
   function relayoutFrom(i) {
     for (let k = i + 1; k < S.stream.length; k++) { const p = S.stream[k - 1]; S.stream[k].start = p.start + p.bars - (p.cut ? 0 : overlapOf(p.entry.transition)); }
@@ -536,7 +604,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // result (Classic), and the window with it, already made ready: the line was tried before it was queued
   function command(c, pre = null) {
     if (!S || S.paused !== undefined) return false;
-    const item = S.stream[S.onAir], rel = relNow();
+    const item = S.stream[S.onAir], rel = relNow(), before = item.song;
     if (!item.plan) { toast(t(item.frozen ? 'steerWhy:frozen' : 'steerWhy:lead')); return false; }
     // a grown song (radio-profiles D9): the first boundary of the waypoint, in the grown song's bars; the steering
     // moves it to the phrase after when its edit cannot be typed in time (pend, with the bar it came: q)
@@ -582,7 +650,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // (a typed line tried first: its window is ready, made with this very song)
     // (and the console drawn in a task of its own)
     if (pre && pre.p) { if (soon) soon.done = true; soon = null; player.swap(pre.p); setTimeout(() => renderNow(), 0); return true; }
-    swapSoon(windowPlayable(), item.start + heardAt(item, cmd));
+    // (#82: while the steering runs away from the page the song is the same: its window, and the plan of its code, were
+    // made again for nothing; the answer swaps the window)
+    if (!(item.growing && item.song === before)) swapSoon(windowPlayable(), item.start + heardAt(item, cmd));
     renderNow();
     return true;
   }
@@ -591,7 +661,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // steered again away from the page swaps the window on air when it is ready, so the song being prepared plays the
   // choice (#86)
   function rebias(k) {
-    const swap = () => { player.swap(windowPlayable()); renderNow(); };
+    const swap = () => { swapSoon(windowPlayable(), (S.stream.find(x => x.n > k) || {}).start ?? Infinity); renderNow(); };
     for (const x of S.stream) {
       if (x.n <= k || !x.base0 || x.frozen) continue;
       const b = biasSong(S.recipe, x.n, x.base0);
@@ -621,9 +691,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const drop = x => x.id === id || (c.kind === 'extend' && x.kind === 'curve' && x.id > id && x.at > relNow() && x.d >= c.ins);
     item.commands = item.commands.filter(x => !drop(x));
     S.recipe.steering = (S.recipe.steering || []).filter(x => !(x.song === item.n && drop(x)));
+    const before = item.song;
     resteer(item, { async: true, then: () => { keepHistory(item); swapSoon(windowPlayable(), by); renderNow(); } });
     keepHistory(item);
-    swapSoon(windowPlayable(), by);
+    if (!(item.growing && item.song === before)) swapSoon(windowPlayable(), by);
     renderNow();
   }
   // ---------- "+" and "−" prepared ahead (console-add-ahead) ----------
@@ -1019,6 +1090,20 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const empty = q.querySelector('li.muted');
     if (rows) { if (empty) empty.hidden = true; q.insertAdjacentHTML('afterbegin', rows); } else if (empty) empty.hidden = false;
   }
+  // the Extend waiting for its double phrase (#82): a badge next to the button with the seconds left, as the "+" of the
+  // Arrangement group; drawn again with the console's quarter-second tick, without a rebuild
+  function paintExtend() {
+    const box = root.querySelector('#radio-steer'), btn = box && box.querySelector('[data-cmd="extend"]');
+    if (!btn || !S) return;
+    const item = S.stream[S.onAir], rel = relNow(), old = btn.parentElement.querySelector('[data-ext-pend]');
+    const c = item.plan ? item.commands.filter(x => x.kind === 'extend' && x.at > rel).sort((a, b) => a.at - b.at)[0] : null;
+    if (!c) { if (old) old.remove(); return; }
+    const s = Math.max(0, Math.ceil(secsTo(item, c.at))), x = `+${c.s ?? Math.round(extendSeconds(item.plan))} s`;
+    const html = `<span class="arr-pend ${c.pend ? 'prep' : 'ready'} ext-pend" data-ext-pend title="${esc(t('arrPendBar', { bar: c.at + 1 }))}"><i class="arr-pend-led" aria-hidden="true"></i><span class="arr-pend-t">${esc(t('extPendIn', { x, s }))}</span><span class="arr-pend-s" aria-hidden="true">${esc(t('arrPendShort', { n: x, s }))}</span></span>`;
+    if (old && old.outerHTML === html) return;
+    const tmp = document.createElement('span'); tmp.innerHTML = html;
+    if (old) old.replaceWith(tmp.firstChild); else btn.after(tmp.firstChild);
+  }
   // the history keeps the song as steered, so saving it from there keeps the listener's changes
   function keepHistory(item) {
     const h = history.find(x => x.n === item.n && x.seed === S.recipe.seed);
@@ -1200,7 +1285,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the riser row (D11): what the next press places, remembered while the page is open
   const riserForm = { bars: 'auto', dir: 'up', sound: 'noise' };
   const keyLabel = k => ({ ArrowUp: '↑', ArrowDown: '↓', V: 'Shift+V' }[k] || k.toUpperCase());
-  let steerKey = '', dragging = null, pendingSession = null;
+  let steerKey = '', steerUseKey = '', dragging = null, pendingSession = null;
   // the part Vary and Swap act on (radio-variation D5): the lead by default, remembered while the page is open
   let varyPart = 'lead';
   // the track Vary and Swap act on (radio-arrangement D7): Auto, or one playing track of the part by id; back to Auto
@@ -1418,9 +1503,12 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const ph = item.plan.phrase;
     const st = stateNow(item.song, rel), on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
     const pending = item.commands.filter(c => c.at > rel || c.scope === 'session');
-    const key = [item.n, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', userPatterns().map(x => `${x.id}:${x.uses || 0}`).join(), sv.preset, sv.style, voiceHelper, sayWait.map(w => w.at).join(), typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
-    if (!force && key === steerKey) return;
-    steerKey = key;
+    // (the use counts of the saved patterns redraw only the panel's body, not the console: an add or a replace counts a
+    // use right after its own redraw, #82)
+    const pats = userPatterns(), useKey = pats.map(x => `${x.uses || 0}:${x.lastUsed || ''}`).join();
+    const key = [item.n, item.ver || 0, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', pats.map(x => x.id).join(), sv.preset, sv.style, voiceHelper, sayWait.map(w => w.at).join(), typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
+    if (!force && key === steerKey) { if (useKey !== steerUseKey) { steerUseKey = useKey; spUsesChanged(pats); } return; }
+    steerKey = key; steerUseKey = useKey;
     const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-sv-line]') ? document.activeElement.selectionStart : null;
     setTimeout(() => { if (typing === null) return; const i = root.querySelector('[data-sv-line]'); if (i) { i.focus(); try { i.setSelectionRange(typing, typing); } catch (e) {} } }, 0);
     const tip = k => `title="${esc(t(k))}"`;
@@ -1551,6 +1639,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     spMount(box.querySelector('.sp-slot'), spOld, savedPanel, spFocus);
     // (the locks waiting for their boundary keep their ring after a rebuild, D8)
     paintPending();
+    paintExtend();
   }
 
   // ---------- saved patterns among many (saved-patterns-list) ----------
@@ -1653,6 +1742,13 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     }
     list.forEach(cv => spIo.observe(cv));
   }
+  // the use counts changed (an add, a replace): the panel's patterns read again and its body drawn, not the console
+  function spUsesChanged(pats) {
+    if (!spCtx) return;
+    const by = new Map(pats.map(x => [x.id, x]));
+    spCtx.fitting = spCtx.fitting.map(x => by.get(x.id) || x);
+    spRenderBody();
+  }
   // a chip, a menu or the search draws only the panel's body again, not the console (D1)
   function spRenderBody({ top = false } = {}) {
     const el = root.querySelector('#radio-steer .sp'), body = el && el.querySelector('.sp-body');
@@ -1700,6 +1796,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (!box || dragging) return;
     const rt = root.querySelector('#radio-rec-time'); if (rt) rt.textContent = clockOf(recElapsed());
     renderSteer();
+    paintExtend();
     if (!S) { nowMemo = null; box.innerHTML = `<div class="lbl">${esc(t('radioNow'))}</div><p class="muted">${esc(t('radioIdle'))}</p>`; return; }
     const item = S.stream[S.onAir], song = item.song, e = item.entry;
     // (paused: the bar it stopped on, the player's clock no longer runs)
@@ -1779,7 +1876,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         <div class="radio-onair">
           <button class="btn primary radio-start" id="radio-start" aria-pressed="${on}" ${tip(on ? 'tipStop' : 'tipStart')}>${on ? '■ ' + esc(t('radioStop')) : '▶ ' + esc(t('radioStart'))}</button>
           <button class="btn" id="radio-pause" ${on ? '' : 'disabled'} ${tip(paused ? 'tipResume' : 'tipPause')}>${paused ? '▶ ' + esc(t('radioResume')) : '❚❚ ' + esc(t('radioPause'))}</button>
-          <button class="btn" id="radio-skip" ${on && !paused ? '' : 'disabled'} ${tip('tipSkip')}>⏭ ${esc(t('radioSkip'))}</button>
+          <button class="btn" id="radio-skip" ${on && !paused && !S.skipping ? '' : 'disabled'}${on && S.skipping ? ' aria-busy="true"' : ''} ${tip('tipSkip')}>⏭ ${esc(t(on && S.skipping ? 'radioSkipping' : 'radioSkip'))}</button>
           <button class="btn" id="radio-pl" ${on && !S.limit ? '' : 'disabled'} ${tip('tipSessionPl')}>${esc(t('addToPlaylist'))}</button>
           <span class="radio-vol" ${tip('volumeAll')}><button class="btn icon" id="radio-mute" aria-label="${esc(t('mute'))}"></button><input type="range" id="radio-volume" min="0" max="100" step="1" value="${player.volume().volume}" aria-label="${esc(t('volumeAll'))}"><output id="radio-volume-out"></output></span>
         </div>
@@ -1936,8 +2033,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       delete item.created; delete item.uses; delete item.lastUsed;
       const sel = b.dataset.spNew ? null : root.querySelector(`[data-sp-target="${CSS.escape(id)}"]`);
       // (a new track waits with the "+" and "−" of its boundary and enters with them, #82)
+      // (one redraw: the badge or the queued replace is drawn by the press; the use count then redraws the panel's body)
       const ok = b.dataset.spNew ? pendPattern(item) : command({ kind: 'pattern', mode: 'replace', target: sel ? sel.value : spTarget[id], item });
-      if (ok) { onPatternUsed(id); renderSteer(true); }
+      if (ok) { onPatternUsed(id); renderSteer(); }
       return ok;
     }
     // (a lock waits for its boundary with the "+" and "−" pressed for it, console-add-ahead D8)

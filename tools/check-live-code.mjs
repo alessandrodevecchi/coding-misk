@@ -33,6 +33,25 @@ function codes(id, profile, over = {}) {
 }
 const print = list => createHash('sha256').update(list.join('\n\u0000\n')).digest('hex').slice(0, 16);
 const CHECKS = {
+  '#82: the written plan made elsewhere (the radio\'s plan worker) from a copy of the build gives the same code at every step'() {
+    let n = 0;
+    for (const [id, over] of [['kellerlicht', {}], ['crescendo-notte-lunga', {}], ['kellerlicht', { functions: 'mixer' }]]) {
+      const C = resolveProfile('switch', { ...(OPENED[id] || {}), ...over }), b = crescendoSong(song(id), { narrated: C.narrated, rules: growthRules(C, { styles: STYLES }) });
+      const make = () => liveCode(b, C, { lang: () => 'en', files: () => files, cols: () => 80 });
+      const A = make(), B = make();
+      if (A.planReady()) continue;
+      // (as the worker makes it and sends it back: a structured copy in, the edits as a list out)
+      const away = liveCode(structuredClone(b), structuredClone(C), { lang: () => 'en', files: () => files }).plan(), msg = structuredClone({ edits: [...away.edits], ahead: away.ahead });
+      B.setPlan({ edits: new Map(msg.edits), ahead: msg.ahead }, 'en');
+      assert(B.planReady(), `${id}: the plan set is not taken`);
+      const bars = [0, ...new Set(buildSteps(A.build).map(x => x.at))];
+      for (const bar of bars) assert(A.codeAt(bar) === B.codeAt(bar), `${id} ${JSON.stringify(over)}: bar ${bar} differs with the plan made elsewhere`);
+      B.setPlan({ edits: new Map(), ahead: [] }, 'en');
+      assert(B.codeAt(bars[bars.length - 1]) === A.codeAt(bars[bars.length - 1]), `${id}: a plan set again replaced the one in place`);
+      n++;
+    }
+    assert(n >= 2, `only ${n} songs with a written plan`);
+  },
   'Classic and Crescendo keep their code'() {
     const now = Object.fromEntries(SONGS.flatMap(id => ['classic', 'crescendo'].map(p => [`${id} ${p}`, print(codes(id, p))])));
     if (process.argv.includes('--write')) { fs.writeFileSync(FIXTURES, JSON.stringify(now, null, 2) + '\n'); return; }

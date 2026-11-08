@@ -8,7 +8,7 @@
 // Bars: a grown song keeps the bars of its written form after its growth, moved by the growth (airOffset): grown bar
 // b plays the written bar b - off. A command records its boundary in the grown song's bars (what the queue shows); the
 // director's rewrite gets the same boundary in its own bars.
-import { steerSong, sayAir, COMMANDS, patternPart } from './steering.js';
+import { steerSong, sayAir, COMMANDS, patternPart, riserAirTarget, riserAir } from './steering.js';
 import { writtenForm, growOnAir, airControls } from './growth.js';
 import { energyOf } from './energy.js';
 import { stream } from './random.js';
@@ -41,6 +41,8 @@ const BATCH_HURRY = 5;
 // how far a grown song's bars are from its written form's: the growth took `growth` bars in place of the written
 // form's first `from` (fitted), or before it (free, from 0)
 export const airOffset = g => (g && g.onAir && g.crescendo ? g.crescendo.growth - (g.onAir.from || 0) : 0);
+// a riser on the grown song itself (#82): one placed there (`air`), or one pressed inside the growth and still pending
+export const airRiser = (c, g) => c.kind === 'riser' && (!!c.air || (!!c.pend && !!(g && g.onAir && g.crescendo) && (Number.isFinite(c.q) ? c.q : c.at) < g.crescendo.growth));
 // the bars where a command on a grown song may apply, in the grown song's bars, first first; rel: the bar now; plan:
 // the director's plan as steered so far; [] when none is left (late); lead: as applyBar's for a typed line
 export function airBoundaries(kind, rel, plan, g, lead = 0.5, tries = PHRASE_TRIES) {
@@ -468,7 +470,8 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
   // (a typed line, say-live, changes no code to type and nothing of the written form: it goes on the grown song on its
   // own bar, after the other commands. Through the director it landed on the written form's bar B - off, before the
   // arrival or inside the growth, where the transit keeps no clip of the written form, and was never heard; fx3)
-  const typed = c => c.kind === 'say-live', director = list => list.filter(c => !typed(c)).map(toDirector);
+  // (a riser pressed inside the growth goes on the grown song on its own bars too, airRiser, #82)
+  const typed = c => c.kind === 'say-live' || airRiser(c, g0), director = list => list.filter(c => !typed(c)).map(toDirector);
   let N = g0, Wprev = writtenForm(song), P = plan, R = { song, plan, opts };
   const done = [];
   // the moves that need more bars get them, the arrival kept (three times at most); when some still has to hurry (the
@@ -494,6 +497,11 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
     // (min: the first boundary a console change prepared ahead may take, console-add-ahead D2; the steering moves it
     // later only when its typing does not fit)
     const cands = cmd.pend && !typed(cmd) ? airBoundaries(cmd.kind, Number.isFinite(cmd.q) ? cmd.q : cmd.at - 1, P, g0).filter(b => !Number.isFinite(cmd.min) || b >= cmd.min) : [cmd.at];
+    if (airRiser(cmd, g0)) {
+      const r = cmd.air || riserAirTarget(g0, plan, Number.isFinite(cmd.q) ? cmd.q : cmd.at - 1, cmd);
+      if (r) { const { pend, ...kept } = cmd; done.push({ ...kept, at: r.start, air: { start: r.start, end: r.end, bars: r.bars, dir: r.dir } }); }
+      return;
+    }
     if (typed(cmd)) { if (cands.length) { const { pend, ...kept } = cmd; done.push({ ...kept, at: cands[0] }); } return; }
     const rng = stream(seed, `waypoint:${n}:${i}`);
     let pick = null;
@@ -578,7 +586,9 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
     group(commands.slice(i, j), i);
     i = j;
   }
-  const said = done.filter(typed);
+  const risen = done.filter(c => c.kind === 'riser' && c.air);
+  if (risen.length) N = riserAir(N, plan, risen.map(c => c.air), stream(seed, `waypoint:${n}:riser`));
+  const said = done.filter(c => c.kind === 'say-live');
   if (said.length) N = sayAir(N, said.map(c => ({ at: c.at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' })));
   return { song: N, grown: g0, commands: done, plan: R.plan, opts: R.opts, plain: R.song };
 }
@@ -587,7 +597,7 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
 export function directorView({ song, plan, opts, commands, seed, n, grown }) {
   const off = airOffset(grown);
   // (typed lines live on the grown song only, as in steerOnAir)
-  return steerSong({ song, plan, opts, commands: commands.filter(c => c.kind !== 'say-live').map(c => { const { q, pend, at0, ...rest } = c; return { ...rest, at: c.at - off }; }), seed, n });
+  return steerSong({ song, plan, opts, commands: commands.filter(c => c.kind !== 'say-live' && !airRiser(c, grown)).map(c => { const { q, pend, at0, ...rest } = c; return { ...rest, at: c.at - off }; }), seed, n });
 }
 
 // the director's view of a grown song after its steering: the commands as the steering placed them (a pending one that
