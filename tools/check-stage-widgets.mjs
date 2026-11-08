@@ -362,5 +362,18 @@ check(widgetSettings(null).v === CW_VERSION, 'Widget notes: settings carry the v
   }
 }
 
+// pianoroll-one-row (task 3.1): a pianoroll panel with F.roll draws its one-row look on Monitor, a side panel (strip)
+// and the big screen, the same twice; without F.roll every panel draws as before
+{
+  const st = song(), cyc = 6.5;
+  const draws = [['Monitor', (g, F) => drawMonitor(g, 1280, 720, F)], ['a side panel', (g, F) => drawLayer(g, 1280, 720, { ...F, pal: seeThrough(F.pal), roster: F.roster.slice(0, 4) }, 'strip')], ['the big screen', (g, F) => drawLayer(g, 1280, 720, { ...F, roster: F.roster.slice(0, 2) }, 'screen')]];
+  for (const [name, draw] of draws) {
+    const base = frameOf(st, cyc, columnCache()), roster = base.roster.map((p, i) => (i < 2 ? { ...p, widget: 'pianoroll' } : p));
+    const run = roll => { const g = recorder(); draw(g, { ...base, roster, ...(roll ? { roll } : {}) }); return JSON.stringify(g.log); };
+    const plain = run(null), none = run(() => null), thin = run(() => ({ look: 'thin', top: 1 })), thin2 = run(() => ({ look: 'thin', top: 1 })), alpha = run(() => ({ look: 'alpha', top: 1 }));
+    check(plain === none && thin !== plain && thin === thin2 && alpha !== thin, `${name}: a one-row look drawn (the same twice), none without it`);
+  }
+}
+
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);

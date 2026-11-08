@@ -18,7 +18,8 @@ async function pickFormat(mb, q) {
 // drawFrame(t, cyc, feed, codeAt, index): draws the frame for time t into the canvas; onProgress(0..1, phase).
 // writable: a file to write into while rendering (#61), else the file is kept in memory.
 // Returns { promise, cancel }: the promise gives { blob (null when written to disk), ext, seconds, onsets }.
-// onNotes(notes): the notes of the lines with a note widget of each block, before its frames (code-widgets D11)
+// onNotes(notes, rolls): the notes of the lines with a note widget of each block, before its frames (code-widgets D11),
+// and the one-row shapes of its pianorolls by `key@span start` (pianoroll-one-row D2)
 // onStageNotes(notes): the notes of every instrument of each block, before its frames (widgets-on-stage D2)
 // The feed of a frame also has waveAt(t, n): n samples of the song's wave ending at t seconds (at a quarter of the sample
 // rate), for the widget looks' spectrum columns, up to HISTORY seconds back
@@ -43,8 +44,8 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
     let hist = new Float32Array(0), histAt = 0, drawn = 0, ap = 0;
     const report = phase => onProgress(Math.min(1, ap * 0.3 + drawn / frames * 0.7), phase);
     const sink = {
-      async add(ch, start, blockOnsets, notes, stageNotes, lit = null) {
-        if (onNotes && notes) onNotes(notes);
+      async add(ch, start, blockOnsets, notes, stageNotes, lit = null, rolls = null) {
+        if (onNotes && notes) onNotes(notes, rolls || {});
         if (onLit && lit) onLit(lit);
         if (onStageNotes && stageNotes) onStageNotes(stageNotes);
         for (const [k, list] of Object.entries(blockOnsets || {})) (onsets[k] = onsets[k] || []).push(...list);

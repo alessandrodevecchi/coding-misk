@@ -1,7 +1,8 @@
 // Browser checks for the code widgets (code-widgets, #79): off by default; on, the calls in the code and their widgets
 // below the lines, scope with its line's instrument, Classic moving at a section boundary without a step, widgets kept
 // while the Live coder types, muted lines dimmed, any parameter accepted, the Settings card, frame time; a widget whose kind
-// changes on a playing line redraws at once, and settings saved before the app widgets get them once (#79).
+// changes on a playing line redraws at once, and settings saved before the app widgets get them once (#79); the one-row
+// pianoroll in the editor, on Monitor and in the fast video (pianoroll-one-row, CW_ONLY=onerow, ONE_SHOTS=<dir> pictures).
 // Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-code-widgets.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('fs');
@@ -12,16 +13,17 @@ let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
 const CALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/g;
 
-async function open(browser, { widgets = null, lang = 'it', ui = 'neon', width = 1440, height = 1000 } = {}) {
+async function open(browser, { widgets = null, lang = 'it', ui = 'neon', width = 1440, height = 1000, look = null } = {}) {
   const page = await (await browser.newContext({ viewport: { width, height } })).newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.addInitScript(([w, l, u]) => {
+  await page.addInitScript(([w, l, u, k]) => {
     if (sessionStorage.getItem('cw-init')) return;
     sessionStorage.setItem('cw-init', '1');
     localStorage.setItem('coding-misk-lang', l); localStorage.setItem('coding-misk-ui', JSON.stringify(u));
+    if (k) localStorage.setItem('coding-misk-look', JSON.stringify(k));
     if (w) localStorage.setItem('coding-misk-code-widgets', JSON.stringify(w)); else localStorage.removeItem('coding-misk-code-widgets');
-  }, [widgets, lang, ui]);
+  }, [widgets, lang, ui, look]);
   await page.goto(URL); await page.waitForFunction(() => document.querySelector('strudel-editor') && document.querySelector('strudel-editor').editor, null, { timeout: 30000 }); await sleep(3500);
   return { page, errors };
 }
@@ -134,8 +136,122 @@ async function migration(browser) {
   await page.close();
 }
 
+// 7. pianoroll-one-row: typed lines in Compose (L1 thin at half height, L2 the section's varying look, L3 two rows as
+// before), the settings changed while playing, Italian labels; a Classic song with only the hats' pianoroll: one look
+// and one height per section, Random as rollLooks, Monitor's hats panel the same look, a fast video's widget the same
+// look and height as the editor at each section. ONE_SHOTS=<dir>: pictures of every look in light and dark (editor,
+// Monitor, a fast video frame). CW_ONLY=onerow runs only this
+const ONE = '$: s("[~ hh]*4").gain(0.1)._pianoroll()\n$: s("hh*8").gain("0.5 0.15 0.3 0.15")._pianoroll()\n$: s("hh*8, [~ oh]*2")._pianoroll()';
+const HATS_ONLY = { on: true, max: 4, appKinds: 1, v: 2, instruments: Object.fromEntries(['bass', 'lead', 'drums', 'arp', 'hats', 'pad', 'fx', 'voice'].map(k => [k, { on: k === 'hats', primary: 'pianoroll', secondary: [] }])) };
+async function oneRow(browser) {
+  const W = await import(require('path').resolve(__dirname, '../src/live/widgets.js'));
+  const D = W.widgetSettings(null), oneRows = page => page.evaluate(() => Object.fromEntries([...(globalThis.codingMiskOneRow || new Map())].map(([k, v]) => [k.replace(/^.*_widget__/, ''), v])));
+  const typed = async (page, code = ONE) => page.evaluate(async code => {
+    const e = document.querySelector('strudel-editor').editor;
+    globalThis.codingMiskOneRow = new Map();
+    e.setCode(`setcpm(30)\n${code}`); await e.evaluate(); await new Promise(r => setTimeout(r, 2500));
+    return { err: String(e.repl.state.evalError || ''), heights: Object.fromEntries([...document.querySelectorAll('#edhost canvas[id*="_widget_"]')].map(c => [c.id.replace(/^.*_widget__/, ''), parseFloat(c.style.height)])) };
+  }, code);
+  // typed lines
+  {
+    const { page, errors } = await open(browser, { widgets: { on: true } });
+    const r = await typed(page), o = await oneRows(page), L2 = o.pianoroll_1;
+    check(!r.err && r.heights.pianoroll_0 === 18 && r.heights.pianoroll_1 === 36 && r.heights.pianoroll_2 === 36, 'one-row: L1 at half the row height (18 px), L2 and L3 at 36 px, no evalError', `${r.err} ${JSON.stringify(r.heights)}`);
+    check(o.pianoroll_0 && o.pianoroll_0.look === 'thin' && L2 && W.ROLL_LOOKS.includes(L2.look) && L2.look === W.rollLooks(D, L2.section + 1, L2.seed)[L2.section] && !o.pianoroll_2, 'one-row: L1 Thin, L2 the section\'s Random look (with "Widget notes: Always full"), L3 drawn by Strudel as before', JSON.stringify(Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v.look]))));
+    // the settings changed while it plays: the looks change at once, no reload
+    await page.click('#open-settings'); await sleep(600);
+    const gen = page.locator('#set-widgets [data-cw-sec="general"]');
+    if (!(await gen.evaluate(e => e.open))) await gen.locator('> summary').click();
+    const labels = await page.locator('#set-widgets').textContent();
+    check(/Pianoroll a una riga, volume uguale/.test(labels) && /Pianoroll a una riga, volume che varia/.test(labels) && /Sottile/.test(labels) && /Trasparenza/.test(labels) && /A caso/.test(labels), 'one-row settings: both rows in Italian, with their choices');
+    await page.locator('#set-widgets [data-cw-roll-varied="height"]').click(); await page.locator('#set-widgets [data-cw-roll-equal="full"]').click(); await sleep(800);
+    const o2 = await oneRows(page), S = await page.evaluate(() => JSON.parse(localStorage.getItem('coding-misk-code-widgets')));
+    check(S.rollVaried === 'height' && S.rollEqual === 'full' && o2.pianoroll_1.look === 'height' && o2.pianoroll_0.look === 'full', 'one-row settings: saved, and the editor follows them while playing', `${S.rollVaried} ${S.rollEqual} ${o2.pianoroll_1.look} ${o2.pianoroll_0.look}`);
+    check(!errors.length, 'no page errors (one-row typed lines)', errors.join('; '));
+    await page.close();
+  }
+  // a Classic song: per section, editor and Monitor
+  const song = 'luci-rosse', bars = [1, 5, 9, 13, 25, 31, 41, 45, 55, 57], editor = {};
+  {
+    const { page, errors } = await open(browser, { widgets: HATS_ONLY, look: 'monitor' });
+    await page.locator('#track-pick').selectOption(song); await sleep(1500);
+    // (the Live build on: the code changes at each section, so the fast video's segments carry each section's line)
+    if ((await page.getAttribute('#live-toggle', 'aria-pressed')) !== 'true') { await page.click('#live-toggle'); await sleep(1500); }
+    // (a song brings its own look: Monitor is chosen after it)
+    await page.locator('#looks').selectOption('monitor'); await sleep(300);
+    await page.click('#play'); await sleep(3000);
+    for (const b of bars) {
+      await page.evaluate(b => globalThis.codingMiskCaptions.seek(b - 1), b); await sleep(2600);
+      const o = (await oneRows(page)).pianoroll_0, st = await page.evaluate(() => (globalThis.codingMiskStageRoll || {}).hats || null);
+      editor[b] = o ? { look: o.look, height: o.height, section: o.section, span: o.span.join('-'), stage: st && st.look, stageRows: st && st.rows } : null;
+    }
+    const secs = {};
+    for (const b of bars) if (editor[b]) (secs[editor[b].section] ||= []).push(editor[b]);
+    const stable = Object.values(secs).every(l => l.every(x => x.look === l[0].look && x.height === l[0].height && x.span === l[0].span));
+    check(bars.every(b => editor[b]) && stable, 'one-row song: one look and one height per section in the editor', JSON.stringify(editor));
+    const varied = Object.entries(secs).filter(([, l]) => !['thin', 'full'].includes(l[0].look));
+    check(varied.length > 0 && varied.every(([k, l]) => l[0].look === W.rollLooks(D, +k + 1, song)[+k]), 'one-row song: a varying section takes its look from rollLooks and the song\'s seed', varied.map(([k, l]) => `${k}:${l[0].look}`).join(' '));
+    // (the stage draws one panel per instrument: a section with two hats lines of different sounds keeps the roll of before)
+    check(bars.every(b => !editor[b] || editor[b].stage === editor[b].look || editor[b].stageRows > 1) && bars.filter(b => editor[b] && editor[b].stage === editor[b].look).length >= 4, 'one-row song: Monitor\'s hats panel shows the editor\'s look in each section (two rows: as before)', bars.map(b => `${b}:${editor[b] && editor[b].stage}/${editor[b] && editor[b].stageRows}`).join(' '));
+    check(!errors.length, 'no page errors (one-row song)', errors.join('; '));
+    await page.close();
+  }
+  // the fast video of the same song: the widget's look and height at each section as in the editor
+  {
+    const { page, errors } = await open(browser, { widgets: HATS_ONLY });
+    await page.locator('#track-pick').selectOption(song); await sleep(1500);
+    if ((await page.getAttribute('#live-toggle', 'aria-pressed')) !== 'true') { await page.click('#live-toggle'); await sleep(1500); }
+    const downloads = []; page.on('download', d => downloads.push(d));
+    await page.evaluate(() => {
+      localStorage.setItem('coding-misk-export-speed', JSON.stringify('fast')); localStorage.setItem('coding-misk-out-kind', JSON.stringify('video'));
+      localStorage.setItem('coding-misk-video', JSON.stringify({ layout: 'code-widgets', quality: '720p30', card: 'never', soulPanel: false, visual: 'fixed:monitor', soul: 'off', realScope: 'auto' }));
+      globalThis.codingMiskFastRolls = {};
+    });
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(600);
+    const t0 = Date.now();
+    await page.click(`#songs [data-song-id="${song}"] [data-act="export"]`); await sleep(1500);
+    while (Date.now() - t0 < 600000 && await page.evaluate(() => globalThis.codingMiskExport.job)) await sleep(400);
+    await sleep(1500);
+    const fast = await page.evaluate(() => globalThis.codingMiskFastRolls || {}), stage = await page.evaluate(() => (globalThis.codingMiskStageRoll || {}).hats || null);
+    // (the bars where the video's code shows the widget too: its typing between two steps may differ from the editor's)
+    const both = bars.filter(b => editor[b] && fast[b]), diff = both.filter(b => fast[b].look !== editor[b].look || fast[b].height !== editor[b].height);
+    check(both.length >= bars.length / 2 && both.some(b => !['thin', 'full'].includes(editor[b].look)) && !diff.length, 'one-row fast video: the same look and height as the editor at each section', diff.map(b => `${b}: ${JSON.stringify(fast[b])} vs ${editor[b].look} ${editor[b].height}`).join('; ') || both.map(b => `${b}:${fast[b].look}`).join(' '));
+    check(stage && stage.look === editor[57].look, 'one-row fast video: Monitor\'s hats panel in the video with the last section\'s look', JSON.stringify(stage));
+    const d = downloads.find(x => /\.(mp4|webm)$/.test(x.suggestedFilename()));
+    if (d && process.env.ONE_SHOTS) {
+      const file = require('path').join(require('os').tmpdir(), `onerow-${Date.now()}.mp4`); await d.saveAs(file);
+      const dur = +require('child_process').execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]).toString().trim();
+      require('child_process').execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(Math.max(0, dur - 5.5)), '-i', file, '-frames:v', '1', `${process.env.ONE_SHOTS}/video-veloce-ultima-sezione.png`]);
+      require('child_process').execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '20', '-i', file, '-frames:v', '1', `${process.env.ONE_SHOTS}/video-veloce-sottile.png`]);
+    }
+    check(!errors.length, 'no page errors (one-row fast video)', errors.join('; '));
+    await page.close();
+  }
+  // pictures of every look, light and dark: the editor (typed lines) and Monitor (the song's hats at a section)
+  if (process.env.ONE_SHOTS) {
+    const dir = process.env.ONE_SHOTS;
+    for (const ui of ['light', 'neon']) for (const [name, eq, va, bar] of [['sottile', 'thin', 'height', 9], ['pieno', 'full', 'height', 9], ['altezza', 'thin', 'height', 54.5], ['trasparenza', 'thin', 'alpha', 54.5], ['entrambe', 'thin', 'both', 54.5]]) {
+      let { page } = await open(browser, { widgets: { ...HATS_ONLY, rollEqual: eq, rollVaried: va }, ui, width: 1100, height: 800, look: 'monitor' });
+      // (the editor: all three lines, whatever the instruments: typed code keeps its calls)
+      await typed(page); await sleep(400);
+      await page.evaluate(() => { const c = document.querySelector('#edhost [id*="_widget_"]'); if (c) c.scrollIntoView({ block: 'center' }); }); await sleep(300);
+      await page.locator('#edhost').screenshot({ path: `${dir}/editor-${name}-${ui === 'light' ? 'chiaro' : 'scuro'}.png` });
+      await page.close();
+      ({ page } = await open(browser, { widgets: { ...HATS_ONLY, rollEqual: eq, rollVaried: va }, ui, width: 1100, height: 800, look: 'monitor' }));
+      await page.locator('#track-pick').selectOption(song); await sleep(1500);
+      await page.locator('#looks').selectOption('monitor'); await sleep(300);
+      await page.click('#play'); await sleep(2500);
+      // (the last section, bars 55 to 58, is short: the picture a second and a half in)
+      await page.evaluate(b => globalThis.codingMiskCaptions.seek(b), bar); await sleep(bar > 50 ? 1500 : 3000);
+      await page.locator('#stage').screenshot({ path: `${dir}/monitor-${name}-${ui === 'light' ? 'chiaro' : 'scuro'}.png` });
+      await page.close();
+    }
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
+  if (process.env.CW_ONLY === 'onerow') { await oneRow(browser); await browser.close(); console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed'); process.exit(failed ? 1 : 0); }
   if (process.env.CW_ONLY === 'migration') { await migration(browser); await browser.close(); console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed'); process.exit(failed ? 1 : 0); }
   if (process.env.CW_ONLY === 'churn') { await churn(browser); await browser.close(); console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed'); process.exit(failed ? 1 : 0); }
 
@@ -446,6 +562,7 @@ async function migration(browser) {
 
   await churn(browser);
   await migration(browser);
+  await oneRow(browser);
 
   await browser.close();
   console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed');

@@ -466,8 +466,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       const items = S.stream.slice(S.onAir, S.onAir + 2), made = !!(ahead && ahead.p && sameWindow(ahead.key, windowKey(items)));
       changed = { ahead: changed.ahead + (made ? 1 : 0), here: changed.here + (made ? 0 : 1), p: made ? ahead.p : windowPlayable() };
       player.swap(changed.p);
-      // (the radio drawn in a task of its own)
-      setTimeout(() => render(), 0);
+      // (the radio drawn in a task of its own, the console in another)
+      setTimeout(() => render({ split: true }), 0);
     } else {
       changeAhead(cyc);
       if (performance.now() - S.lastCard > 250) { S.lastCard = performance.now(); renderNow(cyc); }
@@ -1927,8 +1927,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     return `${item.custom ? SLIDERS : ''}<span>${esc(parts.join(' · '))}</span>`;
   }
   let customOpen = store.get('coding-misk-radio-custom-open', true) !== false;
-  function render() {
+  // split (#82, the natural song change): the console is drawn in a task of its own after the rest; meanwhile the old
+  // console stays in place (no empty frame)
+  function render({ split = false } = {}) {
     const on = !!S;
+    const oldSteer = split ? root.querySelector('#radio-steer') : null;
     const paused = on && S.paused !== undefined, tip = k => `title="${esc(t(k))}"`;
     // a die: kind, tooltip key, optional visible label; the tooltip adds the seed of the last throw
     const die = (kind, key, label = '', k = '') => dieHtml({ t, esc, lastDice }, kind, key, label, k);
@@ -2000,7 +2003,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     </div>`;
     steerKey = '';
     renderNow();
-    renderSteer(true);
+    const fresh = oldSteer && root.querySelector('#radio-steer');
+    if (fresh && oldSteer.dataset.k !== undefined) { fresh.replaceWith(oldSteer); const mine = S; setTimeout(() => { if (S === mine && root.contains(oldSteer)) renderSteer(true); }, 0); }
+    else renderSteer(true);
     player.renderVolume();
   }
 

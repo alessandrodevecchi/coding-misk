@@ -233,7 +233,9 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         ${row(t('cwRoll'), seg('data-cw-roll', [['pianoroll', 'pianoroll'], ['punchcard', 'punchcard']], S.roll), t('helpCwRoll'))}
         ${row(t('cwOrder'), order, t('cwOrderHint'))}
         ${row(t('cwShare'), `<span class="cw-unit"><input type="number" data-cw-num="share" min="0" max="100" step="5" value="${S.share}" data-no-knob> %</span>`, t('cwShareHint'))}
-        ${row(t('cwNotes'), seg('data-cw-notes', [['volume', t('cwNotes:volume')], ['full', t('cwNotes:full')]], S.notes), t('cwNotesHint'))}`)}
+        ${row(t('cwNotes'), seg('data-cw-notes', [['volume', t('cwNotes:volume')], ['full', t('cwNotes:full')]], S.notes), t('cwNotesHint'))}
+        ${row(t('cwRollEqual'), seg('data-cw-roll-equal', [['thin', t('cwRollEqual:thin')], ['full', t('cwRollEqual:full')]], S.rollEqual), t('cwRollEqualHint'))}
+        ${row(t('cwRollVaried'), seg('data-cw-roll-varied', [['height', t('cwRollVaried:height')], ['alpha', t('cwRollVaried:alpha')], ['both', t('cwRollVaried:both')], ['random', t('cwRollVaried:random')]], S.rollVaried), t('cwRollVariedHint'))}`)}
       ${sec('muted', `${row(t('cwWindow'), `<select data-cw-window data-no-knob>${CW_WINDOWS.map(w => opt(String(w), String(S.window), w === 'always' ? t('cwWindow:always') : t('cwWindow:n', { n: w }))).join('')}</select>`, t('cwWindowHint'))}
         ${row(t('cwDim'), seg('data-cw-dim', [['1', t('cwYes')], ['0', t('cwNo')]], S.dim ? '1' : '0'), t('cwDimHint'))}`)}
       ${sec('widgets', `<p class="hint muted">${esc(t('cwWidgetsHint'))}</p><div class="cw-checks">${WIDGETS.map(w => check(`data-cw-widget="${w}"`, S.widgets[w], w)).join('')}</div>`)}
@@ -346,6 +348,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (b.dataset.cwOn) { setCw(S => { S.on = b.dataset.cwOn === '1'; }); return render(); }
     if (b.dataset.cwRoll) { setCw(S => { S.roll = b.dataset.cwRoll; }); return render(); }
     if (b.dataset.cwNotes) { setCw(S => { S.notes = b.dataset.cwNotes; }); return render(); }
+    if (b.dataset.cwRollEqual) { setCw(S => { S.rollEqual = b.dataset.cwRollEqual; }); return render(); }
+    if (b.dataset.cwRollVaried) { setCw(S => { S.rollVaried = b.dataset.cwRollVaried; }); return render(); }
     if (b.dataset.cwDim) { setCw(S => { S.dim = b.dataset.cwDim === '1'; }); return render(); }
     if (b.dataset.cwMove) { const k = b.dataset.cwMove, d = +b.dataset.dir; setCw(S => { const i = S.order.indexOf(k), j = i + d; if (i >= 0 && j >= 0 && j < S.order.length) [S.order[i], S.order[j]] = [S.order[j], S.order[i]]; }); render(); const f = root.querySelector(`[data-cw-move="${k}"][data-dir="${d}"]:not([disabled])`) || root.querySelector(`[data-cw-move="${k}"]:not([disabled])`); if (f) f.focus(); return; }
     if (b.dataset.cwSec2) { const k = b.dataset.cwSec2, w = b.dataset.w; setCw(S => { const I = S.instruments[k], has = I.secondary.includes(w); I.secondary = has ? I.secondary.filter(x => x !== w) : [...I.secondary, w]; }); return render(); }

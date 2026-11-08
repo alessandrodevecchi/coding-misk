@@ -14,7 +14,11 @@ export const pitchesOf = list => [...new Set(list.map(n => n[2]))].sort((a, b) =
 // pianoroll and punchcard: one row per pitch used (fold), the playhead in the middle.
 // o: { span (cycles, 4), punch, full (notes at full opacity), on, off, head (colours), px (line scale), minW, pitches }
 // → the number of notes drawn
+// pianoroll-one-row D4, D6: o.look ('thin', 'full', 'height', 'alpha', 'both') draws one row, every note on it, its level
+// its volume over o.top (capped at 1; hits of 0.001 or less not drawn); o.half: Thin as a centred band of half the box
+// (the stage's panels). Without o.look, exactly as before.
 export function roll(g, box, list, cyc, o) {
+  if (o.look) return oneRow(g, box, list, cyc, o);
   const span = o.span || 4, px = o.px || 1;
   const pitches = o.pitches || pitchesOf(list);
   const rows = Math.max(1, pitches.length), rh = box.h / rows;
@@ -27,6 +31,31 @@ export function roll(g, box, list, cyc, o) {
     g.globalAlpha = alphaOf(n, o.full);
     g.fillStyle = on ? o.on : o.off;
     if (o.punch) { g.beginPath(); g.arc(x + w / 2, y + rh / 2, Math.min(w, rh) * 0.4, 0, Math.PI * 2); g.fill(); } else g.fillRect(x, y + 1, w - 1, Math.max(1, rh - 2));
+  }
+  g.globalAlpha = 1;
+  if (o.head) { g.fillStyle = o.head; g.fillRect(box.x + box.w / 2, box.y, 1.5 * px, box.h); }
+  return shown.length;
+}
+
+// the one-row looks (D3, D4): Thin ticks of equal size; Full bars at full strength; Height bars as tall as their level
+// from the bottom (at least 20%); Transparency (alpha) full bars with the level as opacity (at least 0.2); Both the
+// height and an opacity of 0.35 + 0.65 × level
+export function oneRow(g, box, list, cyc, o) {
+  const span = o.span || 4, px = o.px || 1, look = o.look;
+  const shown = notesAround(list, cyc, span).filter(n => n[3] > 0.001);
+  const top = o.top > 0 ? o.top : Math.max(1e-6, ...shown.map(n => n[3]));
+  const by = look === 'thin' && o.half ? box.y + box.h / 4 : box.y, bh = look === 'thin' && o.half ? box.h / 2 : box.h, full = Math.max(1, bh - 2);
+  for (const n of shown) {
+    const x = box.x + ((n[0] - (cyc - span / 2)) / span) * box.w, w = Math.max(o.minW ?? 2, ((n[1] - n[0]) / span) * box.w);
+    const lv = Math.min(1, n[3] / top), on = n[0] <= cyc && cyc < n[1];
+    let h = full, a = 1, bw = w - 1;
+    if (look === 'thin') bw = Math.max(1, Math.min(w - 2, 3 * px));
+    else if (look === 'height') h = Math.max(0.2, lv) * full;
+    else if (look === 'alpha') a = Math.max(0.2, lv);
+    else if (look === 'both') { h = Math.max(0.2, lv) * full; a = 0.35 + 0.65 * lv; }
+    g.globalAlpha = a;
+    g.fillStyle = on ? o.on : o.off;
+    g.fillRect(x, by + bh - 1 - h, bw, h);
   }
   g.globalAlpha = 1;
   if (o.head) { g.fillStyle = o.head; g.fillRect(box.x + box.w / 2, box.y, 1.5 * px, box.h); }

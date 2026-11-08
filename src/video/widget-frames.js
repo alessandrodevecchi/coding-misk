@@ -8,6 +8,7 @@
 // else the hidden mixer's entry for the line (`miskMix(x, [[from, to, { analyze: '…' }], …])`)
 import * as paint from '../visuals/widget-painters.js';
 import { widgetFrame, widgetSize, paintWidget } from '../widgets/app-widgets.js';
+import { rollThinHeight } from '../live/widgets.js';
 
 const CALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/;
 const NOTE = ['pianoroll', 'punchcard', 'spiral', 'pitchwheel'];
@@ -40,16 +41,16 @@ export function instrumentOfLine(text, a, run) {
   return null;
 }
 // the note widgets and the scope and spectrum instruments of a fast video's segments
-// → { noteKeys: Set, instOf: Map(key → instrument), instruments: [..] }
+// → { noteKeys: Set, rollKeys: Set (the pianorolls, pianoroll-one-row), instOf: Map(key → instrument), instruments: [..] }
 export function widgetPlan(segments) {
-  const noteKeys = new Set(), instOf = new Map();
+  const noteKeys = new Set(), rollKeys = new Set(), instOf = new Map();
   for (const s of segments) for (const w of widgetLines(s.code)) {
     // (the app widgets draw from the stage notes, code-over-visual D8)
     if (w.type === 'hitgrid' || w.type === 'tonecloud') continue;
-    if (NOTE.includes(w.type)) noteKeys.add(w.key);
+    if (NOTE.includes(w.type)) { noteKeys.add(w.key); if (w.type === 'pianoroll') rollKeys.add(w.key); }
     else { const i = instrumentOfLine(s.code.slice(w.a, w.b), w.a, s.run || null); if (i) instOf.set(w.key, i); }
   }
-  return { noteKeys, instOf, instruments: [...new Set(instOf.values())] };
+  return { noteKeys, rollKeys, instOf, instruments: [...new Set(instOf.values())] };
 }
 
 // notes: key → [[begin, end, pitch, level]] (cycles); waves: instrument → { sr, data } (mono, the instrument alone);
@@ -58,7 +59,9 @@ export function widgetPlan(segments) {
 // the fallback). The pictures come from the shared painters (src/visuals/widget-painters.js, widgets-on-stage D1).
 // app (code-over-visual D8): the app widgets' { S (their settings), notes(c0, c1) (the stage notes), P (their palette),
 // ctx, options(index, type) (a call's own options) }, or null
-export function fastWidgets({ notes = {}, waves = {}, instOf = new Map(), S, P, app = null }) {
+// rollAt(key, cyc) (pianoroll-one-row D2): the one-row look of a pianoroll's line at a cycle, { look, top } or null (two
+// or more rows: as before); the canvas is half the row height for Thin, as in the editor
+export function fastWidgets({ notes = {}, waves = {}, instOf = new Map(), S, P, app = null, rollAt = null }) {
   const cache = new Map(), Z = S.sizes, full = S.notes === 'full', DPR = 2;
   const canvasFor = (id, w, h) => {
     let c = cache.get(id);
@@ -69,10 +72,10 @@ export function fastWidgets({ notes = {}, waves = {}, instOf = new Map(), S, P, 
     return c;
   };
   const whole = c => ({ x: 0, y: 0, w: c.width, h: c.height });
-  function roll(c, list, cyc, punch) {
+  function roll(c, list, cyc, punch, one = null) {
     const g = c.getContext('2d');
     g.clearRect(0, 0, c.width, c.height);
-    const shown = paint.roll(g, whole(c), list, cyc, { span: 4, punch, full, on: P.a1, off: P.muted, head: P.ink, px: DPR });
+    const shown = paint.roll(g, whole(c), list, cyc, { span: 4, punch, full, on: P.a1, off: P.muted, head: P.ink, px: DPR, ...(one ? { look: one.look, top: one.top } : {}) });
     // (for the checks: the most notes a note widget has drawn at once)
     globalThis.codingMiskFastNotes = Math.max(globalThis.codingMiskFastNotes || 0, shown);
   }
@@ -117,7 +120,12 @@ export function fastWidgets({ notes = {}, waves = {}, instOf = new Map(), S, P, 
       }
       if (type === 'spectrum') { const c = canvasFor(id, Z.spectrum, Z.spectrum); spectrum(c, samples(instOf.get(key), t, 256, master)); return c; }
       const list = notes[key] || [];
-      if (type === 'pianoroll' || type === 'punchcard') { const c = canvasFor(id, 500, Z.row); roll(c, list, cyc, type === 'punchcard'); return c; }
+      if (type === 'pianoroll' || type === 'punchcard') {
+        const one = type === 'pianoroll' && rollAt ? rollAt(key, cyc) : null;
+        // (for the checks: the one-row look of each bar's pianorolls)
+        if (rollAt) (globalThis.codingMiskFastRolls ||= {})[Math.floor(cyc)] = { look: one ? one.look : null, height: one && one.look === 'thin' ? rollThinHeight(Z.row) : Z.row };
+        const c = canvasFor(id, 500, one && one.look === 'thin' ? rollThinHeight(Z.row) : Z.row); roll(c, list, cyc, type === 'punchcard', one); return c;
+      }
       if (type === 'spiral') { const c = canvasFor(id, Z.spiral, Z.spiral); spiral(c, list, cyc); return c; }
       if (type === 'pitchwheel') { const c = canvasFor(id, Z.round, Z.round); wheel(c, list, cyc); return c; }
       if ((type === 'hitgrid' || type === 'tonecloud') && app) {
