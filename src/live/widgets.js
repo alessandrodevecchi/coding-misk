@@ -4,6 +4,7 @@
 // when it is shown (live-code.js `codeAt`, main.js `codeFor`). Pure apart from `installWidgets` and `linkAnalysers`,
 // which touch Strudel's Pattern and analysers in a page (and stub the methods in Node and on the render page).
 import { hashString } from '../endless/random.js';
+import { roll as paintRoll } from '../visuals/widget-painters.js';
 
 export const CW_KEY = 'coding-misk-code-widgets';
 // the six inline widgets of @strudel/codemirror, in the order the Settings card shows them
@@ -34,7 +35,11 @@ export const CW_DEFAULTS = Object.freeze({
   params: { labels: false, smear: false, fold: true, steady: true, fade: true },
   // px: the height of the row widgets (Strudel 60), the round ones (Strudel 200 and 275), spiral, spectrum
   sizes: { row: 36, round: 120, spiral: 200, spectrum: 120 },
+  // pianoroll-one-row D7: a pianoroll with one row, its hits as loud (thin ticks or full blocks) or with accents (height,
+  // transparency, both, or one of the three per section)
+  rollEqual: 'thin', rollVaried: 'random',
 });
+export const ROLL_EQUAL = ['thin', 'full'], ROLL_VARIED = ['height', 'alpha', 'both', 'random'], ROLL_LOOKS = ['height', 'alpha', 'both'];
 export const CW_SIZE_LIMITS = { row: [20, 120], round: [60, 300], spiral: [80, 400], spectrum: [40, 300] };
 
 const clampInt = (v, lo, hi, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
@@ -90,7 +95,93 @@ export function widgetSettings(raw) {
     instruments,
     params: Object.fromEntries(CW_PARAMS.map(p => [p, typeof (r.params || {})[p] === 'boolean' ? r.params[p] : D.params[p]])),
     sizes: Object.fromEntries(Object.entries(D.sizes).map(([k, v]) => [k, clampInt((r.sizes || {})[k], ...CW_SIZE_LIMITS[k], v)])),
+    rollEqual: ROLL_EQUAL.includes(r.rollEqual) ? r.rollEqual : D.rollEqual,
+    rollVaried: ROLL_VARIED.includes(r.rollVaried) ? r.rollVaried : D.rollVaried,
   };
+}
+
+// ---------- one-row pianoroll (pianoroll-one-row) ----------
+// The rules shared by the three painters of a pianoroll (the editor's wrapper below, the stage panels, the fast video),
+// so they cannot drift: the row of a hit, the reference span, the shape of a line in it (rows, equal volume, loudest
+// hit) and the look of a section. Pure.
+export const ROLL_SPAN = 8, ROLL_EQUAL_RATIO = 0.95, ROLL_SILENT = 0.001;
+// the value Strudel's pianoroll sorts its rows by (@strudel/draw getValue): freq, else note or n, else the sound
+export function rollRow(v) {
+  if (!v || typeof v !== 'object') return v;
+  if (v.freq) return Math.round((12 * Math.log2(v.freq / 440) + 69) * 100) / 100;
+  const note = v.note ?? v.n;
+  if (typeof note === 'string') return note.toLowerCase();
+  if (typeof note === 'number') return note;
+  return v.s !== undefined ? `_${v.s}` : JSON.stringify(v);
+}
+// a hit's volume as the line writes it: gain × velocity (1 when absent)
+export const rollLevel = v => (v && typeof v === 'object' ? (v.gain ?? 1) * (v.velocity ?? 1) : 1);
+// the notes [begin, end, row, volume] of the haps that start (Strudel haps)
+export const rollNotesOf = haps => haps.filter(h => h.whole && (!h.hasOnset || h.hasOnset())).map(h => [Number(h.whole.begin), Number(h.whole.end), rollRow(h.value), rollLevel(h.value)]);
+// D2: the reference span of a line in a section { start, end }: the first 8 cycles from the later of the section's
+// start and the bar the line's current code starts, cut at the section's end
+export function rollSpan(sec, codeStart = 0) {
+  const a = Math.max(sec.start, Number.isFinite(codeStart) ? codeStart : sec.start);
+  return [a, Math.min(sec.end, a + ROLL_SPAN)];
+}
+// D1, D3: the shape of a line from its notes in the span: { rows (distinct rows of the audible hits that start in the
+// span), equal (the quietest at least 95% of the loudest), top (the loudest) }
+export function rollShape(notes, span) {
+  const rows = new Set();
+  let lo = Infinity, hi = 0;
+  for (const n of notes || []) {
+    if (!(n[0] >= span[0] && n[0] < span[1]) || !(n[3] > ROLL_SILENT)) continue;
+    rows.add(n[2]); lo = Math.min(lo, n[3]); hi = Math.max(hi, n[3]);
+  }
+  return { rows: rows.size, equal: !rows.size || lo >= ROLL_EQUAL_RATIO * hi, top: hi };
+}
+// D1: the looks of the first n sections for Random: one of height, alpha, both per section by the seed, drawn again when
+// it would make three sections in a row the same (S.rollVaried other than random: that look everywhere)
+const looksMemo = new Map();
+export function rollLooks(S, n, seed = '') {
+  const fixed = S && ROLL_LOOKS.includes(S.rollVaried) ? S.rollVaried : null;
+  if (fixed) return Array.from({ length: n }, () => fixed);
+  const out = [];
+  for (let k = 0; k < n; k++) {
+    let pick = ROLL_LOOKS[Math.floor(rand(seed, 'cw-roll-look', k) * ROLL_LOOKS.length)];
+    if (k >= 2 && out[k - 1] === pick && out[k - 2] === pick) { const other = ROLL_LOOKS.filter(l => l !== pick); pick = other[Math.floor(rand(seed, 'cw-roll-look-again', k) * other.length)]; }
+    out.push(pick);
+  }
+  return out;
+}
+// D1: the look of a line in a section: null (no row or two or more rows: the roll as before), 'thin' or 'full' (equal
+// volume), 'height', 'alpha' or 'both' (varying volume; with Random the section's look, the same for every line)
+export function rollLook(S, seed, section, shape) {
+  if (!shape || shape.rows !== 1) return null;
+  if (shape.equal) return S && S.rollEqual === 'full' ? 'full' : 'thin';
+  if (S && ROLL_LOOKS.includes(S.rollVaried)) return S.rollVaried;
+  const k = Math.max(0, Math.floor(Number(section) || 0)), key = `${seed}\u0000${k}`;
+  if (!looksMemo.has(key)) { if (looksMemo.size > 512) looksMemo.clear(); looksMemo.set(key, rollLooks({ rollVaried: 'random' }, k + 1, seed)[k]); }
+  return looksMemo.get(key);
+}
+// D4: the editor widget's height for Thin (half the row height, at least 12 px)
+export const rollThinHeight = row => Math.max(12, Math.round((Number(row) || 36) / 2));
+// a line as a key: without its widget call and its spaces (the same as the fast video's lineKey)
+export const rollKey = text => String(stripWidgets(String(text || ''))).replace(/\s+/g, '');
+// the keys of the pattern lines of a code
+export const rollKeys = code => new Set(chainLines(String(code || '')).filter(l => PATTERN.test(l)).map(rollKey));
+// D2: the bar a line's current code starts, within a section. steps: the bars where the code changes (the live build's
+// steps, 0 first, low first, as the fast video's segments); keysAt(step): the line keys of the code from that step.
+// The step of the bar, walked back while the step before still has the line and the section started before it.
+// null: the line is not in the code of its step (code typed by hand: the caller uses the bar it was evaluated at)
+export function rollCodeStart(steps, bar, key, secStart, keysAt) {
+  const list = steps && steps.length ? steps : [0];
+  let i = 0;
+  for (let k = 0; k < list.length; k++) if (list[k] <= bar + 1e-9) i = k;
+  if (!keysAt(list[i]).has(key)) return null;
+  while (i > 0 && list[i] > secStart && keysAt(list[i - 1]).has(key)) i--;
+  return Math.max(secStart, list[i]);
+}
+// the pattern line of a code that holds the place `at` (a hap's location), its text, or null
+export function lineAtOffset(code, at) {
+  let pos = 0;
+  for (const l of chainLines(String(code || ''))) { if (at >= pos && at < pos + l.length) return PATTERN.test(l) ? l : null; pos += l.length + 1; }
+  return null;
 }
 
 // a widget call at the end of a line, a continuation line of its own included (one level of nested brackets for options)
@@ -334,6 +425,8 @@ export function widgetOptions(S, theme = {}, width = 500) {
   const roll = { width: w, height: Z.row, fold: P.fold ? 1 : 0, labels: P.labels ? 1 : 0, smear: P.smear ? 1 : 0, active: a1, inactive: mu, playheadColor: fg, background: 'transparent' };
   return {
     notes: S.notes,
+    // pianoroll-one-row: the two settings, read by the editor's one-row painter at each frame
+    one: { rollEqual: S.rollEqual, rollVaried: S.rollVaried },
     scope: { width: w, height: Z.row, color: a1, ...(P.smear ? { smear: 0.5 } : {}) },
     pianoroll: roll,
     punchcard: { ...roll },
@@ -365,7 +458,11 @@ export function installWidgets(Pattern, getOpts = () => globalThis.miskWidgets) 
       f = function (id, options) {
         if (typeof id !== 'string') return orig.call(this, id, options);
         const W = getOpts() || {}, o = { ...(W[name] || {}), ...(options && typeof options === 'object' ? options : {}) };
-        const full = W.notes === 'full' && name !== 'scope' && name !== 'spectrum';
+        // pianoroll-one-row D5: a pianoroll with one row is drawn by the one-row painter, from the hits' real volume
+        // (whatever "Widget notes" says), at half the row height for Thin
+        const one = name === 'pianoroll' ? oneRowOf(this, W) : null;
+        if (one && rollLook(W.one, one.seed, one.section, one.shape) === 'thin') o.height = rollThinHeight(o.height || 36);
+        const full = W.notes === 'full' && name !== 'scope' && name !== 'spectrum' && !one;
         // the drawing methods Strudel's widget calls, wrapped for this call only: the canvas is kept, scope and
         // spectrum are not started (drawn below), the painters get full notes
         let ctx = null;
@@ -376,6 +473,7 @@ export function installWidgets(Pattern, getOpts = () => globalThis.miskWidgets) 
           P[m] = function (cfg) {
             if (cfg && cfg.ctx) ctx = cfg.ctx;
             if (own) return this;
+            if (one && m === 'pianoroll' && cfg && cfg.ctx && typeof this.draw === 'function') { this.draw(oneRowPainter(cfg.ctx, cfg.id, one, getOpts, o), { lookbehind: -2, lookahead: 2, id: cfg.id }); return this; }
             return keep[m].call(this, cfg);
           };
         }
@@ -403,6 +501,37 @@ export function installWidgets(Pattern, getOpts = () => globalThis.miskWidgets) 
     f.miskWidget = true;
     P[key] = f;
   }
+}
+// pianoroll-one-row D2, D5: the one-row shape of a pianoroll's pattern at an evaluation, or null (two or more rows, no
+// hit). W.roll (set by the app before each evaluation, rollContext): { code (the code evaluated), bar (the bar it is
+// for), section (index), start, end (the section's bars), seed, codeStart(key, line) (the bar the line's code starts) };
+// without it (a code outside a song) the span is the first 8 cycles
+export function oneRowOf(pat, W = {}) {
+  if (!pat || typeof pat.queryArc !== 'function') return null;
+  try {
+    const R = W.roll || null, sec = R ? { start: R.start, end: R.end } : { start: 0, end: Infinity };
+    let codeStart = sec.start;
+    if (R && R.codeStart && typeof R.code === 'string') {
+      // the line of the pattern: the place of one of its hits in the code evaluated
+      const probe = pat.queryArc(sec.start, Math.min(sec.end, sec.start + 4 * ROLL_SPAN)).find(h => h.context && h.context.locations && h.context.locations.length);
+      const line = probe ? lineAtOffset(R.code, probe.context.locations[0].start) : null;
+      if (line) codeStart = R.codeStart(rollKey(line), line);
+    }
+    const span = rollSpan(sec, codeStart), shape = rollShape(rollNotesOf(pat.queryArc(span[0], span[1])), span);
+    return shape.rows === 1 ? { shape, span, section: R ? R.section : 0, seed: R ? R.seed : '' } : null;
+  } catch (e) { return null; }
+}
+// D5, D6: the editor's one-row painter: the hits of the widget's id, 4 cycles with the playhead in the middle, drawn by
+// the shared paint.roll in the look of the settings read at each frame
+function oneRowPainter(ctx, id, one, getOpts, o) {
+  return (haps, time) => {
+    const c = ctx.canvas, W = getOpts() || {}, look = rollLook(W.one, one.seed, one.section, one.shape) || 'full', px = globalThis.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, c.width, c.height);
+    const list = rollNotesOf(haps.filter(h => h.hasTag && h.hasTag(id) && h.whole));
+    // (for the checks: the look, the scale and the span each one-row widget drew last)
+    (globalThis.codingMiskOneRow ||= new Map()).set(id, { look, top: one.shape.top, span: one.span, section: one.section, seed: one.seed, height: c.height / px, time });
+    paintRoll(ctx, { x: 0, y: 0, w: c.width, h: c.height }, list, time, { span: 4, look, top: one.shape.top, on: o.active || '#fff', off: o.inactive || '#888', head: o.playheadColor || '#fff', px });
+  };
 }
 // #79: the editor's block widgets of @strudel/codemirror (BlockWidget) say every widget equals every other (`eq()` is
 // always true) and hand CodeMirror the canvas itself. When a widget's id changes where CodeMirror does not rebuild the

@@ -52,6 +52,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Twelve built-in grooves: Techno pickup, Rolling kick (techno), Broken techno, Trance push, Trance pickup, House pickup, Rolling kick (house), Drift, Heartbeat, Phonk roll, Phonk half-time and Rock push.
 - Presets Strum (country guitar), Swell (ambient pad) and Two-feel (jazz bass).
 - Radio: a countdown badge next to Extend until it enters ("Extend +16 s · in 24 s").
+- One-row pianoroll looks: a pianoroll widget whose hits fall on one row draws thin ticks in a low strip when every hit is as loud, and shows accents by bar height, transparency or both, in the editor, on the stage panels and in videos.
+- Settings "One-row pianoroll, equal volume" (Thin, Full) and "One-row pianoroll, varying volume" (Height, Transparency, Both, Random) in the Code widgets card.
+- `npm run check:one-row-roll`.
 
 ### Changed
 

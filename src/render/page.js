@@ -19,6 +19,7 @@ import { installHelpers, useFns } from '../song/writer.js';
 import { loadLimiter, setMasterLevel, limiterDelay } from '../sounds/limiter.js';
 import { noteOf, stageInstOf } from '../visuals/stage-feed.js';
 import { codeBus } from '../decode/mix.js';
+import { rollNotesOf, rollShape } from '../live/widgets.js';
 
 const post = (m, transfer = []) => parent.postMessage({ codingMiskRender: true, ...m }, location.origin, transfer);
 // superdough's deprecation notices come once per voice: thousands of console lines slow the render down
@@ -93,7 +94,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   }
   post({ progress: 0, phase: 'schedule' });
   const R = repl({ transpiler, defaultOutput: () => {}, getTime: () => 0 });
-  const onsets = {}, skipped = new Set(), notes = {}, stage = stageNotes ? {} : null, lits = lit ? { codes: [], haps: [] } : null;
+  const onsets = {}, skipped = new Set(), notes = {}, rolls = {}, stage = stageNotes ? {} : null, lits = lit ? { codes: [], haps: [] } : null;
   // the haps that start in this block's window [from, end), from the segments it covers, in onset order (cut groups depend on it)
   const c0 = T.cycleAt(from), c1 = T.cycleAt(end), all = [];
   for (const seg of segments) {
@@ -111,6 +112,21 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
       if (!w) continue;
       hap.ensureObjectValue();
       (notes[w.key] ||= []).push([+hap.whole.begin.valueOf().toFixed(4), +hap.whole.end.valueOf().toFixed(4), pitchOf(hap.value), +((hap.value.gain ?? 1) * (hap.value.velocity ?? 1)).toFixed(3)]);
+    }
+    // pianoroll-one-row D2: the shape of each pianoroll line over its reference spans (wline.spans, from the app), by
+    // `key@span start`: rows, equal volume and the loudest hit, the same rules as the editor's
+    const spans = new Map();
+    for (const w of seg.wlines || []) for (const sp of w.spans || []) { const k = `${sp[0]}|${sp[1]}`; if (!spans.has(k)) spans.set(k, { sp, lines: [] }); spans.get(k).lines.push(w); }
+    for (const { sp, lines } of spans.values()) {
+      const todo = lines.filter(w => !rolls[`${w.key}@${sp[0]}`]);
+      if (!todo.length) continue;
+      const by = new Map(todo.map(w => [w, []]));
+      for (const hap of pattern.queryArc(sp[0], sp[1])) {
+        if (!hap.hasOnset()) continue;
+        const at = ((hap.context && hap.context.locations) || [])[0], w = at && todo.find(x => at.start >= x.a && at.start < x.b);
+        if (w) by.get(w).push(hap);
+      }
+      for (const [w, haps] of by) rolls[`${w.key}@${sp[0]}`] = rollShape(rollNotesOf(haps), sp);
     }
     for (const hap of pattern.queryArc(a, b, { _cps: T.cps(a) })) {
       if (!hap.hasOnset()) continue;
@@ -173,7 +189,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   }
   const buf = await ctx.startRendering();
   const channels = [buf.getChannelData(0).slice(lag), buf.getChannelData(1).slice(lag)];
-  post({ done: true, channels, sampleRate, onsets, notes, stageNotes: stage, lit: lits, skipped: [...skipped], replaced: [...replaced] }, channels.map(c => c.buffer));
+  post({ done: true, channels, sampleRate, onsets, notes, rolls, stageNotes: stage, lit: lits, skipped: [...skipped], replaced: [...replaced] }, channels.map(c => c.buffer));
 }
 
 addEventListener('message', e => {

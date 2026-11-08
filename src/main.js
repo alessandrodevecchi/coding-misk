@@ -113,7 +113,7 @@ import { createGrowthStore } from './live/growth-store.js';
 import GROWTH_HASH from 'virtual:growth-hash';
 import SONG_DURATIONS from './library/song-durations.json';
 import { startHardware } from './hardware.js';
-import { CW_KEY, CW_VERSION, APP_KINDS_VERSION, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom, guardEditorRanges, recoverEditor } from './live/widgets.js';
+import { CW_KEY, CW_VERSION, APP_KINDS_VERSION, widgetSettings, widgetMemory, widgetOptions, linkAnalysers, installWidgetDom, guardEditorRanges, recoverEditor, rollKeys, rollCodeStart, rollSpan, rollLook } from './live/widgets.js';
 import { SW_KEY, SW_VERSION, stageSettings, stageMapping, stageScopeInstruments, layerOn, toggleLayer, FULL_LOOKS } from './visuals/stage-settings.js';
 // the full-screen widget looks (widgets-on-stage D3)
 const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
@@ -766,13 +766,19 @@ ready.then(() => {
     try { return await evalInner(autostart); } finally { markMuted(); requestAnimationFrame(markMuted); }
   };
   const evalInner = async autostart => {
-    if (!(song && song.run)) { evaluatedCode = ed.code || ''; return plain(autostart); }
+    if (!(song && song.run)) {
+      evaluatedCode = ed.code || '';
+      { const s = sched(); globalThis.miskWidgets.roll = rollContext(song, codeFresh ? codeBar : Math.floor(s ? s.now() : 0), evaluatedCode); }
+      return plain(autostart);
+    }
     ed.flash();
     // the bar the code is for (the radio's hidden songs change with their own steps): the bar just shown by the
     // player, else the bar playing (code evaluated by hand)
     const s = sched(), bar = codeFresh ? codeBar : Math.floor(s ? s.now() : 0);
     codeFresh = false;
     evaluatedCode = song.run(ed.code || '', bar);
+    // pianoroll-one-row D2: the section, the seed and the code start of each line, for the one-row pianorolls
+    globalThis.miskWidgets.roll = rollContext(song, bar, evaluatedCode);
     await ed.repl.evaluate(evaluatedCode, autostart);
     if (cwLinks) cwLinks.refresh();
   };
@@ -849,6 +855,37 @@ const plainWidgets = (sg, bar, c) => {
   const at = b => Math.max(0, sg.meta.sectionAt(b)), opts = b => ({ S, bar: b, section: at(b), sections: sg.meta.sections.length, seed: sg.id || '' }), sec = sg.meta.sections[sg.meta.sectionAt(bar)];
   return plainMemory.place(c, opts(bar), { key: `${sg.id || ''}\u0000${JSON.stringify(S)}\u0000${c}`, start: sec ? sec.start : Math.ceil(bar), prep: b => ({ code: c, opts: opts(b) }) });
 };
+// pianoroll-one-row D2: the bars where a song's code changes (its live build's steps, the fast video's segments) and the
+// line keys of the code from each, kept per song
+const rollStepMemo = new WeakMap();
+function rollStepsOf(sg) {
+  let r = rollStepMemo.get(sg);
+  if (!r) {
+    const bars = sg.meta ? sg.meta.bars : 0, keys = new Map();
+    const steps = sg.build ? [...new Set([0, ...buildSteps(sg.build).map(x => x.at).filter(a => a > 0 && a < bars)])].sort((a, b) => a - b) : [0];
+    r = { steps, keysAt: at => { if (!keys.has(at)) { let k; try { k = rollKeys(codeFor(sg, at)); } catch (e) { k = new Set(); } keys.set(at, k); } return keys.get(at); } };
+    rollStepMemo.set(sg, r);
+  }
+  return r;
+}
+// a line typed by hand (not in the code of its step): its code starts at the bar it was first evaluated at in the section
+const rollHand = new Map();
+// the context of the one-row pianorolls of an evaluation (installWidgets reads globalThis.miskWidgets.roll): the
+// section at the bar the code is for, as the stage counts it (index and bounds), the song's seed, the code start of a line
+function rollContext(sg, bar, code) {
+  const cyc = bar + 1e-6, f = Math.floor(Math.max(0, bar) / 8) * 8, sec = stageSection(cyc) || { start: f, end: f + 8 }, info = stageSectionInfo(cyc);
+  const seed = (song && song.id) || '', R = sg && sg.meta && !sg.loop ? rollStepsOf(sg) : null;
+  return {
+    code, bar, section: info ? info.i : Math.floor(sec.start / 8), start: sec.start, end: sec.end, seed,
+    codeStart: key => {
+      const at = R ? rollCodeStart(R.steps, bar, key, sec.start, R.keysAt) : null;
+      if (at !== null) return at;
+      const k = `${seed}\u0000${sec.start}\u0000${key}`;
+      if (!rollHand.has(k)) { if (rollHand.size > 500) rollHand.clear(); rollHand.set(k, bar); }
+      return Math.max(sec.start, rollHand.get(k));
+    },
+  };
+}
 const codeFor = (sg, bar, keep = null) => (sg.run ? c => c : withVisuals)(sg.codeAt ? sg.codeAt(bar, keep) : keep && sg.codeKeep ? sg.codeKeep(keep) : plainWidgets(sg, bar, sg.code)).replace(/setcpm\([^)]*\)/, `setcpm(${+sg.meta.bpm[Math.max(0, Math.min(sg.meta.bars - 1, Math.floor(bar)))].toFixed(2)}/4)`);
 // code-widgets D6: the code of a playing song changed only between its equal start and end, in one transaction, so the
 // widgets and the lit notes of the lines left as they were stay (a full replacement removes every widget until the
@@ -1827,14 +1864,28 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   const cwS = cwSettings(), cwOn = cwS.on && withWidgets(frag ? frag.o.show : layout);
   let cw = null;
   if (cwOn) {
-    const plan = widgetPlan(segments), mark = list => list && list.map(s => ({ ...s, wlines: linesByKey(s.code, plan.noteKeys) }));
+    // pianoroll-one-row D2: each pianoroll line asks the render page for its shape over the reference span of every
+    // section it plays in (the code start from the segments, as the editor's from the live build's steps); a block asks
+    // only for the sections around it and the spans not known yet
+    const plan = widgetPlan(segments), rolls = {}, RT = tempoClock(sg.meta.bpm.map(Number)), rkeys = new Map();
+    const rsteps = segments.map(x => x.from), rkeysAt = a => { if (!rkeys.has(a)) { const x = segments.find(y => y.from === a); rkeys.set(a, rollKeys(x ? x.code : '')); } return rkeys.get(a); };
+    const rsecs = sg.meta.sections.map((x, i) => ({ i, start: x.start, end: x.start + x.len }));
+    const spanAt = (key, bar, sec) => rollSpan(sec, rollCodeStart(rsteps, bar, key, sec.start, rkeysAt) ?? Math.max(sec.start, bar));
+    const spansOf = (s, key, c0, c1) => rsecs.filter(x => x.end > Math.max(s.from, c0) && x.start < Math.min(s.to, c1)).map(x => spanAt(key, Math.max(s.from, x.start), x)).filter(sp => !rolls[`${key}@${sp[0]}`]);
+    const mark = (list, c0 = -Infinity, c1 = Infinity) => list && list.map(s => ({ ...s, wlines: linesByKey(s.code, plan.noteKeys).map(w => (plan.rollKeys.has(w.key) ? { ...w, spans: spansOf(s, w.key, c0, c1) } : w)) }));
+    const rollAt = (key, cyc) => {
+      const sec = rsecs[Math.max(0, sg.meta.sectionAt(Math.min(cyc, sg.meta.bars - 0.001)))];
+      if (!sec) return null;
+      const sp = spanAt(key, cyc, sec), shape = rolls[`${key}@${sp[0]}`], look = rollLook(cwS, sg.id || '', sec.i, shape);
+      return look ? { look, top: shape.top } : null;
+    };
     const at = job.segmentsAt;
-    job = { ...job, segments: mark(job.segments), segmentsAt: at ? (a, b) => mark(at(a, b)) : null };
+    job = { ...job, segments: mark(job.segments), segmentsAt: at ? (a, b) => mark(at(a, b), RT.cycleAt(a) - 1, RT.cycleAt(b) + 3) : null };
     const P = (() => { if (ct.roles) return { ...ct.roles.widget }; const cs = getComputedStyle(document.documentElement), v = k => cs.getPropertyValue(k.replace('--', '--dk-')).trim() || cs.getPropertyValue(k).trim(); return { ink: v('--ink') || '#fff', muted: v('--muted') || '#888', a1: v('--a1') || '#f4a', a2: v('--a2') || '#fb4' }; })();
     const waves = {}, notes = {}, seen = new Set();
     // the app widgets (code-over-visual D8) from the stage notes the render page sends with each block
     const fsn = () => globalThis.codingMiskFastStageNotes, appW = { S: awSettings(), P: ct.roles ? widgetPalette(ct.roles) : { band: P.ink === '#fff' ? '#000' : '#0d0818', ink: P.ink, comment: P.muted, hit: P.a1, now: P.a2, cur: P.muted, cell: P.muted, inv: P.a2, invInk: '#000' }, notes: (c0, c1) => (fsn() ? notesOfStore(fsn(), () => fsn().instruments)(c0, c1) : []), ctx: { lang: getLang(), font: ct.family, songNotes } };
-    cw = { notes, waves, provider: fastWidgets({ notes, waves, instOf: plan.instOf, S: cwS, P, app: appW }), addNotes(block) { for (const [k, list] of Object.entries(block)) for (const n of list) { const id = `${k}|${n[0]}|${n[2]}`; if (seen.has(id)) continue; seen.add(id); (notes[k] ||= []).push(n); } } };
+    cw = { notes, waves, provider: fastWidgets({ notes, waves, instOf: plan.instOf, S: cwS, P, app: appW, rollAt }), addNotes(block, more = {}) { for (const [k, v] of Object.entries(more || {})) if (!rolls[k]) rolls[k] = v; for (const [k, list] of Object.entries(block)) for (const n of list) { const id = `${k}|${n[0]}|${n[2]}`; if (seen.has(id)) continue; seen.add(id); (notes[k] ||= []).push(n); } } };
     if (plan.instruments.length) {
       fastJob = { id: sg.id, progress: 0, phase: 'scope', cancel: () => {} };
       try { if (!(await cwRealScopes(job, plan.instruments, waves, o.realScope === 'always'))) for (const k of Object.keys(waves)) delete waves[k]; }
@@ -1905,7 +1956,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       else video.composeAt({ layout, q, ct }, cyc, t);
     },
     onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
-    onNotes: cw ? block => cw.addNotes(block) : null,
+    onNotes: cw ? (block, more) => cw.addNotes(block, more) : null,
     onStageNotes: block => { for (const [k, list] of Object.entries(block)) for (const n of list) stageNotes.add(k, n); },
     onLit: overOn ? L => { for (const x of L.haps) { const src = L.codes[x[2]]; let k = litCodes.lastIndexOf(src); if (k < 0) k = litCodes.push(src) - 1; lits.push([x[0], x[1], k, x[3]]); } lits.sort((a, b) => a[0] - b[0]); } : null,
   });
@@ -5726,7 +5777,7 @@ settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store,
     // its next step, section or evaluation
     // stage-app-widgets D5: the quick switch above the visual follows the card
     stageWidgetsChanged: () => syncWidgetsBtn(),
-    widgetsChanged: () => { if (ed && !isPlaying() && mode === 'track' && compiled) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code); markMuted(); },
+    widgetsChanged: () => { globalThis.miskWidgets = { ...widgetGroups(), roll: (globalThis.miskWidgets || {}).roll || null }; if (ed && !isPlaying() && mode === 'track' && compiled) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code); markMuted(); },
     // the video recorder is made after the settings: a page opened on the settings gets its preview below
     videoPreview: el => { try { video.preview(el); } catch (e) {} },
     // code-over-visual D13: the Code over card's preview; a change of its settings reaches the stage at once

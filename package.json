@@ -43,6 +43,7 @@
     "check:clips": "node --no-warnings tools/check-clips.mjs",
     "check:decode": "node --no-warnings tools/check-decode.mjs",
     "check:stage-widgets": "node --no-warnings tools/check-stage-widgets.mjs",
+    "check:one-row-roll": "node --no-warnings tools/check-one-row-roll.mjs",
     "check:render-styles": "node --no-warnings tools/check-render-styles.mjs",
     "check:sound-guard": "node --no-warnings tools/check-sound-guard.mjs",
     "catalog:strudel": "node --no-warnings tools/strudel-catalog.mjs",
