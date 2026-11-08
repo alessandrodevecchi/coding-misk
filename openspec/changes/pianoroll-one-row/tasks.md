@@ -23,7 +23,7 @@ Refs: coding-misk/#82. Estimate: about 4 agent hours. Dev server for browser che
 - [x] 4.1 Two segmented rows in the Code widgets card with their hints (D7), English and Italian strings in `src/i18n.js`; verify with `PORT=5301 node tools/check-settings.cjs` (rows present in both languages, a change applies while playing, saved and in the backup) and `npm run check:guide`.
 - [x] 4.2 Guide card text of the code widgets (`src/guide.js`, en and it), `npm run knowledge` and `npm run check:knowledge`, a line in `docs/knowledge/decisions.md` (visible window rejected, D2), CHANGELOG entry under Unreleased; verify that both checks pass.
 - [x] 4.3 Screenshots in light and dark (neon) of L1 Thin, L1 Full, L2 Height, L2 Transparency, L2 Both and L3, in the editor and on a Monitor panel, plus one fast video frame of L2, in the owner's test folder `notes/prove-<date>/pianoroll-una-riga/`; verify that the quietest bar is visible in both themes.
-- [ ] 4.4 Run `npx vite build`, `npm run check:one-row-roll`, `npm run check:stage-widgets`, `npm run check:code-over`, `PORT=5301 node tools/check-code-widgets.cjs`, `PORT=5301 node tools/check-widget-placement.cjs`; DEVLOG entry in Italian.
+- [x] 4.4 Run `npx vite build`, `npm run check:one-row-roll`, `npm run check:stage-widgets`, `npm run check:code-over`, `PORT=5301 node tools/check-code-widgets.cjs`, `PORT=5301 node tools/check-widget-placement.cjs`; DEVLOG entry in Italian.
 
 ## Workflow follow-up
 
