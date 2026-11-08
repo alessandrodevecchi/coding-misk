@@ -94,6 +94,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Radio: Now playing is redrawn only when what it shows changes; the position marks move in place.
 - Radio: Skip no longer freezes the page while the next song grows; it shows "Skipping…" until the next song is ready.
 - Radio: the change to the next song at the end of a song no longer freezes the page; the next song's window and its code plan are made before the change.
+- Radio: the new song's code goes into the editor, the next typing is planned and the console is drawn in tasks of their own after a song change.
+- Reverb impulse responses are reused for the same room settings, so reverbs that change together no longer stall the scheduler.
 - Radio: a riser pressed inside the growth of a Live coder or Crescendo song comes within two phrases, not near the song's end.
 - Radio: console commands steer Classic songs and make the code plan of the window away from the page; the window is not made again while the steering runs.
 - Radio: adding a saved pattern redraws only the saved patterns panel after the press.
