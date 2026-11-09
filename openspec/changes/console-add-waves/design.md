@@ -1,11 +1,13 @@
 ## Context
 
-Console "+", "−", lock and saved-pattern presses are prepared ahead in batches (`console-add-ahead`, not yet archived; `src/radio/radio.js`, "+ and − prepared ahead"). Today:
+Console "+", "−", lock and saved-pattern presses are prepared ahead in batches (`console-add-ahead`, not yet archived; `src/radio/radio.js`, "+ and − prepared ahead"). On 8 November, before this change was implemented, incremental steering landed and the late-entries fix followed (DEVLOG of 8 November). The code this change starts from:
 
-- `batchFor` joins the **earliest** pending batch of the song that has at least `ADD_LEAD` = 2 s left, with no limit on how long after its first press. A join restarts the batch's preparation from scratch.
-- A new batch takes `addAt`: the first phrase start at least `ADD_LEAD` + `addPrep` seconds ahead, where `addPrep` is the **page's** last preparation time. `item.addPrep` (this song's, raised on every push) is written but `addAt` never reads it, and `expectedPrep` (the quadratic guess for grown songs) is defined but never called.
-- On a grown song the steering on air (`steerOnAir` in `src/endless/waypoints.js`, in the growth worker) replays every command of the song and places the batch's head on the first of `BATCH_TRIES` = 4 phrase starts where `need = max(families, half the lines)` lines can be typed at 5 times a person's pace (`BATCH_HURRY`); the rest go over `BATCH_TAIL` = 2 phrases. With no fitting boundary it takes the first with at least 75 % of the most typing time.
-- A batch that is not ready a third of a bar before its boundary moves to `addAt(item, b.at)`. A steering still running is left to finish, then the batch is steered again for the new boundary.
+- `batchFor` joins the **earliest** pending batch of the song that has at least `ADD_LEAD` = 2 s left, with no limit on how long after its first press. A join restarts the batch's preparation.
+- A new batch takes `addAt`: the first phrase start at least `ADD_LEAD` + `expectedPrep` seconds ahead. `expectedPrep` is this song's estimate (incremental-steering D9: Classic, the last preparation of the song; a grown song, the steering time per command measured on the song times the batch's commands, plus the rest of the preparation). A "not ready" move goes to the first phrase start that leaves this estimate.
+- On a grown song the steering on air (`steerOnAir`, in the console worker, with kept results) places the batch's head on the first of `BATCH_TRIES` = 2 phrase starts from its earliest one where `need = max(families, half the lines)` lines can be typed at 5 times a person's pace (`BATCH_HURRY`); the rest go over `BATCH_TAIL` = 2 phrases. With no fitting boundary it takes the first with at least 75 % of the most typing time.
+- Moves are logged with a reason (`[radio] console change moved … (typing: …)`, not ready, busy page, late, steering answered after a push), but not recorded on the batch.
+- A curve command on a grown song makes the director's view on the page, in a task after the press (`steerAir`, `airView`), while the worker steers; about 115 ms with the CPU slowed 4 times, 1-2 "skip query: too late" (DEVLOG of 9 November).
+- The director writes a console change from the phrase start at or after its bar (`steerSong`: `from = round(at / phrase)`, forced moves keyed by phrase index). A change on a half-phrase bar is not accepted today: its forced key is fractional and never read, and `round` skips the half phrase. Verified on 9 November while writing this update.
 
 ### Baseline measurements (8 November, before this change and before incremental steering)
 
@@ -48,64 +50,97 @@ What the numbers say:
 
 The main cause of the owner's "+5 s becomes +25 or +50 s" is the steering on air: its replay time (preparation) causes the long chains, and its typing rule causes the frequent one-to-three-phrase moves. The incremental steering change (separate, done first) removes the replay cost; this change fixes the batching rules and the head rule.
 
+### After incremental steering (8 November, same kit, adapted instrumentation)
+
+Live coder with earlier commands: heads within 2 phrases 4 → 5 of 8, worst head 11.77 → 3.84 phrases, median steering 4.4 → 0.3 s; Crescendo with earlier commands, steering 2.4 → 0.4 s; "not ready" moves 12 → 1, "busy page" 3 → 0, "typing" 9 → 12. The remaining moves come from the head rule (at least one line per instrument) and the late joins. The before numbers of this change are measured again on the branch with `tools/check-add-waves.cjs` (DEVLOG).
+
 ## Goals / Non-Goals
 
 **Goals:**
 - Batches follow the press rhythm: a burst is one batch, a later press is a second wave that never moves the first.
+- The head of each batch enters within 2 phrases of its first press; 3 or 4 phrases only as fallback; never more than 4.
+- A smaller head is preferred to a later one.
+- On slow songs a batch enters within 30 s of the press when a half-phrase start there leaves time for its lines.
 - Every move is explained, so the checks and the DEVLOG can count causes.
-- After incremental steering lands: heads within 2 phrases of the press, preferring fewer head lines to a later head.
+- The badge costs nothing extra; a curve command does no director work on the page.
 
 **Non-Goals:**
-- Incremental steering itself (separate change, first). This change only notes where it depends on it.
 - Changing the typing pace model of Live coder or the Crescendo typing probe (finding 5: a follow-up question below).
 - An exact badge at the press.
+- Half-phrase entries for commands other than the console's prepared batches ("+", "−", saved patterns, locks).
 
 ## Decisions
 
 ### D1. Join window (owner decision A)
 
-A batch keeps `tFirst` and `tLast` (performance time of its first and last press). `batchFor` takes the **latest** pending batch of the song and joins it only when `now − tLast ≤ 5 s`, `now − tFirst ≤ 10 s` and at least `ADD_LEAD` seconds are left. Otherwise it opens a new batch (D2). An undo press ("−" after a pending "+", the opposite lock) goes to the latest batch that holds the change it undoes, while `ADD_LEAD` seconds are left, and does not move `tLast`: taking a change back must never add a track first and remove it a phrase later.
+A batch keeps `tFirst` and `tLast` (performance time of its first and last press). `batchFor` takes the **latest** pending batch of the song and joins it only when `now − tLast ≤ 5 s`, `now − tFirst ≤ 10 s` and at least `ADD_LEAD` seconds are left. Otherwise it opens a new batch (D3).
 
 Alternatives: a window measured on the boundary (seconds left) rather than on presses: rejected, the owner's complaint is about presses far apart in time joining. Keeping "earliest batch": rejected, it is what merges second waves into the first.
 
-### D2. Second wave (owner decision B)
+### D2. Undo (owner, final)
 
-A new batch's boundary is `max(addAt(item), head(prev) + phrase)` where `prev` is the latest pending batch of the song. The new batch is steered **on top of** the pending batches before it: its steering input is the song's commands, then each earlier pending batch's commands (pending, with their own `q` and `min`), then its own. Because `steerOnAir` places batches in order, the earlier batches get the same placement as in their own steering, and the result stays valid when they commit unchanged: `fresh()` accepts a base equal to the commands on air plus the committed batches' commands (same ids). If an earlier batch restarts or moves, the later ones restart; a later batch that would fall less than a phrase after an earlier one moves with the reason `order`. A new press never moves an earlier batch (it only joins or opens).
+An undo press ("−" when a "+" of the same instrument is pending, "+" when a "−" is pending, the opposite lock) goes to the **latest** pending batch that holds the change it undoes, while that batch has more than a third of a bar left (`ADD_MARGIN`, as the lock undo today), whatever the join window, and does not move `tLast`. Taking a change back must never add a track first and remove it a phrase later.
 
-Alternative: prepare the second wave only after the first commits. Simpler, but with the present replay cost (2 to 13 s on grown songs with history) the second wave would often miss its phrase and add "not ready" moves. After incremental steering both are cheap; stacking keeps the second wave on time in both worlds.
+Simplification (owner): a press after an undo is an ordinary press. In "+", "−", "+" the last "+" follows the join window of the latest batch; outside it, it opens a new batch (a new queue entry) and never goes back to the batch it was taken from.
 
-### D3. Move reasons
+### D3. Second wave and order (owner decision B)
 
-Every move pushes `{ from, to, why, detail }` onto the batch (`why` ∈ `typing`, `not ready`, `busy page`, `late`, `order`, `bound`), logged as today's `[radio] console change moved …` with the reason, exposed in `pendingAdds` and `addsDone` for the checks. For `typing`, `steerOnAir` returns per batch the boundaries it tried and why each failed (lines needed, seconds of typing needed and usable). This comes back as a field next to `commands`, never inside a recorded command, so the recipe and replay are untouched. The temporary instrumentation in `baseline/instrumentation.patch` is the sketch: it put the probe on the commands, which the real change must not do.
+A new batch's earliest boundary is `max(addAt(item), head(prev) + phrase)` where `prev` is the latest pending batch of the song (its boundary, its head once steered). A new press never moves an earlier batch: it only joins the latest one or opens a new one.
 
-### D4. Lead from this song's preparation
+A later batch is steered on top of the earlier pending batches: its steering input is the song's commands, then the commands of each earlier pending batch as last prepared (pending, with their own `q`, `min` and `batch`), then its own. `steerOnAir` places batches in order and keeps the results of the earlier ones (incremental steering), so the later batch's head and badge are right early and cost only its own commands. When an earlier batch commits, the commands on air change and the later batch is steered again; with the kept results this costs about its own commands (0.2 to 0.8 s on a long Live coder song at normal speed). When an earlier batch moves for its own reason to less than a phrase before a later batch, or after it, the later batch moves with the reason `order`; when an earlier batch restarts, the later ones restart too.
 
-`addAt` reads `item.addPrep ?? addPrep` (this song's measured preparation, else the page's). `expectedPrep` is deleted or used only through this value: its quadratic formula models the replay that incremental steering removes, so it must not be tuned now. A `not ready` move goes to the first phrase start that leaves this song's measured preparation, not simply the next one. This is the small fix for the chain of finding 2; it does not need incremental steering and stays useful after it.
+Alternative: prepare the second wave only after the first commits. Rejected: the badge would show the default boundary for a whole phrase and the head would be placed late.
 
-### D5. Head distance and head shrinking (after incremental steering)
+### D4. Move reasons
 
-In `steerOnAir`'s batch grouping: on the first two candidate boundaries the head may shrink down to one line (one family first, in the existing family order) before the next boundary is tried; candidates 3 and 4 keep today's `need` as fallback; `BATCH_TRIES` stays 4. The rest of the lines go over the next `BATCH_TAIL` phrases as today. The thresholds (2 phrases, one line, `BATCH_HURRY`) are re-measured with `baseline/run.sh` once incremental steering has landed, and confirmed with the owner before this group is implemented. A shrunk head changes where lines go on a fresh press only; a replay uses recorded boundaries and does not run this choice, so seed fixtures do not move (`check:endless` must confirm).
+Every move pushes `{ from, to, why, detail }` onto the batch (`why` ∈ `typing`, `not ready`, `busy page`, `late`, `order`, `answered after a move`), keeps the existing log line and is exposed in `pendingAdds` and `addsDone` for the checks. For `typing`, the detail is the head probe `steerOnAir` already returns next to `commands` (`heads`: candidates, lines, seconds of typing needed and usable), never inside a recorded command, so the recipe and replay are untouched. Each batch also records its presses (`{ t, rel, part, kind }`, the undo ones marked) so the checks read the first press of every batch.
 
-### D6. Badge
+### D5. Head distance and shrinking (owner, final)
 
-At the press the badge shows the default boundary as today (`addAt`, which now reads this song's preparation, D4). It updates when the steering answers (head placed) and at each move, with the existing highlight. No extra steering, growth or typing probe runs to refine the first number. On a Classic song the first number was right in the baseline; on a grown song with history it is a lower bound until the steering answers.
+In `steerOnAir`'s batch grouping, the candidate boundaries are the phrase starts (and, D6, half-phrase starts) from the batch's earliest boundary (`min`) on, sorted by their distance from the batch's first press `q` (bars, in phrases):
 
-### D7. Check
+1. **Near:** candidates within 2 phrases of `q`, in order. On each, the head takes as many lines as fit (all of them when they fit, else the most that fit, down to one line, families in the existing order: the first line of each instrument, then the second…). The first near candidate where one line fits takes the head.
+2. **Fallback:** when no near candidate fits even one line, the candidates more than 2 and at most 4 phrases after `q`, the same way.
+3. **Last resort:** when nothing fits, the first candidate within 4 phrases with at least 75 % of the most typing time among them, with one line typed as fast as it must (today's rule, bounded to 4 phrases).
 
-`tools/check-add-waves.cjs` (dev server on PORT), built on `baseline/measure.cjs` without the instrumentation (it reads the move reasons from `pendingAdds` and `addsDone`): the baseline scenarios plus the join window cases (presses at 0, 4, 8, 12 s; at 0 and 6 s; an undo at 12 s), a second wave with an earlier batch forced to move (`order`), the replay of a two-wave session (song JSON-equal), and the load budget at 4× CPU. It prints the head-distance distribution and the moves by reason in the format of the baseline table, so the DEVLOG numbers come from it.
+The rest of the lines go over the next `BATCH_TAIL` = 2 phrases after the head, as today. `BATCH_HURRY` stays 5; `BATCH_TRIES` is replaced by the distance bounds (2 and 4 phrases). A move after the steering ("not ready", "busy page", "late", "order") still moves the whole batch to the next boundary; the 4-phrase bound is the target of the head rule, and the checks report the batches that went past it and why.
+
+A shrunk head changes where lines go on a fresh press only; a replay uses recorded boundaries and does not run this choice, so seed fixtures do not move (`check:endless`, `check:steer-memo` must confirm).
+
+Alternatives: keep "at least one line per instrument" on the head: rejected by the owner (a smaller head is preferred to a later one). Try the far candidates with all lines before shrinking on the near ones: rejected, it moves the head later.
+
+### D6. Slow songs: half-phrase starts within 30 s
+
+`ADD_CAP` = 30 s. When the first phrase start a batch may take (after `addAt`'s lead and preparation) is more than `ADD_CAP` seconds after the batch's first press, the half-phrase starts (phrase start + phrase / 2) within `ADD_CAP` seconds of the first press are candidates too, before it. On a grown song they are near candidates of D5, taken when at least one line fits there; on a Classic song (no typing) `addAt` returns the first one that leaves the lead and preparation.
+
+The director accepts a console change on a half-phrase bar: `steerSong` rewrites from the phrase start before it (`floor`, only when the bar is exactly a half-phrase start; every other bar keeps `round`, so recorded commands and fixtures do not move) and keeps the listener's "+"/"−" entries of a half-phrase bar in its forced list under the half key; `directSong` takes them on the half-phrase bar after the moves of the phrase start. The transit and typing of a grown song already work on any bar (mixer commands use bars).
+
+Alternative: shorten the phrase of slow songs: rejected, it changes the director's song and every fixture.
+
+### D7. Badge
+
+At the press the badge shows the batch's boundary as `addAt` gives it (this song's preparation estimate, D3's order). It updates when the steering answers (head placed) and at each move, with the existing highlight, from the batch's fields on the existing quarter-second paint. No steering, growth, typing probe or console rebuild runs only to refresh it.
+
+### D8. Curve command off the page
+
+`steerAir` no longer makes the director's view on the page while the worker steers (the worker's answer brings the view, `view: true`). Until the answer, the curve panel reads the pending curve commands of the song (energy target, lane values, resets) over the last view: a few array reads per paint. A song steered on the page (no worker) still makes the view there, as before.
+
+### D9. Checks
+
+`tools/check-add-lag.cjs` gains: the join window (presses at 0, 4, 8, 12 s give two batches; at 0 and 6 s two batches), an undo outside the window, "+", "−", "+" with the last press outside the window (a new batch), a second wave at least a phrase after the first, an `order` move forced by a long task before the first wave's boundary, the six presses and the owner's session with the new head targets, and a curve command at 4× CPU (no task over 100 ms, no "too late"). `tools/check-add-waves.cjs` runs the baseline scenarios of `baseline/run.sh` without instrumentation (it records the presses itself and reads the moves from the log and `addsDone`), at normal speed and with the CPU slowed, and prints the heads in phrases per batch, the moves by reason, the long tasks and "too late"; it fails when fewer than 90 % of the heads are within 2 phrases or any head is past 4.
 
 ## Risks / Trade-offs
 
-- [Stacked preparation of a second wave is wasted when the first wave restarts] → only when the listener changes the first wave inside its window; the second wave restarts, as a join does today.
-- [A shrunk head brings in one instrument a phrase before the others, which can sound less like a "burst"] → only when the whole batch does not fit; the alternative today is everything one to three phrases later. The owner confirms after re-measuring (D5).
-- [More, smaller batches mean more window swaps] → one per wave, at most one per phrase by D2; covered by the load budget check.
-- [Move-reason data travelling from the worker] → a small field next to the result; never recorded.
-- [The 2-phrase target may still fail with the present replay cost] → stated dependency; the head-distance requirement is verified only after incremental steering.
+- [A shrunk head brings one instrument in a phrase before the others, less of a "burst"] → only when the whole batch does not fit; the owner chose it over a later head.
+- [Half-phrase entries change the director's rewrite on those bars] → only for new console batches on slow songs; a whole-phrase command is unchanged, fixtures do not move. A half-phrase entry sounds mid-phrase, which the owner accepted for slow songs.
+- [Stacked steering of a second wave is wasted when the first wave restarts] → only when an undo reaches the first wave; the second restarts, as a join does today.
+- [More, smaller batches mean more window swaps] → one per wave, at most one per phrase by D3; covered by the load checks.
+- [The curve panel shows the pending value before the director has placed it] → the same value the listener dragged; the answer replaces it within about a second.
 
 ## Migration Plan
 
-No stored data changes: recorded commands keep their form, so saved sessions replay as before. Implement D1 to D4, D6 and D7 first (independent of incremental steering). Implement D5 after incremental steering has landed and the baseline has been re-measured. Rollback is a revert; nothing is migrated.
+No stored data changes: recorded commands keep their form, so saved sessions replay as before. Rollback is a revert; nothing is migrated.
 
 ## Open Questions
 
-- Crescendo's typing probe never fits (finding 5). Recommended: a follow-up issue to check whether the probe should use Crescendo's own typing pace, after incremental steering; this change keeps the fallback as is for Crescendo.
+- Crescendo's typing probe never fits (finding 5). Recommended: a follow-up issue to check whether the probe should use Crescendo's own typing pace; this change keeps the last-resort rule for Crescendo.

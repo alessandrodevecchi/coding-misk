@@ -1,36 +1,44 @@
 # Tasks
 
-Groups 1 to 4 do not depend on incremental steering. Group 5 starts only after the incremental steering change has landed and the owner has confirmed the thresholds on the re-measured baseline.
+Incremental steering has landed (8 November); every group can start. The owner's final decisions of 8 November are in `design.md` (D1 to D8).
 
-## 1. Move reasons (D3)
+## 0. Before
 
-- [ ] 1.1 Record every move of a batch as `{ from, to, why, detail }` with `why` in `typing`, `not ready`, `busy page`, `late`, `order`, `bound`; log it with the reason; expose `moves` in `pendingAdds` and `addsDone`. Verify: `check-add-lag.cjs --quick` passes and its push case reads `busy page` from `addsDone`.
-- [ ] 1.2 Return from `steerOnAir` (worker and page path) the boundaries a pending batch tried, each with lines, typing needed and usable seconds, as a field next to `commands`, never inside a recorded command. Verify: `npm run check:endless` and `check:radio-profiles` unchanged, and a Live coder batch moved for typing shows its probes in `addsDone`.
-- [ ] 1.3 Note the move reasons in `docs/knowledge/radio-commands.md` (console "+" timing) and run `npm run check:knowledge`.
+- [ ] 0.1 Add `tools/check-add-waves.cjs` from `baseline/measure.cjs` without instrumentation: it records each press and the batch it went to, reads the moves from the console log and `addsDone`, and prints per batch the head and last line in phrases from the first press, the moves with their reasons, the steering time; per run the long tasks and "too late"; a summary per profile; `--rate n` slows the CPU. Run it on the branch before any code change (normal speed: the scenarios of `baseline/run.sh`; 4×: berlin-techno with 8 earlier commands, p3 and p6, every profile) and keep the output for the DEVLOG.
 
-## 2. Join window and undo (D1)
+## 1. Move reasons (D4)
 
-- [ ] 2.1 Keep `tFirst` and `tLast` on each batch; `batchFor` joins the latest pending batch only within 5 s of its last press, 10 s of its first and with `ADD_LEAD` left, else opens a new batch. Verify in the new check (4.1): presses at 0, 4, 8, 12 s give two batches (0-8 s and 12 s); presses at 0 and 6 s give two batches.
-- [ ] 2.2 An undo press ("−" after a pending "+", "+" after a pending "−", the opposite lock) goes to the latest batch holding that change while `ADD_LEAD` is left, without moving `tLast`. Verify: "+ arp", then "− arp" 12 s later leaves no pending change and no new batch.
+- [ ] 1.1 Record every move of a batch as `{ from, to, why, detail }` with `why` in `typing`, `not ready`, `busy page`, `late`, `order`, `answered after a move`; keep the log line; record the presses (`{ t, rel, part, kind, undo }`); expose `moves` and `presses` in `pendingAdds` and `addsDone`. Verify: `check-add-lag.cjs` reads `busy page` from `addsDone` in its push case.
+- [ ] 1.2 The typing detail comes from the `heads` field `steerOnAir` already returns next to `commands`, never inside a recorded command. Verify: `check:endless` and `check:radio-profiles` unchanged.
 
-## 3. Second wave, order and lead (D2, D4, D6)
+## 2. Join window and undo (D1, D2)
 
-- [ ] 3.1 A new batch's boundary is at least one phrase after the head of the latest pending batch; a press never moves an earlier batch. Verify: in the p6 pattern no earlier batch has a move made at a press time, and the second batch's head is at least one phrase after the first's.
-- [ ] 3.2 Steer a later batch on top of the earlier pending batches (their commands pending with their own `q` and `min`) and accept its result when they commit unchanged. Verify: the second wave of p6 on a Live coder song is ready without a restart after the first wave commits, and its song is JSON-equal to a fresh steering of all commands.
-- [ ] 3.3 When an earlier batch moves or restarts, restart later batches and move one that falls less than a phrase after it, with the reason `order`. Verify: the check forces the first wave to move (a long task before its boundary) and reads `order` on the second.
-- [ ] 3.4 `addAt` reads this song's measured preparation (`item.addPrep`, else the page's); a `not ready` move goes to the first phrase start that leaves it; remove `expectedPrep` or route it through this value. Verify: on the baseline Live coder seed `waves-switch-berlin-techno-8-p1` (12 s steering) the batch has at most 2 `not ready` moves (baseline: 11).
-- [ ] 3.5 Badge: the first estimate stays the default boundary; it updates when the steering places the head and at each move, with the highlight; no extra work at the press. Verify: the click's own task stays under 20 ms (`check-add-lag.cjs`) and the badge changes within one tick of the steering answer.
-- [ ] 3.6 Update the console card in `src/guide.js` (English and Italian) if the wording of waves or badge changes, and `docs/knowledge/radio-commands.md`; run `npm run check:guide` and `npm run check:knowledge`.
+- [ ] 2.1 Keep `tFirst` and `tLast` on each batch; `batchFor` joins the latest pending batch only within 5 s of its last press, 10 s of its first and with `ADD_LEAD` left, else opens a new batch. Verify in `check-add-lag`: presses at 0, 4, 8, 12 s give two batches (0-8 s and 12 s); presses at 0 and 6 s give two batches.
+- [ ] 2.2 An undo press goes to the latest batch holding that change while more than `ADD_MARGIN` of a bar is left, without moving `tLast`; a later press is ordinary. Verify: "+ arp", then "− arp" 12 s later leaves no pending change and no new batch; "+", then "−" and "+" 12 s later leave one new batch with "+1".
 
-## 4. Check, replay and load (D7)
+## 3. Second wave, order (D3)
 
-- [ ] 4.1 Add `tools/check-add-waves.cjs` from `openspec/changes/console-add-waves/baseline/measure.cjs` (no instrumentation): baseline scenarios, join window cases, undo, forced `order` move, two-wave replay (song JSON-equal, lines on their entry bars), head-distance distribution and moves by reason printed like the baseline table. List it in `AGENTS.md` Tooling and `docs/knowledge/checks.md`. Verify: it runs green on Classic, Crescendo and Live coder.
-- [ ] 4.2 Load: with the CPU slowed 4 times, no main-thread task over 100 ms from the first press of p6 until two bars after the last entry, against the same run before the change (reported). Verify: `check-add-waves.cjs --rate 4` and `check-add-lag.cjs` pass.
-- [ ] 4.3 Fixtures and replay: `npm run check:endless`, `npm run check:radio-profiles`, `npm run check:live-code`, `npm run check:crescendo` (quick) with no fixture moved; if an intended change moves them, raise `DIRECTOR_VERSION` or `SHAPES_VERSION` in the same commit. Verify: the commands' output.
-- [ ] 4.4 Record the numbers (before and after for groups 1 to 4) in `DEVLOG.md`, from the check's output.
+- [ ] 3.1 A new batch's earliest boundary is at least one phrase after the head of the latest pending batch; a press never moves an earlier batch. Verify: in the p6 pattern no earlier batch moves at a press, and the second batch's head is at least one phrase after the first's.
+- [ ] 3.2 Steer a later batch on top of the earlier pending batches (their last prepared commands); steer it again when they commit or restart. Verify: `check:steer-memo` (stacked batches) and the second wave of p6 enter with their song JSON-equal to a replay.
+- [ ] 3.3 When an earlier batch moves to less than a phrase before a later one, or after it, move the later one with the reason `order`. Verify: `check-add-lag` forces the first wave to move (a long task before its boundary) and reads `order` on the second.
 
-## 5. Head distance and shrinking (D5, after incremental steering)
+## 4. Head distance and shrinking (D5)
 
-- [ ] 5.1 Re-run `baseline/run.sh` with the instrumentation on the branch where incremental steering has landed; record the table and ask the owner to confirm the 2-phrase target, one-line head and `BATCH_HURRY`. Verify: the re-measured table is in the DEVLOG and the owner's answer in `design.md`.
-- [ ] 5.2 In the batch grouping, on the first two candidate boundaries shrink the head down to one line (families in order) before trying a later boundary; candidates 3 and 4 keep today's `need`; `BATCH_TRIES` stays 4. Verify: `check-add-waves.cjs` reports at least 90 % of heads within 2 phrases and all within 4 on the baseline scenarios with a quiet page, and `check:endless` fixtures unchanged.
-- [ ] 5.3 Update the head rule in `docs/knowledge/radio-commands.md` and `docs/knowledge/decisions.md` (shrink before moving, rejected: whole batch later) and run `npm run check:knowledge`; record before and after numbers in `DEVLOG.md`.
+- [ ] 4.1 In the batch grouping of `steerOnAir`: near candidates within 2 phrases of the first press, then fallback candidates up to 4 phrases, each taking the most lines that fit down to one; last resort bounded to 4 phrases. Verify: `check:endless`, `check:steer-memo`, `check:radio-profiles`, `check:live-code`, `check:crescendo` unchanged.
+- [ ] 4.2 Update `check-add-lag` (six presses, owner's session): head within 2 phrases, every head within 4, at least 90 % within 2 in the owner's session. Verify: `check-add-lag` (all profiles) and `--owner` pass.
+
+## 5. Slow songs (D6)
+
+- [ ] 5.1 Director: a console "+"/"−" on a half-phrase start is forced on that bar (`steerSong` from the phrase start before it, `directSong` half keys); any other bar as before. Verify: a Node test (in `check:endless` or `check:radio-profiles`) that a "+" on a half-phrase bar adds its track on that bar, and fixtures unchanged.
+- [ ] 5.2 Radio and steering: when the first phrase start is more than `ADD_CAP` = 30 s after the first press, offer the half-phrase starts within 30 s (Classic `addAt`, grown songs' near candidates). Verify: the owner's session (67-71 BPM) has heads within 30 s where one line fits; `check-add-waves` lo-fi runs unchanged where phrases are under 30 s.
+
+## 6. Badge and curve (D7, D8)
+
+- [ ] 6.1 Badge: the estimate from the batch's fields; no extra steering, growth or rebuild to refresh it. Verify: the click's own task stays under 20 ms (`check-add-lag`).
+- [ ] 6.2 Curve: no director view on the page while the worker steers; the curve panel shows pending curve values. Verify: `check-add-lag` curve case at 4× (no task over 100 ms, no "too late", the curve value shown at once); `check-steering` curve drag.
+
+## 7. Docs, checks, numbers
+
+- [ ] 7.1 Update the console card in `src/guide.js` (English and Italian), `docs/knowledge/radio-commands.md`, `docs/knowledge/decisions.md`, `docs/knowledge/checks.md`, `AGENTS.md` tooling; run `npm run check:guide` and `npm run check:knowledge`.
+- [ ] 7.2 Run `check:steer-memo`, `check:endless`, `check:radio-profiles`, `check:live-code`, `check:crescendo`, `check:sound-guard`, `check:knowledge`, `check:guide`, `npm run build`, `check-add-lag` (all profiles and `--owner`), `check-add-waves` (1× and 4×); no fixture moves (or a version bump, explained).
+- [ ] 7.3 Record before and after (heads in phrases per batch, moves by reason, long tasks, "too late", 1× and 4×) in `DEVLOG.md`; `CHANGELOG.md` under Unreleased.
