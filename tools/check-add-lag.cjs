@@ -8,7 +8,8 @@
 // - the change enters on the default boundary (the first phrase start that leaves 2 s plus the expected preparation),
 //   or later only when pushed; the badge counts down;
 // - net counting ("+ +" is two, "+ −" is nothing, "+ − +" is one), changes on different instruments in a burst enter
-//   together with the same bar, a cancelled row changes nothing;
+//   together with the same bar (on a grown song its head within 2 phrases, the rest within 4), a cancelled row changes
+//   nothing;
 // - Classic: a long task injected a second before the boundary pushes the change to the next phrase start (shown at
 //   once with a highlight); a page kept busy enters after the 30 s bound with "[radio] entered under load"; an
 //   11-track song takes "+ arp" and "− bass" without a skipped window; the song steered away from the page is
@@ -17,27 +18,34 @@
 //   ring within 100 ms, no task over the budget, recorded as lock-part and unlock-part on the entry bar); a lock pressed
 //   with a "+" enters in the same batch, "+" first; a lock then an unlock before the entry cancel out and record nothing;
 //   a mixer lock waits on its button and locks its track on the entry bar.
-// - grown songs (#82): six presses on three instruments late in the song make one batch; most of it (one track of each
-//   instrument at least) enters on its first boundary and every entry within about three phrases of the press; each
-//   instrument's badge reads "k of n in" until all of its tracks play; in Live coder a saved pattern added as a new
-//   track inside the growth of an 11-minute song waits in one batch with two "+" and they enter within about three
-//   phrases, never at the end of the growth.
+// - grown songs (#82): six presses on three instruments late in the song make one batch; its head (at least one line)
+//   enters within 2 phrases of the press and every line within 4 (console-add-waves D5); each instrument's badge reads
+//   "k of n in" until all of its tracks play; in Live coder a saved pattern added as a new track inside the growth of
+//   an 11-minute song waits in one batch with two "+" and they enter within about three phrases, never at the end of the
+//   growth.
+// - waves (console-add-waves, Classic): presses at 0, 4, 8 and 12 s make two batches (the window is 5 s from the last
+//   press and 10 s from the first), presses at 0 and 6 s two batches, the second at least a phrase after the first
+//   and the first not moved by the press; a "−" 9 s after a "+" takes it back from its batch (no batch left); "+", then
+//   "−" and "+" 9 s later leave one new batch with "+1"; a long task before the first wave's boundary moves it and the
+//   second wave moves with the reason "order"; every move recorded on its batch with its reason.
+// - a curve command on a Live coder song with the CPU slowed 4 times (console-add-waves D8, also alone with --curve):
+//   no main-thread task over the budget and no "too late" in the 6 s after it, the curve shows the value at once.
 // - the owner's session (#82, 8 November): a Live coder song of exactly 10 minutes at a slow tempo (ambient, berlin
 //   techno, darksynth and acid), about twelve commands over the song: two "+" together, a lock, an energy change, a
 //   "−", a "+" cancelled from the queue, a curve, then five "+" on three instruments and two more a few seconds later.
-//   Every batch's head enters within 4 phrases of its first press (most within 2), the badge once the batch is ready
+//   Every batch's head enters within 4 phrases of its first press (at least 90 % within 2), the badge once the batch is ready
 //   names the bar it enters on (within one phrase), every move says why, the batches' own work stays under the
 //   budget, and the new tracks' sounds are loaded before their entry (no "took too long"); a burst with the CPU slowed
 //   4 times keeps its own work under the budget.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-add-lag.cjs [--budget 100] [--profiles classic,crescendo,switch] [--rate 4] [--style berlin-techno] [--standing n] [--quick] [--owner]
-// --owner: only the owner's session (it also runs after the Live coder cases without --quick)
+// --owner: only the owner's session (it also runs after the Live coder cases without --quick); --curve: only the curve case
 // --standing n: the commands standing before the late cases (default 8 in Classic, 3 on a grown song)
 // --quick: only the late "+", the burst, the net counts and the locks, at normal CPU speed
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
 const BUDGET = +arg('--budget', 100), RATE = +arg('--rate', 4), PROFILES = arg('--profiles', 'classic,crescendo,switch').split(','), STYLE = arg('--style', 'berlin-techno');
-const QUICK = process.argv.includes('--quick'), OWNER = process.argv.includes('--owner'), STANDING = arg('--standing', null) === null ? null : +arg('--standing', 0);
+const QUICK = process.argv.includes('--quick'), OWNER = process.argv.includes('--owner'), CURVE = process.argv.includes('--curve'), STANDING = arg('--standing', null) === null ? null : +arg('--standing', 0);
 const OWNER_SEED = arg('--owner-seed', '69qgtn');
 const NAMES = { switch: 'Live coder', classic: 'Classic', crescendo: 'Crescendo' };
 // (src/radio/radio.js: ADD_LEAD seconds at least before the boundary, the click's own budget)
@@ -81,7 +89,8 @@ const table = [];
   // `from` (null: neither within `bars`, a track the director keeps silent)
   const heardFrom = (n, from, bars) => R(async ([n, from, bars]) => { const { soundAt } = await import('/src/endless/growth.js'), { buildSteps } = await import('/src/song/build.js'), s = globalThis.codingMiskRadio.steering, steps = buildSteps(s.song); return s.plan.added.slice(-n).map(a => { const st = steps.find(x => x.at >= from && [].concat(x.add ?? []).includes(a.id)); if (st) return st.at; for (let b = Math.floor(from); b < from + bars; b++) if (soundAt(s.song, b).tracks.some(t => t.id === a.id)) return b; return null; }); }, [n, from, bars]);
   // the badges of the instruments of the last batch until all of its tracks play (#82): sampled until the last entry
-  const watchTrail = async (ats, parts) => { const seen = {}, last = Math.max(...ats); for (let k = 0; k < 600 && (await rel()) < last + 0.5; k++) { const b = await badges(); for (const p of parts) if (b[p] && / of \d+ in · next in \d+ s$/.test(b[p].text)) seen[p] = b[p].text; await sleep(150); } await sleep(400); return { seen, after: await badges() }; };
+  // (any: a badge of the instrument at all, for an instrument none of whose tracks came in on the head, console-add-waves D5)
+  const watchTrail = async (ats, parts) => { const seen = {}, any = {}, last = Math.max(...ats); for (let k = 0; k < 600 && (await rel()) < last + 0.5; k++) { const b = await badges(); for (const p of parts) { if (b[p] && / of \d+ in · next in \d+ s$/.test(b[p].text)) seen[p] = b[p].text; if (b[p]) any[p] = b[p].text; } await sleep(150); } await sleep(400); return { seen, any, after: await badges() }; };
   const lockRing = sel => R(q => { const b = document.querySelector(q); return b ? { s: b.dataset.pendS || null, tip: b.title } : null; }, sel);
   const lockedParts = () => R(() => (globalThis.codingMiskRadio.steering.plan.lockedParts || []).slice());
   const lockPart = on => (on.find(x => x.p === 'bass') || on.find(x => x.less) || on[0] || {}).p;
@@ -174,16 +183,19 @@ const table = [];
     const tEnd = Date.now(); while (Date.now() - tEnd < 12 * P * 1000 && (await pending()).length) await sleep(500);
     watching = false; await poll;
     const done = (await R(() => globalThis.codingMiskRadio.addsDone)).filter(d => seen[d.id]);
-    const rows = done.map(d => { const x = seen[d.id]; return { id: d.id, q: x.q, at: d.at, head: (d.at - x.q) / ph, last: (Math.max(...d.ats) - x.q) / ph, ready: x.ready, pushes: d.pushes }; });
+    const rows = done.map(d => { const x = seen[d.id]; return { id: d.id, q: d.q ?? x.q, at: d.at, head: (d.at - x.q) / ph, last: (Math.max(...d.ats) - x.q) / ph, ready: x.ready, pushes: d.pushes }; });
     table.push(`${name}: ${rows.map(r => `#${r.id} press ${r.q.toFixed(1)}, entry ${r.at} (head ${r.head.toFixed(2)} phrases, last ${r.last.toFixed(2)}, ready badge ${r.ready ?? '—'}, moves ${r.pushes})`).join('; ')}`);
     const want = Object.keys(seen).filter(id => !gone.has(+id)).length;
     check(rows.length >= 2 && rows.length === want && !(await pending()).length, `${name}: every batch entered (but the cancelled one)`, `${rows.length} entered of ${want}`);
     check(rows.every(r => r.head <= 4), `${name}: every batch's head enters within 4 phrases of its first press`, rows.map(r => r.head.toFixed(2)).join(' '));
-    check(rows.filter(r => r.head <= 2).length >= Math.ceil(rows.length / 2), `${name}: most heads enter within 2 phrases`, rows.map(r => r.head.toFixed(2)).join(' '));
+    check(rows.filter(r => r.head <= 2).length >= Math.ceil(0.9 * rows.length), `${name}: at least 90 % of the heads enter within 2 phrases`, rows.map(r => r.head.toFixed(2)).join(' '));
+    const secs = rows.map(r => (r.at - r.q) * bs);
+    console.log(`info  ${name}: heads ${secs.map(x => `${x.toFixed(0)} s`).join(', ')} after their first press`);
     check(rows.every(r => r.ready !== null && Math.abs(r.ready - r.at) <= ph), `${name}: the badge of a ready batch names its entry bar, within a phrase`, rows.map(r => `${r.ready}→${r.at}`).join(' '));
     check(Math.max(0, ...Object.values(own)) <= BUDGET, `${name}: the batches' own work on the main thread stays under ${BUDGET} ms`, Object.entries(own).map(([k, v]) => `${k} ${v}`).join(', '));
     const moved = logs.filter(x => /moved/.test(x));
-    check(moved.every(x => /\((not ready|busy page|late|typing|steering)/.test(x)), `${name}: every move says why`, moved.join(' | ') || 'no move');
+    check(moved.every(x => /\((not ready|busy page|late|typing|order|answered after a move)/.test(x)), `${name}: every move says why`, moved.join(' | ') || 'no move');
+    check(done.every(d => d.moves.length === d.pushes && d.moves.every(m => m.why)), `${name}: every move is recorded on its batch with its reason`, done.map(d => `#${d.id} ${d.moves.map(m => m.why).join(',') || '-'}`).join(' '));
     console.log(`info  ${name}: ${moved.length} moves${moved.length ? `: ${moved.join(' | ')}` : ''}`);
     check(!slow.length, `${name}: no sound loaded after its note ("took too long")`, slow.join(', '));
     // the CPU slowed: a burst on this long song, its own work under the budget until it is ready
@@ -194,8 +206,112 @@ const table = [];
     }
     await page.click('#radio-start').catch(() => {}); await sleep(500);
   };
+  // the waves (console-add-waves D1 to D4), on the Classic song on air: see the header
+  const wavesCase = async (name, fresh) => {
+    const ph = (await steering()).phrase;
+    // (each case on a session of its own, pressed 0.3 bar after a phrase start: the next boundary is about a phrase
+    // away, about 14 s at 128 BPM)
+    let n = 0;
+    const start = async () => { await fresh(`add-ahead-classic-w${n++}`); const s = await steering(), r = await rel(); const b = (Math.floor(r / s.phrase) + 1) * s.phrase + 0.3; await R(x => globalThis.codingMiskRadio.seek(x), b); await sleep(600); };
+    const plusOf = async (n, not = []) => (await instOn()).filter(x => x.more && !not.includes(x.p)).map(x => x.p).slice(0, n);
+    const click = (kind, part) => page.click(pressSel(kind, part)).catch(() => {});
+    // 1. presses at 0, 4, 8 and 12 s: two batches, 0-8 s and 12 s; the first not moved by the later press
+    {
+      await start();
+      const [a, b, c, d] = await plusOf(4);
+      const parts = [a, b, c, d || a];
+      const ids = [];
+      for (let k = 0; k < 4; k++) { if (k) await sleep(4000); await click('more', parts[k]); await sleep(100); ids.push((await pending()).map(x => x.id)); }
+      const p = await pending(), first = p.find(x => x.id === Math.min(...p.map(y => y.id)));
+      check(p.length === 2 && first && first.presses.length === 3 && !first.moves.length, `${name}: presses at 0, 4, 8 and 12 s make two batches, the first of three presses and not moved`, JSON.stringify(p.map(x => ({ id: x.id, at: x.at, presses: x.presses.length, moves: x.moves }))));
+      const second = p.find(x => x !== first);
+      check(second && second.at >= first.at + ph, `${name}: the second wave enters at least a phrase after the first`, JSON.stringify(p.map(x => `#${x.id}@${x.at}`)));
+      await waitEntered();
+    }
+    // 2. presses at 0 and 6 s: two batches
+    {
+      await start();
+      const [a, b] = await plusOf(2);
+      await click('more', a); await sleep(6000); await click('more', b); await sleep(150);
+      const p = await pending();
+      check(p.length === 2, `${name}: presses at 0 and 6 s make two batches`, JSON.stringify(p.map(x => ({ id: x.id, at: x.at, parts: x.parts }))));
+      await waitEntered();
+    }
+    // 3. "+", then "−" 9 s later: taken back from its batch, no batch left
+    {
+      await start();
+      const [a] = await plusOf(1);
+      await click('more', a); await sleep(9000); await click('less', a); await sleep(150);
+      const p = await pending();
+      check(!p.length, `${name}: a "−" 9 s after a "+" takes it back, no new batch`, JSON.stringify(p.map(x => ({ id: x.id, parts: x.parts }))));
+    }
+    // 4. "+", then "−" and "+" 9 s later: the last "+" opens a new batch
+    {
+      await start();
+      const [a] = await plusOf(1);
+      await click('more', a); await sleep(150); const id0 = ((await pending())[0] || {}).id;
+      await sleep(9000); await click('less', a); await sleep(150); await click('more', a); await sleep(150);
+      const p = await pending();
+      check(p.length === 1 && p[0].id !== id0 && p[0].parts[a] === 1 && (await rows()).length === 1, `${name}: "+", then "−" and "+" 9 s later leave one new batch with "+1"`, JSON.stringify({ id0, p: p.map(x => ({ id: x.id, parts: x.parts })) }));
+      await waitEntered();
+    }
+    // 5. two waves, a long task before the first wave's boundary: the first moves (busy page), the second with "order"
+    {
+      await start();
+      const [a, b] = await plusOf(2);
+      await click('more', a); await sleep(6000); await click('more', b); await sleep(300);
+      const p0 = await pending(), w1 = p0.find(x => x.id === Math.min(...p0.map(y => y.id))), bs = await barSec();
+      if (p0.length !== 2) check(false, `${name}: two waves for the order case`, JSON.stringify(p0));
+      else {
+        for (let k = 0; k < 400 && (w1.at - (await rel())) * bs > 1.1; k++) await sleep(50);
+        await R(() => { setTimeout(() => { const t = performance.now(); while (performance.now() - t < 120); }, 0); });
+        let p = p0;
+        for (let k = 0; k < 60; k++) { await sleep(50); p = await pending(); const x = p.find(y => y.id === w1.id); if (x && x.at !== w1.at) break; }
+        const x1 = p.find(y => y.id === w1.id), x2 = p.find(y => y.id !== w1.id);
+        check(x1 && x1.moves.some(m => m.why === 'busy page') && x2 && x2.moves.some(m => m.why === 'order') && x2.at >= x1.at + ph, `${name}: the first wave moved by a busy page, the second keeps a phrase after it with the reason "order"`, JSON.stringify(p.map(y => ({ id: y.id, at: y.at, moves: y.moves }))));
+        await waitEntered();
+        const done = (await R(() => globalThis.codingMiskRadio.addsDone)).filter(d => p0.some(x => x.id === d.id));
+        check(done.length === 2 && done.every(d => d.moves.length === d.pushes), `${name}: the moves are recorded on the entered batches`, JSON.stringify(done.map(d => ({ id: d.id, at: d.at, moves: d.moves }))));
+      }
+    }
+  };
+  // a curve command with the CPU slowed (console-add-waves D8): see the header
+  const curveCase = async name => {
+    await freshPhrase((await rel()) + 1);
+    const r = await rel(), ph = (await steering()).phrase, d = Math.floor(r / (2 * ph)) + 1;
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: RATE });
+    const t0 = await R(() => { window.__lt = []; return performance.now(); }); late = [];
+    await R(c => globalThis.codingMiskRadio.command(c), { kind: 'curve', d, value: 0.9, curve: 'brightness' });
+    await sleep(6000);
+    const lt = await R(() => window.__lt);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    const m = { lt, t0 };
+    table.push(`${name}, a curve with the CPU ${RATE}× slower: longest ${longest(m)} ms, "too late" ${late.length}; tasks ${tasks(m)}`);
+    // (what the director's view of this song costs on the page with the CPU slowed, the work the press no longer does
+    // there: reported, not checked)
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: RATE });
+    const view = await R(() => (globalThis.codingMiskRadio.viewMs ? globalThis.codingMiskRadio.viewMs() : null));
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    table.push(`${name}: the director's view on the page would cost ${view} ms at ${RATE}× (${(await steering()).commands.length} commands)`);
+    const set = await R(dd => { const s = globalThis.codingMiskRadio.steering; return s.plan.curves[dd] && s.plan.curves[dd].brightness; }, d);
+    check(longest(m) <= BUDGET && late.length === 0, `${name}: a curve command with the CPU slowed ${RATE} times: no task over ${BUDGET} ms and no "too late" in the 6 s after it`, `longest ${longest(m)} ms, "too late" ${late.length}; tasks ${tasks(m)}`);
+    check(set === 0.9, `${name}: the curve value reaches the song`, `${set}`);
+  };
   if (OWNER) await ownerCase();
-  for (const profile of OWNER ? [] : PROFILES) {
+  if (CURVE) {
+    // (the owner's 10-minute song, where the view on the page cost about 115 ms, with twelve commands standing)
+    await R(() => { localStorage.clear(); localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: ['ambient', 'berlin-techno', 'darksynth', 'acid'], chaos: 0.6, energy: 0.45, complexity: 0.7, talk: 0, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song', profile: 'switch', compilation: 'off', length: 10 })); });
+    await page.reload(); await sleep(3500);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="radio"]'); await sleep(300);
+    await page.fill('#radio-seed', OWNER_SEED); await page.click('#radio-start');
+    check(await waitReady(), 'Live coder: the song is ready'); await sleep(2000);
+    const ph = (await steering()).phrase;
+    for (let k = 0; k < 12; k++) { await R(b => globalThis.codingMiskRadio.seek(b), (k % 3) * ph + 1.5 + k); await sleep(400); await R(c => globalThis.codingMiskRadio.command(c), { kind: k % 2 ? 'energy-up' : 'energy-down' }); await sleep(1500); }
+    await sleep(2500);
+    await freshPhrase(3 * ph);
+    for (let k = 0; k < 3; k++) await curveCase(`Live coder, owner's song (${k + 1})`);
+  }
+  for (const profile of OWNER || CURVE ? [] : PROFILES) {
     const name = NAMES[profile] || profile;
     await R(([p, st]) => { localStorage.clear(); localStorage.setItem('coding-misk-lang', 'en'); localStorage.setItem('coding-misk-radio', JSON.stringify({ styles: [st], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0, artist: null, transition: 'cut', harmony: 'compatible', scope: 'song', profile: p, compilation: 'off' })); }, [profile, STYLE]);
     await page.reload(); await sleep(3500);
@@ -289,7 +405,10 @@ const table = [];
       report(`${name}, a burst (${presses.map(([k, p]) => `${k === 'more' ? '+' : '−'} ${p}`).join(', ')})`, m);
       const got = (await steering()).commands.slice(before);
       check(m.first.length === 1, `${name}: the burst is one batch`, `${m.first.length}`);
-      check(got.length === presses.length && got.every(x => x.at === got[0].at), `${name}: the burst enters together, on one bar`, JSON.stringify(got.map(x => `${x.kind}:${x.part}@${x.at}`)));
+      // (a grown song: the head within 2 phrases with as many lines as can be typed, the rest within 4, console-add-waves D5)
+      const ph2 = (await steering()).phrase, ats2 = got.map(x => x.at);
+      if (profile === 'classic') check(got.length === presses.length && got.every(x => x.at === got[0].at), `${name}: the burst enters together, on one bar`, JSON.stringify(got.map(x => `${x.kind}:${x.part}@${x.at}`)));
+      else check(got.length === presses.length && Math.min(...ats2) - m.r0 <= 2 * ph2 && Math.max(...ats2) - m.r0 <= 4 * ph2, `${name}: the burst's head enters within 2 phrases, every change within 4`, `press ${m.r0.toFixed(1)}, ${JSON.stringify(got.map(x => `${x.kind}:${x.part}@${x.at}`))}`);
       check(m.q0.length === presses.length, `${name}: one queue row per instrument`, JSON.stringify(m.q0.map(x => x.text)));
     }
     // 3. net counts: "+ −" leaves nothing, "+ − +" is one, "+ +" is two
@@ -332,14 +451,15 @@ const table = [];
       report(`${name}, six presses (${presses.map(x => `+ ${x[1]}`).join(', ')})`, m);
       const got = (await steering()).commands.slice(before), ats = got.map(c => c.at), head = Math.min(...ats), last = Math.max(...ats);
       table.push(`${name}, six presses: press ${m.r0.toFixed(1)}, entries ${got.map(c => `${c.part}@${c.at}`).join(' ')}`);
-      check(got.length >= 4 && fams.every(p => got.some(c => c.part === p && c.at === head)) && got.filter(c => c.at === head).length >= Math.ceil(got.length / 2), `${name}: most of the six enter on the first boundary, one of each instrument at least`, got.map(c => `${c.part}@${c.at}`).join(' '));
-      check(last - m.r0 <= 3 * ph + 1, `${name}: every entry within about three phrases of the press`, `press ${m.r0.toFixed(1)}, last ${last}, phrase ${ph}`);
+      check(got.length >= 4 && head - m.r0 <= 2 * ph, `${name}: the head of the six enters within 2 phrases of the press`, `press ${m.r0.toFixed(1)}, ${got.map(c => `${c.part}@${c.at}`).join(' ')}`);
+      check(last - m.r0 <= 4 * ph, `${name}: every line within 4 phrases of the press`, `press ${m.r0.toFixed(1)}, last ${last}, phrase ${ph}`);
       const hf = await heardFrom(got.length, m.r0, 6 * ph);
       check(hf.filter(b => b !== null && b <= last).length >= Math.ceil(hf.length / 2), `${name}: most added tracks play by the last entry bar (a kick may sit out a break; check:radio-profiles checks each track's boundary)`, `${JSON.stringify(hf)} for ${JSON.stringify(ats)}`);
       const tailParts = [...new Set(got.filter(c => c.at > head).map(c => c.part))];
       if (tailParts.length && (await rel()) < last) {
         const w = await watchTrail(ats, tailParts);
-        check(tailParts.every(p => w.seen[p]) && tailParts.every(p => !w.after[p]), `${name}: an instrument's badge stays until all of its tracks play (${tailParts.join(', ')}), then goes`, JSON.stringify(w));
+        const onHead = new Set(got.filter(c => c.at === head).map(c => c.part));
+        check(tailParts.every(p => (onHead.has(p) ? w.seen[p] : w.any[p])) && tailParts.every(p => !w.after[p]), `${name}: an instrument's badge stays until all of its tracks play (${tailParts.join(', ')}), then goes`, JSON.stringify(w));
       } else console.log(`info  ${name}: the six entered on one boundary${tailParts.length ? ' (already past)' : ''}`);
       await waitEntered();
     }
@@ -416,6 +536,8 @@ const table = [];
         check(got.length === 1 && got[0].kind === 'lock' && got[0].track === id && got[0].at === m.at && locked, `${name}: "lock ${id}" recorded on its entry bar and the track locked`, JSON.stringify(got.map(c => `${c.kind}:${c.track}@${c.at}`)));
       }
     }
+    if (profile === 'classic') await wavesCase(name, fresh);
+    if (profile === 'switch' && !QUICK) await curveCase(name);
     if (profile === 'classic' && !QUICK) {
       // 5. the steering away from the page is the page's own, and a replay gives the same song
       {

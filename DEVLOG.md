@@ -2860,3 +2860,51 @@ Misure (sessione del proprietario, Chrome headless, macchina condivisa con caric
 | note mute «no soundfont zone» | 12 | 0 | 12 | 0 |
 
 Prove: `check-add-lag --owner` (tutto ok, lavoro proprio dei batch ≤ 19 ms con CPU 4×), `check:sound-guard` (due controlli nuovi: campioni di un codice, nota fuori dal font), `check:endless` (96), più quelli sotto prima del commit.
+
+## 2026-11-08 diagnosi delle ondate della console (#82)
+
+Ramo `docs/82-console-waves` da `develop` (6895b24). Solo pianificazione: change OpenSpec `console-add-waves`, nessun codice del prodotto.
+
+- **Problema (proprietario):** un «+» della console mostra «Entra tra 5 s» e poco dopo passa a 25 o 50 s; più «+» spostano di nuovo le entrate; un «+» premuto 15 s dopo entra nello stesso lotto e sposta tutto più avanti.
+- **Misure** (log temporaneo in `radio.js` e `waypoints.js`, mai committato; kit in `openspec/changes/console-add-waves/baseline/`: `run.sh`, `measure.cjs`, `instrumentation.patch`, risultati): Classic, Crescendo, Live coder × berlin-techno e lo-fi × nessun comando prima o molti (8, in lo-fi 6) × un «+», tre «+» in fila, sei «+» in tre gruppi (0, 15 s, 20 s). 44 lotti.
+
+| Profilo | Comandi prima | Lotti | Testa entro 2 frasi | Testa oltre 2 frasi | Testa peggiore | Lotti spostati | Steering (mediana) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Classic | nessuno / molti | 8 / 8 | 8 / 8 | 0 / 0 | 1,9 frasi | 1 / 1 | 0,0 / 0,1 s |
+| Crescendo | nessuno / molti | 8 / 7 | 8 / 6 | 0 / 1 | 2,7 frasi | 0 / 2 | 0,7 / 2,4 s |
+| Live coder | nessuno / molti | 6 / 8 | 5 / 4 | 1 / 4 | 11,8 frasi | 4 / 6 | 0,3 / 4,4 s |
+
+- **Cause, per spostamento:** battitura che non sta nel confine 9 (9 lotti, solo brani cresciuti, da 1 a 3 frasi in più), preparazione non pronta 12 (11 in un solo lotto), pagina occupata 3. 12 lotti hanno preso pressioni arrivate da 5 a 22 s dopo la prima.
+- **Causa principale:** lo steering in onda dei brani cresciuti. Rigioca tutti i comandi: con molti comandi prima dura da 2 a 13 s (da 0,2 a 1,6 s senza). Su un brano Live coder con 12 s di steering il lotto è slittato 11 volte, una frase alla volta (da «Entra tra 11 s» a circa 170 s): `addAt` usa il tempo di preparazione dell'ultima volta della pagina (1 s) e non quello del brano (`item.addPrep`), `expectedPrep` non è mai chiamata, e ogni spostamento rifà lo steering da capo. Lo stesso caso con un altro seed (4,4 s) entra in orario. Gli spostamenti più frequenti (da 1 a 3 frasi) vengono dalla regola della testa: almeno una riga per strumento, quindi tre strumenti sono sempre tre righe, da 50 a 70 s di battitura.
+- **Da sapere:** in Crescendo la prova di battitura non sta mai (da 1,2 a 2,8 s utili a ogni confine), quindi la testa la sceglie sempre il ripiego; di solito resta sul primo confine. I brani lo-fi sono di 48-80 battute: con 8 comandi uno per frase finivano dopo la pressione, rifatto con 6 comandi nelle prime due frasi.
+- **Decisioni del proprietario nella change:** finestra di unione (5 s dall'ultima pressione, 10 s dalla prima), seconda ondata almeno una frase dopo il lotto prima, che una pressione non sposta mai, motivo registrato per ogni spostamento, badge aggiornato frase per frase senza costi. Lo steering incrementale si fa prima, come change a parte: l'obiettivo delle 2 frasi e la testa che si accorcia si rimisurano dopo, con lo stesso kit.
+
+## 2026-11-09 ondate della console (#82)
+
+Ramo `feat/82-console-waves` da `feat/44-themed-checks` (3ba4d8d, uguale a develop), con `docs/82-console-waves` unito. Change OpenSpec `console-add-waves`, aggiornata prima del codice con le decisioni finali del proprietario dell'8 novembre (commit a sé).
+
+- **Finestra di unione (D1).** Una pressione entra nell'ultimo lotto in attesa del brano solo entro 5 s dalla sua ultima pressione e 10 s dalla prima (con almeno 2 s prima del confine); altrimenti apre un lotto nuovo. Prima entrava nel lotto più vecchio con tempo rimasto, a qualsiasi distanza.
+- **Annullare (D2).** Un «−» che toglie un «+» in attesa (o il contrario, o il lucchetto opposto) torna al lotto che lo contiene, anche fuori dalla finestra, e non sposta la finestra. Semplificazione del proprietario: in «+», «−», «+» l'ultimo «+» è una pressione normale e fuori finestra apre un lotto nuovo.
+- **Seconda ondata (D3).** Un lotto nuovo entra almeno una frase dopo quelli prima, che una pressione non sposta mai. Il lotto dopo è sterzato sopra i comandi dei lotti prima (lo steering incrementale riusa il loro risultato) e di nuovo quando entrano; se uno prima si sposta, quelli dopo lo seguono con il motivo `order`.
+- **Motivi (D4).** Ogni spostamento è registrato sul lotto (`moves`: da, a, motivo, dettaglio) e le pressioni pure (`presses`), in `pendingAdds` e `addsDone`; la riga di log resta: `typing`, `not ready`, `busy page`, `late`, `order`, `answered after a move`.
+- **Testa entro 2 frasi (D5).** In `steerOnAir` la testa prende il primo confine entro 2 frasi dalla prima pressione dove si scrive almeno una riga, con quante righe ci stanno; se nessuno, il confine vicino con più tempo, in fretta, con la testa di prima (una riga per strumento, metà delle righe: così Crescendo, dove la prova non sta mai, tiene insieme le raffiche); 3-4 frasi solo se non resta un confine vicino. Prima prova scartata: un confine lontano dove una riga sta prima di uno vicino in fretta portava le teste del proprietario a 2,3-3,3 frasi (2-3 minuti).
+- **Brani lenti (D6).** Se il prossimo inizio di frase è a più di 30 s dalla pressione, il lotto può entrare a metà frase entro 30 s. Verificato: il regista non lo accettava (chiave forzata frazionaria mai letta, `round` saltava la mezza frase). Ora `steerSong` riscrive dalla mezza frase per «+», «−» e pattern salvati su una mezza frase (`halfPhrase`), `directSong` li mette sulla loro battuta dopo le mosse dell'inizio di frase, `headroom` parte da lì. Ogni altro comando o battuta come prima: fixture invariate. Nuovo controllo in `check:endless` (30 brani: passi prima della battuta invariati, traccia sulla sua battuta, un comando dopo la tiene, un «−» su mezza frase la toglie, replay uguale).
+- **Badge (D7):** invariato, dai campi del lotto, nessun lavoro in più.
+- **Comando curva (D8, bug rimasto dall'ultima correzione).** La pagina non fa più la vista del regista mentre aspetta il worker (la tiene solo per un'estensione in attesa); le curve mostrano i comandi curva ed energia in attesa sopra l'ultima vista (`viewPend`). Sul brano del proprietario con 13-15 comandi la vista costava 52-63 ms con CPU 4× per comando; i 115 ms del 9 novembre non li ho riprodotti (erano con la voce e più comandi). Dopo: nessun task oltre 50 ms nei 6 s dopo una curva, nessun «too late».
+- **Strumenti:** `tools/check-add-waves.cjs` (il kit del baseline senza strumentazione: teste in frasi per lotto, spostamenti per motivo, long task, «too late», lavoro proprio dei lotti); `check-add-lag` con finestra, annullamento, «+ − +», seconda ondata, `order`, curva con CPU 4× (`--curve`), sei pressioni e raffica con la regola nuova, sessione del proprietario con almeno 90 % entro 2 frasi; `check:radio-profiles` con la regola nuova della testa.
+
+Misure (porta 5306, Chrome headless, macchina condivisa; «prima» su 82eaded, stesso strumento):
+
+| | prima 1× | dopo 1× | prima 4× | dopo 4× |
+| --- | --- | --- | --- | --- |
+| lotti (kit) | 49 | 65 (p6 ora in tre ondate) | 9 | 12 |
+| teste entro 2 frasi | 49 (100 %) | 62 (95 %) | 9 (100 %) | 12 (100 %) |
+| testa peggiore | 1,88 frasi | 2,87 frasi (terza ondata lo-fi) | 1,78 | 1,76 |
+| teste oltre 4 frasi | 0 | 0 | 0 | 0 |
+| spostamenti | typing 7 | typing 5 | busy page 1, typing 1 | typing 2 |
+| task > 100 ms | 1 (326 ms, Classic) | 1 (295 ms, Classic) | 1 (115 ms) | 5 (fino a 161 ms, tutti Classic) |
+| «too late» | 2 | 1 | 2 | 5 (Classic) |
+| sessione del proprietario: teste | 0,92 / 0,49 / 0,25 frasi (50 / 27 / 14 s) | 0,42 / 0,29 / 0,49 / 0,25 / 1,08 frasi (23 / 16 / 27 / 14 / 59 s) | | |
+
+- **Da sapere:** le teste oltre 2 frasi dopo sono terze ondate dei p6 lo-fi (pressioni a 15 e 21 s: la seconda ondata è a una frase dalla prima, la terza a una frase dalla seconda), come vuole la decisione B. I task lunghi di Classic con CPU 4× sono la valutazione del codice nuovo all'ingresso (lavoro proprio dei lotti al massimo 9 ms, un p3 con un solo lotto ha lo stesso percorso di prima); prima e dopo un p6 Classic a 1× ha un task di circa 300 ms all'ingresso. Crescendo e Live coder: nessun task oltre 100 ms.
+- **Prove:** `check:steer-memo` (35 brani, 309 steering confrontati), `check:endless` (97, uno nuovo), `check:radio-profiles` (31), `check:live-code` (25), `check:crescendo` rapido (42), `check:sound-guard` (14), `check:knowledge`, `check:guide`, `npm run build`; nel browser (porta 5306) `check-add-lag` completo (tutti i profili, sessione del proprietario e curva), `check-add-lag --owner`, `check-add-waves` a 1× e 4×, `check-steering`. Fixture invariate, nessun `DIRECTOR_VERSION` o `SHAPES_VERSION` nuovo: la mezza frase vale solo per i comandi «+», «−» e pattern nuovi su una mezza frase, che i comandi registrati prima non hanno, e la regola della testa sceglie solo dove va un lotto in attesa (le repliche usano le battute registrate).

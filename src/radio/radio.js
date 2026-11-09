@@ -232,9 +232,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   function steerAir(item, { async = false, then = null } = {}) {
     const token = item.growToken = (item.growToken || 0) + 1;
     // (#82: the director's view with the new commands, for the console until the answer, in a task of its own after the
-    // press; the answer brings the view made in the worker)
+    // press; the answer brings the view made in the worker. console-add-waves D8: only for an extension still waiting
+    // for its answer, which changes the parts the next press counts; a curve or energy change is shown from the command
+    // itself, viewPend, and the view on the page cost about 115 ms with the CPU slowed 4 times)
     const hasView = async && !!player.steer;
-    if (item.g0) { if (hasView) setTimeout(() => { if (S && item.growToken === token && item.growing) airView(item); }, 0); else airView(item); }
+    if (item.g0) { if (!hasView) airView(item); else if (item.commands.some(c => c.pend && c.kind === 'extend')) setTimeout(() => { if (S && item.growToken === token && item.growing) airView(item); }, 0); }
     const args = { grown: item.g0 || null, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: item.commands.map(c => ({ ...c })), seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe), owner: ownerOf(item), ...(hasView ? { view: true } : {}) };
     // (the answer to a typed line gives the song already on air: that one is kept, so the window is not written again
     // and its plan not made twice, #82)
@@ -249,7 +251,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the song an item plays; its bars move the songs after it
   function setSong(item, song) {
     // (ver: the console is drawn again when the song changes, #82: a command's steering answers after its press)
-    item.song = song; item.curves = null; item.ver = (item.ver || 0) + 1;
+    item.song = song; item.curves = null; item.ver = (item.ver || 0) + 1; item.viewPend = null;
     const bars = barsOf(song) + (item.cut ? 0 : item.extra || 0);
     if (bars !== item.bars && !item.cut) { item.bars = bars; const i = S ? S.stream.indexOf(item) : -1; if (i >= 0) relayoutFrom(i); }
   }
@@ -707,6 +709,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (air && c.kind === 'say-live') { setSong(item, pre ? pre.song : sayAir(item.song, [{ at, text: c.text, lang: c.lang, speaker: c.speaker || '', mode: c.mode === 'moment' ? 'moment' : 'now' }])); item.said = item.song; }
     // (the answer swaps the window only when it changed the song: a typed line's answer is the song already playing)
     const swapped = item.song;
+    // (a curve or energy change steered away from the page: the curves show it from the command until the answer, D8)
+    if (VIEW_KINDS.includes(cmd.kind) && !(pre && pre.steer)) item.viewPend = [...(item.viewPend || []), cmd];
     // (a typed line tried on a Classic song: the steering's result is the song with it, as resteer gives it)
     if (pre && pre.steer && !air) { const r = pre.steer; item.plan = r.plan; item.opts = r.opts; item.plain = r.song; setSong(item, r.song); }
     else resteer(item, { async: true, then: () => { keepHistory(item); if (item.song !== swapped) swapSoon(windowPlayable(), pendingBy(item)); renderNow(); } });
@@ -777,6 +781,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // press. (A half-phrase start was planned for a later entry; the steering writes a change from the phrase start at or
   // after its bar, so later entries go to the next phrase start.)
   const ADD_LEAD = 2, ADD_SETTLE = 250, ADD_BOUND = 30, ADD_QUIET = 2000, ADD_TASK = 50, ADD_STEP = 100, ADD_MARGIN = 0.34;
+  // the join window of a batch (console-add-waves D1): a press joins the latest batch within ADD_JOIN_LAST ms of its last
+  // press and ADD_JOIN_FIRST ms of its first; a slow song's batch may enter on a half-phrase start within ADD_CAP seconds
+  // of its first press (D6)
+  const ADD_JOIN_LAST = 5000, ADD_JOIN_FIRST = 10000, ADD_CAP = 30;
   const load = createLoadMonitor();
   let batches = [], batchN = 0, addPrep = 1, addRest = 0.5, addTimer = null, addsDone = [];
   // the longest piece of the batches' own work on the main thread, per kind (tools/check-add-lag.cjs)
@@ -787,16 +795,23 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   const secsTo = (item, at) => (item.start + at - nowBar()) * barSecOf(item.song, at);
   // the phrase starts of the song on air after bar rel, in its bars (a grown song: the director's phrases moved by its
   // offset, as airBoundaries gives them, without its limit of two)
-  function addStarts(item, rel) {
+  // (half: the half-phrase starts instead, console-add-waves D6; none when the phrase has an odd number of bars)
+  function addStarts(item, rel, half = false) {
     const ph = item.plan.phrase, last = item.plan.bars - ph, air = airSteer(item) && item.g0, off = air ? airOffset(item.g0) : 0, out = [];
-    for (let d = Math.max(0, (Math.floor((rel - off) / ph) + 1) * ph); d <= last; d += ph) if (d + off > rel) out.push(d + off);
+    if (half && ph % 2) return out;
+    const h = half ? ph / 2 : 0;
+    for (let d = Math.max(0, (Math.floor((rel - off) / ph) + (half ? 0 : 1)) * ph); d <= last; d += ph) if (d + off + h > rel) out.push(d + off + h);
     return out;
   }
   // the boundary a change pressed now takes: the first phrase start after `after` that leaves ADD_LEAD seconds plus this
   // song's expected preparation of a batch of k commands (expectedPrep), or null near the end of the song
-  function addAt(item, after = -Infinity, k = 1) {
-    const rel = relNow(), need = ADD_LEAD + expectedPrep(item, k);
-    return addStarts(item, rel).find(b => b > after && (b - rel) * barSecOf(item.song, b) >= need) ?? null;
+  // (q: the bar of the batch's first press, now by default: a slow song whose phrase start is more than ADD_CAP seconds
+  // after it takes the first half-phrase start within ADD_CAP seconds that leaves the time, D6)
+  function addAt(item, after = -Infinity, k = 1, q = null) {
+    const rel = relNow(), need = ADD_LEAD + expectedPrep(item, k), ok = b => b > after && (b - rel) * barSecOf(item.song, b) >= need;
+    const at = addStarts(item, rel).find(ok) ?? null, from = q ?? rel, secs = b => (b - from) * barSecOf(item.song, b);
+    if (at !== null && secs(at) > ADD_CAP) { const h = addStarts(item, rel, true).find(b => b < at && ok(b) && secs(b) <= ADD_CAP); if (h !== undefined) return h; }
+    return at;
   }
   // the expected preparation of a batch of k commands on a song (D2; incremental-steering D9). Classic: the last batch's
   // time on this song, else the page's (1 s before the first). A grown song: the steering reuses the commands before the
@@ -843,14 +858,14 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const mine = on.filter(x => instrumentOf(x) === part).length + net;
     return mine <= 0 ? 'not-playing' : total <= 1 ? 'last-track' : null;
   }
-  // a press: the batch it joins (the earliest one of the song with ADD_LEAD seconds left, D3), else the batch of the
-  // boundary a press now takes
+  // a press: an undo goes back to the batch holding the change it takes back (console-add-waves D2); else the batch it
+  // joins (the latest one of the song, within its join window, D1), else a new batch (a second wave, D3)
   function pend(kind, part) { const t0 = performance.now(); try { return pendNow(kind, part); } finally { cost('press', t0); } }
   function pendNow(kind, part) {
     if (!S || S.paused !== undefined || !['more', 'less'].includes(kind)) return false;
     const item = S.stream[S.onAir];
     if (!item.plan) { toast(t(item.frozen ? 'steerWhy:frozen' : 'steerWhy:lead')); return false; }
-    const b = batchFor(item);
+    const back = undoOf(item, kind, part), b = back || batchFor(item);
     if (!b) { toast(t('steerLate')); return false; }
     const why = pendWhy(item, b, kind, part);
     if (why) { if (emptyBatch(b)) batches = batches.filter(x => x !== b); toast(t(`steerWhy:${why}`, { type: instName(part) })); paintPending(); return false; }
@@ -862,20 +877,37 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       if (!b.parts[part]) delete b.parts[part];
     }
     b.session = opts.scope === 'session';
+    pressed(b, kind, part, !!back);
     restartBatch(b, ADD_SETTLE);
     paintPending();
     addWatch();
     return true;
   }
-  // the batch a press joins (D3): the earliest one of the song with ADD_LEAD seconds left, else the batch of the
-  // boundary a press now takes (made when there is none), or null near the end of the song
+  // the latest batch of the song a press takes a change back from (D2): a "−" with a "+" (or a saved pattern) of the
+  // instrument pending, a "+" with a "−" pending, while more than ADD_MARGIN of a bar is left; or null
+  function undoOf(item, kind, part) {
+    const left = b => item.start + b.at - nowBar() > ADD_MARGIN;
+    const holds = b => (kind === 'less' ? (b.parts[part] || 0) > 0 || b.pats.some(x => x.part === part) : (b.parts[part] || 0) < 0);
+    return batches.filter(b => b.item === item && left(b) && holds(b)).reduce((a, b) => (!a || b.id > a.id ? b : a), null);
+  }
+  // a press recorded on its batch (D4: the checks read them); an undo does not move the join window (D2)
+  function pressed(b, kind, part, undo = false) {
+    const now = performance.now();
+    if (!undo) b.tLast = now;
+    b.presses.push({ t: Math.round(now - b.t0), rel: Math.round(relNow() * 100) / 100, kind, part, ...(undo ? { undo: true } : {}) });
+  }
+  // the earliest boundary of a later wave (D3): a phrase after the latest boundary of the song's batches before it
+  const waveFloor = (item, id) => { const xs = batches.filter(x => x.item === item && x.id < id); return xs.length ? Math.max(...xs.map(x => x.at)) + item.plan.phrase : -Infinity; };
+  // the batch a press joins (D1): the latest one of the song, within ADD_JOIN_LAST ms of its last press and
+  // ADD_JOIN_FIRST ms of its first, with ADD_LEAD seconds left; else a new batch on the boundary a press now takes, at
+  // least a phrase after the batches before it (D3), or null near the end of the song
   function batchFor(item) {
-    let b = batchesOf(item).find(x => secsTo(item, x.at) >= ADD_LEAD);
-    if (b) return b;
-    const at = addAt(item);
+    const now = performance.now(), last = batches.filter(x => x.item === item).reduce((a, b) => (!a || b.id > a.id ? b : a), null);
+    if (last && now - last.tLast <= ADD_JOIN_LAST && now - last.tFirst <= ADD_JOIN_FIRST && secsTo(item, last.at) >= ADD_LEAD) return last;
+    const floor = waveFloor(item, Infinity), at = addAt(item, floor - 0.5);
     if (at === null) return null;
-    b = batchesOf(item).find(x => x.at === at) || null;
-    if (!b) { b = { id: ++batchN, S, item, at, at0: at, parts: {}, pats: [], locks: {}, t0: performance.now(), q: Math.round(relNow() * 100) / 100, state: 'settle', seq: 0, pushes: 0, flash: 0, session: false }; batches.push(b); }
+    const b = { id: ++batchN, S, item, at, at0: at, parts: {}, pats: [], locks: {}, t0: now, tFirst: now, tLast: now, q: Math.round(relNow() * 100) / 100, state: 'settle', seq: 0, pushes: 0, flash: 0, session: false, presses: [], moves: [] };
+    batches.push(b);
     return b;
   }
   const emptyBatch = b => !Object.keys(b.parts).length && !b.pats.length && !Object.keys(b.locks).length;
@@ -892,6 +924,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (pendWhy(item, b, 'more', part) === 'cap') { if (emptyBatch(b)) batches = batches.filter(x => x !== b); toast(t('steerWhy:cap', { type: instName(part) })); paintPending(); return false; }
     b.pats.push({ item: pat, part });
     b.session = opts.scope === 'session';
+    pressed(b, 'pattern', part);
     restartBatch(b, ADD_SETTLE);
     paintPending();
     addWatch();
@@ -911,6 +944,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const last = batchesOf(item).filter(x => x.locks[key]).pop();
     if (last && item.start + last.at - nowBar() > ADD_MARGIN) {
       delete last.locks[key];
+      pressed(last, kind, key, true);
       restartBatch(last, ADD_SETTLE);
       paintPending();
       return true;
@@ -920,6 +954,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (!b) { toast(t('steerLate')); return false; }
     b.locks[key] = { kind, ...target };
     b.session = opts.scope === 'session';
+    pressed(b, kind, key);
     restartBatch(b, ADD_SETTLE);
     paintPending();
     addWatch();
@@ -929,10 +964,33 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // its boundary)
   function restartBatch(b, wait = 0) {
     if (b.inflight && player.cancelAhead) { b.inflight = false; player.cancelAhead(); }
-    b.seq++; b.state = 'settle'; b.ready = null; b.retarget = false;
+    b.seq++; b.state = 'settle'; b.ready = null; b.retarget = false; b.cmds = null;
     clearTimeout(b.timer);
-    if (emptyBatch(b)) { batches = batches.filter(x => x !== b); return; }
+    if (emptyBatch(b)) { batches = batches.filter(x => x !== b); orderAfter(b); return; }
     b.timer = setTimeout(() => prepBatch(b), wait);
+  }
+  // the commands of the song's batches before a later wave, as they were last prepared (D3: the later wave is steered on
+  // top of them), and their key; null while one of them is still waiting for its preparation
+  const stackOf = b => { const xs = batches.filter(x => x.item === b.item && x.id < b.id).sort((x, y) => x.id - y.id); return xs.some(x => !x.cmds) ? null : { key: xs.map(x => `${x.id}:${x.cmdsSeq}`).join(), cmds: xs.flatMap(x => x.cmds) }; };
+  const stackKey = b => { const s = stackOf(b); return s ? s.key : null; };
+  // a batch's boundary moves (D4): logged with its reason, recorded, shown at once; the later waves keep a phrase after it
+  function moveBatch(b, to, why, detail = '') {
+    console.info(`[radio] console change moved from bar ${b.at + 1} to bar ${to + 1} (${why}${detail ? `: ${detail}` : ''})`);
+    b.moves.push({ from: b.at, to, why, ...(detail ? { detail } : {}) });
+    b.at = to; b.flash = performance.now() + 600; b.pushes++;
+    orderAfter(b);
+  }
+  // the later waves of a batch that moved or went (D3): each at least a phrase after the batches before it, else it moves
+  // with the reason "order" and is steered again for its new boundary
+  function orderAfter(b) {
+    for (const x of batches.filter(y => y.item === b.item && y.id > b.id).sort((y, z) => y.id - z.id)) {
+      const floor = waveFloor(x.item, x.id);
+      if (x.at >= floor) continue;
+      const at = addAt(x.item, floor - 0.5, sizeOf(x), x.q);
+      if (at === null) { batches = batches.filter(y => y !== x); toast(t('steerLate')); continue; }
+      moveBatch(x, at, 'order');
+      restartBatch(x, 0);
+    }
   }
   // the batch as commands (D3): instruments in the order of INSTRUMENTS, "−" before "+", |n| times each, then the locks
   // in the order pressed (D8), one boundary, each in today's form (lock-part and unlock-part with the part, lock and
@@ -960,17 +1018,22 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const item = b.item;
     if (S.stream[S.onAir] !== item) { batches = batches.filter(x => x !== b); return; }
     if (S.paused !== undefined) { b.timer = setTimeout(() => prepBatch(b), 300); return; }
+    // (a later wave waits for the commands of the batches before it, D3)
+    const stack = stackOf(b);
+    if (!stack) { b.timer = setTimeout(() => prepBatch(b), 100); return; }
     // (the earliest boundary its steering may take, #82: the first that leaves time to prepare the batch as it is now,
     // or its bar when that is earlier. Its own head moved later by the typing never holds a new steering back: a batch
     // steered again for a new press took the head of the last steering as its earliest boundary, the typing moved it
-    // on again, and a batch that kept taking presses drifted phrase after phrase)
-    const tgt = addAt(item, -Infinity, sizeOf(b));
+    // on again, and a batch that kept taking presses drifted phrase after phrase. A later wave: a phrase after the
+    // batches before it, D3)
+    const tgt = addAt(item, waveFloor(item, b.id) - 0.5, sizeOf(b), b.q);
     b.min = tgt === null ? b.at : Math.min(b.at, tgt);
     const seq = ++b.seq, air = airSteer(item) && item.g0, cmds = batchCommands(b, air), started = performance.now();
     b.state = 'prep'; b.base = item.commands; b.song0 = item.song; b.win = windowItems(); b.started = started; b.inflight = true;
+    b.cmds = cmds; b.cmdsSeq = seq; b.stack = stack.key;
     const alive = () => b.seq === seq && batches.includes(b) && S === b.S && S.stream[S.onAir] === item;
-    const fresh = () => alive() && item.commands === b.base && item.song === b.song0;
-    const all = [...item.commands, ...cmds].map(c => ({ ...c }));
+    const fresh = () => alive() && item.commands === b.base && item.song === b.song0 && stackKey(b) === b.stack;
+    const all = [...item.commands, ...stack.cmds, ...cmds].map(c => ({ ...c }));
     const job = air ? (player.steerAhead || player.steer)({ grown: item.g0, song: item.base.song, plan: item.base.plan, opts: item.base.opts, commands: all, seed: S.recipe.seed, n: item.n, ctx: item.growCtx, chooser: airChooserOf(S.recipe), view: true, owner: ownerOf(item) })
       : (player.steerClassic ? player.steerClassic({ ...item.base, commands: all, seed: S.recipe.seed, n: item.n, owner: ownerOf(item) }) : new Promise(r => setTimeout(r, 0)).then(() => steerSong({ ...item.base, commands: all, seed: S.recipe.seed, n: item.n })))
         .then(r => (item.growCtx && player.grow ? (player.growAhead || player.grow)(r.song, item.growCtx).then(g => ({ ...r, plain: r.song, song: g })) : { ...r, plain: r.song }));
@@ -985,13 +1048,13 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       if (air) item.steerPer = (Number.isFinite(r.ms) ? r.ms : performance.now() - started) / 1000 / Math.max(1, Number.isFinite(r.work) ? r.work : cmds.length);
       if (b.retarget) {
         b.retarget = false; holdPrep(item, (performance.now() - started) / 1000 * 1.2 + 0.5);
-        const at2 = addAt(item, b.at - 1, cmds.length);
+        const at2 = addAt(item, Math.max(b.at, waveFloor(item, b.id)) - 0.5, cmds.length, b.q);
         if (at2 === null) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; }
         // (#82: a grown song's steering whose head is at or after the boundary the push gave is kept as it is: steered
         // again, it took as long once more and was pushed again)
         const got = air && fresh() ? cmds.map(c => r.commands.find(x => x.id === c.id)) : null, head = got && got.every(Boolean) ? Math.min(...got.map(x => x.at)) : null;
         if (head === null || head < at2) {
-          if (at2 !== b.at) { console.info(`[radio] console change moved from bar ${b.at + 1} to bar ${at2 + 1} (steering of ${Math.round(performance.now() - started)} ms answered after a push)`); b.at = at2; b.flash = performance.now() + 600; b.pushes++; }
+          if (at2 !== b.at) moveBatch(b, at2, 'answered after a move', `steering of ${Math.round(performance.now() - started)} ms`);
           restartBatch(b, 0); return;
         }
       }
@@ -1003,11 +1066,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         const got = cmds.map(c => r.commands.find(x => x.id === c.id));
         if (got.some(x => !x)) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; }
         at = Math.min(...got.map(x => x.at));
-        if (at !== b.at) {
-          const h = (r.heads || []).find(x => x.batch === cmds[0].batch);
-          console.info(`[radio] console change moved from bar ${b.at + 1} to bar ${at + 1} (typing${h ? `: ${h.k} of ${h.n} lines on the head, ${h.cands.join(' ')}` : ''})`);
-          b.at = at; b.flash = performance.now() + 600; b.pushes++;
-        }
+        const h = (r.heads || []).find(x => x.batch === cmds[0].batch);
+        if (h) b.head = { k: h.k, n: h.n, fallback: !!h.fallback };
+        if (at !== b.at) moveBatch(b, at, 'typing', h ? `${h.k} of ${h.n} lines on the head${h.fallback ? ', fallback' : ''}, ${h.cands.join(' ')}` : '');
       }
       const ats = air ? new Set(r.commands.filter(x => cmds.some(c => c.id === x.id)).map(x => x.at - airOffset(r.grown))) : new Set([at]);
       const plain = air ? r.view.song : r.plain, plan = air ? r.view.plan : r.plan, ids = new Set((plan.added || []).filter(a => ats.has(a.at)).map(a => a.id));
@@ -1044,10 +1105,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   function pushBatch(b, why) {
     // (not ready: the preparation takes at least as long as it ran, so the next boundary leaves that much again)
     if (b.state === 'prep' && b.started) holdPrep(b.item, (performance.now() - b.started) / 1000 * 1.25);
-    const at = addAt(b.item, b.at, sizeOf(b));
-    if (at === null) { batches = batches.filter(x => x !== b); toast(t('steerLate')); paintPending(); return; }
-    console.info(`[radio] console change moved from bar ${b.at + 1} to bar ${at + 1} (${why})`);
-    b.at = at; b.flash = performance.now() + 600; b.pushes++;
+    const at = addAt(b.item, Math.max(b.at + 0.5, waveFloor(b.item, b.id) - 0.5), sizeOf(b), b.q);
+    if (at === null) { batches = batches.filter(x => x !== b); orderAfter(b); toast(t('steerLate')); paintPending(); return; }
+    moveBatch(b, at, why);
     // (a steering still running is left to finish: it says how long this song's steering takes, and the batch is
     // steered again for its new boundary when it answers; stopping it would start the same long work again)
     if (b.inflight) { b.retarget = true; paintPending(); return; }
@@ -1067,7 +1127,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         if (b.S !== S || S.stream[S.onAir] !== b.item) { batches = batches.filter(x => x !== b); continue; }
         if (S.paused !== undefined) continue;
         const item = b.item, left = item.start + b.at - player.now();
-        if (b.state !== 'settle' && (item.commands !== b.base || item.song !== b.song0)) { restartBatch(b); continue; }
+        if (b.state !== 'settle' && (item.commands !== b.base || item.song !== b.song0 || stackKey(b) !== b.stack)) { restartBatch(b); continue; }
         // (a ready batch whose window lost its next song meanwhile gets its window made again)
         if (b.state === 'ready' && !sameWin(b) && left > ADD_MARGIN + 1) { reWindow(b); continue; }
         if (left > ADD_MARGIN + 0.12) continue;
@@ -1103,7 +1163,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const placed = cmds.map(c => ({ c, at: air ? ((r.commands.find(x => x.id === c.id) || {}).at ?? b.at) : b.at })), fams = {};
     for (const { c, at } of placed) { const part = c.kind === 'pattern' ? patternPart(c.item) : c.kind === 'more' ? c.part : null; if (part) (fams[part] = fams[part] || []).push(at); }
     item.trails = [...(item.trails || []).filter(x => x.ats.some(a => a > relNow())), ...Object.entries(fams).map(([part, ats]) => ({ id: b.id, part, ats: ats.sort((x, y) => x - y) }))];
-    addsDone = [...addsDone.slice(-19), { id: b.id, at0: b.at0, at: b.at, ats: placed.map(x => x.at), pats: b.pats.length, parts: { ...b.parts }, locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), pushes: b.pushes, underLoad, waited: Math.round(performance.now() - b.t0) }];
+    addsDone = [...addsDone.slice(-19), { id: b.id, at0: b.at0, at: b.at, ats: placed.map(x => x.at), pats: b.pats.length, parts: { ...b.parts }, locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), pushes: b.pushes, underLoad, waited: Math.round(performance.now() - b.t0), q: b.q, moves: b.moves.slice(), presses: b.presses.slice(), head: b.head || null, times: { ...(b.times || {}) } }];
     // (the whole session: the kinds that go to the session, as command() gives them; a mixer lock stays on this song)
     const recs = cmds.map(c => (b.session && SESSION_KINDS.includes(c.kind) ? { ...c, scope: 'session' } : c));
     item.growToken = (item.growToken || 0) + 1; delete item.growing; delete item.finish;
@@ -1307,15 +1367,23 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // square per double phrase (filled when the listener set it), a solid line, a glow on set parts, the parts
   // already played shaded. Handles only on the parts still to come.
   const LANES = ['density', 'brightness', 'tension', 'voice'];
+  // the commands the curves show before their steering answers (console-add-waves D8)
+  const VIEW_KINDS = ['curve', 'curve-reset', 'energy-up', 'energy-down'];
   const CW = 320, CPAD = 8;
   let detailsOpen = !!store.get('coding-misk-radio-details', false), hoverD = null;
   const curveData = item => {
     const P = item.plan, max = densityMax(P);
     // (a grown song: measured on the song as the director wrote it, in the plan's bars)
     if (!item.curves) item.curves = songCurves(item.song && item.song.onAir ? item.plain || item.base.song : item.song, P, item.opts || item.base.opts);
-    const C = item.curves, val = (d, c) => C[d].set[c] ?? C[d].measured[c];
-    const charge = P.plan.map((d, i) => d.role !== 'drop' && (P.plan[i + 1] || {}).role === 'drop' && (C[i].set.tension ?? 0) >= 0.7);
-    return { P, C, max, val, charge };
+    // (the curve and energy changes still steered away from the page, over the last view, as the director applies them,
+    // console-add-waves D8: a few reads per paint)
+    const pend = (item.viewPend || []).filter(c => item.commands.some(x => x.id === c.id)), off = airSteer(item) && item.g0 ? airOffset(item.g0) : 0;
+    const d0 = c => Math.floor(Math.ceil((c.at - off) / P.phrase) / 2), r2 = x => Math.round(x * 100) / 100, cl = (x, a, b) => Math.max(a, Math.min(b, x));
+    const setOf = (d, c) => { let v = item.curves[d].set[c]; for (const x of pend) { if (x.kind === 'curve' && x.curve === c && x.d === d && d >= d0(x)) v = c === 'density' ? Math.round(cl(x.value, 1, max)) : r2(cl(x.value, 0, 1)); else if (x.kind === 'curve-reset' && x.curve === c && d >= d0(x)) v = null; } return v ?? null; };
+    const target = d => pend.reduce((v, x) => (['energy-up', 'energy-down'].includes(x.kind) && d >= d0(x) ? r2(cl(v + (x.kind === 'energy-up' ? 0.15 : -0.15), 0.05, 1)) : x.kind === 'curve' && (!x.curve || x.curve === 'energy') && x.d === d && d >= d0(x) ? r2(cl(x.value, 0, 1)) : v), P.plan[d].target);
+    const C = item.curves, val = (d, c) => setOf(d, c) ?? C[d].measured[c];
+    const charge = P.plan.map((d, i) => d.role !== 'drop' && (P.plan[i + 1] || {}).role === 'drop' && (setOf(i, 'tension') ?? 0) >= 0.7);
+    return { P, C, max, val, charge, setOf, target };
   };
   const shownOf = (c, v, max) => (c === 'density' ? t('curveOf', { n: v, max }) : String(Math.round(v * 100)));
   // one curve as SVG: vals 0..max, set[i] true when the listener set part i
@@ -1343,18 +1411,18 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     return `<svg class="radio-curve ${energy ? 'steer' : 'lane'}" viewBox="0 0 ${CW} ${h}" data-h="${h}" data-top="${top}" data-bot="${bot}" data-n="${n}" data-sz="${sz}" data-max="${curve === 'density' ? max : ''}" role="img" aria-label="${esc(title)}">${energy ? `<title>${esc(t('curveHelp:energy'))}</title>` : ''}${g}</svg>`;
   }
   function curvePanel(item, rel, sec) {
-    const { P, C, max, val, charge } = curveData(item), dbl = 2 * P.phrase, n = P.plan.length;
+    const { P, C, max, val, charge, setOf, target } = curveData(item), dbl = 2 * P.phrase, n = P.plan.length;
     const cur = Math.min(n - 1, Math.floor(rel / dbl)), frac = rel / Math.max(1, n * dbl);
-    const energy = drawCurve({ vals: P.plan.map(d => d.target), cur, frac, h: 96, energy: true, roles: P.plan.map(d => d.role), charge, title: t('radioShape') });
+    const energy = drawCurve({ vals: P.plan.map((d, i) => target(i)), cur, frac, h: 96, energy: true, roles: P.plan.map(d => d.role), charge, title: t('radioShape') });
     const lanes = LANES.map(c => {
-      const anySet = C.some((p, i) => i > cur && p.set[c] !== null);
-      const svg = drawCurve({ vals: C.map((p, i) => val(i, c)), set: C.map(p => p.set[c] !== null), max: c === 'density' ? Math.max(1, max) : 1, cur, frac, h: 50, curve: c, title: t('curve:' + c) });
+      const anySet = C.some((p, i) => i > cur && setOf(i, c) !== null);
+      const svg = drawCurve({ vals: C.map((p, i) => val(i, c)), set: C.map((p, i) => setOf(i, c) !== null), max: c === 'density' ? Math.max(1, max) : 1, cur, frac, h: 50, curve: c, title: t('curve:' + c) });
       return `<div class="radio-lane" data-lane="${c}" title="${esc(t('curveHelp:' + c))}"><span class="lane-name">${esc(t('curve:' + c))}</span><output>${esc(shownOf(c, val(cur, c), max))}</output>
         <button class="mini" data-curve-reset="${c}" ${anySet ? '' : 'disabled'} title="${esc(t('curveResetTip'))}">↺</button><div class="screen">${svg}</div></div>`;
     }).join('');
     const summary = LANES.map(c => `<span data-lane="${c}">${esc(t('curve:' + c))} <b>${esc(shownOf(c, val(cur, c), max))}</b></span>`).join(' · ');
     return `<div class="curves">
-      <div class="radio-lane main" data-lane="energy"><span class="lane-name">${esc(t('curve:energy'))} · ${esc(t('curveMain'))}</span><output>${Math.round(P.plan[cur].target * 100)}</output><span></span><div class="screen">${energy}</div></div>
+      <div class="radio-lane main" data-lane="energy"><span class="lane-name">${esc(t('curve:energy'))} · ${esc(t('curveMain'))}</span><output>${Math.round(target(cur) * 100)}</output><span></span><div class="screen">${energy}</div></div>
       <span class="curves-where">${esc(sec)}</span>
       <button class="curves-toggle" id="curves-toggle" aria-expanded="${detailsOpen}" title="${esc(t('curvesDetailsTip'))}"><span class="tw">${detailsOpen ? '▾' : '▸'} ${esc(t('curvesDetails'))}</span> ${detailsOpen ? '' : summary}</button>
       <div class="radio-lanes" ${detailsOpen ? '' : 'hidden'}>${lanes}</div>
@@ -1364,9 +1432,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   const tipBox = (() => { const el = document.createElement('div'); el.className = 'curve-tip'; el.hidden = true; document.body.appendChild(el); return el; })();
   function showTip(item, d, px, py, over = {}) {
     if (!item || !item.plan || d === null) { tipBox.hidden = true; return; }
-    const { P, max, val } = curveData(item);
+    const { P, max, val, target } = curveData(item);
     if (d < 0 || d >= P.plan.length) { tipBox.hidden = true; return; }
-    const v = c => (over.curve === c ? over.value : c === 'energy' ? P.plan[d].target : val(d, c));
+    const v = c => (over.curve === c ? over.value : c === 'energy' ? target(d) : val(d, c));
     tipBox.innerHTML = `<div class="tip-part">${esc(t('curvePart', { n: d + 1, role: t('role:' + P.plan[d].role) }))}</div>${['energy', ...LANES].map(c => `<div data-lane="${c}"><span>${esc(t('curve:' + c))}</span><b>${esc(c === 'energy' ? String(Math.round(v(c) * 100)) : shownOf(c, v(c), max))}</b></div>`).join('')}`;
     tipBox.hidden = false;
     const w = tipBox.offsetWidth, hh = tipBox.offsetHeight;
@@ -2363,11 +2431,14 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // the console alone drawn again: my phrases changed (a typed row's save button, #82)
     renderConsole() { renderSteer(true); },
     // the console changes pending (tools/check-add-lag.cjs): per batch its boundary, counts, state and pushes
-    get pendingAdds() { return batches.map(b => ({ id: b.id, at: b.at, at0: b.at0, parts: { ...b.parts }, pats: b.pats.map(x => x.part), locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), state: b.state, pushes: b.pushes, t0: b.t0, times: { ...(b.times || {}) } })); },
+    get pendingAdds() { return batches.map(b => ({ id: b.id, at: b.at, at0: b.at0, parts: { ...b.parts }, pats: b.pats.map(x => x.part), locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), state: b.state, pushes: b.pushes, t0: b.t0, q: b.q, times: { ...(b.times || {}) }, moves: b.moves.slice(), presses: b.presses.slice(), head: b.head || null })); },
     // the last batches that entered: boundary planned and taken, pushes, whether under load, ms from the first press
     get addCost() { return { ...addCost }; },
     resetAddCost() { for (const k of Object.keys(addCost)) delete addCost[k]; },
-    get addsDone() { return addsDone.map(x => ({ ...x, parts: { ...x.parts } })); },
+    // (tools/check-add-lag.cjs: what the director's view of the song on air costs on the page, ms; the page no longer
+    // makes it for a curve command, console-add-waves D8)
+    viewMs() { const it = S && S.stream[S.onAir]; if (!it || !it.g0) return null; const t0 = performance.now(); directorView({ song: it.base.song, plan: it.base.plan, opts: it.base.opts, commands: it.commands, seed: S.recipe.seed, n: it.n, grown: it.g0 }); return Math.round(performance.now() - t0); },
+    get addsDone() { return addsDone.map(x => ({ ...x, parts: { ...x.parts }, moves: x.moves.map(m => ({ ...m })), presses: x.presses.map(p => ({ ...p })) })); },
     // what the load monitor saw over the last ms (tools/check-add-lag.cjs)
     loadSeen: ms => load.seen(ms),
     // the pushes of each typed line (tools/check-say-lag.cjs)

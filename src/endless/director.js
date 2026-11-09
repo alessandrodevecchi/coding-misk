@@ -630,7 +630,22 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
   }
   const boundaries = bars / phrase;
   const say = (kind, at) => { lastSay = at; return pickPhrase(kind, comments); };
-  for (let k = from; k < boundaries; k++) {
+  // the listener's "+" and "−" on the half-phrase start after boundary k (console-add-waves D6): on their bar, after the
+  // moves of the phrase start, as the listener's (keys k + 0.5 of forced; a song without them is written as before)
+  const half = k => {
+    const fs = forced[k + 0.5];
+    if (!fs || !fs.length) return;
+    const at = (k + 0.5) * phrase;
+    for (const f of fs) {
+      const ids = f.tracks || [f.track];
+      if (ids.some(id => locked.includes(id) && !f.mixer)) continue;
+      steps.push({ at, ...f.step, by: 'listener' });
+      ids.forEach(id => moved.set(id, k));
+    }
+  };
+  // (a rewrite from a half-phrase start: the steps of its phrase start are kept, its own moves go on its bar)
+  if (from % 1) half(Math.floor(from));
+  for (let k = Math.ceil(from); k < boundaries; k++) {
     const at = k * phrase, d = Math.floor(k / 2), { role, target } = plan.plan[d];
     const isDouble = k % 2 === 0, prevRole = d > 0 ? plan.plan[d - 1].role : null;
     // the listener's curves for this part (#40): set ones are soft targets next to energy
@@ -791,6 +806,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     }
     if (said) { const first = steps.find(s => s.at === at); first.say = said; }
     phrases.push({ bar: at, role, target: round(target), moves: chosen.map(c => `${c.kind} ${(c.tracks || [c.track]).join('+')}`), say: said ? said.en : null });
+    half(k);
   }
   // the voice instrument (voice-instrument): it comes in on the bar its clip starts (kept steps stay as they are)
   if (plan.spoken) {

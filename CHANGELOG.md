@@ -7,6 +7,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- `tools/check-add-waves.cjs`: heads in phrases, moves by reason, long tasks and "too late" of console "+" waves on the baseline scenarios.
+- Every move of a pending console batch is recorded with its reason.
 - Italian speaker Siri 4 (`siri4`), spoken with the macOS system voice; `npm run voices` makes its samples with `say` without `-v`.
 - Draw styles grid on each voice card of the Voices tab: switch the voice styles automatic draws may give a voice, with a mark on changed styles, the count of allowed styles and Reset to defaults.
 - Voice style choices kept in the browser and in the settings backup; an import merges them per voice.
@@ -60,6 +62,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Radio console "+", "−", saved patterns and locks join a pending batch only within 5 s of its last press and 10 s of its first; a later press opens a second wave at least one phrase after the first, which it never moves.
+- A "−" that takes back a pending "+" goes back to that batch, even outside the join window.
+- On a grown radio song a batch's head enters within two phrases of the first press with as many new lines as can be typed there, at least one; three or four phrases only as a fallback.
+- On slow songs a console batch can enter on the half-phrase start within 30 s of the press.
 - Generated voices, the voice instrument and the narrator speaker drawn next to a chosen narrator style use only the speaker and style pairs that `src/voices/combos.json` allows.
 - Radio: a style the compilation invents shows in Now playing and in On air, STYLES as the same chip and hint as the Invent die's trial style, with an explicit Keep.
 - "Fully narrated" is now "Narrated growth".
@@ -91,6 +97,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- A curve or energy command on a grown radio song no longer builds the director's view on the page while it waits for its steering.
 - Radio: a song's own drum machine and sample sounds are loaded ahead, notes out of a soundfont's range play from another font of the instrument, and a resume, a console change or the next song no longer makes the scheduler skip notes on a slow computer.
 - Radio console changes on a long Live coder song enter within a phrase or two of the press instead of minutes later, and the sounds of the tracks they bring in are loaded before their entry.
 - A track added with «+» on a grown radio song plays from its phrase, also when several instruments are added at once.
