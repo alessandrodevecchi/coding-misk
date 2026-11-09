@@ -107,6 +107,22 @@ export function stateAt(song, bar) {
   return { song: out, upTo };
 }
 
+// stateAt for a reader that never changes what it gets (#82): the tracks copied one level deep, their patterns, clips
+// and settings shared with `song` until a step replaces them (applyStep never changes them in place). The director reads
+// the song's state many times per boundary; the whole song copied every time made the next song's writing a long task
+// on the page (about 200 ms with the CPU slowed 4 times). Same result as stateAt, read only.
+export function stateView(song, bar) {
+  const steps = buildSteps(song), out = { ...song, build: undefined, tracks: (song.tracks || []).map(t => ({ ...t })) };
+  delete out.build;
+  const added = new Set(steps.flatMap(s => [...(s.add !== undefined ? list(s.add) : []), ...(s.clone ? [s.clone.track] : [])]));
+  out.tracks.forEach(t => { if (added.has(t.id)) t.mute = true; });
+  const base = Object.fromEntries(out.tracks.map(t => [t.id, t.settings || {}]));
+  let upTo = 0;
+  for (const s of steps) { if (s.at > bar) break; applyStep(out, s); upTo++; }
+  out.tracks.forEach(t => { if (!(t.pinned || []).length) return; const b = base[t.id]; t.settings = { ...(t.settings || {}) }; t.pinned.forEach(k => { if (k in b) t.settings[k] = b[k]; else delete t.settings[k]; }); });
+  return { song: out, upTo };
+}
+
 // file name of a spoken comment: "Serve più ritmo!" → "serve_piu_ritmo"
 // (kept per text: the voice code, the captions and the samples prepared ask it for the same lines many times a bar)
 const slugMemo = new Map();

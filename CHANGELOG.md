@@ -91,6 +91,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Radio: a song's own drum machine and sample sounds are loaded ahead, notes out of a soundfont's range play from another font of the instrument, and a resume, a console change or the next song no longer makes the scheduler skip notes on a slow computer.
 - Radio console changes on a long Live coder song enter within a phrase or two of the press instead of minutes later, and the sounds of the tracks they bring in are loaded before their entry.
 - A track added with «+» on a grown radio song plays from its phrase, also when several instruments are added at once.
 - A line typed in the radio console with Say now is heard with its own new sample, and no later line of the same voice plays a neighbouring sample.

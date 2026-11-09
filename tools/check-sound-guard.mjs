@@ -1,9 +1,9 @@
 // Checks for the sound guard (#54): the register of broken sounds and its stand-ins, the error kinds it learns, zone
 // learning from a font file, the sound wrapper and the decode guard; the voice helper's local say_* banks never learned
-// (#82); the reverb impulse responses kept and reused (#82). No browser.
+// (#82); the reverb impulse responses kept and reused (#82); the samples a code plays, for the preload (#82). No browser.
 //   npm run check:sound-guard      exit 1 when any check fails
 import { createIrCache, installReverbCache } from '../src/sounds/reverb-cache.js';
-import { createRegister, isBrokenError, indexOf, zoneOf, guardSounds, guardDecode, HEALTH_KEY, fixSampleUrl, fixSampleBank, isLocalBank, servesAudio, freshUrl } from '../src/sounds/sound-guard.js';
+import { createRegister, isBrokenError, indexOf, zoneOf, guardSounds, guardDecode, HEALTH_KEY, fixSampleUrl, fixSampleBank, isLocalBank, servesAudio, freshUrl, samplesIn } from '../src/sounds/sound-guard.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const memStore = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
@@ -94,6 +94,22 @@ const CHECKS = {
     assert(threw && !register.learned().length && !replaced.length, 'still failing: an error, no neighbour, nothing learned');
     assert(freshUrl('/a.wav?cmRetry=1', 2) === '/a.wav?cmRetry=2' && freshUrl('/a?x=1', 3) === '/a?x=1&cmRetry=3', 'freshUrl');
   },
+  async 'wrapper: a note a font has no zone for plays from a font that has one, nothing learned (#82)'() {
+    const played = [], replaced = [];
+    const bells = { onTrigger: async (t, v) => { const n = indexOf(v.n, 3); played.push(n); if (n === 0 && v.note < 27) throw new Error('no soundfont zone found for preset '); return { n }; }, data: { type: 'soundfont', fonts: ['a', 'b', 'c'] } };
+    const map = soundMapOf({ bells });
+    const register = createRegister({ version: 't', known: [] });
+    let asked = 0;
+    guardSounds({ soundMap: map, registerSound: (k, f, d) => map.setKey(k, { onTrigger: f, data: d }), register, onReplace: (...a) => replaced.push(a.join(' ')), zone: async (font, midi) => { asked++; return font === 'c' ? { low: 0, high: 60 } : null; } });
+    const r = await map.get().bells.onTrigger(0, { n: 0, note: 24 }, () => {});
+    assert(r.n === 2 && replaced.join() === 'bells 0 2 24' && !register.learned().length, `stand-in with a zone, nothing learned: ${r.n} ${replaced}`);
+    played.length = 0; const a0 = asked;
+    await map.get().bells.onTrigger(0, { n: 0, note: 24 }, () => {});
+    assert(played.join() === '2' && asked === a0, 'the same note again goes to it at once');
+    played.length = 0;
+    await map.get().bells.onTrigger(0, { n: 0, note: 60 }, () => {});
+    assert(played.join() === '0', 'other notes keep their font');
+  },
   async 'wrapper: a page answered for a sample is not a broken sample (#82)'() {
     const bad = { onTrigger: async () => { throw Object.assign(new Error('Unable to decode audio data'), { name: 'EncodingError' }); }, data: { type: 'sample', samples: ['/samples/mine/a.wav', '/samples/mine/b.wav'] } };
     const map = soundMapOf({ mine: bad });
@@ -166,6 +182,14 @@ const CHECKS = {
     assert(r1.buffer === first && r1.duration === 2, 'the newest asked wins over an older one still being made');
     const r4 = a.createReverb(2, 0.1, 15000, 1000, 'file', 1, 0);
     assert(r4.buffer && r4.buffer.adjusted === 'file', 'a response from a file is made as before');
+  },
+  // (#82: a song's own drum machine loaded on its first note; the preload reads the samples from the code)
+  'samples of a code: drum machines in lower case, sample numbers, no other sounds'() {
+    const map = { rolandtr808_bd: 12, rolandtr808_hh: 3, oberheimdmx_cp: 2, numbers: 9, bd: 20 }, count = n => map[n] || 0;
+    const code = '$: s("[bd ~ bd bd]*4").bank("RolandTR808").gain(1)\n$: s("hh*8, cp").bank("OberheimDMX")\n$: s("numbers").n("3 <7 12>")\n$: s("bd:3 ~")\n$: note("c3").s("gm_piano")\n$: s("sawtooth")';
+    const got = samplesIn(code, count).map(x => `${x.s}:${x.n}`).join(' ');
+    assert(got === 'rolandtr808_bd:0 oberheimdmx_cp:0 numbers:3 numbers:7 bd:3', got);
+    assert(samplesIn('$: s("bd").n("0 1 2 3 4 5")', count, 4).length === 4, 'at most `most` numbers');
   },
 };
 let failed = 0;
