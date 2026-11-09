@@ -3,7 +3,7 @@
 // Pure and deterministic: no Node or browser APIs, no Math.random (randomness comes from random.js).
 import { BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, TEX_RHYTHMS, GROOVES, ROWS, DEFAULT, KEYS, fitSteps, meterSteps } from '../music.js';
 import { FORMAT, VERSION, SETTING_FIELDS, VOICE_DEFAULT, VOICE_CHARACTERS, VOICE_STYLES, VOICE_LIMITS } from '../song/format.js';
-import { stateAt, SPEAKERS, speakerId } from '../song/build.js';
+import { stateAt, stateView, SPEAKERS, speakerId } from '../song/build.js';
 import { VOCAB_GROUPS, VOCABULARY } from '../song/vocabulary.js';
 import { makeRng, freshSeed, stream } from './random.js';
 import { withDefaults, PART_NAMES, styleId } from './recipe.js';
@@ -594,7 +594,7 @@ export function candidateMoves(state, ctx, blocked, rng) {
 
 // the song as the director sees it while writing: every track muted until a step adds it
 const working = (base, steps) => ({ ...base, build: steps });
-const measure = (song, bar, ctx) => energyOf(stateAt(song, bar).song, ctx);
+const measure = (song, bar, ctx) => energyOf(stateView(song, bar).song, ctx);
 
 const stepIds = s => [...['add', 'remove'].flatMap(k => (s[k] === undefined ? [] : Array.isArray(s[k]) ? s[k] : [s[k]])), ...['set', 'pattern', 'rack', 'unrack'].filter(k => s[k]).map(k => s[k].track)];
 
@@ -625,7 +625,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
   // the memory of the loop, from the kept steps
   for (const s of steps) { for (const id of stepIds(s)) moved.set(id, Math.floor(s.at / phrase)); if (s.say) lastSay = Math.max(lastSay, s.at); }
   if (from > 0) {
-    const st = stateAt(working(base, steps), from * phrase).song, added = new Set(steps.flatMap(s => stepIds(s)));
+    const st = stateView(working(base, steps), from * phrase).song, added = new Set(steps.flatMap(s => stepIds(s)));
     brokeDrums = st.tracks.filter(t => t.type === 'drums' && t.mute && added.has(t.id)).map(t => t.id);
   }
   const boundaries = bars / phrase;
@@ -638,7 +638,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     const setCurves = ['density', 'brightness', 'tension'].filter(c => curveOf(part, c) !== null);
     const curveGap = song => {
       if (!setCurves.length) return 0;
-      const m = curveParts(stateAt(song, at).song, { lift });
+      const m = curveParts(stateView(song, at).song, { lift });
       return setCurves.reduce((a, c) => a + (c === 'density' ? Math.abs(m.density - curveOf(part, c)) / Math.max(3, plan.usualHigh) : Math.abs(m[c] - curveOf(part, c))), 0);
     };
     const landmark = isDouble && role !== prevRole && LANDMARKS.includes(role);
@@ -655,7 +655,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     if (hardEnd && k === boundaries - 2) base.tracks.forEach(t => blocked.add(t.id));
     const chosen = [];
     const take = move => { chosen.push(move); steps.push({ at, ...move.step }); (move.tracks || [move.track]).forEach(id => { moved.set(id, k); blocked.add(id); }); };
-    let state = stateAt(working(base, steps), at).song;
+    let state = stateView(working(base, steps), at).song;
     // the listener's moves come first on their boundary (they ignore the one-move-per-track rule, not the locks)
     // (a track the listener brings in here is not taken out by the break or the charge of the same boundary)
     const brought = new Set();
@@ -665,12 +665,12 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
       if (ids.some(id => locked.includes(id) && !f.mixer)) continue;
       take({ ...f, by: 'listener' }); steps[steps.length - 1].by = 'listener';
     }
-    state = stateAt(working(base, steps), at).song;
+    state = stateView(working(base, steps), at).song;
     // the listener's tracks that sat out a break or a charge come back on the next phrase (D4)
     if (protect.length && k > 0 && role !== 'break' && !(charge && !isDouble) && d < outroFrom) {
       // (only as many as fit under the cap at this bar, in the order they came in; the others wait for a later phrase, D8)
       const back = protect.filter(p => p.at < at && !locked.includes(p.id) && (state.tracks.find(t => t.id === p.id) || {}).mute).map(p => p.id).slice(0, Math.max(0, TRACK_CAP - countedOn(state).length));
-      if (back.length) { take({ kind: 'back', phrase: KIND_OF_ADD[(state.tracks.find(t => t.id === back[0]) || {}).type] || 'drop', track: back[0], tracks: back, step: { add: back }, quiet: true }); state = stateAt(working(base, steps), at).song; }
+      if (back.length) { take({ kind: 'back', phrase: KIND_OF_ADD[(state.tracks.find(t => t.id === back[0]) || {}).type] || 'drop', track: back[0], tracks: back, step: { add: back }, quiet: true }); state = stateView(working(base, steps), at).song; }
     }
 
     if (k === 0 && !(forced[0] || []).length) {
@@ -702,7 +702,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     const riser = base.tracks.find(t => t.type === 'riser');
     // the charge before a drop: the riser from the first phrase, fewer drums on the last one (the drop brings them back)
     if (charge && k > 0) {
-      state = stateAt(working(base, steps), at).song;
+      state = stateView(working(base, steps), at).song;
       const r = riser && state.tracks.find(t => t.id === riser.id);
       if (isDouble && r && r.mute && !locked.includes(riser.id) && !held) take({ kind: 'add-riser', track: riser.id, step: { add: riser.id } });
       if (!isDouble) {
@@ -710,7 +710,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
         const drums = playing(state).filter(t => t.type === 'drums' && !brought.has(t.id));
         if (drums.length) { const out = drums[drums.length - 1].id; brokeDrums = [...new Set([...brokeDrums, out])]; take({ kind: 'charge', track: out, step: { remove: out } }); }
       }
-      state = stateAt(working(base, steps), at).song;
+      state = stateView(working(base, steps), at).song;
     }
     // riser: in the phrase before a big moment, out in the phrase after it
     if (riser && !blocked.has(riser.id) && !held) {
@@ -719,7 +719,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
       else if (!r.mute && moved.get(riser.id) === k - 2) take({ kind: 'strip', track: riser.id, step: { remove: riser.id }, quiet: true });
     }
     // ordinary moves toward the target
-    state = stateAt(working(base, steps), at).song;
+    state = stateView(working(base, steps), at).song;
     const gap = Math.abs(measure(working(base, steps), at, ctx) - target);
     let want = (k === 0 ? 0 : 1) + (gap > 0.2 ? 1 : 0) + (landmark && gap > 0.35 ? 1 : 0) - chosen.filter(c => !c.quiet && c.kind !== 'charge').length + (k === 0 ? 0 : 0);
     if (k > 0 && setCurves.length && curveGap(working(base, steps)) > 0.25) want++;
@@ -730,7 +730,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     if (slow) want = Math.min(want, 1);
     if (hardEnd && k >= boundaries - 2) want = 0;
     for (let i = 0; i < want; i++) {
-      state = stateAt(working(base, steps), at).song;
+      state = stateView(working(base, steps), at).song;
       const e0 = energyOf(state, ctx);
       let cands = candidateMoves(state, ctx, blocked, M);
       // after the intro, below the usual count of tracks, the first move adds one (taste rule: 4 to 5 layers)
@@ -746,7 +746,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
         const e = measure(working(base, [...steps, { at, ...c.step }]), at, ctx);
         let score = -Math.abs(e - target);
         if (c.kind === lastKind) score -= 0.03;
-        const count = playing(stateAt(working(base, [...steps, { at, ...c.step }]), at).song).length;
+        const count = playing(stateView(working(base, [...steps, { at, ...c.step }]), at).song).length;
         const high = Math.max(plan.usualHigh, curveOf(part, 'density') ?? 0);
         if (count > high) score -= 0.08 * (count - high);
         // below the usual count, prefer adding, and in the usual entry order (drums, bass, pads, …)
@@ -771,7 +771,7 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     // track before the final outro, where they leave with the rest, nor a locked one or one brought in on this
     // boundary). Songs with no commands never reach it
     {
-      state = stateAt(working(base, steps), at).song;
+      state = stateView(working(base, steps), at).song;
       let over = countedOn(state).length - TRACK_CAP;
       if (over > 0) {
         const entry = id => { const i = steps.findIndex(x => stepIds(x).includes(id) && (x.add !== undefined)); return i < 0 ? -1 : i; };

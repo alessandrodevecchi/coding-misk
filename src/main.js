@@ -85,7 +85,8 @@ import { encode, createEncoder, canEncode, formatOf, EXT } from './export/encode
 import { segmentsOf, timelineOf, renderInBlocks } from './export/fast.js';
 import { renderVideo } from './export/fast-video.js';
 import { askDiskFile, LONG_SECONDS } from './export/disk.js';
-import { guardDecode, guardSounds, createRegister, HEALTH_KEY, soundfontsIn, preloadFonts } from './sounds/sound-guard.js';
+import { SOUNDFONT_FIX } from './sounds/soundfont-fix.js';
+import { guardDecode, guardSounds, createRegister, HEALTH_KEY, soundfontsIn, samplesIn, preloadFonts } from './sounds/sound-guard.js';
 import { installReverbCache } from './sounds/reverb-cache.js';
 import reverbGen from 'superdough/reverbGen.mjs';
 import soundfonts from '@strudel/soundfonts/package.json';
@@ -823,7 +824,12 @@ const soundRegister = createRegister({ version: soundfonts.version, store: local
   if (!globalThis.soundMap || !globalThis.soundMap.listen || !globalThis.registerSound) return;
   clearInterval(iv);
   guardSounds({ soundMap: globalThis.soundMap, registerSound: globalThis.registerSound, register: soundRegister, now: () => globalThis.getAudioContext().currentTime,
-    onReplace: (name, from, to) => { const k = `${name}:${from}→${to}`; if (!seen.has(k)) { seen.add(k); console.info(`[sounds] ${name} ${from} is broken, playing ${to}`); } } });
+    onReplace: (name, from, to, midi) => { const k = `${name}:${from}→${to}`; if (seen.has(k)) return; seen.add(k);
+      if (midi != null) { console.info(`[sounds] ${name} ${from} has no zone for MIDI ${midi}, playing ${to}`); return; }
+      // (#82: a part the library is known to break, SOUNDFONT_FIX, such as the vibraphone's top zone, an empty MP3 from C6
+      // up: said as such, with its notes; the preload of every zone plays it too)
+      const fix = SOUNDFONT_FIX.find(f => f.name === name && f.font === from);
+      console.info(fix ? `[sounds] ${name} ${from}${fix.low !== undefined ? ` (MIDI ${fix.low}-${fix.high})` : ''} is a known broken part, playing ${to}` : `[sounds] ${name} ${from} is broken, playing ${to}`); } });
 }, 300); }
 // what the render page learns (a preload, an export) reaches this page through localStorage
 addEventListener('storage', e => { if (e.key === HEALTH_KEY) soundRegister.reload(); });
@@ -1105,16 +1111,22 @@ function liveBuild(sg, s, cyc) {
   if (!typing && !due) {
     if (typingSoon && typingSoon.sg === sg && typingSoon.at === next.at) return;
     const me = typingSoon = { sg, at: next.at };
-    setTimeout(() => {
+    const plan = () => {
       if (typingSoon !== me) return;
       typingSoon = null;
       const s2 = sched();
       if (song !== sg || typing || !s2 || !isPlaying() || hand || resumeTo !== null || freshSoon) return;
       const st = buildSteps(sg.build), nx = st[built];
       if (!nx || nx.at !== me.at || s2.lastEnd + .1 * s2.cps >= nx.at) return;
+      // (#82: the paste rule's decisions up to the step made a slice at a time first, each in a task of its own: a window
+      // made anew late in a long song, after a pause or a console change, made them all here, 300 ms with the CPU
+      // slowed 4 times, and the scheduler skipped its windows. The plan waits for them; a step due meanwhile goes in at
+      // once, as when there is no time to type it)
+      if (sg.paste && sg.paste.upTo && !sg.paste.upTo(nx.at, 8)) { typingSoon = me; setTimeout(plan, 0); return; }
       const prevAt = built > 0 && st[built - 1] ? st[built - 1].at : -Infinity, to = codeFor(sg, nx.at);
       typing = makeTyping(settleOthers(ed.code || '', to, nx.at), to, Math.max(s2.now(), prevAt + .5), nx.at - .2 * s2.cps, s2.cps, typingHuman(), stretchOf(nx.at), sg.paste ? sg.paste(nx.at) : Infinity, sg.earlier ? sg.earlier(nx.at) : null);
-    }, 0);
+    };
+    setTimeout(plan, 0);
     return;
   }
   if (!due) { typeFrame(typing, cyc); return; }
@@ -5514,22 +5526,69 @@ let preloaded = '';
 let preloadJob = 0;
 // the radio's latest window handed to the player (a skip that waits for its first voices gives way to a newer one)
 let radioWin = null;
-const preloadSounds = p => {
+// (#82, too-late bursts: the window's samples too, the drum machine hits and the sample banks its code plays, in the
+// order its steps bring them in from `bar`, then the rest of the window (the next song, hidden); before, only a console
+// change loaded its samples ahead, and a song's own drum machine loaded on its first note, "took too long")
+const preloadSounds = (p, bar = 0) => {
   const key = p && p.meta ? `${p.title}|${p.meta.bpm.length}` : '';
   if (!key || key === preloaded || !globalThis.soundMap) return;
   preloaded = key;
   const job = ++preloadJob, done = names => preloadFonts(names, { soundMap: globalThis.soundMap, play: v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + .2, .05) })
     .then(n => { if (n) console.info(`[sounds] next song: ${n} soundfont zones loaded (${names.join(', ')})`); }, () => {});
-  if (p.soundCode) { done(soundfontsIn(p.soundCode())); return; }
-  const bars = p.meta.bars, segs = p.build ? [...new Set([0, ...buildSteps(p.build).map(x => x.at).filter(a => a > 0 && a < bars)])].sort((a, b) => a - b) : [0], codes = [];
+  const bars = p.meta.bars, from = Math.max(0, Math.floor(bar));
+  // (a window with its sound code, a grown song's: the code of its next few steps first, then the sound code for the
+  // rest, as writing every step's code of a long grown song costs seconds; Classic: every step, as before)
+  const segs = (p.build ? [...new Set([from, ...buildSteps(p.build).map(x => x.at).filter(a => a > from && a < bars)])].sort((a, b) => a - b) : [from]).slice(0, p.soundCode ? 6 : Infinity), codes = [];
   const next = () => {
     if (job !== preloadJob) return;
     const t0 = performance.now();
-    while (segs.length && performance.now() - t0 < 12) codes.push(codeFor(p, segs.shift()));
-    if (segs.length) setTimeout(next, 0); else done(soundfontsIn(codes.join('\n')));
+    while (segs.length && performance.now() - t0 < 12) { const c = codeFor(p, segs.shift()); codes.push(c); warmSamples(samplesOf(c)); }
+    if (segs.length) { setTimeout(next, 0); return; }
+    const all = p.soundCode ? p.soundCode() : codes.join('\n');
+    warmSamples(samplesOf(all));
+    done(soundfontsIn(all));
   };
   next();
 };
+// Samples loaded ahead through one queue (#82): at most SAMPLE_PAR at a time, each started in a task of its own, a
+// silent hit 3 s ahead (a hit scheduled sooner than its sample loads logs "took too long"). A console change's samples
+// go first; a sample already loaded or queued is skipped. (36 samples fetched all at once, as a console change did,
+// skipped no scheduler window even with the CPU slowed 4 times: the fetches and the decoding run off the page; the
+// limit only keeps a whole song's samples from holding the console's back)
+const SAMPLE_PAR = 6, sampleDone = new Set(), sampleWait = new Map(), sampleQueue = [];
+let sampleBusy = 0;
+const sampleMap = () => (globalThis.soundMap && globalThis.soundMap.get && globalThis.soundMap.get()) || {};
+// (the samples a code plays; a voice bank is loaded by the voice queue)
+const samplesOf = code => { const map = sampleMap(); return samplesIn(code, name => { const s = map[name], d = s && s.data; if (!d || d.type !== 'sample' || /^say_/.test(name)) return 0; return Array.isArray(d.samples) ? d.samples.length : 1; }); };
+function warmSamples(list, first = false) {
+  const out = [], front = [];
+  for (const v of list) {
+    const k = `${v.s}:${v.n}`;
+    if (sampleDone.has(k)) { out.push(Promise.resolve()); continue; }
+    let w = sampleWait.get(k);
+    if (!w) { let res; w = { v, k, p: new Promise(r => { res = r; }) }; w.res = res; sampleWait.set(k, w); (first ? front.push(w) : sampleQueue.push(w)); }
+    else if (first) { const i = sampleQueue.indexOf(w); if (i >= 0) { sampleQueue.splice(i, 1); front.push(w); } }
+    out.push(w.p);
+  }
+  if (front.length) sampleQueue.unshift(...front);
+  pumpSamples();
+  return Promise.all(out);
+}
+function pumpSamples() {
+  while (sampleBusy < SAMPLE_PAR && sampleQueue.length) {
+    const w = sampleQueue.shift();
+    sampleBusy++;
+    setTimeout(() => {
+      let one;
+      try { one = Promise.resolve(globalThis.superdough({ s: w.v.s, n: w.v.n, gain: 0 }, globalThis.getAudioContext().currentTime + 3, .05)); } catch (e) { one = Promise.reject(e); }
+      // (a sample that never answers does not hold the queue: 4 s at most)
+      Promise.race([one.then(() => sampleDone.add(w.k), () => {}), new Promise(r => setTimeout(r, 4000))]).then(() => { sampleWait.delete(w.k); sampleBusy--; w.res(); pumpSamples(); });
+    }, 0);
+  }
+}
+// for the checks: the queue's state, and samples warmed through it ([{ s, n }])
+globalThis.codingMiskWarm = list => warmSamples(list, true);
+globalThis.codingMiskSamples = { get pending() { return sampleQueue.length + sampleBusy; }, done: () => [...sampleDone] };
 // Voice samples loaded ahead one at a time, each in a task of its own (#82): all of a song's samples loading together
 // made the scheduler late with the CPU slowed ("took too long", "skip query: too late"). A sample already loaded or
 // queued is skipped; warmOne resolves once its sample is loaded (a silent hit, gain 0).
@@ -5598,19 +5657,18 @@ async function warmTracks(tracks) {
   const play = v => globalThis.superdough(v, globalThis.getAudioContext().currentTime + 3, .05);
   // (the samples of a bank: as many as it has, at most WARM_N; a voice bank is loaded by the voice queue)
   const count = s => { const d = s && s.data && s.data.samples; return Array.isArray(d) ? d.length : d && typeof d === 'object' ? Math.max(1, ...Object.values(d).map(x => (Array.isArray(x) ? x.length : 1))) : 1; };
-  // (each started in a task of its own; the loads run together, a sound that never answers given up after 4 s)
-  const loads = [];
+  // (fonts each started in a task of its own, a font that never answers given up after 4 s; samples through the sample
+  // queue, first in it, #82)
+  const loads = [], samples = [];
   for (const name of names) {
     const s = map[name];
     const fonts = s && s.data && Array.isArray(s.data.fonts);
-    const all = fonts || name.startsWith('say_') ? 1 : Math.min(WARM_N, count(s));
-    for (let i = 0; i < all; i++) {
-      await new Promise(r => setTimeout(r, 0));
-      const one = fonts ? (warmedFonts.has(name) ? Promise.resolve() : preloadFonts([name], { soundMap: globalThis.soundMap, play }).then(() => warmedFonts.add(name)))
-        : Promise.resolve().then(() => play({ s: name, n: i, gain: 0 }));
-      loads.push(Promise.race([one.catch(() => {}), new Promise(r => setTimeout(r, 4000))]));
-    }
+    if (!fonts) { if (!name.startsWith('say_') && s && s.data && s.data.type === 'sample') for (let i = 0, all = Math.min(WARM_N, count(s)); i < all; i++) samples.push({ s: name, n: i }); continue; }
+    await new Promise(r => setTimeout(r, 0));
+    const one = warmedFonts.has(name) ? Promise.resolve() : preloadFonts([name], { soundMap: globalThis.soundMap, play }).then(() => warmedFonts.add(name));
+    loads.push(Promise.race([one.catch(() => {}), new Promise(r => setTimeout(r, 4000))]));
   }
+  loads.push(warmSamples(samples, true));
   await Promise.all(loads);
   return names.length;
 }
@@ -5697,7 +5755,8 @@ radio = createRadio({
     warmTracks: tracks => warmTracks(tracks),
     // the main thread's cost of the last step evaluated by the transport, in ms (console-add-ahead D2)
     lastStep: () => lastStepMs,
-    start: (p, bar, o) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio', { voices: o && o.voices }); },
+    // (the window's sounds loaded ahead from its first bar, #82: before, only a window handed over while playing was)
+    start: (p, bar, o) => { songLook(store.get('coding-misk-radio-look', 'palco')); return playSong(p, bar, 'radio', { voices: o && o.voices }).then(r => { setTimeout(() => { if (song === p) preloadSounds(p, bar); }, 0); return r; }); },
     // the next song's voice samples, as it will be written on air (#82)
     preloadVoices: list => queueVoices(list),
     // a typed line's sample loaded and decoded at once ({ s, n }): resolves once its buffer is ready, so the line is
@@ -5716,7 +5775,7 @@ radio = createRadio({
       const fresh = ((p.air || song.air) && p.id !== song.id || !!freshSoon) && !hand;
       song = p; typing = null; typingSoon = null; built = buildSteps(p.build).filter(x => x.at <= Math.floor(cyc)).length; cwAt = Math.floor(cyc);
       // (the soundfonts of the window loaded in a task of its own: finding them writes the code of every step, #82)
-      warmVoices(p); setTimeout(() => { if (song === p) preloadSounds(p); }, 0); source = { kind: 'radio', name: p.title }; renderSource();
+      warmVoices(p); setTimeout(() => { if (song === p) preloadSounds(p, cyc); }, 0); source = { kind: 'radio', name: p.title }; renderSource();
       // (#82: the new code goes into the editor and is evaluated in a task of its own, not in the frame of the song
       // change: the window holds the next song already, so the sound is the same; the steps and widgets wait for it)
       if (fresh) {
@@ -5737,6 +5796,7 @@ radio = createRadio({
       song = p; typing = null; built = buildSteps(p.build).filter(x => x.at <= bar).length; cwAt = bar;
       source = { kind: 'radio', name: p.title }; renderSource();
       ed.setCode(codeNow(p, bar)); ed.evaluate();
+      setTimeout(() => { if (song === p) preloadSounds(p, bar); }, 0);
     },
     stop: () => stop(),
     volume: () => ({ volume, muted }),

@@ -21,12 +21,20 @@ export function secondsAt(song, bar) {
 // → paste(bar): how many lines the typing towards the step on that bar may paste (0 or 1), the same in the app, the
 // video and the checks. Decided step by step in order (a step needs the decisions before it), and kept.
 export function pasteRule(L, C, { seed = '' } = {}) {
-  if (C.typist !== 'human' || C.duration === 'free' || !L.build.crescendo) return () => 0;
+  if (C.typist !== 'human' || C.duration === 'free' || !L.build.crescendo) { const none = () => 0; none.upTo = () => true; return none; }
   // (display steps, voice-track-tuning D8, change only the code shown: never a step of the typing)
   const bars = [...new Set(buildSteps(L.build).filter(x => !x.display).map(x => x.at))].filter(b => b >= 1).sort((a, b) => a - b), done = new Map();
   let k = 0, prev = 0, last = -Infinity;
-  return bar => {
+  // (#82: the decisions up to a bar cost a code and a typing plan per step; a window made anew late in a long song, after
+  // a pause or a console change, made them all in the task that planned the next typing, up to 300 ms with the CPU
+  // slowed 4 times. upTo(bar, ms) makes them for at most ms and says whether they reach the bar, so the app makes them
+  // a slice at a time first; the decisions are the same)
+  const rule = bar => { advance(bar, Infinity); return done.get(bar) || 0; };
+  rule.upTo = (bar, ms = 8) => advance(bar, ms);
+  const advance = (bar, ms) => {
+    const t0 = ms === Infinity ? 0 : performance.now();
     while (k < bars.length && bars[k] <= bar) {
+      if (ms !== Infinity && performance.now() - t0 >= ms) return false;
       const at = bars[k++], t = secondsAt(L.build, at);
       let ok = 0;
       if (t >= 120 && t - last >= 60) {
@@ -37,8 +45,9 @@ export function pasteRule(L, C, { seed = '' } = {}) {
       done.set(at, ok);
       prev = at;
     }
-    return done.get(bar) || 0;
+    return true;
   };
+  return rule;
 }
 
 // the typing of each step as the app plans it (makeTyping in src/main.js): from half a bar after the step before to a

@@ -125,6 +125,7 @@ export function airCode(W, songs, { lang = () => 'en', files = () => ({}), cols 
     const local = { ...A.song, build: buildSteps(LA.build).filter(s => s.at >= A.start).map(({ i, ...s }) => ({ ...s, at: s.at - A.start })) };
     const P = pasteRule({ build: local, codeAt: b => (LA.codeLoad || LA.codeAt)(b + A.start) }, A.ctl, { seed: A.song.id || '' });
     paste = bar => P(bar - A.start);
+    paste.upTo = (bar, ms) => P.upTo(bar - A.start, ms);
   }
   // prepare(): the song on air's written plan made a little at a time before the window goes on air (#82)
   // planWork(): what the plan is made from away from the page ({ build, ctl } for liveCode(build, ctl).plan()), or null

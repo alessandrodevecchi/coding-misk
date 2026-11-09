@@ -125,6 +125,29 @@ export async function zoneOf(font, midi, get = fetchText) {
 // the soundfonts a piece of Strudel code plays (as the compiler writes them: .s("gm_…"), alone or layered)
 export const soundfontsIn = code => [...new Set(String(code).match(/\bgm_[a-z0-9_]+/g) || [])];
 
+// the samples a piece of Strudel code plays, as the compiler writes them (#82): per line, the sounds of s("…") (or
+// sound("…")), with the drum machine of .bank("…") in front ("RolandTR808" and "hh" are "rolandtr808_hh", the sound map's
+// lower-case key) and the sample numbers of "name:n" or of .n("…") (every number of its string, at most `most`; 0 when
+// there is none). count(name): how many samples the sound map holds for a sample sound, 0 for any other sound (a
+// soundfont, a synth, a name it does not know). Returns [{ s, n }], each once, in the order of the code.
+export function samplesIn(code, count, most = 12) {
+  const out = [], seen = new Set();
+  const add = (s, n) => { const c = count(s); if (!c) return; const i = indexOf(n, c), k = `${s}:${i}`; if (!seen.has(k)) { seen.add(k); out.push({ s, n: i }); } };
+  for (const line of String(code).split('\n')) {
+    const m = /\b(?:s|sound)\(\s*"([^"]*)"/.exec(line);
+    if (!m) continue;
+    const b = /\.bank\(\s*"([^"]+)"/.exec(line), bank = b ? b[1].toLowerCase() : '';
+    const nm = /\.n\(\s*"([^"]*)"/.exec(line);
+    const ns = nm ? [...new Set((nm[1].match(/-?\d+/g) || []).map(Number))].slice(0, most) : [0];
+    for (const w of m[1].match(/[A-Za-z_][\w]*(?::\d+)?/g) || []) {
+      const [word, idx] = w.split(':'), name = (bank ? `${bank}_${word}` : word).toLowerCase();
+      if (idx !== undefined) add(name, +idx);
+      else for (const n of ns.length ? ns : [0]) add(name, n);
+    }
+  }
+  return out;
+}
+
 // loads every zone of the first font of each soundfont, one silent note per zone, one at a time with a pause, so a broken
 // zone is learned (and its stand-in loaded) before a song needs it. play(value): superdough at gain 0 a little ahead.
 // Decoding runs off the main thread; the pauses keep the live scheduler on time.
@@ -160,8 +183,11 @@ export const freshUrl = (url, k = Date.now()) => {
 };
 
 // wraps the soundfont and sample sounds of a sound map (superdough's soundMap and registerSound), now and as more are
-// registered. now(): the audio clock, to skip a stand-in that would come too late; onReplace(name, from, to): a stand-in
-// played (on every such note). Returns a function that stops watching.
+// registered. now(): the audio clock, to skip a stand-in that would come too late; onReplace(name, from, to, midi): a
+// stand-in played (on every such note; midi: set when the font has no zone for that note). Returns a function that stops
+// watching.
+// A soundfont font that has no zone for a note ("no soundfont zone found", #82: a low note of the tubular bells, every
+// phrase, silent) plays from the first other font of the instrument that has one; not learned, as the font is sound.
 export function guardSounds({ soundMap, registerSound, register, now = () => 0, onReplace = () => {}, zone = zoneOf, probe = servesAudio }) {
   const wrapOne = (key, s) => {
     if (s.data.type === 'sample') fixSampleBank(s.data.samples);
@@ -169,12 +195,21 @@ export function guardSounds({ soundMap, registerSound, register, now = () => 0, 
     const list = type === 'sample' && Array.isArray(s.data.samples) ? s.data.samples : null;
     const count = fonts ? fonts.length : list ? list.length : 1;
     const play = s.onTrigger, local = isLocalBank(key);
+    // (the font of the instrument that has a zone for a note, by font and note: an index, or -1 for none)
+    const zoneFont = new Map();
+    const inRange = async (idx, midi) => {
+      const k = `${idx}:${midi}`;
+      if (!zoneFont.has(k)) { let j = -1; for (let d = 1; d < count && j < 0; d++) { const c = (idx + d) % count; if (!register.broken(key, c, midi) && (await zone(fonts[c], midi))) j = c; } zoneFont.set(k, j); }
+      return zoneFont.get(k);
+    };
     registerSound(key, async (time, v, onended) => {
       const midi = fonts ? midiOf(v) : null;
       const want = indexOf(v.n, count);
       let idx = local ? want : register.standIn(key, count, want, midi);
       if (idx === null) idx = want;
       else if (idx !== want) onReplace(key, want, idx);
+      // (a note this font has no zone for, met before: straight to the font that has one)
+      if (fonts) { const j = zoneFont.get(`${idx}:${midi}`); if (j !== undefined && j >= 0) idx = j; }
       let fresh = false;
       for (let tries = 0; ; tries++) {
         try { return await play(time, idx === want ? v : { ...v, n: idx }, onended); }
@@ -184,6 +219,13 @@ export function guardSounds({ soundMap, registerSound, register, now = () => 0, 
             if (fresh || !list || typeof list[idx] !== 'string') throw e;
             fresh = true;
             list[idx] = freshUrl(list[idx]);
+            continue;
+          }
+          if (fonts && count > 1 && tries < 3 && /no soundfont zone/i.test(String((e && e.message) || e))) {
+            const j = await inRange(idx, midi);
+            if (j < 0 || now() > time) throw e;
+            onReplace(key, idx, j, midi);
+            idx = j;
             continue;
           }
           if (!isBrokenError(e) || count < 2 || tries >= 3) throw e;

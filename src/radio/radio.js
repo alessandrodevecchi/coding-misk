@@ -263,7 +263,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   function windowPlayable(over = null, list = null) {
     const items = (list || S.stream.slice(S.onAir, S.onAir + 2)).map(x => (over && x === over.item ? { ...x, song: over.song } : x));
     const W = windowSong(items.map(x => ({ song: x.song, n: x.n + 1, start: x.start, transition: x.entry.transition, cut: x.cut })));
-    return player.makePlayable(W, items.map((x, i) => ({ n: x.n + 1, prefix: `s${x.n + 1}-`, start: x.start, song: x.song, title: x.song.title, profile: profileOf(x), custom: !!x.custom || !!displayOn(x), ctl: liveControlsOf(x), show: i === 0 ? 'air' : showOf(x) })));
+    const p = player.makePlayable(W, items.map((x, i) => ({ n: x.n + 1, prefix: `s${x.n + 1}-`, start: x.start, song: x.song, title: x.song.title, profile: profileOf(x), custom: !!x.custom || !!displayOn(x), ctl: liveControlsOf(x), show: i === 0 ? 'air' : showOf(x) })));
+    // (what it is made of, so a resume can play on the window the player has when nothing changed, #82)
+    if (p && typeof p === 'object') p.winKey = windowKey(items);
+    return p;
   }
   // A window handed to the player once its song on air's written plan is made, a little at a time, with the page free
   // between the slices (#82: a typed line froze the page while a Live coder window made its plan in one block). It goes
@@ -273,7 +276,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // a skip, a start) wins, and this one is dropped; so does a window still waiting for its plan when a newer one comes
   // here (the newer one holds every change, and keeps the earlier of the two bars).
   let windowSeq = 0, soon = null;
-  for (const k of ['swap', 'jump', 'start', 'resumeAt', 'stop']) if (typeof player[k] === 'function') { const f = player[k]; player[k] = (...a) => { windowSeq++; return f.apply(player, a); }; }
+  // (handed: the last window handed to the player)
+  let handed = null;
+  for (const k of ['swap', 'jump', 'start', 'resumeAt', 'stop']) if (typeof player[k] === 'function') { const f = player[k]; player[k] = (...a) => { windowSeq++; handed = k === 'stop' ? null : a[0]; return f.apply(player, a); }; }
   function swapSoon(p, by = Infinity) {
     if (!p.prepare) { if (soon) soon.done = true; soon = null; player.swap(p); return; }
     const seq = windowSeq, mine = S, now = player.now();
@@ -430,7 +435,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (!S || S.paused === undefined) return;
     const bar = S.paused; delete S.paused;
     if (recS) { recS.cap.resume(); if (recS.pauseStart) recS.paused += performance.now() - recS.pauseStart; recS.pauseStart = null; }
-    player.resumeAt(windowPlayable(), bar);
+    // (#82: the window the player has when nothing it is made of changed during the pause: a window made anew had every
+    // cache empty, its code, its paste rule and its plan made again on the first bars after the resume, and the
+    // scheduler skipped windows there)
+    const items = S.stream.slice(S.onAir, S.onAir + 2), keep = handed && handed.winKey && sameWindow(handed.winKey, windowKey(items));
+    player.resumeAt(keep ? handed : windowPlayable(), bar);
     render();
   }
   // the next song is generated once the song on air has played 40 % of its length: control changes made
