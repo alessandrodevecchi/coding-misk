@@ -670,7 +670,7 @@ const CHECKS = {
     assert(free.total > 1 && !free.frame(0.01).includes('say_') && tight.total === 0 && tight.frame(0) === `${from}\n${voice}`, 'a free step: typed when it fits, pasted when it does not');
     console.log(`      ${song.title}: ${shown} voice lines shown at ${steps.length} steps (${buildSteps(L.build).filter(s => s.display).length} display steps), voice heard on ${bars} bars the same three ways`);
   },
-  '#82: a batch of six "+" on a grown song enters soon, most on its first boundary, its tracks on their boundaries; a replay is the same; a lone saved pattern enters on its boundary'() {
+  '#82: a batch of six "+" on a grown song enters soon, its head within 2 phrases and every line within 4, its tracks on their boundaries; a replay is the same; a lone saved pattern enters on its boundary'() {
     let n = 0, sum = 0;
     const skipped = [];
     for (const x of airCases().slice(0, 6)) {
@@ -684,9 +684,10 @@ const CHECKS = {
       if (r.commands.length < 4) { skipped.push(`${x.id}: ${r.commands.length} placed`); continue; }
       const ats = r.commands.map(c => c.at), head = Math.min(...ats), last = Math.max(...ats);
       const onHead = r.commands.filter(c => c.at === head);
-      assert(fams.every(p => !r.commands.some(c => c.part === p) || onHead.some(c => c.part === p)), `${x.id}: an instrument missing on the head ${head}: ${ats.join(' ')}`);
-      assert(onHead.length >= Math.ceil(r.commands.length / 2), `${x.id}: less than half on the head: ${r.commands.map(c => `${c.part}@${c.at}`).join(' ')}`);
-      assert(head <= at + 3 * ph && last - head <= 2 * ph, `${x.id}: pressed on ${q}, entries ${ats.join(' ')}`);
+      // (console-add-waves D5: the head, at least one line, within 2 phrases of the press, as many lines as fit there;
+      // every line within 4 phrases)
+      assert(onHead.length >= 1 && head - q <= 2 * ph, `${x.id}: pressed on ${q}, head ${head}: ${r.commands.map(c => `${c.part}@${c.at}`).join(' ')}`);
+      assert(last - q <= 4 * ph, `${x.id}: pressed on ${q}, entries ${ats.join(' ')}`);
       // (every added track the song plays comes into the code on the boundary of its command, or plays within a phrase
       // of it when the part there leaves it out, a break for a kick; kick-variety: no added track stays silent, every one
       // plays from the phrase where it enters)

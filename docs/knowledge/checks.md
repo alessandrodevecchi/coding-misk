@@ -73,6 +73,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | Tool | npm script | Needs | What it covers |
 | --- | --- | --- | --- |
 | `tools/check-add-lag.cjs` |  | dev server, Chrome | "+" and "−" of the radio console prepared ahead (console-add-ahead, #82): a press records a pending change, the song is steered away from the page and the change enters on a phrase start, with no lag. On a radio song in… |
+| `tools/check-add-waves.cjs` |  | dev server, Chrome | Console "+" waves (console-add-waves, #82): the baseline scenarios of openspec/changes/console-add-waves/baseline, without instrumentation. Per run: a radio session on a fixed seed, earlier energy commands, then a press… |
 | `tools/check-arrangement-levels.cjs` |  | dev server, Chrome | Levels and load of a radio song stacked to 12 tracks with "+" (radio-arrangement D4, D5, tasks 1.5 and 1.8): for each style, a radio session where the console adds tracks of every instrument until 12 play; then the… |
 | `tools/check-backup.mjs` |  | Node | Checks for the backup of everything in the browser (#31). No browser. |
 | `tools/check-captions.cjs` |  | dev server, Chrome | Browser check of the stage captions (spoken-text-on-stage, #82): the cases of the design measured again (the caption is the line heard on every spoken bar, the voice track's lines shown, nothing shown that is not heard)… |

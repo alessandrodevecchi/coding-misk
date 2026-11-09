@@ -1230,6 +1230,33 @@ const CHECKS = {
     }
     assert(checked >= 15, `only ${checked} songs`);
   },
+  'arrangement: a "+" or "−" on a half-phrase start enters on its bar'() {
+    // (console-add-waves D6: a slow song's batch within 30 s of the press; the steps before its bar stay as they were,
+    // a later command keeps it, the same commands give the same song)
+    let checked = 0;
+    for (const g of arrSongs(30, 'arr-half')) {
+      const ph = g.plan.phrase, at = 3 * ph + ph / 2;
+      if (ph % 2 || at + 2 * ph >= outroFrom(g.plan) * 2 * ph) continue;
+      const part = ARR_PARTS.find(p => partHas(g.plan.R, p) && !whyNot({ kind: 'more', part: p }, g.song, g.plan, at - 1));
+      if (!part) continue;
+      const before = onAt(g.song, at).filter(t => instrumentOf(t) === part).length;
+      const r = steerArr(g, [{ kind: 'more', part, at }]), id = r.plan.added[0] && r.plan.added[0].id;
+      assert(id, `${g.style}: no track added`);
+      const steps = s => JSON.stringify((s.build || []).filter(x => x.at < at));
+      assert(steps(r.song) === steps(g.song), `${g.style}: the steps before bar ${at} changed`);
+      assert(buildSteps(r.song).some(s => s.at === at && [].concat(s.add ?? []).includes(id)), `${g.style}: ${id} has no step on bar ${at}`);
+      assert(onAt(r.song, at).filter(t => instrumentOf(t) === part).length === before + 1 && !onAt(r.song, at - 1).some(t => t.id === id), `${g.style}: ${id} does not come in on bar ${at}`);
+      // (a later command on a phrase start, and a "−" on the next half-phrase start, keep it; the same commands, the same song)
+      const cmds = [{ kind: 'more', part, at }, { kind: 'energy-up', at: at + ph / 2 }, { kind: 'less', part, at: at + 2 * ph }];
+      const r2 = steerArr(g, cmds);
+      assert(onAt(r2.song, at + ph / 2).some(t => t.id === id), `${g.style}: a later command dropped ${id}`);
+      assert(!onAt(r2.song, at + 2 * ph).some(t => t.id === id) && onAt(r2.song, at + 2 * ph - 1).some(t => t.id === id), `${g.style}: the "−" on bar ${at + 2 * ph} did not take ${id} out on its bar`);
+      assert(!validateSong(r2.song).errors.length, `${g.style}: ${validateSong(r2.song).errors.slice(0, 2).map(e => `${e.path}: ${e.msg}`)}`);
+      assert(JSON.stringify(steerArr(g, cmds).song) === JSON.stringify(r2.song), `${g.style}: replay`);
+      checked++;
+    }
+    assert(checked >= 15, `only ${checked} songs`);
+  },
   'arrangement: a second track sounds different, an octave away, in key'() {
     let n = 0, apart = 0, octave = 0, composed = 0;
     for (const g of arrSongs(80, 'arr-var')) {

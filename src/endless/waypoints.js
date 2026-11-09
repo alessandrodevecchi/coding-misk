@@ -31,11 +31,12 @@ const KNOBS = ['cutoff', 'reso', 'drive', 'grit', 'room', 'delay', 'gain'];
 // the boundaries a command may wait for: the next phrase or the one after (the next double phrase or the one after for
 // structural commands), the next bars for the mixer
 const PHRASE_TRIES = 2, BAR_TRIES = 4;
-// a batch of console changes (console-add-ahead, #82: commands with the same `batch`): the boundaries its head may take,
-// from its earliest one, and the phrases after the head where the rest of its new lines may enter. (Two, #82: inside a
-// growth the song has a step about every bar, so the head's typing never fitted the bar before a boundary and the head
-// went to the third or fourth phrase, minutes later on a slow 10-minute song; now it is typed in a hurry within two)
-const BATCH_TRIES = 2, BATCH_TAIL = 2;
+// a batch of console changes (console-add-ahead, #82: commands with the same `batch`): its head enters within
+// BATCH_NEAR phrases of the batch's first press, BATCH_FAR as a fallback, never later (console-add-waves D5, the owner's
+// decision of 8 November), with as many lines as can be typed there, down to one; the rest come in over the next
+// BATCH_TAIL phrases. On a slow song whose first phrase start is more than BATCH_CAP seconds after the press, the
+// half-phrase starts within BATCH_CAP seconds come first (D6)
+const BATCH_NEAR = 2, BATCH_FAR = 4, BATCH_TAIL = 2, BATCH_CAP = 30;
 // how much faster than a person a batch's head may be typed (#82): a Live coder song has a step of its own about every
 // phrase, so the lines of a batch have about a phrase to be typed in; at a person's pace one line fits, two at most
 const BATCH_HURRY = 5;
@@ -555,30 +556,53 @@ export function steerOnAir({ grown = null, song, plan, opts, commands = [], seed
     };
     let at = new Map(list.map(c => [c, c.at]));
     if (list.some(c => c.pend)) {
-      const q = Number.isFinite(list[0].q) ? list[0].q : list[0].at - 1, min = list[0].min;
-      const cands = airBoundaries(list[0].kind, q, P, g0, 0.5, BATCH_TRIES + 8).filter(b => !Number.isFinite(min) || b >= min).slice(0, BATCH_TRIES);
-      if (!cands.length) return;
+      const q = Number.isFinite(list[0].q) ? list[0].q : list[0].at - 1, min = list[0].min, ph = P.phrase;
+      // (the phrase starts from its earliest boundary on; within BATCH_FAR phrases of the press, else the first one left)
+      const starts = airBoundaries(list[0].kind, q, P, g0, 0.5, 2 * BATCH_FAR + 8).filter(b => !Number.isFinite(min) || b >= min);
+      if (!starts.length) return;
+      const dist = b => (b - q) / ph, secs = b => (b - q) * barSecondsAt(N, b);
+      let cands = starts.filter(b => dist(b) <= BATCH_FAR);
+      if (!cands.length) cands = starts.slice(0, 1);
+      // (a slow song: the half-phrase starts within BATCH_CAP seconds of the press, before a phrase start further away,
+      // console-add-waves D6; the director takes a "+" or "−" on them)
+      if (ph % 2 === 0 && secs(cands[0]) > BATCH_CAP) {
+        const off = airOffset(g0), last = P.bars - ph + off, half = [];
+        for (let b = Math.floor((q - off) / ph) * ph + off + ph / 2; b < cands[0] && b <= last; b += ph) if (b > q && (!Number.isFinite(min) || b >= min) && secs(b) <= BATCH_CAP) half.push(b);
+        cands = [...half, ...cands];
+      }
       // (the new lines one instrument after another: the first of each, then the second of each…)
       const rest = list.filter(c => !adds(c)), fams = [...new Set(list.filter(adds).map(familyOf))], byFam = fams.map(f => list.filter(c => adds(c) && familyOf(c) === f));
       const order = [];
       for (let k = 0; order.length < list.length - rest.length; k++) for (const xs of byFam) if (xs[k]) order.push(xs[k]);
-      const need = Math.min(order.length, Math.max(fams.length, Math.ceil(order.length / 2)));
+      // (at least one new line on the head: the smallest head the batch may take, D5)
+      const least = order.length ? 1 : 0;
       const memo = new Map(), probe = (B, k) => { const key = `${B}:${k}`; if (!memo.has(key)) { const x = onB(B, [...rest, ...order.slice(0, k)]); memo.set(key, typingFrom(x.t.song, B, q, x.t.E, C, { hurry: BATCH_HURRY, head: true })); } return memo.get(key); };
-      let B = null, k = need;
-      for (const b of cands) {
-        if (!probe(b, need).fits) continue;
-        B = b;
-        if (need < order.length) {
-          if (probe(b, order.length).fits) k = order.length;
-          else { let lo = need, hi = order.length; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (probe(b, m).fits) lo = m; else hi = m; } k = lo; }
+      // the first boundary of a list where the smallest head can be typed in time, with the most lines that can
+      const fit = bs => {
+        for (const b of bs) {
+          if (!probe(b, least).fits) continue;
+          let k = least;
+          if (least < order.length) {
+            if (probe(b, order.length).fits) k = order.length;
+            else { let lo = least, hi = order.length; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (probe(b, m).fits) lo = m; else hi = m; } k = lo; }
+          }
+          return { B: b, k };
         }
-        break;
-      }
-      // (no boundary leaves time for the head even in a hurry: the first one with about the most time to type it, so
-      // the lines come in soon, typed as fast as they must)
-      if (B === null) { const most = Math.max(...cands.map(b => probe(b, need).usable)); B = cands.find(b => probe(b, need).usable >= most * 0.75); }
+        return null;
+      };
+      // near (within BATCH_NEAR phrases, half-phrase starts first): the first where the head fits; when none does, the
+      // near one with about the most time to type it, typed as fast as it must, with today's head (at least one line of
+      // each instrument and half of them, as a batch that fits nowhere took it before; Crescendo, whose typing probe
+      // never fits, keeps its bursts together); the candidates up to BATCH_FAR phrases only when no near one is left
+      // (a later wave, a boundary held by the lead), the same way
+      const near = cands.filter(b => dist(b) <= BATCH_NEAR), far = cands.filter(b => dist(b) > BATCH_NEAR);
+      const need = Math.min(order.length, Math.max(fams.length, Math.ceil(order.length / 2)));
+      const rush = bs => { const most = Math.max(...bs.map(b => probe(b, least).usable)); return { B: bs.find(b => probe(b, least).usable >= most * 0.75), k: need, fallback: true }; };
+      const pool = near.length ? near : far;
+      const got = fit(pool) || rush(pool), fallback = !!got.fallback;
+      const B = got.B, k = got.k;
       // (why the head took its boundary, for the radio's log: never part of the result)
-      work.heads.push({ batch: list[0].batch, q, min, B, k, n: order.length, need, cands: [...memo].map(([key, x]) => `${key}:${x.fits ? 'fits' : 'no'}:${r3(x.need)}/${r3(x.usable)}`) });
+      work.heads.push({ batch: list[0].batch, q, min, B, k, n: order.length, fallback, cands: [...memo].map(([key, x]) => `${key}:${x.fits ? 'fits' : 'no'}:${r3(x.need)}/${r3(x.usable)}`) });
       const tail = order.slice(k);
       const next = airBoundaries(list[0].kind, B, P, g0, 0.5, BATCH_TAIL);
       at = new Map(list.map(c => [c, B]));

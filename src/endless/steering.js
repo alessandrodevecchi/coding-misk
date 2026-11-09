@@ -575,7 +575,10 @@ function headroom(song, P, from) {
   };
   const out = (song.build || []).slice();
   let j = 0;
-  for (let at = Math.ceil(from / ph) * ph; at < P.bars; at += ph) {
+  // (a rewrite from a half-phrase start, console-add-waves D6: its bar first, then the phrase starts)
+  const bars = [...(from % ph && (2 * from) % ph === 0 ? [from] : [])];
+  for (let at = Math.ceil(from / ph) * ph; at < P.bars; at += ph) bars.push(at);
+  for (const at of bars) {
     while (j < all.length && all[j].at <= at) apply(all[j++]);
     const n = [...on].filter(([id, v]) => v && types[id] !== 'riser' && types[id] !== 'voice' && types[id] !== 'spoken').length;
     const f = n > usual ? Math.sqrt(usual / n) : 1;
@@ -605,6 +608,11 @@ export function targetTracks(song, tracks, cmd, seed) {
   const lo = Math.min(...tracks.map(t => last(t.id))), tied = tracks.filter(t => last(t.id) === lo);
   return [tied.length > 1 ? stream(seed, 'target').pick(tied) : tied[0]];
 }
+
+// a console "+", "−" or saved pattern on a half-phrase start (console-add-waves D6: a slow song's batch within 30 s of
+// the press); such commands are only made by the radio's batches, so recorded commands on phrase starts never match
+export const HALF_KINDS = ['more', 'less', 'pattern'];
+export const halfPhrase = (cmd, at, ph) => HALF_KINDS.includes(cmd.kind) && ph % 2 === 0 && at % ph === ph / 2;
 
 // One command applied to a song: the modified plan and options, and the rewrite from its bar.
 function rewrite(song, plan, opts, cmd, rng) {
@@ -814,8 +822,11 @@ function rewrite(song, plan, opts, cmd, rng) {
   }
   // the listener's + and − on the boundaries from here (radio-arrangement): forced again on every rewrite, so a later
   // command never drops them (each boundary in their order)
-  const arranged = (P.arrange || []).filter(e => e.at >= Math.round(at / ph) * ph && e.at < P.plan.length * dbl);
-  if (forced.length || arranged.length) from = Math.round(at / ph);
+  // (a console "+" or "−" on a half-phrase start, console-add-waves D6: the rewrite goes on from that bar, the steps of
+  // the phrase start before it kept; any other command or bar as before)
+  const fromK = halfPhrase(cmd, at, ph) ? at / ph : Math.round(at / ph);
+  const arranged = (P.arrange || []).filter(e => e.at >= fromK * ph && e.at < P.plan.length * dbl);
+  if (forced.length || arranged.length) from = fromK;
   P.bars = P.plan.length * dbl;
   P.sections = sectionsWith(P);
   if (P.risers) P.risers = P.risers.filter(r => r.end <= P.bars && r.change < P.bars);

@@ -100,8 +100,10 @@ Every move pushes `{ from, to, why, detail }` onto the batch (`why` ∈ `typing`
 In `steerOnAir`'s batch grouping, the candidate boundaries are the phrase starts (and, D6, half-phrase starts) from the batch's earliest boundary (`min`) on, sorted by their distance from the batch's first press `q` (bars, in phrases):
 
 1. **Near:** candidates within 2 phrases of `q`, in order. On each, the head takes as many lines as fit (all of them when they fit, else the most that fit, down to one line, families in the existing order: the first line of each instrument, then the second…). The first near candidate where one line fits takes the head.
-2. **Fallback:** when no near candidate fits even one line, the candidates more than 2 and at most 4 phrases after `q`, the same way.
-3. **Last resort:** when nothing fits, the first candidate within 4 phrases with at least 75 % of the most typing time among them, with one line typed as fast as it must (today's rule, bounded to 4 phrases).
+2. **Near, in a hurry:** when no near candidate fits even one line (inside a growth the song has a step about every bar, so a line rarely fits a person's pace, even five times faster), the first near candidate with at least 75 % of the most typing time among them, with today's head (at least one line of each instrument and half of the lines) typed as fast as it must. Crescendo, whose typing probe never fits, keeps its bursts together this way.
+3. **Fallback:** the candidates more than 2 and at most 4 phrases after `q` only when no near candidate is left (a later wave held a phrase after the one before it, a boundary held by the lead and preparation), the same way.
+
+Measured on 9 November: taking a far boundary where a line fits before a near one in a hurry put the owner's heads 2.3 to 3.3 phrases (2 to 3 minutes) after the press on the 54-second phrases of Voltaggio, against 0.25 to 0.92 before; rejected.
 
 The rest of the lines go over the next `BATCH_TAIL` = 2 phrases after the head, as today. `BATCH_HURRY` stays 5; `BATCH_TRIES` is replaced by the distance bounds (2 and 4 phrases). A move after the steering ("not ready", "busy page", "late", "order") still moves the whole batch to the next boundary; the 4-phrase bound is the target of the head rule, and the checks report the batches that went past it and why.
 

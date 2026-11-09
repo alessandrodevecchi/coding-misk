@@ -386,6 +386,7 @@ Everything random comes from one seed through named streams: `plan`, `moves`, `m
 | A vary under 20 ms                           | `steering: one vary takes less than 20 ms`                       |
 | Old add and remove replay as before          | `arrangement: old add and remove replay as before radio-arrangement` |
 | + and −, several tracks of one instrument    | `arrangement: + and − per instrument, several tracks of one instrument` |
+| + and − on a half-phrase start (slow songs) | `arrangement: a "+" or "−" on a half-phrase start enters on its bar` |
 | A second track differs and fits              | `arrangement: a second track sounds different, an octave away, in key` |
 | Limits and warnings, two kicks               | `arrangement: limits, recommended counts as warnings, two kicks on different grooves` |
 | Three «+ kick», different rows; sixth repeats the least held | `arrangement: three "+ kick" give different kick rows on every style with a kick (kick-variety)` |
