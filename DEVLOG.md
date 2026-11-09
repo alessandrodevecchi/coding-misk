@@ -2860,3 +2860,21 @@ Misure (sessione del proprietario, Chrome headless, macchina condivisa con caric
 | note mute «no soundfont zone» | 12 | 0 | 12 | 0 |
 
 Prove: `check-add-lag --owner` (tutto ok, lavoro proprio dei batch ≤ 19 ms con CPU 4×), `check:sound-guard` (due controlli nuovi: campioni di un codice, nota fuori dal font), `check:endless` (96), più quelli sotto prima del commit.
+
+## 2026-11-08 diagnosi delle ondate della console (#82)
+
+Ramo `docs/82-console-waves` da `develop` (6895b24). Solo pianificazione: change OpenSpec `console-add-waves`, nessun codice del prodotto.
+
+- **Problema (proprietario):** un «+» della console mostra «Entra tra 5 s» e poco dopo passa a 25 o 50 s; più «+» spostano di nuovo le entrate; un «+» premuto 15 s dopo entra nello stesso lotto e sposta tutto più avanti.
+- **Misure** (log temporaneo in `radio.js` e `waypoints.js`, mai committato; kit in `openspec/changes/console-add-waves/baseline/`: `run.sh`, `measure.cjs`, `instrumentation.patch`, risultati): Classic, Crescendo, Live coder × berlin-techno e lo-fi × nessun comando prima o molti (8, in lo-fi 6) × un «+», tre «+» in fila, sei «+» in tre gruppi (0, 15 s, 20 s). 44 lotti.
+
+| Profilo | Comandi prima | Lotti | Testa entro 2 frasi | Testa oltre 2 frasi | Testa peggiore | Lotti spostati | Steering (mediana) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Classic | nessuno / molti | 8 / 8 | 8 / 8 | 0 / 0 | 1,9 frasi | 1 / 1 | 0,0 / 0,1 s |
+| Crescendo | nessuno / molti | 8 / 7 | 8 / 6 | 0 / 1 | 2,7 frasi | 0 / 2 | 0,7 / 2,4 s |
+| Live coder | nessuno / molti | 6 / 8 | 5 / 4 | 1 / 4 | 11,8 frasi | 4 / 6 | 0,3 / 4,4 s |
+
+- **Cause, per spostamento:** battitura che non sta nel confine 9 (9 lotti, solo brani cresciuti, da 1 a 3 frasi in più), preparazione non pronta 12 (11 in un solo lotto), pagina occupata 3. 12 lotti hanno preso pressioni arrivate da 5 a 22 s dopo la prima.
+- **Causa principale:** lo steering in onda dei brani cresciuti. Rigioca tutti i comandi: con molti comandi prima dura da 2 a 13 s (da 0,2 a 1,6 s senza). Su un brano Live coder con 12 s di steering il lotto è slittato 11 volte, una frase alla volta (da «Entra tra 11 s» a circa 170 s): `addAt` usa il tempo di preparazione dell'ultima volta della pagina (1 s) e non quello del brano (`item.addPrep`), `expectedPrep` non è mai chiamata, e ogni spostamento rifà lo steering da capo. Lo stesso caso con un altro seed (4,4 s) entra in orario. Gli spostamenti più frequenti (da 1 a 3 frasi) vengono dalla regola della testa: almeno una riga per strumento, quindi tre strumenti sono sempre tre righe, da 50 a 70 s di battitura.
+- **Da sapere:** in Crescendo la prova di battitura non sta mai (da 1,2 a 2,8 s utili a ogni confine), quindi la testa la sceglie sempre il ripiego; di solito resta sul primo confine. I brani lo-fi sono di 48-80 battute: con 8 comandi uno per frase finivano dopo la pressione, rifatto con 6 comandi nelle prime due frasi.
+- **Decisioni del proprietario nella change:** finestra di unione (5 s dall'ultima pressione, 10 s dalla prima), seconda ondata almeno una frase dopo il lotto prima, che una pressione non sposta mai, motivo registrato per ogni spostamento, badge aggiornato frase per frase senza costi. Lo steering incrementale si fa prima, come change a parte: l'obiettivo delle 2 frasi e la testa che si accorcia si rimisurano dopo, con lo stesso kit.
