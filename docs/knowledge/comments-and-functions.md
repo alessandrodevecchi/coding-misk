@@ -86,6 +86,8 @@ The app's own functions:
 | `chan` |  |  | no help text: described below |
 | `crunch` |  |  | no help text: described below |
 | `miskMix` |  |  | no help text: described below |
+| `vox` |  |  | no help text: described below |
+| `melody` |  |  | no help text: described below |
 | `plk` | a, b | `.decay(a).sustain(b)` | envelope: decay and sustain (it: inviluppo: decay e sustain) |
 | `wet` | a, b | `.delay(a).room(b)` | echo and reverb: delay and room (it: eco e riverbero: delay e room) |
 | `res` | a, b | `.lpf(a).lpq(b)` | filter with resonance: lpf and lpq (it: filtro con risonanza: lpf e lpq) |
@@ -95,6 +97,7 @@ The app's own functions:
 - `chan`: `.chan(name)` is the bus and the visual of a track, `.orbit(n).analyze(name)`, with the orbit from the song's buses.
 - `crunch`: `.crunch(x)` is distortion with its volume, `.distort(x).distortvol(0.5)`.
 - `miskMix`: the hidden mixer, called as `miskMix(pattern, ranges)`. It never appears in the code shown.
+- `vox` and `melody`: the decoded code's top line group (decode-refine D6), `$: vox("reading from track").gain(0.8)` or `$: melody("tracing the hook")`. Both give `silence`: shown in the Decode tab, never sent to the player, kept by Copy with `const vox = () => silence, melody = () => silence`.
 
 Adding a library function or a name word is a new entry in `src/song/functions.js`. `npm run check:strudel` fails when a name is a Strudel name. `npm run check:functions` checks that every folded line expands back to the line written out.
 

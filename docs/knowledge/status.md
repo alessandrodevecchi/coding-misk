@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 115. With open tasks: 36. All tasks ticked, waiting to be archived: 79.
+OpenSpec changes not archived: 116. With open tasks: 37. All tasks ticked, waiting to be archived: 79.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -23,6 +23,7 @@ OpenSpec changes not archived: 115. With open tasks: 36. All tasks ticked, waiti
 | [console-add-ahead](../../openspec/changes/console-add-ahead/tasks.md) | 1 | 18 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
+| [decode-refine](../../openspec/changes/decode-refine/tasks.md) | 16 | 32 |
 | [fm-groove-lab](../../openspec/changes/fm-groove-lab/tasks.md) | 1 | 16 |
 | [generator-followups](../../openspec/changes/generator-followups/tasks.md) | 2 | 3 |
 | [growth-shapes](../../openspec/changes/growth-shapes/tasks.md) | 3 | 25 |

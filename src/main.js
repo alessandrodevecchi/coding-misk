@@ -1542,7 +1542,9 @@ $('#stop').addEventListener('click', stop);
 document.addEventListener('keydown', e => {
   const inEditor = e.target.closest && e.target.closest('strudel-editor');
   // barra spaziatrice: play/pausa, tranne mentre si scrive o su un pulsante
-  if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !inEditor && !e.target.closest('input, select, textarea, button, [contenteditable]')) { e.preventDefault(); if (curTab === 'decode' && decodeTab && decodeTab.playing && !e.repeat) { decodeTab.tap(); return; } togglePlay(); return; }
+  if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !inEditor && !e.target.closest('input, select, textarea, button, [contenteditable]')) { e.preventDefault(); togglePlay(); return; }
+  // Decode (decode-refine D8): T taps the tempo while the track plays, also with a button focused (a T never presses it)
+  if (e.code === 'KeyT' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && !inEditor && !e.target.closest('input, select, textarea, [contenteditable]') && curTab === 'decode' && decodeTab && decodeTab.playing) { e.preventDefault(); if (!e.repeat) decodeTab.tap(); return; }
   if (!(e.ctrlKey || e.metaKey)) return;
   if (e.key === 'Enter' && !inEditor) { e.preventDefault(); play(); }
   if (e.key === '.' && !inEditor) { e.preventDefault(); stop(); }
@@ -4106,6 +4108,8 @@ function previewBtn(tr) { const on = !!(preview && preview.state && preview.stat
 // for the browser checks (tools/check-preview.cjs)
 globalThis.codingMiskPreview = preview;
 // (and what the bar counter counts: the song in Compose, written or grown, and the song playing)
+// the code Copy gives now (tools/check-decode.cjs: the decoded code keeps its top line group with its helpers)
+globalThis.codingMiskCopy = () => currentCode();
 globalThis.codingMiskBars = () => ({ compose: { bars: compiled.meta.bars, pending: !!compiled.pending, growth: growBars(), cue: cueBar(), map: (({ pre, G, W, end, bars, ending, steps }) => ({ pre, G, W, end, bars, ending, steps, view: growView, sel, tk }))(playMap()), follow: { on: follow, held: followHeld(), scrolls: knobFollow.scrolls }, narrator: (g => ({ ghost: !!g, off: g ? g.off : null, pending: g ? g.pending : null, marks: nMarks().map(({ at, text, track }) => ({ at, text, track })) }))(ghostInfo()) }, song: song && song.meta ? { id: song.id, bars: song.meta.bars, loop: !!song.loop } : null });
 // the styles a pattern saved from a song with no style tags links (pattern-followups D1): its artist's, or the styles
 // its style line names

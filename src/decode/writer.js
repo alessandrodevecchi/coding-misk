@@ -6,11 +6,21 @@
 // Level A follows the model bar by bar with the hysteresis of D9: a new drum grid is written once it held for a bar
 // (two bars for a difference of one or two steps), so a one-bar fill never changes the code; a part that stops is
 // muted at once.
+// The edit rule of both levels (decode-refine D7): a line changes when its part enters or stops, at a section change,
+// or when its new pattern differs enough and has waited; numbers in EDIT_RULE. The top line's group (D6): `vox(…)` or
+// `melody(…)` lines that evaluate to silence, `$:` where the model hears a top line.
 import { STEPS, DRUM_ROWS, noteName, NOTE_NAMES, parseChord } from './model.js';
 import { KITS } from '../music.js';
 
 export const SOUND_PRESETS = ['ours', 'simple'];
-export const VOX_LINE = '// vox: …';
+// the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
+// line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
+// or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
+// bassSteps, and at least that many steps in a bar; chordShare, the share of a chord loop's bars that must get a
+// chord not close to the old one (the same root or the relative); runBars,
+// level B: the bars a part must be heard, or not heard, to enter or stop inside a section. Every number can be changed
+// here (tools/decode-edits.mjs measures the result)
+export const EDIT_RULE = { lineBars: 4, anyBars: 2, drumSteps: 3, bassShare: 0.25, chordShare: 0.375, bassSteps: 3, runBars: 2 };
 // the format's eight section keys (used only by the app's own instruments): the nearest to the model's key
 const FORMAT_KEYS = ['E', 'F', 'F#', 'G', 'A', 'B', 'C', 'D'];
 const PC = { C: 0, 'C#': 1, D: 2, Eb: 3, E: 4, F: 5, 'F#': 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11 };
@@ -63,16 +73,17 @@ export function partsByBar(model) {
 // smallest L of 1, 2, 4 or 8 whose last 2L bars repeat, else L of 1 (this bar). → values of length L, index k = the
 // value at the latest bar b' ≤ bar with b' mod L = k
 // grow: before a loop has repeated, the last 2, 4 or 8 bars heard (chords); else this bar alone (bass)
-export function loopAt(list, bar, { grow = false, same = (a, b) => JSON.stringify(a) === JSON.stringify(b) } = {}) {
+// maxL: the longest loop allowed (level A: a loop never grows again inside a section, decode-refine D7)
+export function loopAt(list, bar, { grow = false, same = (a, b) => JSON.stringify(a) === JSON.stringify(b), maxL = 8 } = {}) {
   const loop = L => Array.from({ length: L }, (_, k) => list[bar - ((((bar - k) % L) + L) % L)]);
   const filled = L => { for (let i = bar - L + 1; i <= bar; i++) if (i < 0 || list[i] === null || list[i] === undefined) return false; return true; };
-  for (const L of [1, 2, 4, 8]) {
+  for (const L of [1, 2, 4, 8].filter(x => x <= maxL)) {
     if (bar + 1 < 2 * L || !filled(2 * L)) continue;
     let ok = true;
     for (let i = bar - 2 * L + 1; i <= bar - L && ok; i++) if (!same(list[i], list[i + L])) ok = false;
     if (ok) return loop(L);
   }
-  if (grow) for (const L of [8, 4, 2]) if (bar + 1 >= L && filled(L)) return loop(L);
+  if (grow) for (const L of [8, 4, 2].filter(x => x <= maxL)) if (bar + 1 >= L && filled(L)) return loop(L);
   return [list[bar]];
 }
 
@@ -157,33 +168,174 @@ function songShell(model, opts, bars, tracks) {
   };
 }
 
-// level A (D9, D13): the song of the moment at a bar, what the code shows and plays from that bar on. One section as
-// long as the longest loop; each part with the loop it plays at the bar; a part heard before and silent now stays,
-// muted (`_$:`); a part never heard is not written.
-export function momentSong(model, bar, opts = {}) {
-  const P = partsByBar(model), last = Math.min(bar, model.bars.length - 1), snd = soundsOf(model.bars.slice(0, last + 1), opts.sounds);
-  const tracks = [];
-  let L = 1;
-  const heardBefore = list => list.slice(0, last + 1).some(x => x !== null);
-  const lastOf = list => { for (let b = last; b >= 0; b--) if (list[b] !== null) return b; return -1; };
-  if (last >= 0 && heardBefore(P.drums)) {
-    const now = P.drums[last], g = now || P.drums[lastOf(P.drums)];
-    tracks.push({ id: 'drums', name: 'Drums', type: 'drums', settings: { kit: snd.kit }, patterns: { A: { rows: Object.fromEntries(DRUM_ROWS.filter(r => hits(g[r])).map(r => [r, g[r]])) } }, clips: [{ section: 0, pattern: 'A' }], ...(now ? {} : { hush: true }) });
+// ---------- the edit rule (decode-refine D7) ----------
+// a loop's values spread over 8 bars (every loop length divides 8), to compare loops of different lengths
+const over8 = loop => Array.from({ length: 8 }, (_, k) => loop[k % loop.length]);
+const rootOf = notes => { const cnt = new Array(12).fill(0); for (const x of notes || []) if (x !== null && x !== undefined) cnt[((x % 12) + 12) % 12]++; const mx = Math.max(...cnt); return mx ? cnt.indexOf(mx) : -1; };
+const rowsOn = g => DRUM_ROWS.map(r => hits(g[r]) > 0).join();
+// whether a new value of a part differs enough from the one its line shows to edit the line: drums by steps or a row
+// that enters or leaves, bass by the share of note steps (and a few steps at least) or another root on the loop's first
+// bar, chords by a share of the loop's bars with a chord that is not close (its other quality or its relative)
+export function differsEnough(id, cur, cand, rule = EDIT_RULE) {
+  if (id === 'drums') return diffSteps(cur, cand) >= rule.drumSteps || rowsOn(cur) !== rowsOn(cand);
+  const A = over8(cur), B = over8(cand);
+  if (id === 'bass') {
+    if (rootOf(cur[0]) !== rootOf(cand[0])) return true;
+    let n = 0, d = 0;
+    for (let k = 0; k < 8; k++) for (let j = 0; j < STEPS; j++) { const a = A[k][j] ?? null, b = B[k][j] ?? null; if (a === null && b === null) continue; n++; if (a !== b) d++; }
+    // (over the 8 bars: a one-bar loop counts each of its steps 8 times)
+    return n > 0 && d / n >= rule.bassShare && d >= rule.bassSteps * 8;
   }
-  const code = (id, name, visual, list, make) => {
-    if (last < 0 || !heardBefore(list)) return;
-    const at = list[last] !== null ? last : lastOf(list), loop = loopAt(list, at, loopOpts(id));
+  // (the analysis swaps a chord with its other quality, A for Am, and with its relative, Em for G: they count as close)
+  const pa = A.map(parseChord), pb = B.map(parseChord);
+  const rel = (x, y) => x.quality === 'min' && y.quality === 'maj' && (x.root + 3) % 12 === y.root;
+  const close = (x, y) => !!(x && y) && (x.root === y.root || rel(x, y) || rel(y, x));
+  return pa.filter((x, k) => !close(x, pb[k])).length >= rule.chordShare * 8;
+}
+const sameRoot = (a, b) => { const x = parseChord(a), y = parseChord(b); return !!(x && y) && x.root === y.root; };
+const PARTS_A = ['drums', 'bass', 'chords'];
+const planMemo = new WeakMap();
+// level A's plan (D9 with decode-refine D7): for every bar the value each part's line shows and whether the part is
+// heard, from bar 0 on, so the code of a bar depends only on the bars up to it. A part that enters or stops edits its
+// line at once; a part that enters is level A's section change: the sounds are measured again on the bars heard so far
+// (every line shows them) and loops may grow again. Otherwise a line changes when its new value differs enough
+// (differsEnough), held for two bars (the bar before gave a value close to it), or when any new value held `lineBars`
+// bars, and in both cases `lineBars` passed since its last edit and `anyBars` since any edit. A loop of 2 bars or more never grows again until the next section change.
+// → [{ heard: { drums, bass, chords }, value: { drums, bass, chords }, sounds, section }]
+export function planA(model, preset = 'ours', rule = EDIT_RULE) {
+  let memo = planMemo.get(model);
+  if (!memo) planMemo.set(model, (memo = new Map()));
+  const key = `${preset}|${JSON.stringify(rule)}`;
+  if (memo.has(key)) return memo.get(key);
+  const P = partsByBar(model), bars = model.bars || [], out = [];
+  const cur = { drums: null, bass: null, chords: null }, last = { drums: -99, bass: -99, chords: -99 }, maxL = { bass: 8, chords: 8 }, prev = {}, streak = {};
+  let lastAny = -99, snd = null, section = 0;
+  const candidate = (id, b) => (id === 'drums' ? P.drums[b] : id === 'bass' ? loopAt(P.bass, b, { same: sameBass, maxL: maxL.bass }) : loopAt(P.chords, b, { grow: true, same: sameRoot, maxL: maxL.chords }));
+  // heard in a bar: a part enters when it is heard in this bar and in the next, and stops when it is heard in neither
+  // (with the look ahead the next bar is known; the last bar the model knows decides alone)
+  const on = (id, b) => b >= 0 && b < bars.length && P[id][b] !== null && P[id][b] !== undefined;
+  const next = (id, b) => (b + 1 >= bars.length ? on(id, b) : on(id, b + 1));
+  for (let b = 0; b < bars.length; b++) {
+    const was = b ? out[b - 1].heard : { drums: false, bass: false, chords: false };
+    const heard = Object.fromEntries(PARTS_A.map(id => [id, was[id] ? on(id, b) || next(id, b) : on(id, b) && next(id, b)]));
+    const change = PARTS_A.some(id => heard[id] && !was[id]);
+    if (change) { if (b) section++; maxL.bass = 8; maxL.chords = 8; }
+    if (!snd || change) snd = soundsOf(bars.slice(0, b + 1), preset);
+    for (const id of PARTS_A) {
+      if (heard[id] !== was[id]) { last[id] = b; lastAny = b; }
+      if (!heard[id] || !on(id, b)) continue;
+      const cand = candidate(id, b), held = prev[id] && !differsEnough(id, prev[id], cand, rule);
+      streak[id] = prev[id] && JSON.stringify(prev[id]) === JSON.stringify(cand) ? (streak[id] || 1) + 1 : 1;
+      prev[id] = cand;
+      if (JSON.stringify(cand) === JSON.stringify(cur[id])) continue;
+      if (cur[id] === null || !was[id]) { cur[id] = cand; continue; }
+      // (a smaller difference is written once the same new value held `lineBars` bars: the first bar of a part, heard
+      // alone, may miss a kick, and the line would keep the miss)
+      if ((held && differsEnough(id, cur[id], cand, rule) || streak[id] >= rule.lineBars) && b - last[id] >= rule.lineBars && b - lastAny >= rule.anyBars) { cur[id] = cand; last[id] = b; lastAny = b; }
+    }
+    for (const id of ['bass', 'chords']) if (cur[id] && cur[id].length > 1) maxL[id] = Math.min(maxL[id], cur[id].length);
+    out.push({ heard, value: { ...cur }, sounds: snd, section });
+  }
+  memo.set(key, out);
+  return out;
+}
+
+// level A (D9, D13): the song of the moment at a bar, what the code shows and plays from that bar on. One section as
+// long as the longest loop; each part with the line its plan shows at the bar (planA); a part heard before and silent
+// now stays, muted (`_$:`); a part never heard is not written.
+export function momentSong(model, bar, opts = {}) {
+  const last = Math.min(bar, (model.bars || []).length - 1), tracks = [];
+  if (last < 0) return songShell(model, opts, 1, tracks);
+  const p = planA(model, opts.sounds)[last], snd = p.sounds;
+  let L = 1;
+  if (p.value.drums) {
+    const g = p.value.drums;
+    tracks.push({ id: 'drums', name: 'Drums', type: 'drums', settings: { kit: snd.kit }, patterns: { A: { rows: Object.fromEntries(DRUM_ROWS.filter(r => hits(g[r])).map(r => [r, g[r]])) } }, clips: [{ section: 0, pattern: 'A' }], ...(p.heard.drums ? {} : { hush: true }) });
+  }
+  const code = (id, name, visual, make) => {
+    const loop = p.value[id];
+    if (!loop) return;
     L = Math.max(L, loop.length);
-    tracks.push({ id, name, type: 'code', settings: { visual }, patterns: { A: { code: make(loop) } }, clips: [{ section: 0, pattern: 'A' }], ...(list[last] !== null ? {} : { hush: true }) });
+    tracks.push({ id, name, type: 'code', settings: { visual }, patterns: { A: { code: make(loop) } }, clips: [{ section: 0, pattern: 'A' }], ...(p.heard[id] ? {} : { hush: true }) });
   };
-  code('bass', 'Bass', 'bass', P.bass, loop => bassCode(loop, snd.bass));
-  code('chords', 'Chords', 'pad', P.chords, loop => chordCode(loop, snd.chords));
+  code('bass', 'Bass', 'bass', loop => bassCode(loop, snd.bass));
+  code('chords', 'Chords', 'pad', loop => chordCode(loop, snd.chords));
   return songShell(model, opts, L, tracks);
 }
 
-// the vocals placeholder (D14): a comment after the parts, never played
-export const withVox = code => `${code.replace(/\s+$/, '')}\n\n${VOX_LINE}`;
-export const withoutVox = code => code.replace(/\n*\/\/ vox: …\s*$/, '');
+// ---------- the top line's group (decode-refine D6) ----------
+// a bar's top line (misk-analyzer's `top`): `up` is the share of the bar's tonal energy between 400 and 2000 Hz. The
+// rule: a section (level B) or the last 4 bars (level A, off again below `off`) with a mean share of at least `up` has
+// a top line. The detector does not tell a voice from a synth: a track whose median share is at least `vocal` (a voice
+// over the whole track) gets `vox` lines, any other `melody` lines (measured on the owner's test files; part 2 of the
+// change brings a real top line)
+export const TOP_RULE = { up: 0.22, off: 0.18, vocal: 0.35 };
+// the app helpers of the group: they evaluate to silence (src/song/writer.js)
+export const TOP_HELPERS = ['vox', 'melody'];
+const LABELS = {
+  vox: ['reading from track', 'modulizing from track', 'vocalizing', 'passing through song', 'tracing the voice', 'lifting the vocal', 'following the singer', 'catching the words', 'holding the verse', 'echoing the chorus', 'listening for lyrics', 'shadowing the singer', 'breathing with the line', 'sketching the voice', 'keeping the refrain', 'humming along', 'mapping the vowels', 'riding the vocal', 'carrying the words', 'voice from track'],
+  melody: ['tracing the hook', 'reading the lead', 'following the top line', 'sketching the riff', 'humming the theme', 'catching the arp', 'riding the motif', 'mapping the notes', 'lifting the hook', 'holding the line', 'echoing the lead', 'top line from track', 'shadowing the synth', 'carrying the tune', 'passing the motif', 'outlining the melody', 'keeping the phrase', 'drawing the contour', 'reading the riff', 'listening for the hook'],
+};
+// the method after a line: catalog functions that do nothing to silence
+const METHODS = ['.gain(0.8)', '.room(0.3)', '.slow(2)', '.late(0.125)', '.pan(0.4)', '.gain(0.6)', '.room(0.5)'];
+const hashOf = str => { let h = 2166136261; for (const c of String(str)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+const upOf = b => (b && b.top ? b.top.up || 0 : 0);
+const median = list => { const x = list.slice().sort((a, b) => a - b); return x.length ? x[Math.floor(x.length / 2)] : 0; };
+const topMemo = new WeakMap();
+// per bar { on, seg, kind } (seg: the section, or level A's run of the same state), or null before the first top line;
+// level 'A' or 'B'
+export function topPlan(model, level = 'A', rule = TOP_RULE) {
+  let memo = topMemo.get(model);
+  if (!memo) topMemo.set(model, (memo = new Map()));
+  const key = `${level}|${JSON.stringify(rule)}`;
+  if (memo.has(key)) return memo.get(key);
+  const bars = model.bars || [], out = [];
+  if (level === 'B') {
+    const end = Math.min(bars.length, model.ending ?? bars.length), secs = model.sections && model.sections.length ? model.sections : [{ start: 0, bars: end }];
+    const music = bars.slice(0, end).filter(b => drumsHeard(b) || bassHeard(b) || chordsHeard(b) || upOf(b) > 0);
+    const kind = median(music.map(upOf)) >= rule.vocal ? 'vox' : 'melody';
+    const onBy = secs.map(s => { const list = bars.slice(s.start, Math.min(end, s.start + s.bars)); return list.length > 0 && list.reduce((a, b) => a + upOf(b), 0) / list.length >= rule.up; });
+    const any = onBy.some(Boolean);
+    for (let b = 0; b < bars.length; b++) { const k = secs.findIndex(s => b >= s.start && b < s.start + s.bars); out.push(any && k >= 0 ? { on: onBy[k], seg: k, kind } : null); }
+  } else {
+    let on = false, seg = -1, kind = null;
+    for (let b = 0; b < bars.length; b++) {
+      const w = bars.slice(Math.max(0, b - 3), b + 1), mean = w.reduce((a, x) => a + upOf(x), 0) / w.length;
+      const now = on ? mean >= rule.off : mean >= rule.up && w.length >= 2;
+      const turn = now !== on || (now && seg < 0);
+      if (turn) { seg++; on = now; }
+      // the kind from the bars heard so far, set again only when the state turns (the lines change at most then)
+      if (on && (turn || !kind)) kind = median(bars.slice(0, b + 1).filter(x => upOf(x) > 0).map(upOf)) >= rule.vocal ? 'vox' : 'melody';
+      out.push(kind ? { on, seg, kind } : null);
+    }
+  }
+  memo.set(key, out);
+  return out;
+}
+// the group of top lines at a bar: a header and one to three lines, `$:` where a top line is heard, `_$:` elsewhere;
+// labels and methods drawn from the seed (the file's fingerprint) and the kind, so a track always shows the same lines;
+// a section only turns them on or off (a label that changed with the section was typed as a new line by the player's
+// typing, the old one deleted bars before the new one came). '' without a top line. opts: { seed, level }
+export function voxGroup(model, bar, { seed = '', level = 'A' } = {}) {
+  const plan = topPlan(model, level), p = plan[Math.max(0, Math.min(bar, plan.length - 1))];
+  if (!p) return '';
+  const n = 1 + (hashOf(`${seed}|lines`) % 3), list = LABELS[p.kind], lines = [];
+  for (let k = 0; k < n; k++) {
+    const h = hashOf(`${seed}|${p.kind}|${k}`), m = METHODS[(h >>> 8) % METHODS.length];
+    let i = h % list.length; while (lines.some(l => l.includes(`"${list[i]}"`))) i = (i + 1) % list.length;
+    const label = list[i];
+    lines.push(`${p.on ? '$' : '_$'}: ${p.kind}("${label}")${m}`);
+  }
+  return [`// ========== ${p.kind} ==========`, ...lines].join('\n');
+}
+// the group after the parts (shown, never sent to the player: run and the mixer see the code without it)
+export const withVox = (code, group = '') => (group ? `${code.replace(/\s+$/, '')}\n\n${group}` : code);
+export const withoutVox = code => code.replace(/\n*\/\/ =+ (vox|melody) =+\n[\s\S]*$/, '').replace(/\n*\/\/ vox: …\s*$/, '');
+// the group of a code shown, or ''
+export const voxOf = code => { const m = /\/\/ =+ (vox|melody) =+\n[\s\S]*$/.exec(code || ''); return m ? m[0] : ''; };
+// the helpers for code copied out of the app (Copy): the group's functions as silence
+export const VOX_PRELUDE = 'const vox = () => silence, melody = () => silence\n';
+
 
 // a chord name of the model in the app's spelling (for the tempo and key readout): "Am" stays "Am"
 export const chordLabel = name => { const c = parseChord(name); return c ? `${NOTE_NAMES[c.root]}${c.quality === 'min' ? 'm' : ''}` : ''; };
@@ -191,12 +343,18 @@ export const chordLabel = name => { const c = parseChord(name); return c ? `${NO
 // ---------- level B (D9, D10): sections, a loop per part and section, variations ----------
 const range = (a, z) => Array.from({ length: Math.max(0, z - a) }, (_, i) => a + i);
 const SECTION_NAMES = { intro: 'Intro', verse: 'Verse', build: 'Build', drop: 'Drop', break: 'Break', outro: 'Outro' };
-// a part heard per bar inside a section, with one-bar gaps filled and one-bar islands left out (a missed note, a fill)
-function smooth(list) {
-  const out = list.slice();
-  for (let i = 0; i < list.length; i++) { const a = !!list[i - 1], z = !!list[i + 1]; if (!list[i] && a && z) out[i] = true; if (list[i] && !a && !z) out[i] = false; }
+// a part heard per bar inside a section (decode-refine D7: a part enters or stops when it holds for `runBars`): first
+// every gap shorter than `min` bars between bars heard is filled (a missed note: an alternating x.x.x reads as heard
+// throughout), then every island of bars heard shorter than `min` is left out (a fill, a stray hit). A gap at the
+// section's start or end is a part that enters late or stops early, and stays. (The writer used to fill one-bar gaps and
+// drop one-bar islands at once, from the bars as heard: x.x.x turned into .x.x.)
+export function steady(list, min = EDIT_RULE.runBars) {
+  const out = list.map(Boolean), runsOf = () => { const runs = []; out.forEach((v, i) => { const r = runs[runs.length - 1]; if (r && r.v === v) r.n++; else runs.push({ v, at: i, n: 1 }); }); return runs; };
+  for (const r of runsOf()) if (!r.v && r.n < min && r.at > 0 && r.at + r.n < out.length) for (let i = r.at; i < r.at + r.n; i++) out[i] = true;
+  for (const r of runsOf()) if (r.v && r.n < min && out.length >= min) for (let i = r.at; i < r.at + r.n; i++) out[i] = false;
   return out;
 }
+
 const gridOf = b => Object.fromEntries(DRUM_ROWS.map(r => [r, (b.drums && b.drums[r]) || EMPTY]));
 // the loop of a part over the bars of a section (values by absolute bar, null where not heard): the smallest period of
 // 1, 2, 4 or 8 bars whose positions (bar mod L, as Strudel's `<…>` reads them) hold one value on 80 % of the bars;
@@ -221,7 +379,7 @@ function drumPlan(model) {
   const bars = model.bars, end = model.ending ?? bars.length;
   const grid = k => Object.fromEntries(DRUM_ROWS.map((r, j) => [r, k.split('|')[j]]));
   return (model.sections || []).map(sec => {
-    const idx = range(sec.start, Math.min(sec.start + sec.bars, end)), on = smooth(idx.map(i => drumsHeard(bars[i])));
+    const idx = range(sec.start, Math.min(sec.start + sec.bars, end)), on = steady(idx.map(i => drumsHeard(bars[i])));
     const keys = idx.map((i, j) => (on[j] && drumsHeard(bars[i]) ? gridKey(gridOf(bars[i])) : on[j] ? 'gap' : null));
     const count = new Map(); for (const k of keys) if (k && k !== 'gap') count.set(k, (count.get(k) || 0) + 1);
     let main = null; for (const [k, n] of count) if (!main || n > count.get(main)) main = k;
@@ -257,7 +415,7 @@ export const inKey = key => list => {
 };
 // the song of a level B model (D9): the model's sections with their kinds as names, a drums track with each section's
 // main grid and its variants as clips, bass and chords code tracks with one loop per section; a part plays where it is
-// heard (one-bar gaps filled, one-bar islands left out); sounds by measure per section (D10); the song ends at the
+// heard (runs shorter than EDIT_RULE.runBars merged, decode-refine D7); sounds by measure per section (D10); the song ends at the
 // model's ending
 export function writeFull(model, opts = {}) {
   const bars = model.bars, end = Math.max(1, Math.min(model.ending ?? bars.length, bars.length));
@@ -271,7 +429,24 @@ export function writeFull(model, opts = {}) {
   {
     const plan = drumPlan(M), patterns = {}, ids = new Map(), clips = [];
     const idOf = (key, grid) => { if (!ids.has(key)) { const id = pid(ids.size); ids.set(key, id); const g = grid(key); patterns[id] = { rows: Object.fromEntries(DRUM_ROWS.filter(r => hits(g[r])).map(r => [r, g[r]])) }; } return ids.get(key); };
-    plan.forEach((p, k) => { if (!p.main) return; clips.push(...runs(p.perBar.map(x => (x ? idOf(x, p.grid) : null)), secs[k].start)); });
+    // the edit rule (decode-refine D7): a variant starts only when lineBars passed since the drums' last edit and
+    // anyBars since any part entered or stopped; the way back to the main grid is always written
+    const rule = opts.rule || EDIT_RULE, events = new Set();
+    for (const heardOf of [bassHeard, chordsHeard]) secs.forEach(sec => { const on = steady(range(sec.start, sec.start + sec.bars).map(i => heardOf(bars[i])), rule.runBars); on.forEach((x, j) => { if (j && x !== on[j - 1]) events.add(sec.start + j); }); });
+    plan.forEach((p, k) => {
+      if (!p.main) return;
+      const s0 = secs[k].start, out = [];
+      let lastLine = s0, lastAny = s0;
+      p.perBar.forEach((x, j) => {
+        const b = s0 + j, prev = j ? out[j - 1] : null;
+        if (events.has(b)) lastAny = b;
+        let y = x;
+        if (x !== null && prev !== null && x !== p.main && x !== prev && !(b - lastLine >= rule.lineBars && b - lastAny >= rule.anyBars)) y = p.main;
+        if (j && y !== prev) { lastLine = b; lastAny = b; }
+        out.push(y);
+      });
+      clips.push(...runs(out.map(x => (x ? idOf(x, p.grid) : null)), s0));
+    });
     if (clips.length) tracks.push({ id: 'drums', name: 'Drums', type: 'drums', settings: { kit: all.kit }, patterns, clips });
   }
   // bass and chords
@@ -279,7 +454,7 @@ export function writeFull(model, opts = {}) {
   const part = (id, name, visual, heardOf, valueOf, code, same, keep = () => true) => {
     const patterns = {}, ids = new Map(), clips = [];
     secs.forEach(sec => {
-      const idx = range(sec.start, sec.start + sec.bars), on = smooth(idx.map(i => heardOf(bars[i])));
+      const idx = range(sec.start, sec.start + sec.bars), on = steady(idx.map(i => heardOf(bars[i])), (opts.rule || EDIT_RULE).runBars);
       if (!keep(idx.filter((i, j) => on[j] && heardOf(bars[i])).map(i => valueOf(bars[i])))) return;
       const byBar = {}; idx.forEach((i, j) => { byBar[i] = on[j] && heardOf(bars[i]) ? valueOf(bars[i]) : null; });
       const loop = sectionLoop(byBar, idx, same ? { same } : {});

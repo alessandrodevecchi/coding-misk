@@ -12,7 +12,7 @@
 // variations and a one-off fill, chords out of the key), the tempo pick, Open in Compose's configuration and the same
 // code at every step in Decode and in Compose with "Follow the song".
 import { createAnalyzer, horizonOf, tapTempo, LOOK_AHEAD, LOOK_AHEAD_DEFAULT } from '../src/decode/misk-analyzer.js';
-import { writeSong, momentSong, partsByBar, soundsOf, loopAt, stepsMini, withVox, withoutVox, VOX_LINE, formatKey } from '../src/decode/writer.js';
+import { writeSong, momentSong, partsByBar, soundsOf, loopAt, stepsMini, withVox, withoutVox, voxGroup, voxOf, topPlan, planA, differsEnough, steady, EDIT_RULE, TOP_HELPERS, VOX_PRELUDE, formatKey } from '../src/decode/writer.js';
 import { defaultMix, mixApply, gainsOf, heard, loudnessTrim } from '../src/decode/mix.js';
 import { titleFromName, fingerprint, sameFile } from '../src/decode/input.js';
 import { overCap, mergeDecodes, plainRecord, freshModel, DECODE_CAP } from '../src/decode/store.js';
@@ -36,6 +36,9 @@ import { timelineOf } from '../src/export/fast.js';
 import { textsFor, rightsLine } from '../src/video/texts.js';
 import { shapeOf, barScores, pickFragments } from '../src/video/fragments.js';
 import { absoluteClips } from '../src/endless/transitions.js';
+import { liveCodes, fullCodes, editStats } from './decode-edits.mjs';
+import { strudelInNode } from './mixer-checks.mjs';
+import { HELPERS as HELPERS_APP } from '../src/song/writer.js';
 import fs from 'node:fs';
 
 let failed = 0, passed = 0;
@@ -140,11 +143,11 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
 // ---------- 5.1, 5.2 level A: the code of the moment, drums muted when they stop ----------
 {
   const C = resolveProfile('switch', { narrator: false });
-  const codeAt = bar => withVox(liveCode({ ...momentSong(M, bar, { title: 'Night Run', artist: 'Some Band' }), build: [], crescendo: { growth: 0 } }, C, {}).codeAt(0));
+  const codeAt = bar => withVox(liveCode({ ...momentSong(M, bar, { title: 'Night Run', artist: 'Some Band' }), build: [], crescendo: { growth: 0 } }, C, {}).codeAt(0), bar >= 0 ? voxGroup(M, bar, { seed: 'night', level: 'A' }) : '');
   const c8 = codeAt(8), c33 = codeAt(32), back = codeAt(39);
   check(/^\$: s\("bd\*4"\)/m.test(c8) && /note\(/.test(c8) && /chord\(/.test(c8), 'bar 9: drums, bass and chords lines', c8.split('\n').filter(l => /\$:/.test(l)).length + ' lines');
   check(c33.split('\n').filter(l => /bank\(/.test(l)).every(l => l.startsWith('_$:')) && /^\$: \(note/m.test(c33), 'bar 33: the drums stop, their lines muted with _$:, the bass plays on');
-  check(c8.trimEnd().endsWith(VOX_LINE) && withoutVox(c8) === c8.replace(/\n*\/\/ vox: …\s*$/, ''), 'the vocals placeholder closes the code, and the evaluated code leaves it out');
+  check(!/vox|melody/.test(c8) && !/\/\/ vox: …/.test(c8), 'a track without a top line (drums, bass and a pad) has no top line group and no old vocals comment', c8.split('\n').slice(-2).join(' / '));
   check(c8.split('\n')[0] === '// coding-misk · cover of "Night Run" by Some Band', 'the decoded code starts with the cover line');
   const empty = codeAt(-1);
   check(/\$: silence/.test(empty), 'before the first bar: silence');
@@ -352,6 +355,59 @@ if (process.argv.includes('--app')) {
     check(r.boundsErr <= 1 && r.ms < r.seconds * 1000, `${id} (app export, level B): section bounds within one bar, faster than the file`, `bounds ${r.bounds.join(',') || '-'} (extra ${r.extra}), ${(r.ms / 1000).toFixed(1)} s for ${r.seconds} s`);
     console.log(`info  ${id} (level B): chords ${r.chords}, drums F1 ${JSON.stringify(r.f1)}, on/off ${r.drumsPresence}, engines ${JSON.stringify(r.engines)}`);
   }
+}
+// ---------- decode-refine part 1: balanced code changes, the top line group ----------
+{
+  // the edit rule (D7): how much a new value must differ
+  const one = [33, null, null, 33, null, null, 33, null, null, null, 33, null, 33, null, null, null];
+  const noisy = one.map((x, j) => (j === 1 ? 33 : j === 6 ? null : x));
+  check(!differsEnough('bass', [one], [noisy]), 'a bass bar that differs from the loop on 2 of 16 steps does not edit its line');
+  check(differsEnough('bass', [one], [one.map(x => (x === null ? null : 38))]), 'a bass loop with another root on its first bar edits');
+  check(!differsEnough('chords', ['Am', 'F', 'C', 'G'], ['Am', 'F', 'C', 'Em']) && !differsEnough('chords', ['Am', 'F', 'C', 'G'], ['A', 'F', 'C', 'G']) && differsEnough('chords', ['Am', 'F', 'C', 'G'], ['Dm', 'Bb', 'C', 'G']), 'chords: a relative or the other quality does not edit, two other chords do');
+  const g = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.', oh: E };
+  check(!differsEnough('drums', g, { ...g, hh: '..x...x...x...xx' }) && differsEnough('drums', g, { ...g, oh: '......x.......x.' }) && differsEnough('drums', g, { ...g, hh: 'x.x.x.x.x.x.x.x.' }), 'drums: one step does not edit; a row that enters, or four steps, do');
+  check(steady([1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0]).map(Number).join('') === '111111111000' && steady([0, 1, 0, 0, 1, 1, 0, 1]).map(Number).join('') === '00001111', 'level B: a part flickering every other bar reads as heard, a one-bar island goes, a stop of two bars stays');
+  check(EDIT_RULE.lineBars === 4 && EDIT_RULE.anyBars === 2 && EDIT_RULE.runBars === 2, 'the edit rule\'s numbers in one place', JSON.stringify(EDIT_RULE));
+  // level A loops settle: a four-bar chord loop heard twice stays until a chord changes
+  const cb = (chord, k) => ({ drums: {}, bass: Array(16).fill(null), chord, chordConf: 0.9, level: { drums: 0, bass: 0, chords: 1, other: 0 }, bright: 0.3, low: 0.3 });
+  const prog = ['Am', 'F', 'C', 'G'], LM = { bpm: 124, bars: Array.from({ length: 24 }, (_, i) => cb(prog[i % 4], i)) };
+  const lines = planA(LM).map(p => JSON.stringify(p.value.chords));
+  check(lines.slice(8).every(x => x === lines[8]) && JSON.parse(lines[8]).length === 4, 'level A: a four-bar chord loop heard twice keeps its line to the end', lines[8]);
+  // the measures on a generated song with known sections, both levels (spec: Edit balance targets)
+  const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' };
+  const mel = [76, null, 74, null, 72, null, null, 79, null, 77, null, 76, 74, null, 72, null];
+  const SONG = { bpm: 124, lead: 0.3, bass: 'x..x..x...x.x...', sections: [
+    { name: 'Intro', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: { hh: D.hh }, bass: null, melody: null },
+    { name: 'Verse', bars: 16, chords: ['Am', 'F', 'C', 'G'], drums: D, melody: null },
+    { name: 'Hook', bars: 16, chords: null, drums: D, melody: mel },
+    { name: 'Break', bars: 8, chords: ['F', 'G'], drums: null, bass: null, melody: null },
+    { name: 'Out', bars: 16, chords: ['Am', 'F', 'C', 'G'], drums: { ...D, oh: '......x.......x.' }, melody: null },
+  ] };
+  const { pcm } = renderSong(SONG), B = await analyseFull(pcm, { engine: null });
+  const a = liveCodes(pcm), sa = editStats(a.codes, a.bpm, [8, 24, 40, 48].map(x => x - (a.offset || 0))), fb = fullCodes(B), sb = editStats(fb.codes, fb.bpm, fb.sections);
+  for (const [lv, st] of [['A', sa], ['B', sb]]) check(st.share <= 0.3 && st.perMinute <= 8 && st.avgSize >= 20, `level ${lv} on a generated song: at most 30 % of bars edited, 8 edits a minute, 20 characters an edit on average (small edits printed: the 15 % target is not met yet)`, `${Math.round(st.share * 100)} % of ${st.bars} bars, ${st.perMinute}/min, ${st.edits} edits (${st.mutes} mutes), average ${st.avgSize} characters, small ${Math.round(st.small * 100)} %, section changes ${st.sections === null ? '-' : Math.round(st.sections * 100) + ' %'}`);
+  check(sb.sections >= 0.9, 'level B: every section change gets an edit within one bar', `${Math.round(sb.sections * 100)} %`);
+  // the top line group (D6): `$:` in the hook, `_$:` elsewhere, none without a top line; the same lines for the same seed
+  const up = k => B.bars.slice(k, k + 8).reduce((x, b) => x + b.top.up, 0) / 8;
+  check(up(26) > 0.3 && up(10) < 0.22, 'the top line: the hook\'s bars have a high upper share, the pad\'s a low one', `hook ${up(26).toFixed(2)}, pad ${up(10).toFixed(2)}`);
+  const hook = voxGroup(B, 30, { seed: 'fp1', level: 'B' }), verse = voxGroup(B, 12, { seed: 'fp1', level: 'B' });
+  check(/^\/\/ =+ melody =+\n(\$: melody\("[a-z ]+"\)\.\w+\([\d.]+\)\n?){1,3}$/.test(hook) && /^_\$: melody\(/m.test(verse) && !/^\$:/m.test(verse), 'level B: `$: melody(…)` lines where the hook plays, `_$:` in the other sections', `${hook.split('\n').length - 1} lines: ${hook.split('\n')[1]}`);
+  const keys = [0, 8, 24, 40, 48].map(b => voxGroup(B, b, { seed: 'fp1', level: 'B' }).replace(/_?\$:/g, ''));
+  check(voxGroup(B, 30, { seed: 'fp1', level: 'B' }) === hook && keys.every(x => x === keys[0]) && voxGroup(B, 30, { seed: 'fp2', level: 'B' }) !== hook, 'the same file gives the same lines in every section (a section turns them on or off), another file other lines');
+  const noTop = { ...B, bars: B.bars.map(b => ({ ...b, top: { up: 0.1 } })) };
+  check(voxGroup(noTop, 30, { seed: 'fp1', level: 'B' }) === '' && voxGroup(noTop, 30, { seed: 'fp1', level: 'A' }) === '', 'no top line in the whole track: no group');
+  const vocal = { ...B, bars: B.bars.map(b => ({ ...b, top: { up: 0.5 } })) };
+  check(/^\/\/ =+ vox =+\n\$: vox\(/.test(voxGroup(vocal, 30, { seed: 'fp1', level: 'B' })), 'a top line over the whole track (a voice): `vox(…)` lines');
+  const A2 = createAnalyzer(pcm).model(pcm.length / RATE), sA2 = topPlan(A2, 'A');
+  check(sA2[34] && sA2[34].on && !(sA2[14] && sA2[14].on), 'level A: the group turns on in the hook and stays off in the verse', `bar 35 ${sA2[34] && sA2[34].on}, bar 15 ${sA2[14] && sA2[14].on}`);
+  // the group is shown, never played: withoutVox gives the code the player evaluates; Copy keeps it with its helpers
+  const code = `setcpm(31)\n\n$: s("bd*4")`, shown = withVox(code, hook);
+  check(withoutVox(shown) === code && voxOf(shown) === hook && withVox(code, '') === code && withoutVox(`${code}\n\n// vox: …`) === code, 'the group follows the parts; the evaluated code leaves it out (also the old comment)');
+  check(TOP_HELPERS.every(h => HELPERS_APP.includes(h)) && VOX_PRELUDE.includes('vox = () => silence') && VOX_PRELUDE.includes('melody = () => silence'), 'vox and melody are app helpers, defined as silence for code copied out of the app');
+  // Strudel in Node: the code copied out (the helpers, the parts, the group) evaluates and plays only the parts
+  const S = await strudelInNode(), evn = async c => (await S.evaluate(c)).queryArc(0, 4).filter(h => h.hasOnset()).length;
+  const ev = [await evn(`${VOX_PRELUDE}$: s("bd*4")\n\n${hook}`), await evn('$: s("bd*4")'), await evn(`${VOX_PRELUDE}${hook.replace(/_\$:/g, '$:')}`)];
+  check(ev[0] === ev[1] && ev[1] === 16 && ev[2] === 0, 'the copied code with the group evaluates in Strudel and plays only the parts; the group alone plays nothing', ev.join(','));
 }
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
