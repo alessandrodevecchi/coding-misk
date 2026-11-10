@@ -6,34 +6,34 @@ Two rounds (owner, 8 November). **Part 1** is done now: about 14 agent hours (11
 
 ### 1. Edit measures (about 2 h)
 
-- [ ] 1.1 `tools/decode-edits.mjs`: the code the tab shows at each bar of any audio file (ffmpeg), level A as it plays with the look ahead and level B with "Follow the song"; share of bars edited, edits per minute, mutes, average size, small edits, section changes covered; `--rule` to try other numbers.
-- [ ] 1.2 Baseline with the code before part 1 on the owner's four files (Luci Rosse and the radio song exported by the app, two third-party tracks with a voice), in the design (D7).
+- [x] 1.1 `tools/decode-edits.mjs`: the code the tab shows at each bar of any audio file (ffmpeg), level A as it plays with the look ahead and level B with "Follow the song"; share of bars edited, edits per minute, mutes, average size, small edits, section changes covered; `--rule` to try other numbers.
+- [x] 1.2 Baseline with the code before part 1 on the owner's four files (Luci Rosse and the radio song exported by the app, two third-party tracks with a voice), in the design (D7).
 
 ### 2. Balanced code changes (about 4 h)
 
-- [ ] 2.1 `EDIT_RULE` and `differsEnough` in `src/decode/writer.js` (design D7).
-- [ ] 2.2 Level A: `planA`, a plan for every bar (enter on two bars heard, stop on two bars not heard, sounds only when a part enters, a change held two bars, the waits, loops that stop growing); `momentSong` reads it.
-- [ ] 2.3 Level B: `steady` for the bars heard inside a section (fixes the flicker of the old one-bar smoothing), drum variants that wait.
-- [ ] 2.4 `check:decode` cases: 2 of 16 bass steps, a relative chord, one drum step, a flickering part, a four-bar loop that stays, the targets on a generated song in both levels, the drums still muted on bar 33 with each look ahead.
-- [ ] 2.5 Measure after on the owner's files; numbers in the DEVLOG and the design.
+- [x] 2.1 `EDIT_RULE` and `differsEnough` in `src/decode/writer.js` (design D7).
+- [x] 2.2 Level A: `planA`, a plan for every bar (enter on two bars heard, stop on two bars not heard, sounds only when a part enters, a change held two bars, the waits, loops that stop growing); `momentSong` reads it.
+- [x] 2.3 Level B: `steady` for the bars heard inside a section (fixes the flicker of the old one-bar smoothing), drum variants that wait.
+- [x] 2.4 `check:decode` cases: 2 of 16 bass steps, a relative chord, one drum step, a flickering part, a four-bar loop that stays, the targets on a generated song in both levels, the drums still muted on bar 33 with each look ahead.
+- [x] 2.5 Measure after on the owner's files; numbers in the DEVLOG and the design.
 
 ### 3. Top line lines (about 3 h)
 
-- [ ] 3.1 misk-analyzer's `top.up` per bar; `ANALYSIS_VERSION` 2; the test songs of `tools/decode-audio.mjs` can hold a melody.
-- [ ] 3.2 `topPlan` and `voxGroup` in the writer (`TOP_RULE`, `vox` or `melody`, labels and methods by seed, `$:` and `_$:`), `withVox`, `withoutVox` (also the old comment), `voxOf`, `VOX_PRELUDE`.
-- [ ] 3.3 `vox` and `melody` as app helpers (`HELPERS`, `installHelpers`); the tab shows the group in both levels, plays the code without it, and Copy keeps it with its helpers.
-- [ ] 3.4 Decoded code of a generated song with a hook in `check:strudel` (`tools/strudel-code.mjs`); `check:decode` cases (the group in the hook only, none without a top line, `vox` for a top line through the track, same seed same lines, Strudel in Node evaluates the copied code and plays only the parts).
+- [x] 3.1 misk-analyzer's `top.up` per bar; `ANALYSIS_VERSION` 2; the test songs of `tools/decode-audio.mjs` can hold a melody.
+- [x] 3.2 `topPlan` and `voxGroup` in the writer (`TOP_RULE`, `vox` or `melody`, labels and methods by seed, `$:` and `_$:`), `withVox`, `withoutVox` (also the old comment), `voxOf`, `VOX_PRELUDE`.
+- [x] 3.3 `vox` and `melody` as app helpers (`HELPERS`, `installHelpers`); the tab shows the group in both levels, plays the code without it, and Copy keeps it with its helpers.
+- [x] 3.4 Decoded code of a generated song with a hook in `check:strudel` (`tools/strudel-code.mjs`); `check:decode` cases (the group in the hook only, none without a top line, `vox` for a top line through the track, same seed same lines, Strudel in Node evaluates the copied code and plays only the parts).
 
 ### 4. Tap tempo, Auto, Full (about 2.5 h)
 
-- [ ] 4.1 T taps the tempo (no modifier, focus outside fields and the editor, track playing); Space only plays and pauses; the Tap button on `pointerdown` with its count, also before the tempo is found; Auto after a tapped or picked tempo (the worker's `auto`, misk-analyzer's `resetTempo`); en and it.
-- [ ] 4.2 Full before Play: check that it works (design D10); the proposal after 8 bars in Live; the stored analysis note.
-- [ ] 4.3 `tools/check-decode.cjs`: four T presses with a mute button focused, the Tap count, Auto, Full before Play, the proposal, the group in the code column and not in the evaluated code.
+- [x] 4.1 T taps the tempo (no modifier, focus outside fields and the editor, track playing); Space only plays and pauses; the Tap button on `pointerdown` with its count, also before the tempo is found; Auto after a tapped or picked tempo (the worker's `auto`, misk-analyzer's `resetTempo`); en and it.
+- [x] 4.2 Full before Play: check that it works (design D10); the proposal after 8 bars in Live; the stored analysis note.
+- [x] 4.3 `tools/check-decode.cjs`: four T presses with a mute button focused, the Tap count, Auto, Full before Play, the proposal, the group in the code column and not in the evaluated code.
 
 ### 5. Guide, knowledge and docs (about 1.5 h)
 
-- [ ] 5.1 The Decode card of `src/guide.js` (T and Tap, Auto, the top line lines, Full before Play), en and it; `npm run check:guide`.
-- [ ] 5.2 `docs/knowledge/` (the Decode note, decisions: the edit rule, `vox` and `melody` as app helpers, T for tap), `npm run knowledge`, `npm run check:knowledge`, `npm run catalog:strudel`; `AGENTS.md` tooling line for `decode-edits.mjs`; `DEVLOG.md`; `CHANGELOG.md`.
+- [x] 5.1 The Decode card of `src/guide.js` (T and Tap, Auto, the top line lines, Full before Play), en and it; `npm run check:guide`.
+- [x] 5.2 `docs/knowledge/` (the Decode note, decisions: the edit rule, `vox` and `melody` as app helpers, T for tap), `npm run knowledge`, `npm run check:knowledge`, `npm run catalog:strudel`; `AGENTS.md` tooling line for `decode-edits.mjs`; `DEVLOG.md`; `CHANGELOG.md`.
 
 ## Part 2 (on hold)
 

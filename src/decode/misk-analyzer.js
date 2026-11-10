@@ -370,6 +370,8 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     barCache.length = 0; held = null;
     return lockS;
   };
+  // back to the tempo misk-analyzer finds itself (the Auto button after a tapped or picked tempo): the next model locks again
+  const resetTempo = () => { lockS = null; barCache.length = 0; held = null; };
 
   // ---------- level B: one beat grid for the whole file ----------
   // the onsets that mark the grid: kicks, claps and snares, hats (lighter); each falls on a 16th of the beat
@@ -507,7 +509,24 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       if (ex && best.T.quality === 'maj' && v[m3] > 1.2 * v[M3] && v[m3] >= 0.3 * v[r0]) best = { s: best.s, T: TEMPLATES.find(T => T.root === r0 && T.quality === 'min') };
       chord = chordName(best.T.root, best.T.quality); chordConf = Math.round(Math.min(1, best.s) * 100) / 100;
     }
-    return { start: Math.round(start * 1000) / 1000, chord, chordConf, bass, drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100 };
+    return { start: Math.round(start * 1000) / 1000, chord, chordConf, bass, drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, top: topOf(start, end, bass) };
+  }
+  // the top line of a bar (decode-refine D6): `up`, the median over its frames of the share of the tonal peaks'
+  // energy between 400 and 2000 Hz (no harmonic of a bass note) in all of the frame's tonal energy (60 to 2100 Hz). A
+  // hook, an arp or a voice lifts it (0.25 to 0.7 on the owner's test files); bass, drums and a low pad keep it near
+  // 0.1 to 0.2. It cannot tell a voice from a synth (part 2 of decode-refine brings a real top line)
+  function topOf(start, end, bass) {
+    const harm = [];
+    for (const m of new Set(bass.filter(x => x !== null))) { const f0 = 440 * 2 ** ((m - 69) / 12); for (let k = 1; k <= 8; k++) harm.push(f0 * k); }
+    const share = [];
+    for (let f = 0; f < done2; f++) {
+      const tt = t2(f); if (tt < start || tt >= end) continue;
+      const pk = peaks[f]; let s = 0;
+      if (pk) for (let i = 0; i < pk.length; i += 2) { const x = pk[i]; if (x >= 400 && x <= 2000 && !harm.some(h => Math.abs(x / h - 1) < 0.025)) s += pk[i + 1]; }
+      share.push(chromaE[f] > 0 ? s / chromaE[f] : 0);
+    }
+    share.sort((a, b) => a - b);
+    return { up: share.length ? Math.round(share[Math.floor(share.length / 2)] * 100) / 100 : 0 };
   }
   const rmsOf = (x, a, z) => { a = Math.max(0, Math.round(a)); z = Math.min(x.length, Math.round(z)); let s = 0; for (let i = a; i < z; i++) s += x[i] * x[i]; return z > a ? Math.sqrt(s / (z - a)) : 0; };
   let bassTop = 0;
@@ -585,7 +604,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     m.sections = [{ start: 0, bars: list.length, kind: 'verse' }];
     return m;
   }
-  return { duration, advance, lock, model, setTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), barsRaw: t => bars(t) };
+  return { duration, advance, lock, model, setTempo, resetTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), barsRaw: t => bars(t) };
 }
 
 // level A's horizon (D8): the playhead plus the look ahead; values 'off', '2s', '4s', '2bars', '4bars'

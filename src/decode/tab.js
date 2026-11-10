@@ -5,7 +5,7 @@
 import { probe, decode, fingerprint, sameFile, analysisCopy, MAX_SECONDS, ANALYSIS_RATE } from './input.js';
 import { createDecodeStore, freshModel } from './store.js';
 import { horizonOf, LOOK_AHEAD, LOOK_AHEAD_DEFAULT, LOCK_SECONDS, tapTempo } from './misk-analyzer.js';
-import { momentSong, writeFull, withVox, withoutVox, keyName, SOUND_PRESETS } from './writer.js';
+import { momentSong, writeFull, withVox, withoutVox, voxGroup, voxOf, VOX_PRELUDE, keyName, SOUND_PRESETS } from './writer.js';
 import { defaultMix, mixApply, gainsOf, loudnessTrim, codeBus, setGain, ORIG } from './mix.js';
 import { cycleOfFile, fileOfCycle, decodeMeta, createOriginal } from './sync.js';
 import { currentModel } from './model.js';
@@ -143,6 +143,8 @@ export function createDecodeTab({ root, app }) {
       trim: loudnessTrim(buffer.getChannelData(0), buffer.sampleRate),
     };
     if (match && freshModel(rec.modelA)) model = rec.modelA;
+    // a stored analysis of an older analyser is made again, and the tab says so (decode-refine: Stored analysis)
+    const old = match && ((rec.modelA && !freshModel(rec.modelA)) || (rec.modelB && !freshModel(rec.modelB)));
     // a track with a stored level B analysis opens in Full (owner answer 1)
     if (match && freshModel(rec.modelB) && rec.modelB.level === 'B') { modelB = rec.modelB; modelBSeq++; }
     setLevel(modelB ? 'B' : 'A', { quiet: true });
@@ -153,7 +155,7 @@ export function createDecodeTab({ root, app }) {
     // the stored or tapped tempo goes to the analyser first, so the bars fall where they fell before
     if (cur.tempo) worker.postMessage({ type: 'tempo', bpm: cur.tempo.bpm, downbeat: cur.tempo.downbeat, tapped: !!cur.tempo.tapped });
     else if (model && model.bpm) worker.postMessage({ type: 'tempo', bpm: model.bpm, downbeat: model.downbeat, tapped: false });
-    status = match && model ? { kind: 'note', text: t('dcStored') } : cur.video ? { kind: 'note', text: t('dcVideoNote') } : null;
+    status = old ? { kind: 'note', text: t('dcAnalysedAgain') } : match && model ? { kind: 'note', text: t('dcStored') } : cur.video ? { kind: 'note', text: t('dcVideoNote') } : null;
     if (match && cur.video) status = { kind: 'note', text: `${t('dcStored')} ${t('dcVideoNote')}` };
     await save();
     render();
@@ -323,17 +325,24 @@ export function createDecodeTab({ root, app }) {
     if (codeMemo.has(key)) return codeMemo.get(key);
     const song = momentSong(model || { bars: [], bpm: 120 }, at, { id: 'decoded', title: cur.title, artist: cur.artist, attribution: cur.attribution, sounds: cur.settings.sounds });
     const C = ctl(), lc = liveCode({ ...song, build: [], crescendo: { growth: 0 } }, C, { lang: app.lang, files: app.files, cols: app.cols, widgets: app.widgets });
-    const shown = withVox(lc.codeAt(0)), meta = decodeMeta(model || { duration: cur.duration, downbeat: 0, barSeconds: 2, bpm: 120 });
+    const shown = withVox(lc.codeAt(0), model && at >= 0 ? voxGroup(model, at, { seed: seedOf(), level: 'A' }) : ''), meta = decodeMeta(model || { duration: cur.duration, downbeat: 0, barSeconds: 2, bpm: 120 });
     const sg = {
       id: `decode:${cur.fp ? cur.fp.key : 'x'}`, title: cur.title, kind: 'decode', code: shown, meta, codeAt: null, codeKeep: null,
       run: c => { const s = withoutVox(c); return lc.run ? lc.run(s) : s; },
-      standalone: c => { const s = withoutVox(c); return lc.standalone ? lc.standalone(s) : s; },
+      standalone: c => copyOut(c, lc),
       buses: lc.buses, fns: lc.fns, build: null, ctl: C, doc: null, decode: true,
     };
     const out = { at, code: shown, sg, lines: shown.split('\n').filter(l => /^\s*[_S]?\$:/.test(l)).length };
     if (codeMemo.size > 400) codeMemo.clear();
     codeMemo.set(key, out);
     return out;
+  }
+  // the top line's group (decode-refine D6): drawn from the file's fingerprint; the code copied out of the app keeps it,
+  // with its two helpers defined as silence, after the code the player plays
+  const seedOf = () => (cur && cur.fp ? cur.fp.key : cur ? cur.name : '');
+  function copyOut(c, lc) {
+    const g = voxOf(c), x = withoutVox(c), out = lc.standalone ? lc.standalone(x) : x;
+    return g ? `${VOX_PRELUDE}${out.replace(/\s+$/, '')}\n\n${g}\n` : out;
   }
   // ---------- level B (D5, D9, D13, D18) ----------
   const level = () => (cur && cur.settings.level === 'B' && modelB ? 'B' : 'A');
@@ -345,15 +354,15 @@ export function createDecodeTab({ root, app }) {
     const key = JSON.stringify([modelBSeq, cur.title, cur.artist, cur.attribution, cur.settings.sounds, cur.settings.options]);
     if (bMemo && bMemo.key === key) return bMemo.sg;
     const song = songB(), C = ctl(), lc = liveCode(followSong(song), C, { lang: app.lang, files: app.files, cols: app.cols, widgets: app.widgets });
-    const codeAt = (bar, keep) => withVox(lc.codeAt(Math.max(0, bar), keep));
+    const codeAt = (bar, keep) => withVox(lc.codeAt(Math.max(0, bar), keep), voxGroup(modelB, Math.max(0, bar), { seed: seedOf(), level: 'B' }));
     const first = lc.codeAt(0), head = first.split('\n').filter(l => /^\/\/ coding-misk|^setcpm\(/.test(l)).join('\n');
     const sg = {
-      id: `decode:${cur.fp ? cur.fp.key : 'x'}:B`, title: cur.title, kind: 'decode', code: withVox(first), meta: decodeMeta(modelB), codeAt, codeKeep: null,
+      id: `decode:${cur.fp ? cur.fp.key : 'x'}:B`, title: cur.title, kind: 'decode', code: codeAt(0), meta: decodeMeta(modelB), codeAt, codeKeep: null,
       run: c => { const x = withoutVox(c); return lc.run ? lc.run(x) : x; },
-      standalone: c => { const x = withoutVox(c); return lc.standalone ? lc.standalone(x) : x; },
+      standalone: c => copyOut(c, lc),
       buses: lc.buses, fns: lc.fns, build: lc.build, ctl: C, doc: lc.build, paste: lc.paste, earlier: lc.earlier, decode: true, level: 'B',
       // before the first downbeat: the title and the tempo, no part yet
-      silent: withVox(`${head}\n\n$: silence`),
+      silent: `${head}\n\n$: silence`,
       orbits: orbitsOf(song), tracks: song.tracks.map(x => ({ id: x.id, name: x.name })), sections: song.sections,
     };
     bMemo = { key, sg };
@@ -490,22 +499,25 @@ export function createDecodeTab({ root, app }) {
     const want = horizon(f ?? 0);
     // one request in flight at a time, a little past the horizon (a lost answer frees the slot after 3 s)
     if (playLevel !== 'B' && (!model || (model.analysedTo || 0) < Math.min(cur.duration, want) - 0.01) && (!inflight || performance.now() - inflight > 3000)) { inflight = performance.now(); analyse(want + 0.5); }
+    // Live stays the default; after 8 bars the tab proposes Full once per track (decode-refine)
+    if (playLevel === 'A' && !modelB && !full && !cur.fullHinted && model && model.barSeconds && cycleOfFile(model, f ?? 0) >= 8) { cur.fullHinted = true; if (!status || status.kind !== 'error') status = { kind: 'note', text: t('dcFullHint') }; render(); }
     const now = performance.now();
     if (now - lastUi > 250) { lastUi = now; renderLight(); }
   }
 
   // ---------- tempo controls (D7) ----------
+  // bpm null: back to the tempo misk-analyzer finds (the Auto button)
   function setTempo(bpm, downbeat, tapped) {
-    if (!cur || !worker || !(bpm > 0)) return;
-    cur.tempo = { bpm: Math.round(bpm * 100) / 100, downbeat: Math.max(0, downbeat), tapped };
-    worker.postMessage({ type: 'tempo', ...cur.tempo });
+    if (!cur || !worker || (bpm !== null && !(bpm > 0))) return;
+    if (bpm === null) { cur.tempo = null; worker.postMessage({ type: 'auto' }); }
+    else { cur.tempo = { bpm: Math.round(bpm * 100) / 100, downbeat: Math.max(0, downbeat), tapped }; worker.postMessage({ type: 'tempo', ...cur.tempo }); }
     model = null; codeMemo.clear();
     // a new tempo makes level B's grid old: level A plays, level B runs again with the new tempo
     const wasB = level() === 'B';
     if (modelB) { modelB = null; modelBSeq++; bMemo = null; setLevel('A', { quiet: true }); }
     const wasPlaying = playing, f = fileNow();
     if (wasPlaying) { if (orig) orig.stop(); app.stopCode(); play(f); }
-    else analyse(horizon(f) + 4);
+    else analyse(Math.max(horizon(f) + 4, LOCK_SECONDS + 0.5));
     save(); render();
     if (wasB) runFull('switch');
   }
@@ -516,7 +528,7 @@ export function createDecodeTab({ root, app }) {
     taps.push(f);
     const r = tapTempo(taps);
     if (r && taps.length >= 4) { const hold = taps.slice(); setTempo(r.bpm, r.downbeat, true); taps = hold.length >= 8 ? [] : hold; app.toast(t('dcTapped', { bpm: r.bpm })); }
-    else renderLight();
+    renderLight();
     return true;
   }
 
@@ -553,11 +565,13 @@ export function createDecodeTab({ root, app }) {
     return `<div class="dc-secs-wrap"><div class="lbl">${esc(t('dcSections'))}</div><div class="dc-secs" id="dc-secs">${list}</div></div>`;
   };
   const sliderNote = mix => t(mix.slider === 0 ? 'dcSliderAt0' : mix.slider === 1 ? 'dcSliderAt1' : 'dcSliderMid');
+  // the Tap button (decode-refine D8) with the taps of the series so far, and Auto after a tapped or picked tempo
+  const tapHtml = () => `<button class="chip dc-tap" id="dc-tap" title="${esc(t('dcTapBtnTip'))}"${playing ? '' : ' disabled'}>${esc(t('dcTapBtn'))}${taps.length ? ` <b class="dc-taps">${taps.length < 4 ? `${taps.length}/4` : taps.length}</b>` : ''}</button>${cur.tempo ? `<button class="chip dc-auto" id="dc-auto" title="${esc(t('dcAutoTip'))}">${esc(t('dcAuto'))}</button>` : ''}`;
   const tempoHtml = () => {
     const M = shownModel();
-    if (!M || !M.bpm) return `<span class="dc-tempo muted">${esc(t(playing ? 'dcListening' : 'dcNoTempo'))}</span>`;
+    if (!M || !M.bpm) return `<span class="dc-tempo muted">${esc(t(playing ? 'dcListening' : 'dcNoTempo'))}${playing ? ` ${tapHtml()}` : ''}</span>`;
     return `<span class="dc-tempo" title="${esc(t('dcTapTip'))}">${ICON.tap}<b id="dc-bpm">${esc(String(Math.round(M.bpm * 100) / 100))}</b> BPM${M.uncertain && !M.tapped ? ` <span class="badge dc-unc">${esc(t('dcUncertain'))}</span>` : ''}${M.tapped ? ` <span class="badge">${esc(t('dcTappedBadge'))}</span>` : ''}
-      <button class="chip" data-dc-tempo="0.5" title="${esc(t('dcHalfTip'))}">½×</button><button class="chip" data-dc-tempo="2" title="${esc(t('dcDoubleTip'))}">2×</button>
+      <button class="chip" data-dc-tempo="0.5" title="${esc(t('dcHalfTip'))}">½×</button><button class="chip" data-dc-tempo="2" title="${esc(t('dcDoubleTip'))}">2×</button>${tapHtml()}
       <span class="muted" id="dc-key">${esc(keyName(M.key))}</span></span>`;
   };
   const optionsHtml = o => `<details class="dc-fold" id="dc-options"${optionsOpen ? ' open' : ''}><summary>${ICON.chev}<span class="lbl">${esc(t('dcOptions'))}</span> <span class="muted small">· ${esc(t('dcOptionsSub'))}</span></summary>
@@ -647,6 +661,9 @@ export function createDecodeTab({ root, app }) {
     if (b.id === 'dc-play') { toggle(); return; }
     if (b.id === 'dc-stop') { stop(); cur.paused = 0; renderLight(); return; }
     if (b.id === 'dc-attr') { cur.attribution = !cur.attribution; b.setAttribute('aria-pressed', cur.attribution); optionChanged(); return; }
+    // the Tap button taps on pointerdown (below); a click from the keyboard (Enter, Space) taps here
+    if (b.id === 'dc-tap') { if (e.detail === 0) tap(); return; }
+    if (b.id === 'dc-auto') { setTempo(null); app.toast(t('dcAutoDone')); return; }
     if (b.dataset.dcTempo && shownModel() && shownModel().bpm) { const M = shownModel(); setTempo(M.bpm * +b.dataset.dcTempo, M.downbeat, !!M.tapped); return; }
     if (b.dataset.dcLevel) { if (b.dataset.dcLevel === 'B' && !modelB) runFull('switch'); else setLevel(b.dataset.dcLevel); return; }
     if (b.id === 'dc-full-cancel') { cancelFull(); return; }
@@ -658,6 +675,7 @@ export function createDecodeTab({ root, app }) {
     if (b.dataset.dcMute) { setMix({ type: 'mute', id: b.dataset.dcMute }); return; }
     if (b.dataset.dcSolo) { setMix({ type: 'solo', id: b.dataset.dcSolo }); return; }
   });
+  root.addEventListener('pointerdown', e => { const tb = e.button === 0 && e.target.closest('#dc-tap'); if (tb && !tb.disabled) { e.preventDefault(); tap(); } });
   root.addEventListener('keydown', e => { if (e.target.id === 'dc-drop' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(); } });
   root.addEventListener('toggle', e => { if (e.target.id === 'dc-options') optionsOpen = e.target.open; }, true);
   root.addEventListener('change', e => {

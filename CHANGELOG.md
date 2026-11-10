@@ -7,6 +7,11 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Decode: Tap button next to ½× and 2×, with the count of taps, and the T key to tap the tempo.
+- Decode: Auto button that goes back to the analysed tempo after a tapped, halved or doubled tempo.
+- Decode: the tab proposes Full after 8 bars in Live, once per track.
+- Decode: `vox(…)` and `melody(…)` lines at the end of the decoded code where a top line is heard; they play nothing, also in copied code.
+- `tools/decode-edits.mjs`: edits per minute, share of edited bars and edit sizes of the decoded code, on any audio file.
 - `tools/check-add-waves.cjs`: heads in phrases, moves by reason, long tasks and "too late" of console "+" waves on the baseline scenarios.
 - Every move of a pending console batch is recorded with its reason.
 - Italian speaker Siri 4 (`siri4`), spoken with the macOS system voice; `npm run voices` makes its samples with `say` without `-v`.
@@ -62,6 +67,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Decode: the code changes less often, in Live and in Full: a line waits a few bars between edits and changes only for a real musical difference.
+- Decode: the space bar only plays and pauses.
+- Decode: stored analyses are made again once, with a note in the tab.
 - Radio console "+", "−", saved patterns and locks join a pending batch only within 5 s of its last press and 10 s of its first; a later press opens a second wave at least one phrase after the first, which it never moves.
 - A "−" that takes back a pending "+" goes back to that batch, even outside the join window.
 - On a grown radio song a batch's head enters within two phrases of the first press with as many new lines as can be typed there, at least one; three or four phrases only as a fallback.
@@ -97,6 +105,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Decode: in Full, a part heard every other bar no longer mutes and unmutes on every bar.
 - A curve or energy command on a grown radio song no longer builds the director's view on the page while it waits for its steering.
 - Radio: a song's own drum machine and sample sounds are loaded ahead, notes out of a soundfont's range play from another font of the instrument, and a resume, a console change or the next song no longer makes the scheduler skip notes on a slow computer.
 - Radio console changes on a long Live coder song enter within a phrase or two of the press instead of minutes later, and the sounds of the tracks they bring in are loaded before their entry.
@@ -120,6 +129,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Removed
 
+- Decode: the `// vox: …` comment at the end of the decoded code.
 - The radio button Apply to the song on air (the console's Voice group replaces it).
 - The speakers Eddy, Flo, Grandma, Grandpa, Reed, Rocko, Sandy and Shelley.
 

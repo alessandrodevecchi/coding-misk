@@ -3,7 +3,7 @@
 // ffmpeg (MP3 with tags, MP4 video with sound, a video without sound, a 12-minute file, an unreadable file); Play,
 // the code typing in the code column with its source line, the drums muted on bar 33 with each look ahead; the sync of
 // the original and the code (kick against kick, under 10 ms); mute, solo and the slider (gains, levels, the code text
-// unchanged); Options, title, artist and Attribution in the code; ½× and tap tempo with four key presses; reload and
+// unchanged); Options, title, artist and Attribution in the code; ½× and tap tempo with five presses of T; reload and
 // reopen with a matching file (no analysis, no audio in storage); remove from the list; 400 px without sideways
 // scroll; pictures in neon, hardware and light. --long: two minutes with the code muted (long tasks, lit notes).
 // Level B (groups 6 and 7): no Essentia.js request before Full; Full on a 4-minute file while it plays (the growing
@@ -12,7 +12,10 @@
 // lit notes); a section change typed before its bar; Live and Full while playing; Cancel (nothing stored); Essentia.js
 // blocked (misk-analyzer alone); reopen in Full; Open in Compose (the same code at every step, "Follow the song",
 // validate, Classic and Crescendo); a built-in song with "Follow the song"; pictures fase2-*. --full runs only these.
-// Needs ffmpeg. Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-decode.cjs [shots-dir] [--long] [--full]   (dev server)
+// decode-refine part 1 (--refine runs only these): the Full proposal after 8 bars, T with a mute button focused, the
+// Tap button's count and tooltip, Auto, Space only plays and pauses, Full before Play, the melody lines muted outside a
+// generated hook and playing in it, never evaluated, kept by Copy with their helpers.
+// Needs ffmpeg. Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-decode.cjs [shots-dir] [--long] [--full] [--refine]   (dev server)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), { execFileSync } = require('node:child_process');
 const { exportTestSongs, DIR } = require('./decode-export.cjs');
@@ -50,10 +53,79 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   // the state, with the peak levels taken as the loudest of six readings over 0.6 s (one reading can fall in a gap)
   const st = async () => { const s = await page.evaluate(() => globalThis.codingMiskDecode.state()); if (!s.levels) return s; for (let i = 0; i < 5; i++) { await sleep(100); const l = await page.evaluate(() => globalThis.codingMiskDecode.state().levels); s.levels = { orig: Math.max(s.levels.orig, l.orig), code: Math.max(s.levels.code, l.code) }; } return s; };
   const stNow = () => page.evaluate(() => globalThis.codingMiskDecode.state());
+  // the editor's whole text (the DOM holds only the lines in view)
+  const edCode = () => page.evaluate(() => globalThis.codingMiskPhrases.code());
   const evaluated = () => page.evaluate(() => (globalThis.codingMiskEvaluated ? globalThis.codingMiskEvaluated() : ''));
   const shown = () => page.evaluate(() => { const c = document.querySelector('#edhost .cm-content'); return c ? c.innerText : ''; });
   const open = async file => { await page.setInputFiles("#dc-file", file); for (let i = 0; i < 60; i++) { await sleep(250); const s = await stNow(); if ((s.title && !(s.status && s.status.kind === 'busy')) || (s.status && s.status.kind === 'error')) return s; } return st(); };
   const tabOrder = () => page.$$eval('.tabs .tab', xs => xs.filter(x => !x.hidden).map(x => x.textContent.trim()).join(','));
+
+  // ---------- decode-refine part 1: T and Tap, Auto, Space, the Full proposal, Full before Play, the top line group ----------
+  async function refine() {
+    await page.click('[data-tab="decode"]'); await sleep(300);
+    const { renderSong, writeWav } = await import('./decode-audio.mjs');
+    const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' }, mel = [76, null, 74, null, 72, null, null, 79, null, 77, null, 76, 74, null, 72, null];
+    if (!fs.existsSync(F('hook.wav'))) writeWav(F('hook.wav'), renderSong({ bpm: 124, lead: 0.3, bass: 'x..x..x...x.x...', sections: [{ name: 'Verse', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: D }, { name: 'Hook', bars: 8, chords: null, drums: D, melody: mel }, { name: 'Out', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: D }] }).pcm);
+    if (!fs.existsSync(F('refine.wav'))) ff(['-i', W, '-ss', '3', '-t', '40', F('refine.wav')]);
+    const beat = 60 / 124, bars = async () => (await stNow()).bar;
+    // Live: the tab proposes Full after 8 bars, once
+    let s = await open(F('refine.wav'));
+    check(s.level === 'A', 'a new track opens in Live', s.level);
+    await page.click('#dc-play');
+    for (let i = 0; i < 100 && !((await bars()) >= 9); i++) await sleep(250);
+    await sleep(600);
+    const note = await page.innerText('#tab-decode .dc-status').catch(() => '');
+    check(/Full writes sections/.test(note), 'after 8 bars in Live the tab proposes Full', note);
+    // T with a mute button focused: the tempo is tapped, the button does not toggle
+    await page.click('[data-dc-mute="orig"]'); await sleep(600); await page.focus('[data-dc-mute="orig"]');
+    const before = await page.evaluate(() => { const b = document.querySelector('[data-dc-mute="orig"]'); return { pressed: b.getAttribute('aria-pressed'), focused: document.activeElement === b }; });
+    for (let k = 0; k < 5; k++) { await page.keyboard.press('t'); await sleep(beat * 1000); }
+    await sleep(2500);
+    s = await stNow();
+    const after = await page.evaluate(() => document.querySelector('[data-dc-mute="orig"]').getAttribute('aria-pressed'));
+    check(s.tempo && s.tempo.tapped && Math.abs(s.tempo.bpm - 124) < 8 && s.playing && after === before.pressed, 'T five times with a mute button focused: a tapped tempo, the mute button unchanged, still playing', `${JSON.stringify(s.tempo)} · focused ${before.focused} · mute ${before.pressed} → ${after}`);
+    await page.click('[data-dc-mute="orig"]'); await sleep(300);
+    // the Tap button: its count on pointerdown
+    const tapAt = async () => { const b = await page.$('#dc-tap'); const r = await b.boundingBox(); await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2); await page.mouse.down(); await page.mouse.up(); };
+    await sleep(2500);
+    for (let k = 0; k < 3; k++) { await tapAt(); await sleep(beat * 1000); }
+    const label = await page.innerText('#dc-tap');
+    check(/Tap\s*3\/4/.test(label), 'the Tap button counts the taps of the series', label.replace(/\s+/g, ' '));
+    const tip = await page.getAttribute('#dc-tap', 'title');
+    check(/\bT\b/.test(tip), 'the Tap button\'s tooltip names the T key', tip);
+    // Auto: back to the analysed tempo
+    await sleep(2500);
+    check(!!(await page.$('#dc-auto')), 'Auto shows after a tapped tempo');
+    await page.click('#dc-auto'); await sleep(3000);
+    s = await stNow();
+    check(!s.tempo && Math.abs(s.bpm - 124) < 0.5 && !(await page.$('#dc-auto')) && s.playing, 'Auto: the analysed tempo again, no stored tempo, Auto gone, still playing', `${s.bpm} BPM · ${JSON.stringify(s.tempo)}`);
+    // Space plays and pauses only
+    await page.click('#tab-decode .dc-h');
+    await page.keyboard.press('Space'); await sleep(800);
+    const paused = !(await stNow()).playing;
+    await page.keyboard.press('Space'); await sleep(1500);
+    s = await stNow();
+    check(paused && s.playing && !s.tempo, 'Space pauses and plays again, and taps nothing', `paused ${paused} · playing ${s.playing}`);
+    await page.click('#dc-stop'); await sleep(400);
+    // Full before Play, then the top line group in the hook
+    s = await open(F('hook.wav'));
+    await page.click('[data-dc-level="B"]');
+    for (let i = 0; i < 300; i++) { await sleep(100); s = await stNow(); if (s.modelB && !s.full) break; }
+    check(s.modelB && s.level === 'B' && !s.playing, 'Full picked before Play: the analysis runs with the track stopped and the switch is on Full', `${s.level} · playing ${s.playing}`);
+    await page.click('#dc-play'); await sleep(2500);
+    s = await stNow();
+    check(s.playing && s.playLevel === 'B' && /Full/.test(await page.innerText('#src')), 'Play after Full: the track plays in Full from the start', `${s.playLevel} · bar ${s.bar && s.bar.toFixed(1)}`);
+    let code = await edCode();
+    check(!/\/\/ vox: …/.test(code) && /^_\$: melody\("/m.test(code) && !/^\$: melody/m.test(code), 'outside the hook the melody lines are muted', code.split('\n').filter(l => /melody|vox/.test(l)).join(' / '));
+    await page.evaluate(f => globalThis.codingMiskDecode.seek(f), s.modelB.downbeat + 9 * (240 / 124));
+    await sleep(2500);
+    code = await edCode();
+    const ev = await evaluated();
+    check(/^\$: melody\("[a-z ]+"\)/m.test(code) && !/melody|vox/.test(ev), 'in the hook the melody lines play (`$:`), and the evaluated code has none of them', code.split('\n').filter(l => /melody|vox/.test(l)).join(' / '));
+    const copy = await page.evaluate(() => globalThis.codingMiskCopy());
+    check(/^const vox = \(\) => silence, melody = \(\) => silence/.test(copy) && /\$: melody\(/.test(copy) && copy.indexOf('// ========== melody') > copy.indexOf('$:'), 'Copy keeps the group after the code the player plays, with vox and melody defined as silence', copy.split('\n')[0]);
+    await page.click('#dc-stop'); await sleep(400);
+  }
 
   // ---------- level B (groups 6 and 7): Full, the growing mark, cancel, several tracks, Open in Compose ----------
   async function levelB() {
@@ -184,10 +256,10 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
     for (let i = 0; i < 100; i++) { await sleep(200); if (await page.evaluate(() => document.querySelector('.tab[aria-selected="true"]').dataset.tab === 'componi' && !globalThis.codingMiskCompose.pending())) break; }
     const song = await page.evaluate(() => globalThis.codingMiskCompose.song());
     const got = await page.evaluate(b => b.map(x => globalThis.codingMiskCompose.codeAt(x)), steps);
-    const strip2 = c => (c || '').replace(/\n*\/\/ vox: …\s*$/, '').trim();
+    const strip2 = c => (c || '').replace(/\n*\/\/ =+ (vox|melody) =+\n[\s\S]*$/, '').replace(/\n*\/\/ vox: …\s*$/, '').trim();
     const same = steps.filter((b, i) => strip2(got[i]) === strip2(want[i]));
     check(song.config && song.config.profile === 'switch' && song.config.options.growth === 'follow' && song.config.options.narrator === false && song.cover && song.cover.title === 'decode-test-long', 'Open in Compose: a song of yours with the Live coder, "Follow the song", narrator off and the cover', JSON.stringify(song.config));
-    check(same.length === steps.length, 'Open in Compose: the code at every step matches the code in Decode (the vocals placeholder aside)', `${same.length}/${steps.length} bars`);
+    check(same.length === steps.length, 'Open in Compose: the code at every step matches the code in Decode (the top line group aside)', `${same.length}/${steps.length} bars`);
     check(!JSON.stringify(song).includes('pcm') && song.tracks.map(t => t.id).join() === 'drums,bass,chords' && song.sections.length === 5, 'no audio goes with the song; its decoded sections and tracks', `${song.sections.map(x => x.name).join(',')} · ${song.tracks.map(t => t.id).join(',')}`);
     const tmp = path.join(FILES, 'opened-song.json'); fs.writeFileSync(tmp, JSON.stringify(song));
     let valid = ''; try { valid = execFileSync('node', ['--no-warnings', 'tools/song.mjs', 'validate', tmp], { encoding: 'utf8' }); } catch (e) { valid = `FAIL ${e.stdout || e.message}`; }
@@ -308,8 +380,11 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
     await page.click('#dc-export');
     const w2 = await got(/\.wav$/), tx2 = await got(/\.txt$/);
     if (w2) {
-      const X2 = pcm(w2), a2 = weigh(X2, ORIG, 4, 25);
-      check(Math.abs(a2.a) < 0.04 && a2.res0 > 0.02, 'slider fully on Code: the file holds only the code (no original in it)', `weight ${a2.a.toFixed(3)}, level ${a2.res0.toFixed(3)}`);
+      // (the code imitates the original, so its own sound weighs a little on it: 0.045 after decode-refine made the
+      // level B code steadier, the same as Open in Compose's export, which cannot hold the original at all; the lead-in,
+      // the original's 440 Hz alone, tells a leak apart)
+      const X2 = pcm(w2), a2 = weigh(X2, ORIG, 4, 25), l2 = weigh(X2, ORIG, 0.1, 1.4);
+      check(Math.abs(a2.a) < 0.08 && Math.abs(l2.a) < 0.01 && a2.res0 > 0.02, 'slider fully on Code: the file holds only the code (no original in it, the lead-in silent)', `weight ${a2.a.toFixed(3)}, lead-in ${l2.a.toFixed(4)}, level ${a2.res0.toFixed(3)}`);
       const t2 = fs.readFileSync(tx2, 'utf8');
       check(/Code written over a recording that belongs to its rights holders\./.test(t2) && !/Night Run|Some Band/.test(t2), 'Attribution off, code only: the rights line, neither the title nor the artist', t2.split('\n').filter(l => /rights holders/.test(l)).join(''));
     } else check(false, 'slider fully on Code: the export');
@@ -425,7 +500,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
     const wC = await got(/\.wav$/, 120000);
     if (wC) {
       const XC = pcm(wC), dd = s.modelB.downbeat, aC = weigh(XC, ORIG.subarray(Math.round(dd * 48000)), 4, 24);
-      check(Math.abs(aC.a) < 0.04 && aC.res0 > 0.02, 'Open in Compose: its export holds only the code\'s sound, no original', `weight ${aC.a.toFixed(3)}, level ${aC.res0.toFixed(3)}`);
+      check(Math.abs(aC.a) < 0.08 && aC.res0 > 0.02, 'Open in Compose: its export holds only the code\'s sound, no original (the code\'s own likeness to it under 0.08)', `weight ${aC.a.toFixed(3)}, level ${aC.res0.toFixed(3)}`);
     } else check(false, 'Open in Compose: the export', dls.slice(nC).map(d => d.suggestedFilename()).join(', '));
     await free();
     page.off('download', onDl);
@@ -437,6 +512,13 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
     await page.click('[data-lang="en"]'); await sleep(300);
     await page.click('[data-mode="ascolta"]'); await sleep(300);
     await levelB();
+    check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
+    await browser.close();
+    console.log(failed ? `${failed} failed` : 'all passed');
+    process.exit(failed ? 1 : 0);
+  }
+  if (process.argv.includes('--refine')) {
+    await refine();
     check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
     await browser.close();
     console.log(failed ? `${failed} failed` : 'all passed');
@@ -503,7 +585,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   check(/Night Run/.test(src) && /Live/.test(src), 'the code column\'s source line names the track and "Live"', src);
   await sleep(4000);
   let code = await shown();
-  check(code.startsWith('// coding-misk · cover of "Night Run" by Some Band') && /\/\/ vox: …/.test(code) && /\$: s\("bd/.test(code), 'the code column shows the cover line, the drums and the vocals placeholder', code.split('\n').length + ' lines');
+  check(code.startsWith('// coding-misk · cover of "Night Run" by Some Band') && !/\/\/ vox: …/.test(code) && /\$: s\("[^"]*bd/.test(code) && !/vox|melody/.test(await evaluated()), 'the code column shows the cover line and the drums; no old vocals comment; the evaluated code has no top line line', code.split('\n').length + ' lines');
   const pb = await page.innerText('#pb-title'), pbPos = await page.innerText('#pb-pos'), pbBar = await page.innerText('#pb-bar');
   check(/Night Run/.test(pb) && /\/ 1:5/.test(pbPos) && /bar \d+ \/ \d+/.test(pbBar) && await page.$eval('#pb-prev', b => b.disabled) && await page.$eval('#pb-next', b => b.disabled), 'the player bar: title, time, bar counter; previous and next disabled', `${pb} · ${pbPos} · ${pbBar}`);
   const lit = await page.evaluate(() => document.querySelectorAll('#edhost .cm-content [style*="outline"]').length);
@@ -597,7 +679,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   check(lands['4bars'] === 33 && lands['4s'] === 33 && [33, 34].includes(lands['2s']), 'look ahead 4 bars and 4 s on bar 33, 2 s by bar 34', JSON.stringify(lands));
   await page.selectOption('#dc-look', '2bars');
 
-  // ---------- 5.3 tempo: ½×, 2×, tap with the space bar ----------
+  // ---------- 5.3 tempo: ½×, 2×, tap with the T key ----------
   await page.click('[data-dc-tempo="0.5"]'); await sleep(2500);
   s = await st();
   check(s.bpm === 62 && s.tempo && s.tempo.bpm === 62, '½×: the code is written at 62 BPM', `${s.bpm}`);
@@ -606,10 +688,10 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   check(s.bpm === 124, '2×: back to 124 BPM', `${s.bpm}`);
   await page.click('#tab-decode .dc-h'); // no focused field
   const f0 = (await st()).file, beat = 60 / 124;
-  for (let k = 0; k < 5; k++) { await page.keyboard.press('Space'); await sleep(beat * 1000 * 1.0); }
+  for (let k = 0; k < 5; k++) { await page.keyboard.press('t'); await sleep(beat * 1000 * 1.0); }
   await sleep(2500);
   s = await st();
-  check(s.tempo && s.tempo.tapped && Math.abs(s.tempo.bpm - 124) < 8 && s.playing, 'tap tempo: five presses of the space bar set a tapped tempo and keep playing', JSON.stringify(s.tempo));
+  check(s.tempo && s.tempo.tapped && Math.abs(s.tempo.bpm - 124) < 8 && s.playing, 'tap tempo: five presses of T set a tapped tempo and keep playing', JSON.stringify(s.tempo));
   void f0;
 
   // ---------- 1.3, 1.4 store, reload, reopen ----------
@@ -665,6 +747,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
 
   await levelB();
   await exportsB();
+  await refine();
 
   // ---------- 4.4 two minutes with the code muted ----------
   if (LONG) {

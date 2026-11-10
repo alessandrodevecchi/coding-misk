@@ -16,10 +16,11 @@ const rng = seed => () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = M
 //   drums: { bd, cp, hh, oh: 16-step strings }, drumsOff: [[from, to]] bars without drums, bass: 16-step string ('x'
 //   plays the chord root in octave 1 or 2), bassOff, chordsOff, seed, sections: [{ name, bars, chords, drums, bass }]
 //   (level B: each section's own chords, drums and bass, `null` for none; `bars` in all is their sum), fills: { bar:
-//   drums } (other drums on a bar) }
+//   drums } (other drums on a bar), melody: [16 midi or null] (a square top line, one note per step held to the next;
+//   per section too), melodyOff }
 // → { pcm: Float32Array, truth: { bpm, downbeat, bars: [{ chord, drums, bass: [midi|null ×16] }] } }
 export function renderSong(spec) {
-  const { bpm, lead = 0, chords = ['Am'], drums = {}, drumsOff = [], bass = '', bassOff = [], chordsOff = [], seed = 7, gain = 0.5, sections = null } = spec;
+  const { bpm, lead = 0, chords = ['Am'], drums = {}, drumsOff = [], bass = '', bassOff = [], chordsOff = [], melody = null, melodyOff = [], seed = 7, gain = 0.5, sections = null } = spec;
   const bars = sections ? sections.reduce((a, x) => a + x.bars, 0) : spec.bars;
   // the section of a bar and the bar's index in it
   const secAt = b => { if (!sections) return null; let a = 0; for (const x of sections) { if (b < a + x.bars) return { ...x, at: b - a, start: a }; a += x.bars; } return null; };
@@ -60,6 +61,15 @@ export function renderSong(spec) {
         let lp = 0;
         add(t0 + j * step, len, t => { const s = 2 * ((f * t) % 1) - 1; lp += 0.05 * (s - lp); return 0.55 * lp * Math.min(1, t / 0.004) * Math.min(1, (len - t) / 0.01); });
       }
+    }
+    // the top line: a soft square, each note held until the next step with a note
+    const ml = S && S.melody !== undefined ? S.melody : melody;
+    tb.melody = !!(ml && !off(melodyOff, b) && ml.some(x => x !== null));
+    if (tb.melody) for (let j = 0; j < 16; j++) {
+      if (ml[j] === null || ml[j] === undefined) continue;
+      let k = j + 1; while (k < 16 && (ml[k] === null || ml[k] === undefined)) k++;
+      const f = hz(ml[j]), len = (k - j) * step * 0.9;
+      add(t0 + j * step, len, t => 0.12 * ((f * t) % 1 < 0.5 ? 1 : -1) * Math.min(1, t / 0.005) * Math.min(1, (len - t) / 0.01));
     }
     truth.bars.push(tb);
   }

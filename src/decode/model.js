@@ -3,12 +3,12 @@
 //
 // { version, engine, duration, bpm, bpmCandidates: [half, x, double], confidence, uncertain,
 //   downbeat: seconds, barSeconds, bars: [{ start, chord, chordConf, bass: [16 midi or null],
-//   drums: { bd, cp, hh, oh: 16-step strings }, level: { drums, bass, chords, other }, bright, low }],
+//   drums: { bd, cp, hh, oh: 16-step strings }, level: { drums, bass, chords, other }, bright, low, top: { up } }],
 //   key: { root, mode, conf }, sections: [{ start, bars, kind }], ending: bar, tapped }
 
 // raise when a change to misk-analyzer or the model changes results: stored analyses of an older version are
 // analysed again on the next open (spec: Stored analysis)
-export const ANALYSIS_VERSION = 1;
+export const ANALYSIS_VERSION = 2;
 
 export const STEPS = 16;
 export const DRUM_ROWS = ['bd', 'cp', 'hh', 'oh'];

@@ -1,7 +1,9 @@
 // The code the app generates, and the functions it calls (strudel-catalog, #69, design D3 and D4). No browser.
 // codeSet(): every song in songs/ and songs/examples/ (compileSong); every live build of those songs in each profile
 // and each technical functions preset, every step (crescendoSong or the song's build, through liveCode); one radio session per
-// style with a fixed seed, each song compiled and built the same way; the prelude of the helpers (preludeText).
+// style with a fixed seed, each song compiled and built the same way; the prelude of the helpers (preludeText); the
+// decoded code of a generated test song (decode-refine), every bar of Live and of Full with its top line group, and
+// the code copied out of the Decode tab (scanned as live builds).
 // scanCalls(code): the names called in a code, skipping strings, template strings, comments, local names and
 // JavaScript built-ins.
 // codeScan() (faster-checks): the names called by every code of codeSet(), in the same order, from the shared code
@@ -14,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { cacheKey, cacheGet, cachePut, fileText } from './code-cache.mjs';
 import { runPool } from './check-pool.mjs';
 import { compileSong } from '../src/song/compile.js';
-import { crescendoSong } from '../src/song/crescendo.js';
+import { crescendoSong, followSong } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules, PROFILE_IDS } from '../src/live/profiles.js';
 import { liveCode } from '../src/live/live-code.js';
 import { buildSteps, deriveBuild } from '../src/song/build.js';
@@ -25,6 +27,11 @@ import { generateSession } from '../src/endless/director.js';
 import { loadStyles } from './styles-dir.mjs';
 import { songFiles } from './songs-dir.mjs';
 import { ROOT } from './strudel-functions.mjs';
+import { renderSong } from './decode-audio.mjs';
+import { createAnalyzer } from '../src/decode/misk-analyzer.js';
+import { analyseFull } from '../src/decode/full.js';
+import { momentSong, writeFull, withVox, voxGroup, VOX_PRELUDE } from '../src/decode/writer.js';
+import { decodeControls } from '../src/decode/tab.js';
 
 export { HELPERS };
 // names the app gives: helpers, library functions, the words of song functions (a word with a number when a song
@@ -123,7 +130,7 @@ function* liveBuilds(song, source) {
 // the groups of the code set, in its order: every song file, one radio session per style, the prelude
 export function codeGroups() {
   const files = songFiles(path.join(ROOT, 'songs')).filter(f => !f.includes(`${path.sep}endless${path.sep}`)).map(f => path.relative(ROOT, f));
-  return [...files.map(file => ({ id: file, kind: 'song', file })), ...loadStyles().map(r => ({ id: `radio ${r.id}`, kind: 'radio', style: r.id })), { id: 'prelude', kind: 'prelude' }];
+  return [...files.map(file => ({ id: file, kind: 'song', file })), ...loadStyles().map(r => ({ id: `radio ${r.id}`, kind: 'radio', style: r.id })), { id: 'prelude', kind: 'prelude' }, { id: 'decode', kind: 'decode' }];
 }
 // the codes of a group: [{ kind, source, code }] (a song gives its compiled code, kind songs, then its live builds)
 export function* groupCodes(g) {
@@ -139,6 +146,8 @@ export function* groupCodes(g) {
       yield { kind: 'radio', source, code: compileSong(song) };
       for (const x of liveBuilds(song, source)) yield { kind: 'radio', ...x };
     }
+  } else if (g.kind === 'decode') {
+    // (the decoded code needs level B's analysis, which is asynchronous: runTask makes it)
   } else {
     const lib = Object.fromEntries(LIBRARY.map(f => [f.name, { params: f.params, chain: f.chain, lib: true }]));
     // the mixer (miskMix, MIX_SOURCE) is plain JavaScript over haps, not Strudel calls: left out of the scan
@@ -146,6 +155,26 @@ export function* groupCodes(g) {
     yield { kind: 'prelude', source: 'preludeText', code: pre.slice(0, pre.indexOf('const miskMix = ')) };
   }
 }
+// the decoded code of a generated song with a hook (decode-refine): Live and Full at every bar with the top line
+// group, and the code copied out with the group's helpers
+const DECODE_SONG = (() => {
+  const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' }, mel = [76, null, 74, null, 72, null, null, 79, null, 77, null, 76, 74, null, 72, null];
+  return { bpm: 124, lead: 0.3, bass: 'x..x..x...x.x...', sections: [{ name: 'Intro', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: { hh: D.hh }, bass: null }, { name: 'Verse', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: D }, { name: 'Hook', bars: 8, chords: null, drums: D, melody: mel }, { name: 'Out', bars: 8, chords: ['F', 'G'], drums: { ...D, oh: '......x.......x.' } }] };
+})();
+async function decodeCodes() {
+  const { pcm } = renderSong(DECODE_SONG), A = createAnalyzer(pcm).model(pcm.length / 44100), B = await analyseFull(pcm, { engine: null }), C = decodeControls(), out = [];
+  for (let b = 0; b < A.bars.length; b++) {
+    const lc = liveCode({ ...momentSong(A, b, { title: 'Decoded' }), build: [], crescendo: { growth: 0 } }, C, {});
+    out.push({ kind: 'live', source: `decode Live bar ${b + 1}`, code: withVox(lc.codeAt(0), voxGroup(A, b, { seed: 'check', level: 'A' })) });
+  }
+  const song = writeFull(B, { id: 'decoded', title: 'Decoded' }), lc = liveCode(followSong(song), C, {}), n = song.sections.reduce((a, x) => a + x.bars, 0);
+  for (let b = 0; b < n; b++) out.push({ kind: 'live', source: `decode Full bar ${b + 1}`, code: withVox(lc.codeAt(b), voxGroup(B, b, { seed: 'check', level: 'B' })) });
+  // the code copied out of the tab: the group's helpers, the parts, the group (the app's prelude and mixer are the
+  // prelude group's)
+  out.push({ kind: 'live', source: 'decode Copy', code: `${VOX_PRELUDE}${lc.codeAt(20)}\n\n${voxGroup(B, 20, { seed: 'check', level: 'B' })}` });
+  return out;
+}
+
 // the code set: [{ kind, source, code }], in a fixed order (every song's compiled code, then every song's live builds,
 // then the radio sessions, then the prelude)
 export function* codeSet() {
@@ -156,9 +185,9 @@ export function* codeSet() {
 }
 
 // the scan of a group: [[kind, source, names]] (the task a worker runs)
-export function runTask(g) {
+export async function runTask(g) {
   const seen = new Map();
-  return [...groupCodes(g)].map(({ kind, source, code }) => { if (!seen.has(code)) seen.set(code, [...scanCalls(code)]); return [kind, source, seen.get(code)]; });
+  return (g.kind === 'decode' ? await decodeCodes() : [...groupCodes(g)]).map(({ kind, source, code }) => { if (!seen.has(code)) seen.set(code, [...scanCalls(code)]); return [kind, source, seen.get(code)]; });
 }
 const ENTRY = 'tools/strudel-code.mjs';
 const stylesText = () => fs.readdirSync(path.join(ROOT, 'styles')).filter(f => f.endsWith('.json')).sort().map(f => `${f}\0${fileText(`styles/${f}`)}`).join('\0');

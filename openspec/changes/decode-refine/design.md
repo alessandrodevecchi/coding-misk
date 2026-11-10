@@ -174,7 +174,7 @@ $: melody("tracing the hook").room(0.3);
 
 - **Where a top line is heard.** misk-analyzer adds a measure to every bar, `top.up`: the median, over the bar's frames, of the share of the tonal peaks' energy between 400 and 2000 Hz (no harmonic of a bass note) in all the frame's tonal energy (60 to 2100 Hz). Measured on the owner's files and the generated songs: a hook, an arp or a voice gives 0.25 to 0.7; bass, drums and a low pad 0.1 to 0.2 (Luci Rosse: the hook's bars 17 to 37 against the rest; a generated song: a hook section 0.78 against a pad section 0.15). In level B a section has a top line when the mean over its bars is at least 0.22; in level A when the last four bars reach 0.22, and it goes again below 0.18. Numbers in `TOP_RULE` (`src/decode/writer.js`).
 - **`vox` or `melody`.** The measure cannot tell a voice from a synth (part 2's predominant pitch cannot either; only machine learning could). A track whose median share is at least 0.35, a top line through the whole track as a sung song has, gets `vox` lines; any other gets `melody` lines. On the owner's four files this splits the two vocal tracks from Luci Rosse and the radio song. A level A track decides on the bars heard so far, again only when the top line comes or goes.
-- **Lines.** One to three lines, the number from the file's fingerprint; each label from a list of 20 per kind (`reading from track`, `modulizing from track`, `vocalizing`, `passing through song`, `tracing the voice`, …; `tracing the hook`, `reading the lead`, `catching the arp`, …) and one method from a short list of catalog functions harmless on silence (`gain`, `room`, `slow`, `late`, `pan`), drawn from the fingerprint, the kind and the section (level A: the run of bars with the same state). A track always shows the same lines and sections differ. A line is `$:` where the top line is heard and `_$:` elsewhere; the lines change only when the section or the state changes. No top line in the whole track: no group.
+- **Lines.** One to three lines, the number from the file's fingerprint; each label from a list of 20 per kind (`reading from track`, `modulizing from track`, `vocalizing`, `passing through song`, `tracing the voice`, …; `tracing the hook`, `reading the lead`, `catching the arp`, …) and one method from a short list of catalog functions harmless on silence (`gain`, `room`, `slow`, `late`, `pan`), drawn from the fingerprint and the kind. A track always shows the same lines; a section only turns them on (`$:`, where the top line is heard) or off (`_$:`). No top line in the whole track: no group. (First drawn per section too: in the browser the player's typing then deleted the old line bars before it typed the new one, so the group was empty for most of a section. With fixed labels a section change is one character.)
 - **Silence.** `vox` and `melody` are app helpers (`HELPERS` in `src/song/writer.js`; `installHelpers` defines them as functions that give `silence`). The player never sees them: the code it evaluates and the mixer's line table are the code without the group (`withoutVox`), as for today's comment. Copy keeps the group and starts with `const vox = () => silence, melody = () => silence`, so pasted code evaluates. The group never reaches Open in Compose.
 - `check:strudel` scans the decoded code of a generated song with a hook (Live and Full at every bar, and the copied code) as live builds.
 
@@ -197,7 +197,7 @@ The rule, with its numbers in `EDIT_RULE` (`src/decode/writer.js`) so they can b
 
 1. A part enters when it is heard in this bar and the next, and stops when it is heard in neither; its line is muted or unmuted at once. The drums of `decode-test-124` still mute on bar 33 with each look ahead.
 2. A part that enters is level A's section change: the sounds are measured again on the bars heard so far (all lines show them), and loops may grow again. Sounds change at no other bar.
-3. Otherwise a line changes when its new value differs enough, the bar before already gave a value close to it (the change held two bars), and `lineBars` and `anyBars` passed.
+3. Otherwise a line changes when its new value differs enough and the bar before already gave a value close to it (the change held two bars), or when any new value held the same for `lineBars` bars; in both cases `lineBars` and `anyBars` passed. (The second case came from the browser check: the first bar of the drums, heard alone, missed the kick on beat one, `~ bd!3`, and with the minimum difference only the line kept the miss for 33 bars.)
 4. A loop of 2 bars or more, once written, sets the longest loop of its part until the next section change: it never grows again.
 
 **Level B** (`writeFull`): sections are its section changes, always edited.
@@ -218,7 +218,20 @@ The rule, with its numbers in `EDIT_RULE` (`src/decode/writer.js`) so they can b
 | Vocal track 1 | B     | 13 %        | 4.5              | 118          | 8 %         |
 | Vocal track 2 | B     | 32 %        | 10.2             | 101          | 30 %        |
 
-(The radio song's level A runs at 117.46 BPM: see D4.) Targets: 10-30 % of bars, 2-8 edits per minute at 120-130 BPM, an average of at least 20 characters, at most 15 % small edits, at least 90 % of the section changes in level B with an edit within one bar. The small edits target is the hardest: a chord loop edit is often a few characters (`G` for `Dm`), and it is a real edit. The numbers are a starting point, to tune after the owner listens to Luci Rosse and a song with a voice (open question 2).
+After part 1 (11 November):
+
+| File          | Level | Bars edited | Edits per minute | Average size | Small edits | Section changes edited (B) |
+| ------------- | ----- | ----------- | ---------------- | ------------ | ----------- | -------------------------- |
+| Luci Rosse    | A     | 10 %        | 3.1              | 11           | 50 %        |                            |
+| Radio song    | A     | 28 %        | 8.2              | 20           | 63 %        |                            |
+| Vocal track 1 | A     | 15 %        | 5.3              | 32           | 36 %        |                            |
+| Vocal track 2 | A     | 33 %        | 10.4             | 28           | 28 %        |                            |
+| Luci Rosse    | B     | 9 %         | 2.7              | 124          | 0 %         | 100 %                      |
+| Radio song    | B     | 12 %        | 5.2              | 42           | 16 %        | 100 %                      |
+| Vocal track 1 | B     | 11 %        | 3.9              | 124          | 8 %         | 100 %                      |
+| Vocal track 2 | B     | 25 %        | 7.9              | 102          | 35 %        | 100 %                      |
+
+(The radio song's level A runs at 117.46 BPM: see D4. Vocal track 2 in level A: 18 of its 36 edits are the drums stopping and entering again for two bars or more.) Targets: 10-30 % of bars, 2-8 edits per minute at 120-130 BPM, an average of at least 20 characters, at most 15 % small edits, at least 90 % of the section changes in level B with an edit within one bar. The small edits target is the hardest: a chord loop edit is often a few characters (`G` for `Dm`), and it is a real edit. The numbers are a starting point, to tune after the owner listens to Luci Rosse and a song with a voice (open question 2).
 
 ### D8. Tap tempo key and Auto (part 1)
 

@@ -8,7 +8,7 @@ The code of a decoded track, refined in two rounds. Part 1: it changes only when
 
 ### Requirement: Balanced code changes
 
-In both levels a line SHALL change only when its part enters or stops, at a section change, or when its new pattern differs by the minimum musical difference and 4 bars passed since that line's last edit and 2 bars since any edit. In level A the new pattern SHALL also have held for two bars, and a part that enters SHALL count as a section change. Sounds SHALL change only at a section change. The numbers SHALL sit in one place in the code.
+In both levels a line SHALL change only when its part enters or stops, at a section change, or when its new pattern differs by the minimum musical difference and 4 bars passed since that line's last edit and 2 bars since any edit. In level A the new pattern SHALL also have held two bars (or any difference held 4 bars), and a part that enters SHALL be a section change. Sounds SHALL change only at section changes; the numbers SHALL sit in one place.
 
 #### Scenario: Small noise does not edit
 
@@ -107,7 +107,7 @@ The tab SHALL offer two sound presets. "Our sounds" (default) SHALL choose sound
 
 ### Requirement: Vocals placeholder
 
-The code SHALL end with a group of one to three lines that look like code and stand for the top line: `vox(…)` lines for a track whose top line runs through it as a voice does, `melody(…)` lines for any other, such as `$: vox("reading from track").gain(0.8)` or `$: melody("tracing the hook").room(0.3)`. `vox` and `melody` SHALL be app helpers that evaluate to silence, also in the code copied out of the app. The labels SHALL come from a list of about 20 phrases per kind, chosen by a seed from the file and the section; the methods after them SHALL be catalog functions only. A line SHALL be `$:` where the model hears a top line and `_$:` where it does not, and SHALL change only when the section or that state changes. A track with no top line SHALL have no group. The lines SHALL never play a sound and SHALL not go with Open in Compose. `npm run check:strudel` SHALL scan decoded code with its group and pass.
+The code SHALL end with a group of one to three lines that look like code and stand for the top line: `vox(…)` lines for a track whose top line runs through it as a voice does, `melody(…)` lines for any other, such as `$: vox("reading from track").gain(0.8)` or `$: melody("tracing the hook").room(0.3)`. `vox` and `melody` SHALL be app helpers that evaluate to silence, also in the code copied out of the app. The labels SHALL come from a list of about 20 phrases per kind, chosen by a seed from the file, the same through the track; the methods after them SHALL be catalog functions only. A line SHALL be `$:` where the model hears a top line and `_$:` where it does not, and SHALL change only when the section or that state changes. A track with no top line SHALL have no group. The lines SHALL never play a sound and SHALL not go with Open in Compose. `npm run check:strudel` SHALL scan decoded code with its group and pass.
 
 #### Scenario: A song with vocals
 
@@ -127,4 +127,4 @@ The code SHALL end with a group of one to three lines that look like code and st
 #### Scenario: Same track, same lines
 
 - **WHEN** the same file is decoded twice
-- **THEN** the labels are the same, and two sections of one track can differ
+- **THEN** the labels are the same, in every section, and another file gets other labels

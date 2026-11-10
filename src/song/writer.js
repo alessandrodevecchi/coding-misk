@@ -31,7 +31,8 @@ export const FUNCTIONS = FUNCTION_LEVELS;
 // the app's own functions in the code it writes (installHelpers, preludeText): bus, distortion, the mixer and the
 // library; song functions take their names from NAMES (strudel-catalog: tools/check-strudel.mjs accepts these names
 // besides Strudel's, and fails when one of them is a Strudel name)
-export const HELPERS = ['chan', 'crunch', 'miskMix', ...LIBRARY_NAMES];
+// (vox and melody: the decoded code's top line group, decode-refine D6; they evaluate to silence)
+export const HELPERS = ['chan', 'crunch', 'miskMix', 'vox', 'melody', ...LIBRARY_NAMES];
 const PATTERN = /^\s*[_S]?\$:\s*/;
 const NUM = /^-?\d*\.?\d+$/;
 // the calls of a chain: [{ name, args, text, ws }], ws the spaces after the call (a line break and its indent too)
@@ -526,6 +527,9 @@ export function installHelpers({ register, Pattern = globalThis.Pattern }) {
   installAppWidgets(Pattern);
   register('chan', (name, pat) => { const n = (globalThis.miskBuses || {})[name]; return (n === undefined ? pat : pat.orbit(n)).analyze(name); });
   register('crunch', (x, pat) => pat.distort(x).distortvol(0.5));
+  // the decoded code's top line group (decode-refine D6): plain functions that give silence, so a `vox(...)` or
+  // `melody(...)` line evaluates and plays nothing
+  for (const name of ['vox', 'melody']) if (typeof globalThis[name] !== 'function') globalThis[name] = () => globalThis.silence;
   for (const f of LIBRARY) defineFn(f.name, f);
   useFns(globalThis.miskFns);
   // a hap from a line of the mixer gets its bus, visual and level unless the line sets them, and its section lanes
