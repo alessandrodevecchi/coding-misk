@@ -80,10 +80,11 @@ const state = page => page.evaluate(() => {
   // 3. the Live coder: the edited line from the typing plan; the app widgets in the editor and over the stage; Copy
   {
     // (share 0: each line its primary widget, so the kick shows the hit grid from the start; a track's widget comes from
-    // the track and the seed, #79, and kellerlicht's kick draws a secondary one)
-    const { page, ctx, errors } = await open(browser, { 'coding-misk-code-over': { stage: true }, 'coding-misk-code-widgets': { on: true, max: 4, share: 0 } });
+    // the track and the seed, #79, and kellerlicht's kick draws a secondary one; varied-openings: in Live coder the song now
+    // draws a top opening, hats alone with a pianoroll for over 40 bars, so it keeps the broken-beat opening it had through a trial, as check-live-code.mjs does)
+    const { page, ctx, errors } = await open(browser, { 'coding-misk-code-over': { stage: true }, 'coding-misk-code-widgets': { on: true, max: 4, share: 0 }, 'coding-misk-song-trials': { kellerlicht: { profile: 'switch', live: true, options: { opening: 'broken' } } } });
     await page.locator('#track-pick').selectOption('kellerlicht'); await sleep(800);
-    await page.$eval('#live-profile [data-profile="switch"]', el => el.click()).catch(() => {});
+    // (the trial is already Live coder: a click on the profile would start a new trial without the opening)
     await page.waitForFunction(() => !document.querySelector('#play-growing:not([hidden])'), null, { timeout: 120000 }).catch(() => {});
     await page.click('#play');
     let edited = null, widgets = [], ed = [];

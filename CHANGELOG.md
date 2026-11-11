@@ -140,6 +140,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Radio: adding a saved pattern redraws only the saved patterns panel after the press.
 - The code typing updates the editor at most 30 times a second, and the code panel's scroll no longer forces a layout each frame.
 - Song cards are updated each frame only while the Songs tab is shown.
+- A new hit grid or tone cloud canvas in the editor starts empty, not at the browser's default 300 × 150, until its first draw.
 
 ### Removed
 
