@@ -66,7 +66,7 @@ export function sectionBounds(bars, { min = 4 } = {}) {
   // a peak stands out: at least 0.6, and 0.5 above the lowest novelty within 8 bars (the calm inside a section)
   const peaks = [];
   for (let b = 2; b <= n - 2; b++) {
-    if (N[b] < 0.6 || N[b] - Math.min(...N.slice(Math.max(2, b - 8), Math.min(n - 1, b + 9))) < 0.5) continue;
+    if (N[b] < 0.65 || N[b] - Math.min(...N.slice(Math.max(2, b - 8), Math.min(n - 1, b + 9))) < 0.5) continue;
     let top = true;
     for (let k = Math.max(1, b - 2); k <= Math.min(n - 1, b + 2); k++) if (k !== b && (N[k] > N[b] || (N[k] === N[b] && k < b))) top = false;
     if (top) peaks.push(b);

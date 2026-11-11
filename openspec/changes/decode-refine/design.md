@@ -252,6 +252,46 @@ The code already does it: the level switch shows as soon as a track is open, and
 - Live stays the default for a first open; a track with a stored Full analysis still opens in Full.
 - After 8 bars in Live, the tab proposes Full once per track: a note under the file row ("Full writes sections, one tempo for the whole track and calmer code: press Full…").
 
+## Part 2: measures
+
+Before and after each group of part 2, on the bench of group 6 (`tools/decode-measure.mjs --full`, the WAV files exported again in the part 2 worktree; level A "as played" is the model asked up to two bars ahead of the playhead, as the tab asks it).
+
+### Group 7: drums on dense mixes (11 November)
+
+| Measure | Before | After | Target |
+| --- | --- | --- | --- |
+| luci-rosse kick F1, level A / B | 0.46 / 0.45 | 0.93 / 0.93 | 0.8 |
+| decode-test-acid kick F1, level A / B | 0 / 0.34 | 0.96 / 0.97 | 0.8 |
+| luci-rosse hat F1 (B) | 0.60 | 0.88 | 0.8 |
+| radio seed false claps | 99 | 25 | 40 at most |
+| radio seed drum patterns per section (B) | 8 in one section | 1 | 2 at most |
+| luci-rosse level A as played: downbeat | 1.69 s (half a beat late) | 13 ms from bar 6 | within 30 ms by bar 12 |
+| radio song (owner's export) level A: tempo | 117.46 BPM throughout | 176 BPM from bar 9 (Node), bar 10 (browser) | 176 by bar 16 |
+
+What changed against D4: the broadband click does not tell luci-rosse's kick from its distorted acid bass (both have their attack in the 1-5 kHz band), so the kick under the bass rests on the every-beat rule (`KICK_RULE`). Claps also need noise in the snare band (spectral flatness at least 0.3: claps 0.36 to 0.67, a lead's note over a kick 0.11 to 0.22) and a darkness of 1.3 times the lower third of the hats of the last 6 seconds (`CLAP_RULE`). Hats are on above half the median of the hats of the last 4 bars (`HAT_RULE`). The relock (`RELOCK_BARS`) takes a new tempo only with the backbeat (on decode-test-90 two thirds of the tempo won without it), moves the phase by half a beat when the kicks sit on the off 8ths, by a 16th when the hats sit on the odd 16ths only, and takes a whole tempo within 0.1 BPM (126.05 against 126 moved the acid song's grid a 16th off its kicks in a minute). The radio song's intro holds drums from bar 0: D4's "intro without drums" does not hold there, the relock still finds 176. Similarity: luci-rosse's low-band rhythm 0.54 to 0.75, the acid song's 0.62 to 0.88; their brightness falls (0.67 to 0.59, 0.74 to 0.50) because the right drums now play on the 808 (group 10 picks the kit).
+
+### Group 8: harmony and bass (11 November)
+
+| Measure | Before | After | Target |
+| --- | --- | --- | --- |
+| radio seed chord quality (B) | 1 | 1 | 0.9 |
+| radio seed bass (B) | never decoded | 114 bars, pitch 0.995, octave errors 0.005 | in its octave |
+| owner's vocal track A, bass span per section | up to 33 semitones | 14 at most | 15 at most |
+| owner's vocal track B, bass span per section | up to 36 semitones | 15 at most | 15 at most |
+| luci-rosse chord quality (B with Essentia.js) | 0.25 | 0.63 | |
+
+What changed against D5: the chroma that leaves out the bass's harmonics shows luci-rosse's minor third at an eighth of the root and no major third; misk-analyzer marks such a bar and level B makes it minor where the key holds that minor chord and not the major one (a rule in level A broke a C chord whose third falls on a bass harmonic). The bass range is the 15-semitone window that holds most notes, not the median plus or minus 7: the median folded luci-rosse's riff, which jumps an octave. Chord confidences are almost always above 0.8, so a tie goes to the key's quality. The radio seed's supersaw bass is heard with YIN at a looser threshold on the step after a kick. Its truth is G1 to B1 (octave 1 in Strudel's names; the task says octave 2), and the code writes `g1 a1 b1`.
+
+### Group 9: top line and Lead (11 November)
+
+| Measure | Before | After | Target |
+| --- | --- | --- | --- |
+| arp-and-lead song: lead steps with the right pitch class, with / without Essentia.js | no top line | 0.13 / 0 | 0.7 |
+| acid song: the same | no top line | 0 / 0.01 | |
+| generated hook over drums: the same | no top line | 0.89 / 0.75 | |
+
+Not met on the bench: MELODIA follows the arp and the pad, louder than the lead in the arp-and-lead song (notes 52 to 60 against a lead at 72 to 81), and YIN finds no single pitch in a polyphonic mix. A tonal-peak tracker (the highest salient peak that is no harmonic) reached 0.47 on the arp song but gives no voicing, so it is not kept. MELODIA reports a pitch about 60 ms late (`MELODY_LAG`). Its voicing replaces `top.up` only in bars where `top.up` hears a top line at all (0.18), because MELODIA also voices a pad or a bass. The Lead is written as `n(…).scale(…)` degrees; a sung melody's Lead has `hush` in the song (muted in Compose) and starts muted in Decode's mix.
+
 ## Risks / Trade-offs
 
 - [The edit rule makes level A slow to follow real changes] → Parts entering or stopping never wait; the waits are 2 and 4 bars; level B is the right level for a track the user wants close.

@@ -95,10 +95,10 @@ const loopOpts = id => (id === 'chords' ? { grow: true } : { same: sameBass });
 const sameBassB = (a, b) => { if (!a || !b) return false; let n = 0, ok = 0; for (let j = 0; j < a.length; j++) { if (a[j] === null && b[j] === null) continue; n++; if (a[j] === b[j]) ok++; } return n === 0 || ok / n >= 0.75; };
 
 // a bar of bass notes in mini-notation: the coarsest grid (16, 8 or 4 steps) that holds every note, runs with "!"
-export function stepsMini(notes) {
+export function stepsMini(notes, name = noteName) {
   let n = STEPS;
   for (const g of [4, 8]) if (notes.every((x, j) => j % (STEPS / g) === 0 || x === null)) { n = g; break; }
-  const toks = Array.from({ length: n }, (_, k) => { const x = notes[k * (STEPS / n)]; return x === null ? '~' : noteName(x); });
+  const toks = Array.from({ length: n }, (_, k) => { const x = notes[k * (STEPS / n)]; return x === null || x === undefined ? '~' : name(x); });
   const out = [];
   for (const tk of toks) { const last = out[out.length - 1]; if (last && last.t === tk) last.n++; else out.push({ t: tk, n: 1 }); }
   return out.map(x => (x.n > 1 ? `${x.t}!${x.n}` : x.t)).join(' ');
@@ -106,11 +106,24 @@ export function stepsMini(notes) {
 const seqOf = list => (list.length === 1 ? list[0] : `<${list.join(' ')}>`);
 const bassCode = (loop, snd) => `note("${seqOf(loop.map(b => (loop.length > 1 ? `[${stepsMini(b)}]` : stepsMini(b))))}")${snd}`;
 const chordCode = (loop, snd) => `chord("${seqOf(loop)}").voicing()${snd}`;
+// the Lead (decode-refine D2): degrees of the key's scale from an octave around its notes, `n("<…>").scale("A4:minor")`
+// (a note outside the scale goes to the scale note below it)
+export const LEAD_RULE = { voiced: 0.3 };
+const SCALE_STEPS = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11] };
+export function leadCode(loop, key, snd = '') {
+  const k = key || { root: 9, mode: 'minor' }, sc = SCALE_STEPS[k.mode === 'major' ? 'major' : 'minor'];
+  const all = loop.flat().filter(x => x !== null && x !== undefined).sort((a, b) => a - b), med = all.length ? all[Math.floor(all.length / 2)] : 69;
+  // the scale's root in the octave at or below the median note
+  let base = med - ((((med - k.root) % 12) + 12) % 12);
+  const degree = x => { const o = Math.floor((x - base) / 12), r = x - base - 12 * o; let d = 0; for (let i = 0; i < 7; i++) if (sc[i] <= r) d = i; return d + 7 * o; };
+  const name = `${NOTE_NAMES[k.root]}${Math.floor(base / 12) - 1}:${k.mode === 'major' ? 'major' : 'minor'}`;
+  return `n("${seqOf(loop.map(b => (loop.length > 1 ? `[${stepsMini(b, degree)}]` : stepsMini(b, degree))))}").scale("${name}")${snd}`;
+}
 
 // sounds by measure (D10): "Our sounds" picks from the generator's tables by the model's brightness and low-end
 // weight; "Simple kit" is one fixed set. bars: the bars heard so far (level A) or the section's (level B)
 export function soundsOf(bars, preset = 'ours') {
-  if (preset === 'simple' || !bars.length) return { kit: 'RolandTR909', bass: '.s("sawtooth").lpf(700).gain(.75)', chords: '.s("supersaw").lpf(2000).gain(.3)', why: 'simple' };
+  if (preset === 'simple' || !bars.length) return { kit: 'RolandTR909', bass: '.s("sawtooth").lpf(700).gain(.75)', chords: '.s("supersaw").lpf(2000).gain(.3)', lead: '.s("square").lpf(2400).gain(.25)', why: 'simple' };
   const avg = k => bars.reduce((a, b) => a + (b[k] || 0), 0) / bars.length;
   const bright = avg('bright'), low = avg('low');
   // heavy low end: the 808; bright and light: the 909; between them the other machines of the generator's list
@@ -119,7 +132,7 @@ export function soundsOf(bars, preset = 'ours') {
   const bassCut = Math.round((300 + 900 * Math.min(1, bright * 1.6)) / 50) * 50;
   const chordWave = bright > 0.45 ? 'supersaw' : bright > 0.25 ? 'sawtooth' : 'triangle';
   const chordCut = Math.round((800 + 3200 * Math.min(1, bright * 1.5)) / 100) * 100;
-  return { kit, bass: `.s("${bassWave}").lpf(${bassCut}).gain(.75)`, chords: `.s("${chordWave}").lpf(${chordCut}).gain(.3)`, why: `bright ${bright.toFixed(2)} low ${low.toFixed(2)}` };
+  return { kit, bass: `.s("${bassWave}").lpf(${bassCut}).gain(.75)`, chords: `.s("${chordWave}").lpf(${chordCut}).gain(.3)`, lead: '.s("square").lpf(2400).gain(.25)', why: `bright ${bright.toFixed(2)} low ${low.toFixed(2)}` };
 }
 
 // the song of a decoded track. opts: { id, title, artist, attribution, sounds, upTo (bars written, default all) }
@@ -282,6 +295,9 @@ const hashOf = str => { let h = 2166136261; for (const c of String(str)) { h ^= 
 const upOf = b => (b && b.top ? b.top.up || 0 : 0);
 const median = list => { const x = list.slice().sort((a, b) => a - b); return x.length ? x[Math.floor(x.length / 2)] : 0; };
 const topMemo = new WeakMap();
+// a bar's top line voicing (decode-refine D2): the share of its steps with a top line note, where part 1's measure hears a
+// top line at all (`up` at least TOP_RULE.off): the predominant melody also follows a pad or a bass when nothing is on top
+export const voicedOf = b => (b && b.lead && upOf(b) >= TOP_RULE.off ? b.leadVoiced || 0 : 0);
 // per bar { on, seg, kind } (seg: the section, or level A's run of the same state), or null before the first top line;
 // level 'A' or 'B'
 export function topPlan(model, level = 'A', rule = TOP_RULE) {
@@ -294,7 +310,10 @@ export function topPlan(model, level = 'A', rule = TOP_RULE) {
     const end = Math.min(bars.length, model.ending ?? bars.length), secs = model.sections && model.sections.length ? model.sections : [{ start: 0, bars: end }];
     const music = bars.slice(0, end).filter(b => drumsHeard(b) || bassHeard(b) || chordsHeard(b) || upOf(b) > 0);
     const kind = median(music.map(upOf)) >= rule.vocal ? 'vox' : 'melody';
-    const onBy = secs.map(s => { const list = bars.slice(s.start, Math.min(end, s.start + s.bars)); return list.length > 0 && list.reduce((a, b) => a + upOf(b), 0) / list.length >= rule.up; });
+    // (decode-refine D2: where the bars carry the top line's voicing, a section has a top line when it is voiced on at least
+    // LEAD_RULE.voiced of its steps, as the Lead; else part 1's measure `up`)
+    const voicing = bars.some(b => b && b.lead);
+    const onBy = secs.map(s => { const list = bars.slice(s.start, Math.min(end, s.start + s.bars)); return list.length > 0 && (voicing ? list.reduce((a, b) => a + voicedOf(b), 0) / list.length >= LEAD_RULE.voiced : list.reduce((a, b) => a + upOf(b), 0) / list.length >= rule.up); });
     const any = onBy.some(Boolean);
     for (let b = 0; b < bars.length; b++) { const k = secs.findIndex(s => b >= s.start && b < s.start + s.bars); out.push(any && k >= 0 ? { on: onBy[k], seg: k, kind } : null); }
   } else {
@@ -355,20 +374,23 @@ export function steady(list, min = EDIT_RULE.runBars) {
   return out;
 }
 
+// level B's drum grids (decode-refine D4): a step of the main grid is on in at least `main` of a section's bars with
+// drums; a variant is a whole grid heard in at least `variant` of them (and twice)
+export const GRID_RULE = { main: 0.6, variant: 0.1 };
 const gridOf = b => Object.fromEntries(DRUM_ROWS.map(r => [r, (b.drums && b.drums[r]) || EMPTY]));
 // the loop of a part over the bars of a section (values by absolute bar, null where not heard): the smallest period of
 // 1, 2, 4 or 8 bars whose positions (bar mod L, as Strudel's `<…>` reads them) hold one value on 80 % of the bars;
 // each position's value is its most common one (bass: the bar most like the others). → [values] of length L
-export function sectionLoop(byBar, bars, { same = (a, b) => JSON.stringify(a) === JSON.stringify(b) } = {}) {
+export function sectionLoop(byBar, bars, { same = (a, b) => JSON.stringify(a) === JSON.stringify(b), lengths = [1, 2, 4, 8] } = {}) {
   const heard = bars.filter(b => byBar[b] !== null && byBar[b] !== undefined);
   if (!heard.length) return null;
   const pickOf = list => { let best = list[0], top = -1; for (const x of list) { const n = list.filter(y => same(x, y)).length; if (n > top) { top = n; best = x; } } return best; };
   let fallback = null;
-  for (const L of [1, 2, 4, 8]) {
+  for (const L of lengths) {
     const loop = range(0, L).map(k => { const list = heard.filter(b => ((b % L) + L) % L === k).map(b => byBar[b]); return list.length ? pickOf(list) : null; });
     if (loop.some(x => x === null)) continue;
     const ok = heard.filter(b => same(byBar[b], loop[((b % L) + L) % L])).length / heard.length;
-    if (ok >= 0.8 && (L === 1 || heard.length >= 2 * L || L === 8)) return loop;
+    if (ok >= 0.8 && (L === 1 || heard.length >= 2 * L || L === lengths[lengths.length - 1])) return loop;
     if (!fallback || ok > fallback.ok) fallback = { loop, ok };
   }
   return fallback ? fallback.loop : [byBar[heard[0]]];
@@ -382,12 +404,16 @@ function drumPlan(model) {
     const idx = range(sec.start, Math.min(sec.start + sec.bars, end)), on = steady(idx.map(i => drumsHeard(bars[i])));
     const keys = idx.map((i, j) => (on[j] && drumsHeard(bars[i]) ? gridKey(gridOf(bars[i])) : on[j] ? 'gap' : null));
     const count = new Map(); for (const k of keys) if (k && k !== 'gap') count.set(k, (count.get(k) || 0) + 1);
-    let main = null; for (const [k, n] of count) if (!main || n > count.get(main)) main = k;
-    if (!main) return { main: null, variants: [], perBar: idx.map(() => null), grid };
+    const heard = keys.filter(k => k && k !== 'gap');
+    if (!heard.length) return { main: null, variants: [], perBar: idx.map(() => null), grid };
+    // the main grid (decode-refine D4): per step, on when it is on in at least GRID_RULE.main of the bars with drums, so
+    // noise on a few steps does not split the section into many grids
+    const main = gridKey(Object.fromEntries(DRUM_ROWS.map((r, j) => [r, Array.from({ length: STEPS }, (_, s) => (heard.filter(k => k.split('|')[j][s] === 'x').length >= GRID_RULE.main * heard.length ? 'x' : '.')).join('')])));
     // (a grid within three steps of the main one, or one that only misses some of its hits, is the main one heard less
     // well: a kick under a loud bass, a hat under a crash)
     const near = k => { const g = grid(k), M0 = grid(main); return diffSteps(g, M0) <= 3 || DRUM_ROWS.every(r => [...g[r]].every((c, j) => c !== 'x' || M0[r][j] === 'x')); };
-    const variants = [...count].filter(([k, n]) => k !== main && n >= 2 && !near(k)).map(([k]) => k);
+    // a variant comes back: at least twice and in GRID_RULE.variant of the section's bars with drums
+    const variants = [...count].filter(([k, n]) => k !== main && n >= Math.max(2, Math.ceil(GRID_RULE.variant * heard.length)) && !near(k)).map(([k]) => k);
     const perBar = keys.map(k => (k === null ? null : variants.includes(k) ? k : main));
     return { main, variants, perBar, grid };
   });
@@ -467,6 +493,22 @@ export function writeFull(model, opts = {}) {
   };
   part('bass', 'Bass', 'bass', bassHeard, b => b.bass.map(x => (x === null || x === undefined ? null : x)), bassCode, sameBassB);
   part('chords', 'Chords', 'pad', chordsHeard, b => b.chord, chordCode, undefined, inKey(model.key));
+  // the Lead (decode-refine D2): the top line as one loop per section where it is voiced on at least LEAD_RULE.voiced
+  // of the section's steps; a sung melody (the top line lines' kind `vox`) muted by default (`hush`)
+  {
+    const patterns = {}, ids = new Map(), clips = [], kind = (topPlan(model, 'B').find(Boolean) || {}).kind;
+    secs.forEach(sec => {
+      const idx = range(sec.start, sec.start + sec.bars), voiced = idx.reduce((a, i) => a + voicedOf(bars[i]), 0) / Math.max(1, idx.length);
+      if (!(voiced >= LEAD_RULE.voiced)) return;
+      const byBar = {}; idx.forEach(i => { const l = bars[i] && bars[i].lead; byBar[i] = l && voicedOf(bars[i]) > 0 && l.some(x => x !== null) ? l : null; });
+      const loop = sectionLoop(byBar, idx, { same: sameBassB, lengths: [1, 2, 4] });
+      if (!loop) return;
+      const c = leadCode(loop, model.key, soundsOf(idx.map(i => bars[i]), opts.sounds).lead);
+      if (!ids.has(c)) { const p = pid(ids.size); ids.set(c, p); patterns[p] = { code: c }; }
+      clips.push({ start: sec.start, bars: sec.bars, pattern: ids.get(c) });
+    });
+    if (clips.length) tracks.push({ id: 'lead', name: 'Lead', type: 'code', settings: { visual: 'hook' }, patterns, clips, ...(kind === 'vox' ? { hush: true } : {}) });
+  }
   const song = songShell(model, opts, end, tracks);
   const key = formatKey(model.key), bpm = song.sections[0].bpm;
   song.sections = secs.map((s, i) => ({ name: names[i], bars: s.bars, bpm, key }));

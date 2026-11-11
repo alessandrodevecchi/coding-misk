@@ -12,7 +12,7 @@
 // lit notes); a section change typed before its bar; Live and Full while playing; Cancel (nothing stored); Essentia.js
 // blocked (misk-analyzer alone); reopen in Full; Open in Compose (the same code at every step, "Follow the song",
 // validate, Classic and Crescendo); a built-in song with "Follow the song"; pictures fase2-*. --full runs only these.
-// decode-refine part 1 (--refine runs only these): the Full proposal after 8 bars, T with a mute button focused, the
+// decode-refine part 1 and 7.4 (--refine runs only these): level A's relock on luci-rosse as it plays, the Full proposal after 8 bars, T with a mute button focused, the
 // Tap button's count and tooltip, Auto, Space only plays and pauses, Full before Play, the melody lines muted outside a
 // generated hook and playing in it, never evaluated, kept by Copy with their helpers.
 // decode-library (--library runs only these, also at the end of a whole run): tools/check-decode-library.cjs, the panel,
@@ -64,6 +64,20 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   const tabOrder = () => page.$$eval('.tabs .tab', xs => xs.filter(x => !x.hidden).map(x => x.textContent.trim()).join(','));
 
   // ---------- decode-refine part 1: T and Tap, Auto, Space, the Full proposal, Full before Play, the top line group ----------
+  // decode-refine 7.4: level A's relock as played: luci-rosse's downbeat within 30 ms of the true one by bar 12, the code
+  // restarted on the new grid, the track still playing
+  async function relock() {
+    await page.click('[data-tab="decode"]'); await sleep(300);
+    const file = wavs['luci-rosse'];
+    if (!file || !fs.existsSync(file)) { console.log('note  relock: no luci-rosse.wav (tools/decode-export.cjs)'); return; }
+    await open(file);
+    await page.click('#dc-play');
+    let s = null;
+    for (let i = 0; i < 160; i++) { await sleep(250); s = await stNow(); if (s.bar !== null && s.bar >= 12.5) break; }
+    const bar = 240 / 124, off = Math.round(Math.min(((s.downbeat % bar) + bar) % bar, bar - (((s.downbeat % bar) + bar) % bar)) * 1000);
+    check(s.playing && s.playLevel === 'A' && s.bpm === 124 && off <= 30 && s.trail.some(x => x.kind === 'relock'), 'level A relocks luci-rosse as it plays: 124 BPM, the downbeat within 30 ms by bar 12, the code restarted, still playing', `bar ${s.bar && s.bar.toFixed(1)}, ${s.bpm} BPM, downbeat ${s.downbeat} (${off} ms off), relock ${s.trail.some(x => x.kind === 'relock')}`);
+    await page.click('#dc-play'); await sleep(300);
+  }
   async function refine() {
     await page.click('[data-tab="decode"]'); await sleep(300);
     const { renderSong, writeWav } = await import('./decode-audio.mjs');
@@ -522,6 +536,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   }
   if (process.argv.includes('--refine')) {
     await refine();
+    await relock();
     check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
     await browser.close();
     console.log(failed ? `${failed} failed` : 'all passed');
@@ -762,6 +777,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   await levelB();
   await exportsB();
   await refine();
+  await relock();
 
   // ---------- 4.4 two minutes with the code muted ----------
   if (LONG) {

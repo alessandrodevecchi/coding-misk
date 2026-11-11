@@ -23,9 +23,9 @@ import { compileSong } from '../src/song/compile.js';
 import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
-import { measureApp, measureSynth, measureFull } from './decode-measure.mjs';
-import { analyseFull, pickTempo, barChords, settleMode } from '../src/decode/full.js';
-import { writeFull, inKey } from '../src/decode/writer.js';
+import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
+import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey } from '../src/decode/full.js';
+import { writeFull, inKey, leadCode } from '../src/decode/writer.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
 import { followSong, crescendoSong } from '../src/song/crescendo.js';
 import { growthRules } from '../src/live/profiles.js';
@@ -245,7 +245,7 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
   // the same model shape as level A for the same bars (analysis spec: One song model)
   const A = createAnalyzer(pcm).model(30), B = runs['Essentia.js'];
-  check(JSON.stringify(Object.keys(A.bars[0]).sort()) === JSON.stringify(Object.keys(B.bars[0]).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields');
+  check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !['lead', 'leadVoiced', 'third'].includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !['lead', 'leadVoiced', 'third'].includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line, decode-refine D2)');
   // level A never calls Essentia.js: the worker loads it only for "analyse all"
   const wsrc = fs.readFileSync('src/decode/worker.js', 'utf8'), msrc = fs.readFileSync('src/decode/misk-analyzer.js', 'utf8');
   check(!/essentia/i.test(msrc.replace(/\/\/.*$/gm, '')) && /async function all[\s\S]*import\('\.\/engine-essentia\.js'\)/.test(wsrc) && !/^import .*(engine-essentia|full)/m.test(wsrc), 'level A uses misk-analyzer only: Essentia.js is imported only by level B, inside the worker');
@@ -352,7 +352,8 @@ if (process.argv.includes('--app')) {
     // first seconds; level B's whole-file grid is measured below)
     // (the new bench songs of decode-refine 6.1 carry what groups 7 to 10 fix: measured, not held to the old targets)
     if (r.hard) { console.log(`info  ${id} (level A, new bench song): tempo ${r.bpm}, downbeat ${r.downbeat} s, F1 ${JSON.stringify(r.f1)}, chords ${r.chords}`); continue; }
-    if (id === 'decode-test-long') { console.log(`info  ${id} (level A): tempo ${r.bpm}, downbeat ${r.downbeat} s (half a beat off on the hats-only intro), F1 ${JSON.stringify(r.f1)}`); continue; }
+    // (decode-refine 7.4: the long test song opens on offbeat hats alone; level A's relock puts its beat right once the
+    // kicks come, so it is held to the targets now)
     check(Math.abs(r.bpm - r.bpmTruth) <= 0.1, `${id} (app export): tempo`, `${r.bpm}`);
     check(r.downbeat < 0.03, `${id} (app export): downbeat within 30 ms of the start`, `${r.downbeat} s`);
     check(r.f1.bd >= 0.7 && r.f1.cp >= 0.9 && r.f1.hh >= 0.8, `${id} (app export): drum grids`, JSON.stringify(r.f1));
@@ -365,6 +366,81 @@ if (process.argv.includes('--app')) {
     check(r.boundsErr <= 1 && r.ms < r.seconds * 1000, `${id} (app export, level B): section bounds within one bar, faster than the file`, `bounds ${r.bounds.join(',') || '-'} (extra ${r.extra}), ${(r.ms / 1000).toFixed(1)} s for ${r.seconds} s`);
     console.log(`info  ${id} (level B): chords ${r.chords}, drums F1 ${JSON.stringify(r.f1)}, on/off ${r.drumsPresence}, engines ${JSON.stringify(r.engines)}`);
   }
+}
+// ---------- decode-refine group 7 on the bench (optional, with --app): drums on dense mixes, the relock ----------
+if (process.argv.includes('--app')) {
+  const app = measureApp(), full = await measureFull({ essentia: false, only: ['decode-test-acid'] }), tl = await measureTimelines({ full: true });
+  const acidA = app['decode-test-acid'], acidB = full['decode-test-acid'], L = tl['luci-rosse'], R = tl['radio-bench-c'];
+  if (acidA && acidB) check(acidA.f1.bd >= 0.8 && acidB.f1.bd >= 0.8, 'the acid test song: kick F1 at least 0.8 in both levels under its distorted bass (the every-beat rule)', `A ${acidA.f1.bd}, B ${acidB.f1.bd}`);
+  if (L) {
+    check(L.B.rows.bd.f1 >= 0.8 && L.A.rows.bd.f1 >= 0.8, 'luci-rosse: kick F1 at least 0.8 in both levels', `A ${L.A.rows.bd.f1}, B ${L.B.rows.bd.f1}`);
+    check(L.B.rows.hh.f1 >= 0.8, 'luci-rosse: hat F1 at least 0.8 (the hats\' floor per bars)', `${L.B.rows.hh.f1}`);
+    check(L.A.progress.at12 && L.A.progress.at12.err <= 30, 'luci-rosse in level A as played: the downbeat within 30 ms of a true one by bar 12 (the relock)', JSON.stringify(L.A.progress));
+    console.log(`info  luci-rosse clap F1 ${L.B.rows.cp.f1} (false ${L.B.rows.cp.falseHits}), drum patterns per section ${L.B.perSection.join(',')}`);
+  }
+  if (R) {
+    check(R.B.rows.cp.falseHits <= 40, 'the radio seed: at most 40 false claps (flatness and the hats of the last seconds)', `${R.B.rows.cp.falseHits}`);
+    check(R.B.perSection.every(n => n <= 2), 'the radio seed in level B: at most 2 drum patterns per section (the per-step majority)', R.B.perSection.join(','));
+    check(R.B.chordQuality >= 0.9, 'the radio seed in level B: at least 90 % of the chords with the right quality', `${R.B.chordQuality}`);
+    check(R.B.bassBars >= 0.5 * R.B.drumBars && R.B.bassPitch >= 0.9 && R.B.bassOctaveErrors <= 0.05, 'the radio seed in level B: its supersaw bass decoded, in its own octave', `bass in ${R.B.bassBars} bars, pitch ${R.B.bassPitch}, octave errors ${R.B.bassOctaveErrors}`);
+  }
+}
+// decode-refine group 8 (D5): steady qualities, the bass's octave range, quiet bass bars, quiet minor thirds
+{
+  const bar = (chord, conf, bass = null, lv = 1) => ({ chord, chordConf: conf, bass: bass || Array(16).fill(null), level: { bass: lv } });
+  const q = ['Am', 'A', 'Am', 'Am', 'F', 'A', 'Am', 'F'].map(c => bar(c, 0.7));
+  steadyQualities(q, [{ start: 0, bars: 8 }]);
+  check(q.map(b => b.chord).join(' ') === 'Am Am Am Am F Am Am F', 'a chord\'s quality follows the section\'s majority for its root', q.map(b => b.chord).join(' '));
+  const c = ['A', 'Am', 'A', 'Am', 'Am', 'Am'].map((x, i) => bar(x, i === 0 || i === 2 ? 0.9 : 0.7));
+  steadyQualities(c, [{ start: 0, bars: 6 }]);
+  check(c[0].chord === 'A' && c[2].chord === 'A', 'the other quality stays where it wins clearly in two bars', c.map(b => b.chord).join(' '));
+  const t = ['A', 'A', 'Am', 'Am'].map(x => bar(x, 0.7));
+  steadyQualities(t, [{ start: 0, bars: 4 }], undefined, { root: 9, mode: 'minor' });
+  check(t.every(b => b.chord === 'Am'), 'a tie goes to the key\'s quality', t.map(b => b.chord).join(' '));
+  const notes = n => Array.from({ length: 16 }, (_, j) => (j % 4 === 0 ? n : null));
+  const bb = [bar('Am', 0.9, notes(33)), bar('Am', 0.9, notes(45)), bar('Am', 0.9, notes(64)), bar('Am', 0.9, notes(33), 0.1), bar('Am', 0.9, notes(21))];
+  bassRange(bb, [{ start: 0, bars: 5 }]);
+  check(bb[0].bass[0] === 33 && bb[1].bass[0] === 45 && bb[2].bass[0] === 40 && bb[3].bass.every(x => x === null) && bb[4].bass[0] === 33, 'the bass keeps one octave range per section (a riff\'s octave jump stays, a note far off moves by octaves) and a quiet bass bar has no notes', bb.map(b => b.bass[0]).join(','));
+  const qm = [{ chord: 'A', third: true }, { chord: 'C', third: true }, { chord: 'A' }];
+  quietMinors(qm, { root: 9, mode: 'minor' });
+  check(qm.map(b => b.chord).join() === 'Am,C,A', 'a quiet minor third turns a chord minor only where the key holds that minor chord', qm.map(b => b.chord).join());
+}
+// decode-refine group 9 (D2): the top line and the Lead
+{
+  check(snapToKey(69.3, { root: 9, mode: 'minor' }) === 69 && snapToKey(70.45, { root: 9, mode: 'minor' }) === 70 && snapToKey(72.35, { root: 9, mode: 'minor' }) === 72 && snapToKey(null, null) === null, 'the top line snaps to the key\'s scale within 40 cents');
+  const loop = [[69, null, 72, null, 76, null, null, null, 69, null, 72, null, 74, null, null, null]];
+  check(leadCode(loop, { root: 9, mode: 'minor' }) === 'n("0 2 4 ~ 0 2 3 ~").scale("A4:minor")', 'the Lead is written as degrees of the key\'s scale', leadCode(loop, { root: 9, mode: 'minor' }));
+  // a generated song: a hook section between two verses of chords; the Lead in the hook only, its notes right
+  const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' }, mel = [76, null, 74, null, 72, null, null, 79, null, 77, null, 76, 74, null, 72, null];
+  const { pcm } = renderSong({ bpm: 124, lead: 0.3, bass: 'x..x..x...x.x...', sections: [{ name: 'Verse', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: D }, { name: 'Hook', bars: 8, chords: null, drums: D, melody: mel }, { name: 'Out', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: D }] });
+  for (const [name, engine] of [['Essentia.js', nodeEssentia], ['misk-analyzer', null]]) {
+    const H = await analyseFull(pcm, { engine }), sg = writeFull(H), ld = sg.tracks.find(x => x.id === 'lead');
+    const hook = H.sections.find(s => s.start <= 9 && s.start + s.bars >= 15), inHook = ld && ld.clips.every(c => hook && c.start >= hook.start && c.start + c.bars <= hook.start + hook.bars);
+    let ok = 0, n = 0;
+    for (let i = 9; i < 16; i++) { const b = H.bars[i]; mel.forEach((x, j) => { if (x === null) return; n++; if (b.lead && b.lead[j] !== null && ((((b.lead[j] - x) % 12) + 12) % 12) === 0) ok++; }); }
+    check(ld && inHook && ok / n >= 0.7 && H.engines.lead === (engine ? 'essentia.js' : 'misk-analyzer'), `the Lead of a generated hook (${name}): written in the hook only, its notes right on at least 70 % of the steps`, `${ld ? JSON.stringify(ld.clips) : 'no lead'}, ${Math.round((100 * ok) / n)} %, engine ${H.engines.lead}`);
+    check(compileSong(sg).includes('n("') && !validateSong(sg).errors.length, `the Lead compiles in a valid song (${name})`);
+  }
+  // an instrumental song with no top line: no Lead
+  const P = renderSong({ bpm: 124, lead: 0.3, chords: ['Am', 'F'], bass: 'x..x..x...x.x...', bars: 16, drums: D });
+  const I = await analyseFull(P.pcm, { engine: null });
+  check(!writeFull(I).tracks.some(x => x.id === 'lead'), 'no Lead on a song without a top line', `voiced ${I.bars.map(b => b.leadVoiced).join(',')}`);
+  // a sung melody: muted by default (hush), in the song Open in Compose saves too; the mix starts it muted by the user
+  const V = { ...I, bars: I.bars.map(b => ({ ...b, top: { up: 0.5 }, lead: mel, leadVoiced: 0.6 })) };
+  const vs = writeFull(V), vl = vs.tracks.find(x => x.id === 'lead');
+  check(vl && vl.hush === true && /_\$:/.test(compileSong(vs)), 'a sung melody\'s Lead is muted by default, also in the song Open in Compose saves', vl ? JSON.stringify({ hush: vl.hush }) : 'no lead');
+  const mx = mixApply(defaultMix(['drums']), { type: 'tracks', codeIds: ['drums', 'lead'], muted: ['lead'] }), lt = mx.tracks.find(t => t.id === 'lead');
+  check(lt.mute && lt.by === 'user', 'the mix starts a muted Lead muted by the user, so the slider does not unmute it');
+}
+// a tapped or stored tempo is never moved by the relock (decode-refine D4)
+{
+  const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' };
+  const { pcm } = renderSong({ bpm: 124, lead: 0.3, chords: ['Am', 'F'], bass: 'x..x..x...x.x...', bars: 20, drums: D });
+  const A = createAnalyzer(pcm);
+  A.model(9);
+  A.setTempo({ bpm: 124, downbeat: 0.31, tapped: true });
+  const m = A.model(pcm.length / RATE);
+  check(!m.relocked && m.downbeat === 0.31 && m.bpm === 124, 'the relock never moves a tapped tempo', JSON.stringify({ bpm: m.bpm, downbeat: m.downbeat, relocked: m.relocked }));
 }
 // ---------- decode-refine part 1: balanced code changes, the top line group ----------
 {

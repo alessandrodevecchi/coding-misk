@@ -46,21 +46,21 @@ Two rounds (owner, 8 November). **Part 1** is done now: about 14 agent hours (11
 
 ### 7. Drums on dense mixes (about 6 h)
 
-- [ ] 7.1 Kick against bass note by the broadband click or pitch fall, and the every-beat rule (design D4); verify kick F1 at least 0.8 on the acid test song and on `luci-rosse`.
-- [ ] 7.2 Hat and clap thresholds per section; verify hat F1 at least 0.8 on `luci-rosse` and at most 40 false claps on the radio seed.
-- [ ] 7.3 Level B main grid by per-step majority; verify at most 2 patterns per section plus repeated variations on the radio seed.
-- [ ] 7.4 Level A phase and tempo relock when the kicks enter; verify `luci-rosse`'s downbeat within 30 ms by bar 12 and the radio song at 176 BPM by bar 16, in Node and in the browser.
+- [x] 7.1 Kick against bass note by the broadband click or pitch fall, and the every-beat rule (design D4); verify kick F1 at least 0.8 on the acid test song and on `luci-rosse`.
+- [x] 7.2 Hat and clap thresholds per section; verify hat F1 at least 0.8 on `luci-rosse` and at most 40 false claps on the radio seed.
+- [x] 7.3 Level B main grid by per-step majority; verify at most 2 patterns per section plus repeated variations on the radio seed.
+- [x] 7.4 Level A phase and tempo relock when the kicks enter; verify `luci-rosse`'s downbeat within 30 ms by bar 12 and the radio song at 176 BPM by bar 16, in Node and in the browser.
 
 ### 8. Harmony and bass (about 3 h)
 
-- [ ] 8.1 Chord quality per section and root (design D5); verify at least 90 % right qualities on the radio seed.
-- [ ] 8.2 Bass octave range and the quiet-bass rule; verify the radio seed's bass in octave 2 and a 15-semitone span at most per section on the owner's vocal tracks (printed).
+- [x] 8.1 Chord quality per section and root (design D5); verify at least 90 % right qualities on the radio seed.
+- [x] 8.2 Bass octave range and the quiet-bass rule; verify the radio seed's bass in octave 2 and a 15-semitone span at most per section on the owner's vocal tracks (printed).
 
 ### 9. Top line and Lead part (about 7 h)
 
 - [ ] 9.1 Top line in level B with Essentia.js's predominant pitch and the YIN fallback, snapped to the scale; verify at least 70 % of the lead steps on the arp-and-lead song, with and without Essentia.js; its voicing replaces part 1's `top.up` for the top line lines.
-- [ ] 9.2 The `lead` code track in `writeFull` with one loop per section and no Lead below 30 % voiced, a sung melody muted by default; the Lead track in the Full track list with mute and solo; Open in Compose keeps it.
-- [ ] 9.3 `check:decode` cases (Lead written, no Lead on an instrumental test song, the same code in Decode and Compose); `check:strudel` passes.
+- [x] 9.2 The `lead` code track in `writeFull` with one loop per section and no Lead below 30 % voiced, a sung melody muted by default; the Lead track in the Full track list with mute and solo; Open in Compose keeps it.
+- [x] 9.3 `check:decode` cases (Lead written, no Lead on an instrumental test song, the same code in Decode and Compose); `check:strudel` passes.
 
 ### 10. Sounds by measure (about 6 h)
 

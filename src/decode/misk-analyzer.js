@@ -12,6 +12,22 @@ const HOP = 512, N1 = 1024, N2 = 4096, HOP2 = 2048, DEC = 8;
 const BAND = { kick: [40, 130], snare: [1100, 5200], hat: [7000, 15000], low: [40, 250], mid: [250, 2000], high: [2000, 8000], air: [5200, 11000] };
 // the least music the tempo lock needs (seconds)
 export const LOCK_SECONDS = 8;
+// drums on dense mixes (decode-refine D4): the every-beat rule, a peak of the kick band's flux of at least `flux` times
+// its threshold on each of the bar's four beats, each a rise of the low band of at least `beat` times the track's
+// kick scale
+export const KICK_RULE = { flux: 0.45, beat: 0.25 };
+// a clap (D4): its snare-band rise at least `snare` times the track's strong ones, its darkness (snare band over hat
+// band) at least `local` times the hats' of the last `seconds` seconds, and noise in the snare band (spectral flatness
+// at least `flat`; measured: claps 0.36 to 0.67, a lead's note on a kick 0.11 to 0.22)
+export const CLAP_RULE = { snare: 0.5, local: 1.3, seconds: 6, flat: 0.3 };
+// hats (D4): a step is on when its hat is at least `median` times the median hat of the bar and the `bars` bars before
+export const HAT_RULE = { median: 0.5, bars: 4 };
+// level A's relock (D4): the tempo and the beat phase checked again on the first bars with kicks, this many
+export const RELOCK_BARS = 8;
+// the top line by YIN (D2): a step's band level must reach `floor` of the band's peak
+export const TOP_LINE = { floor: 0.02 };
+// the bass (D5): YIN's looser threshold for a bass that the usual one does not hear (a detuned unison)
+export const BASS_RULE = { loose: 0.35 };
 
 // ---------- FFT (radix 2, in place) ----------
 const ffts = new Map();
@@ -65,6 +81,16 @@ function lowpass(x, sr, fc, q = 0.707) {
   return y;
 }
 
+// a biquad high-pass (RBJ), for the top line's band
+function highpass(x, sr, fc, q = 0.707) {
+  const w = (2 * Math.PI * fc) / sr, al = Math.sin(w) / (2 * q), c = Math.cos(w), a0 = 1 + al;
+  const b0 = (1 + c) / 2 / a0, b1 = -(1 + c) / a0, b2 = b0, a1 = (-2 * c) / a0, a2 = (1 - al) / a0;
+  const y = new Float32Array(x.length);
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < x.length; i++) { const v = b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v; }
+  return y;
+}
+
 // YIN (de Cheveigné and Kawahara) on x[from, from + w): → { f0, ap } or null
 export function yin(x, from, sr, { w = 256, fmin = 28, fmax = 300, threshold = 0.2 } = {}) {
   const tmax = Math.min(w, Math.floor(sr / fmin)), tmin = Math.max(2, Math.floor(sr / fmax));
@@ -95,6 +121,8 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   const flux = { kick: new Float32Array(nf1), snare: new Float32Array(nf1), hat: new Float32Array(nf1), air: new Float32Array(nf1) };
   const energy = { kick: new Float32Array(nf1), hat: new Float32Array(nf1), snare: new Float32Array(nf1), low: new Float32Array(nf1), mid: new Float32Array(nf1), high: new Float32Array(nf1), total: new Float32Array(nf1) };
   const cent = new Float32Array(nf1);
+  // the spectral flatness of the snare band per frame (a clap is noise; a lead's note in the same band is tonal)
+  const flatS = new Float32Array(nf1);
   const chroma = new Float32Array(nf2 * 12), chromaE = new Float32Array(nf2);
   // the tonal peaks of each frame (frequency, magnitude), for a bar's chroma without the bass's upper harmonics
   const peaks = new Array(nf2);
@@ -121,7 +149,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       for (let i = 0; i < N1; i++) { re1[i] = pcm[o + i] * w1[i]; im1[i] = 0; }
       fft(re1, im1);
       const lg = new Float64Array(half + 1);
-      let tot = 0, cw = 0;
+      let tot = 0, cw = 0, fl = 0, fa = 0, fn = 0;
       const bandE = { kick: 0, hat: 0, snare: 0, low: 0, mid: 0, high: 0 }, bandF = { kick: 0, snare: 0, hat: 0, air: 0 };
       for (let k = 1; k <= half; k++) {
         const m = Math.hypot(re1[k], im1[k]), p = m * m;
@@ -129,11 +157,13 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
         tot += p; cw += p * k * hz1;
         const d = lg[k] - prevLog[k], up = d > 0 ? d : 0;
         for (const b of ['kick', 'hat', 'snare', 'low', 'mid', 'high']) { const [a, z] = B1[b]; if (k >= a && k <= z) bandE[b] += p; }
+        if (k >= B1.snare[0] && k <= B1.snare[1]) { fl += Math.log(p + 1e-12); fa += p; fn++; }
         for (const b of ['kick', 'snare', 'hat', 'air']) { const [a, z] = B1[b]; if (k >= a && k <= z) bandF[b] += up; }
       }
       for (const b of ['kick', 'snare', 'hat', 'air']) { const [a, z] = B1[b]; flux[b][done1] = bandF[b] / (z - a + 1); }
       for (const b of ['kick', 'hat', 'snare', 'low', 'mid', 'high']) energy[b][done1] = bandE[b];
       energy.total[done1] = tot; cent[done1] = tot ? cw / tot : 0;
+      flatS[done1] = fn && fa > 0 ? Math.exp(fl / fn) / (fa / fn) : 0;
       prevLog = lg;
     }
   }
@@ -199,6 +229,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       const hs = onsets.hat.map(o => rise('hat', o)), hp = quantile(hs, 0.9), ss = onsets.snare.map(o => rise('snare', o));
       const dom = onsets.hat.filter((o, i) => hs[i] >= 0.5 * hp).map(o => rise('snare', o) / (rise('hat', o) + 1e-6));
       kit = { hatRatio: dom.length >= 4 ? quantile(dom, 0.5) : 0.3, snareTop: quantile(ss, 0.9) || 1, hatTop: hp || 1 };
+      clapMemo.clear();
     }
   }
   // kick or bass: a kick's pitch drops in its first 50 ms (a bass note holds its pitch); a hit with no pitch at all is a
@@ -221,11 +252,43 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   const rise = (band, o) => { const e = energy[band]; let p = 0, q = Infinity; for (let k = o.f - 1; k <= o.f + 2; k++) if (k >= 0 && k < done1) p = Math.max(p, e[k]); for (let k = o.f - 4; k <= o.f - 1; k++) if (k >= 0) q = Math.min(q, e[k]); return Math.max(0, Math.sqrt(p) - Math.sqrt(q === Infinity ? 0 : q)); };
   // the rise of the low band at a hit (its peak over the quietest frame just before), so a kick's own tail is no hit
   const kickPeak = o => { let p = 0, q = Infinity; for (let k = o.f - 1; k <= o.f + 3; k++) if (k >= 0 && k < done1) p = Math.max(p, energy.kick[k]); for (let k = o.f - 4; k <= o.f - 1; k++) if (k >= 0) q = Math.min(q, energy.kick[k]); return Math.max(0, Math.sqrt(p) - Math.sqrt(q === Infinity ? 0 : q)); };
+  // the low band's rise at a beat (the every-beat rule, D4): the strongest local peak of the kick band's flux within
+  // `tol` of t that reaches KICK_RULE.flux of the band's threshold, measured as kickPeak does; 0 without one
+  const beatKick = (t, tol) => {
+    let best = 0;
+    for (let f = Math.max(1, f1(t - tol)); f <= Math.min(done1 - 2, f1(t + tol)); f++) {
+      const x = flux.kick;
+      if (!(x[f] > x[f - 1] && x[f] >= x[f + 1]) || x[f] < KICK_RULE.flux * threshold('kick', f)) continue;
+      best = Math.max(best, kickPeak({ f }));
+    }
+    return best;
+  };
   let kit = { hatRatio: 0.3, snareTop: 1, hatTop: 1 }, kitN = -1;
   const ratioOf = o => rise('snare', o) / (rise('hat', o) + 1e-6);
   // a clap: darker than the track's hats and strong in the snare band, with some noise in the hat band too (a kick's click
   // or a chord's attack has none)
-  const isClap = o => { const s = rise('snare', o), h = rise('hat', o); return h >= 0.15 * kit.hatTop && s >= 0.4 * kit.snareTop && (s / (h + 1e-6) / kit.hatRatio) * (s / kit.snareTop) >= 1; };
+  // (decode-refine D4) and against the hats heard just before it: the snare band's rise over the hat band's must stand
+  // out from the ratio of the hats of the last seconds (a hat over a bright bass note reads darker than the track's hats),
+  // and reach half the track's strong snare-band hits (a kick's click alone does not)
+  const clapMemo = new Map();
+  const isClap = o => {
+    if (clapMemo.has(o.f)) return clapMemo.get(o.f);
+    const s = rise('snare', o), h = rise('hat', o), r = s / (h + 1e-6), local = localHatRatio(o.t), ref = Math.max(kit.hatRatio, local);
+    const v = h >= 0.15 * kit.hatTop && s >= CLAP_RULE.snare * kit.snareTop && r >= CLAP_RULE.local * local && (r / ref) * (s / kit.snareTop) >= 1 && flatAt(o) >= CLAP_RULE.flat;
+    if (o.f < done1 - Math.round(0.1 * fr)) clapMemo.set(o.f, v);
+    return v;
+  };
+  // the snare band's spectral flatness at a hit (its frame and the next): a clap is noise, a lead's or a bass's bright
+  // note in the band is tonal
+  const flatAt = o => Math.max(flatS[o.f] || 0, flatS[o.f + 1] || 0);
+  // the lower third of the ratios of the snare band's rise to the hat band's of the strong hat-band hits of the seconds
+  // before t (the hats there; a clap or a bright note over a hat reads darker, so the lower third), or the track's ratio
+  // with fewer than four
+  const localHatRatio = t => {
+    const list = [];
+    for (const o of onsets.hat) { if (o.t < t - CLAP_RULE.seconds) continue; if (o.t > t + 0.03) break; const h = rise('hat', o); if (h >= 0.5 * kit.hatTop) list.push(rise('snare', o) / (h + 1e-6)); }
+    return list.length >= 4 ? quantile(list, 0.3) : kit.hatRatio;
+  };
   const isHat = o => rise('hat', o) >= 0.3 * kit.hatTop && !isClap(o);
   const airy = o => { let v = 0; for (let k = o.f - 1; k <= o.f + 1; k++) if (k >= 0 && k < done1) v = Math.max(v, flux.air[k]); return v > threshold('air', o.f); };
   // a hat onset at the same time as a stronger snare or clap is the clap's noise
@@ -319,19 +382,82 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     lockS = { bpm: T.bpm, candidates: T.candidates, confidence: T.confidence, uncertain: T.uncertain, downbeat: downbeatOf(beatPhase, beat, t1(start)) };
     return lockS;
   }
-  // the beat phase (seconds): kicks weigh most, then snares, then hats; a Gaussian of 20 ms around each beat
-  function phaseOf(beat, ta, tz, backbeat = false) {
-    const list = [...onsets.kick.filter(o => o.t >= ta && o.t < tz && kickLike(o)).map(o => ({ t: o.t, w: 1 })), ...onsets.snare.filter(o => o.t >= ta && o.t < tz && isClap(o)).map(o => ({ t: o.t, w: backbeat ? 1.5 : 0.6 })), ...onsets.hat.filter(o => o.t >= ta && o.t < tz).map(o => ({ t: o.t, w: 0.15 }))];
+  // the relock (decode-refine D4): level A locks on the first seconds, often an intro without kicks or with offbeat hats
+  // and a bass on the off steps. Once RELOCK_BARS bars with kicks are complete, the tempo and the beat phase are checked
+  // again on them alone: a tempo that is a ratio of the old one (one half, two thirds, three halves, double) replaces it,
+  // and the downbeat moves to the new phase. Once per track, never after a tapped, picked or stored tempo. The bars are
+  // made again on the new grid. → true when the grid changed
+  function relock(t) {
+    if (!lockS || lockS.fixed || lockS.checked) return false;
+    // (the first bar with kicks; with none by then, the first bar with drums: a grid a 16th off hears no kick at all)
+    const barSec = 240 / lockS.bpm, kicks = barCache.findIndex(b => [...(b.drums.bd || '')].filter(c => c === 'x').length >= 2), drums = barCache.findIndex(b => DRUM_ROWS.some(r => [...(b.drums[r] || '')].filter(c => c === 'x').length >= 2));
+    const byDrums = kicks < 0 && !lockS.checkedDrums && drums >= 0 && barCache.length >= drums + RELOCK_BARS, k = byDrums ? drums : kicks;
+    if (k < 0 || barCache.length < k + RELOCK_BARS) return false;
+    // (the check on drums without kicks may come again with the kicks)
+    if (byDrums) lockS.checkedDrums = true; else lockS.checked = true;
+    const ta = lockS.downbeat + k * barSec, tz = Math.min(t, lockS.downbeat + (k + RELOCK_BARS) * barSec);
+    const T = tempoOf(f1(ta), f1(tz));
+    let bpm = lockS.bpm;
+    // (a new tempo needs the backbeat, a clap every two of its beats: a groove of kicks alone fits two thirds of its tempo
+    // as well, measured on decode-test-90)
+    if (T && T.backbeat && [0.5, 2 / 3, 1.5, 2].some(r => Math.abs(T.bpm / (lockS.bpm * r) - 1) < 0.03)) bpm = T.bpm;
+    // (the same tempo measured on more audio: a whole tempo the old one missed by a few hundredths keeps the grid on the
+    // beat for minutes)
+    const same = bpm === lockS.bpm;
+    // (the same tempo measured again on those bars: a line through their onsets on the 16th grid; a whole tempo within 0.1
+    // BPM of it replaces the old one, which may be off by 0.05 BPM and drift a 16th from its kicks in a minute)
+    if (same) {
+      const x = windowTempo(bpm, lockS.downbeat, ta, tz), whole = Math.round(bpm);
+      if (x && Math.abs(x - bpm) < 0.3 && Math.abs(x - Math.round(x)) < 0.1) bpm = Math.round(x);
+      // (or the whole tempo next to the old one, when the onsets of those bars sit on its grid as well)
+      else if (whole !== bpm && Math.abs(whole - bpm) < 0.1 && gridError(whole, lockS.downbeat, ta, tz) <= 1.05 * gridError(bpm, lockS.downbeat, ta, tz)) bpm = whole;
+    }
+    // (the kicks of those bars on the old grid: on the beats, or on the off 8ths; the off 8ths alone move the grid by
+    // half a beat, a groove with some off kicks does not)
+    const beat = 60 / bpm;
+    let db;
+    if (same) {
+      let on = 0, off = 0;
+      for (const b of barCache.slice(k, k + RELOCK_BARS)) [...(b.drums.bd || '')].forEach((c, j) => { if (c !== 'x') return; if (j % 4 === 0) on++; else if (j % 4 === 2) off++; });
+      // (hats only on the odd 16ths of the old grid: it sits a 16th off; the 16th before or after it, the one whose beat
+      // phase scores better)
+      let even = 0, odd = 0;
+      for (const b of barCache.slice(k, k + RELOCK_BARS)) for (const r of ['hh', 'oh']) [...(b.drums[r] || '')].forEach((c, j) => { if (c === 'x') { if (j % 2) odd++; else even++; } });
+      const half = off >= 8 && off >= 3 * on, bb = !!(T && T.backbeat), q = beat / 4;
+      const moved = !half && odd >= 8 && odd >= 3 * even;
+      const start = moved ? [lockS.downbeat - q, lockS.downbeat + q].sort((x, y) => phaseOf(beat, ta, tz, bb, y) - phaseOf(beat, ta, tz, bb, x))[0] : lockS.downbeat + (half ? beat / 2 : 0);
+      const ph = windowPhase(bpm, start, ta, tz);
+      if (half) db = downbeatOf(ph, beat, t1(firstSound()));
+      else {
+        // the same bar: the phase nearest the old downbeat (or the 16th moved)
+        db = ph + Math.round((start - ph) / beat) * beat;
+        while (db - 4 * beat >= -0.02) db -= 4 * beat;
+        db = Math.max(0, db);
+      }
+    } else db = downbeatOf(windowPhase(bpm, phaseOf(beat, ta, tz, !!(T && T.backbeat)), ta, tz), beat, t1(firstSound()));
+    if (bpm === lockS.bpm && Math.abs(db - lockS.downbeat) < 0.004) return false;
+    if (byDrums && !(bpm !== lockS.bpm || Math.abs(db - lockS.downbeat) >= beat / 8)) return false;
+    lockS = { ...lockS, bpm, candidates: [bpm / 2, bpm, bpm * 2].filter(x => x >= 40 && x <= 240).map(x => Math.round(x * 100) / 100), downbeat: db, relocked: { from: { bpm: lockS.bpm, downbeat: lockS.downbeat }, at: Math.round(t * 1000) / 1000 } };
+    barCache.length = 0; held = null;
+    return true;
+  }
+  // the beat phase (seconds): kicks weigh most, then snares, then hats; a Gaussian of 20 ms around each beat (hats
+  // around each 8th, decode-refine D4: offbeat hats are on the grid too, and decide between a weak kick on the beat and a
+  // loud bass note a 16th after it)
+  // (scoreAt: the score of that phase instead, the relock compares two)
+  function phaseOf(beat, ta, tz, backbeat = false, scoreAt = null) {
+    const list = [...onsets.kick.filter(o => o.t >= ta && o.t < tz && kickLike(o)).map(o => ({ t: o.t, w: 1 })), ...onsets.snare.filter(o => o.t >= ta && o.t < tz && isClap(o)).map(o => ({ t: o.t, w: backbeat ? 1.5 : 0.6 })), ...onsets.hat.filter(o => o.t >= ta && o.t < tz).map(o => ({ t: o.t, w: 0.15, p: beat / 2 }))];
+    if (scoreAt !== null) { let sc = 0; for (const o of list) { const P = o.p || beat, d = (((o.t - scoreAt) % P) + P) % P, dist = Math.min(d, P - d); sc += o.w * Math.exp(-0.5 * (dist / 0.02) ** 2); } return sc; }
     let best = { ph: 0, s: -1 };
     for (let ph = 0; ph < beat; ph += 0.004) {
       let sc = 0;
-      for (const o of list) { const d = (((o.t - ph) % beat) + beat) % beat, dist = Math.min(d, beat - d); sc += o.w * Math.exp(-0.5 * (dist / 0.02) ** 2); }
+      for (const o of list) { const P = o.p || beat, d = (((o.t - ph) % P) + P) % P, dist = Math.min(d, P - d); sc += o.w * Math.exp(-0.5 * (dist / 0.02) ** 2); }
       if (sc > best.s) best = { ph, s: sc };
     }
     // fine step around the best
     for (let ph = best.ph - 0.004; ph <= best.ph + 0.004; ph += 0.0005) {
       let sc = 0;
-      for (const o of list) { const d = (((o.t - ph) % beat) + beat) % beat, dist = Math.min(d, beat - d); sc += o.w * Math.exp(-0.5 * (dist / 0.02) ** 2); }
+      for (const o of list) { const P = o.p || beat, d = (((o.t - ph) % P) + P) % P, dist = Math.min(d, P - d); sc += o.w * Math.exp(-0.5 * (dist / 0.02) ** 2); }
       if (sc > best.s) best = { ph, s: sc };
     }
     return best.ph;
@@ -366,7 +492,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   const setTempo = ({ bpm, downbeat, tapped = true, confidence, uncertain = false, round = 2 }) => {
     const L = lockS || { candidates: [], confidence: 0, uncertain: false };
     const k = 10 ** round, b = Math.round(bpm * k) / k;
-    lockS = { ...L, bpm: b, candidates: [b / 2, b, b * 2].filter(x => x >= 40 && x <= 240).map(x => Math.round(x * k) / k), downbeat: downbeat ?? L.downbeat ?? 0, uncertain, tapped, ...(confidence !== undefined ? { confidence } : {}) };
+    lockS = { ...L, bpm: b, candidates: [b / 2, b, b * 2].filter(x => x >= 40 && x <= 240).map(x => Math.round(x * k) / k), downbeat: downbeat ?? L.downbeat ?? 0, uncertain, tapped, fixed: true, ...(confidence !== undefined ? { confidence } : {}) };
     barCache.length = 0; held = null;
     return lockS;
   };
@@ -379,6 +505,44 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     advance(duration); findOnsets();
     return [...onsets.kick.filter(kickLike).map(o => ({ t: o.t, w: 1 })), ...onsets.snare.filter(isClap).map(o => ({ t: o.t, w: 0.7 })), ...onsets.hat.filter(isHat).map(o => ({ t: o.t, w: 0.2 }))];
   };
+  // the beat phase (seconds) of a known tempo that puts the onsets heard between ta and tz on its 16th grid best: the
+  // weighted mean offset of the onsets near the grid, from `ph`, with a narrower window each pass (the relock, D4; the
+  // same points as fitGrid, never past the frames analysed)
+  function windowPhase(bpm, ph, ta, tz) {
+    const P = 60 / bpm, q = P / 4, pts = [...onsets.kick.filter(o => kickLike(o)).map(o => ({ t: o.t, w: 1 })), ...onsets.snare.filter(isClap).map(o => ({ t: o.t, w: 0.7 })), ...onsets.hat.filter(isHat).map(o => ({ t: o.t, w: 0.2 }))].filter(p => p.t >= ta && p.t < tz);
+    let a = ph;
+    for (const tol of [0.05, 0.035, 0.025]) {
+      let sw = 0, sr = 0;
+      for (const p of pts) { const m = Math.round((p.t - a) / q), r = p.t - (a + m * q); if (Math.abs(r) <= tol) { sw += p.w; sr += p.w * r; } }
+      if (sw < 4) break;
+      a += sr / sw;
+    }
+    return ((a % P) + P) % P;
+  }
+  // how far the onsets heard between ta and tz sit from the 16th grid of bpm (its phase fitted from ph): the weighted
+  // mean distance (seconds) of those within 40 ms; Infinity with too few
+  function gridError(bpm, ph, ta, tz) {
+    const q = 15 / bpm, a = windowPhase(bpm, ph, ta, tz), pts = [...onsets.kick.filter(o => kickLike(o)).map(o => ({ t: o.t, w: 1 })), ...onsets.snare.filter(isClap).map(o => ({ t: o.t, w: 0.7 })), ...onsets.hat.filter(isHat).map(o => ({ t: o.t, w: 0.2 }))].filter(p => p.t >= ta && p.t < tz);
+    let sw = 0, se = 0;
+    for (const p of pts) { const r = Math.abs(p.t - (a + Math.round((p.t - a) / q) * q)); if (r <= 0.04) { sw += p.w; se += p.w * r; } else { sw += p.w; se += p.w * 0.04; } }
+    return sw >= 4 ? se / sw : Infinity;
+  }
+  // the tempo (BPM) of a line through the onsets heard between ta and tz near the 16th grid of bpm and phase ph (the
+  // relock, D4); null with too few onsets
+  function windowTempo(bpm, ph, ta, tz) {
+    const pts = [...onsets.kick.filter(o => kickLike(o)).map(o => ({ t: o.t, w: 1 })), ...onsets.snare.filter(isClap).map(o => ({ t: o.t, w: 0.7 })), ...onsets.hat.filter(isHat).map(o => ({ t: o.t, w: 0.2 }))].filter(p => p.t >= ta && p.t < tz);
+    let q = 15 / bpm, a = ph;
+    for (const tol of [0.04, 0.03, 0.025]) {
+      let sw = 0, sm = 0, st = 0, smm = 0, smt = 0, n = 0;
+      for (const p of pts) { const m = Math.round((p.t - a) / q), r = p.t - (a + m * q); if (Math.abs(r) <= tol) { sw += p.w; sm += p.w * m; st += p.w * p.t; smm += p.w * m * m; smt += p.w * m * p.t; n++; } }
+      const den = sw * smm - sm * sm;
+      if (n < 16 || !(den > 0)) return null;
+      const q2 = (sw * smt - sm * st) / den;
+      if (!(q2 > 0.9 * q && q2 < 1.1 * q)) return null;
+      q = q2; a = (st - q * sm) / sw;
+    }
+    return 15 / q;
+  }
   // the tempo and beat phase that put the onsets of the whole file on a 16th grid best: a weighted least-squares line
   // through the onsets near the grid (t = a + m·P/4), three passes with a narrower window; a whole tempo when it fits
   // almost as well. A tempo off by 0.05 BPM drifts by 0.1 s over four minutes: the line keeps the code on the beat.
@@ -458,18 +622,38 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       if (j < 0 || j >= STEPS || Math.abs(o.t - (start + j * step)) > tol || !kickLike(o)) continue;
       strengths.bd[j] = Math.max(strengths.bd[j], kickPeak(o) / hitNorm.kickPeak);
     }
+    // the every-beat rule (decode-refine D4): a kick under a loud bass (an acid line on the kick's own notes) loses its
+    // pitch fall and often its onset; a rise of the low band on each of the bar's four beats is a four-on-the-floor kick
+    // even when the pitch test reads a bass note. (A bass on every beat alone would read as kicks too: rare in the songs
+    // measured, and the low band's rise then sounds like a kick anyway.)
+    const beats = [0, 4, 8, 12].map(j => beatKick(start + j * step, tol));
+    if (beats.every(v => v >= KICK_RULE.beat * hitNorm.kickPeak)) beats.forEach((v, k) => { strengths.bd[4 * k] = Math.max(strengths.bd[4 * k], v / hitNorm.kickPeak); });
     // a snare or clap is noise: it reaches the air band (5 to 11 kHz) too; a chord's attack does not
     // clap or snare against hat (and a kick's click, a chord's attack): the ratio of the snare band's rise to the hat
     // band's, against the ratio of this track's own hats (a clap is about three to five times "darker" than the hats)
     take(onsets.snare, 'cp', o => (isClap(o) ? 'cp' : null), hitNorm.snare);
-    take(onsets.hat, null, o => (!isHat(o) ? null : openHat(o) ? 'oh' : 'hh'), hitNorm.hat);
+    // hats (decode-refine D4): their strength is the hat band's rise against the track's strong hats, and a step is on
+    // above a share of the median of the hats of the last bars, not of the bar's loudest: quieter closed hats between
+    // loud open ones are kept
+    const hatRise = o => rise('hat', o) / kit.hatTop;
+    for (const o of onsets.hat) {
+      if (o.t < start - tol) continue;
+      if (o.t >= end - tol) break;
+      const j = Math.round((o.t - start) / step);
+      if (j < 0 || j >= STEPS || Math.abs(o.t - (start + j * step)) > tol || !isHat(o)) continue;
+      const r = openHat(o) ? 'oh' : 'hh';
+      strengths[r][j] = Math.max(strengths[r][j], hatRise(o));
+    }
+    const near = []; for (const o of onsets.hat) { if (o.t < start - HAT_RULE.bars * barSec) continue; if (o.t >= end) break; if (isHat(o)) near.push(hatRise(o)); }
+    const hatFloor = HAT_RULE.median * quantile(near, 0.5);
     // steps on above 50 % of the strongest step of the band, off below 30 % (hysteresis on the bar before, D9); a band
-    // whose strongest step is weak plays nothing
+    // whose strongest step is weak plays nothing; hats above their floor
     const prev = barCache[i - 1];
     const drums = {};
     for (const r of DRUM_ROWS) {
       const s = strengths[r], top = Math.max(...s), was = prev && prev.drums ? prev.drums[r] : '';
       if (top < 0.22) { drums[r] = '.'.repeat(STEPS); continue; }
+      if (r === 'hh' || r === 'oh') { drums[r] = Array.from(s, v => (v > 0 && v >= hatFloor ? 'x' : '.')).join(''); continue; }
       drums[r] = Array.from(s, (v, j) => (v >= 0.5 * top || (was[j] === 'x' && v >= 0.3 * top) ? 'x' : '.')).join('');
     }
     // the snare band also catches the chords' attacks: a "clap" on every step a chord changes is no clap
@@ -499,17 +683,22 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     const full = new Float64Array(12);
     for (let f = 0; f < done2; f++) { const tt = t2(f); if (tt < start + barSec * 0.04 || tt >= end - barSec * 0.04) continue; for (let c = 0; c < 12; c++) full[c] += chroma[f * 12 + c]; }
     const bestOf = x => { let best = null; for (const T of TEMPLATES) { const sc = cosSim(x, T.v) + (T.root === bassPc ? 0.06 : 0); if (!best || sc > best.s) best = { s: sc, T }; } return best; };
-    let chord = null, chordConf = 0;
+    let chord = null, chordConf = 0, third = false;
     if (full.some(x => x > 0)) {
       let best = bestOf(full);
       const ex = harm.length && v.some(x => x > 0) ? bestOf(v) : null;
       // (only major to minor: leaving the harmonics out removes major-third energy, so it never argues for major; the
       // minor third must hold a fair share of the root and beat the major third)
       const r0 = best.T.root, m3 = (r0 + 3) % 12, M3 = (r0 + 4) % 12;
-      if (ex && best.T.quality === 'maj' && v[m3] > 1.2 * v[M3] && v[m3] >= 0.3 * v[r0]) best = { s: best.s, T: TEMPLATES.find(T => T.root === r0 && T.quality === 'min') };
+      // (decode-refine D5: a quiet minor third, an eighth of the root, that beats the major third three times, as a stab
+      // under a distorted acid bass, only marks the bar `third`: a major chord whose third sits on a bass harmonic looks
+      // the same here, and level B decides with the key)
+      const fair = v[m3] > 1.2 * v[M3] && v[m3] >= 0.3 * v[r0], quiet = v[m3] > 3 * v[M3] && v[m3] >= 0.12 * v[r0];
+      if (ex && best.T.quality === 'maj' && fair) best = { s: best.s, T: TEMPLATES.find(T => T.root === r0 && T.quality === 'min') };
+      else if (ex && best.T.quality === 'maj' && quiet) third = true;
       chord = chordName(best.T.root, best.T.quality); chordConf = Math.round(Math.min(1, best.s) * 100) / 100;
     }
-    return { start: Math.round(start * 1000) / 1000, chord, chordConf, bass, drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, top: topOf(start, end, bass) };
+    return { start: Math.round(start * 1000) / 1000, chord, chordConf, ...(third ? { third: true } : {}), bass, drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, top: topOf(start, end, bass) };
   }
   // the top line of a bar (decode-refine D6): `up`, the median over its frames of the share of the tonal peaks'
   // energy between 400 and 2000 Hz (no harmonic of a bass note) in all of the frame's tonal energy (60 to 2100 Hz). A
@@ -542,21 +731,48 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       const s0 = (start + j * step) * decRate;
       const head = rmsOf(x, s0 + 0.1 * L, s0 + 0.5 * L), tail = rmsOf(x, s0 + 0.6 * L, s0 + 0.95 * L), before = rmsOf(x, s0 - 0.35 * L, s0 - 0.05 * L);
       bassTop = Math.max(bassTop, head);
-      const p1 = yin(x, Math.round(s0 + 0.1 * L), decRate, { w, threshold: 0.2, fmin: 30, fmax: 260 });
-      const late = s0 + 0.1 * L + w / 2, p2 = late + w + tmax < s0 + 0.95 * L ? yin(x, Math.round(late), decRate, { w, threshold: 0.2, fmin: 30, fmax: 260 }) : p1;
-      const m1 = p1 ? midiOf(p1.f0) : null, m2 = p2 ? midiOf(p2.f0) : null;
-      const voiced = m1 !== null && m2 !== null && Math.abs(m1 - m2) < 0.6 && head > 0.12 * bassTop;
+      // (YIN at 0.2, then, on the step after a kick, at BASS_RULE.loose: a detuned unison bass, a supersaw, under a kick's
+      // tail is periodic enough only for a looser threshold, decode-refine D5; elsewhere it found notes in a pad)
+      const late = s0 + 0.1 * L + w / 2, twice = th => { const a = yin(x, Math.round(s0 + 0.1 * L), decRate, { w, threshold: th, fmin: 30, fmax: 260 }), b = late + w + tmax < s0 + 0.95 * L ? yin(x, Math.round(late), decRate, { w, threshold: th, fmin: 30, fmax: 260 }) : a; return [a ? midiOf(a.f0) : null, b ? midiOf(b.f0) : null]; };
+      let [m1, m2] = twice(0.2);
+      const agree = (a, b) => a !== null && b !== null && Math.abs(a - b) < 0.6;
+      // (at the looser threshold one window alone may hold the pitch: the other sits in the kick's tail)
+      let loose = false;
+      if (!agree(m1, m2) && head > 0.12 * bassTop && kickAt(j - 1)) { const [l1, l2] = twice(BASS_RULE.loose); if (agree(l1, l2)) [m1, m2] = [l1, l2]; else if ((l1 === null) !== (l2 === null)) m1 = m2 = l1 ?? l2; loose = agree(m1, m2); }
+      const voiced = agree(m1, m2) && head > 0.12 * bassTop;
       // a kick alone: its low end dies within the step
       const kickOnly = kickAt(j) && tail < 0.45 * head;
       const midi = voiced ? Math.round((m1 + m2) / 2) : null;
       // a new note needs an attack, or a new pitch at about the same level (a kick's tail fades at its own pitch)
-      const fresh = voiced && !kickOnly && (head > 1.4 * before || (prev !== null && Math.abs(midi - prev) >= 1 && head > 0.7 * before));
+      // (or, D5, a pitch heard only at the looser threshold right after a kick: the kick's tail is louder than a short
+      // bass note and hides its attack; a kick's own tail is a clean sine the usual threshold hears, and never a note)
+      const underKick = loose && (out[j - 1] ?? null) === null && (out[j - 2] ?? null) === null;
+      const fresh = voiced && !kickOnly && (head > 1.4 * before || (prev !== null && Math.abs(midi - prev) >= 1 && head > 0.7 * before) || underKick);
       out.push(fresh ? midi : null);
       prev = m1 !== null ? Math.round(m1) : null;
       if (voiced && !kickOnly) heardPitches.add(midi);
     }
     return out;
   }
+  // the top line by YIN (decode-refine D2, level B without Essentia.js): the 200-2000 Hz band, decimated by 4, one pitch
+  // per 16th step (a window in the step's middle) → per bar 16 fractional MIDI notes or null
+  let topSig = null;
+  function topLineYin(downbeat, barSec, n) {
+    if (!topSig) { const bp = lowpass(lowpass(highpass(highpass(pcm, sr, 200), sr, 200), sr, 2000), sr, 2000); topSig = new Float32Array(Math.floor(bp.length / 4)); for (let i = 0; i < topSig.length; i++) topSig[i] = bp[i * 4]; }
+    const r = sr / 4, step = barSec / STEPS, w = Math.max(48, Math.min(256, Math.round(0.45 * step * r))), out = [];
+    for (let i = 0; i < n; i++) {
+      const notes = [];
+      for (let j = 0; j < STEPS; j++) {
+        const s0 = (downbeat + i * barSec + j * step) * r, p = yin(topSig, Math.round(s0 + 0.2 * step * r), r, { w, threshold: 0.25, fmin: 190, fmax: 2100 });
+        notes.push(p && rmsOf(topSig, s0, s0 + step * r) > TOP_LINE.floor * topTop() ? midiOf(p.f0) : null);
+      }
+      out.push(notes);
+    }
+    return out;
+  }
+  let topMax = 0;
+  const topTop = () => { if (!topMax) { for (let i = 0; i < topSig.length; i += 64) topMax = Math.max(topMax, Math.abs(topSig[i])); topMax = topMax || 1; } return topMax; };
+
   // the bars complete before t (with a frame of margin for the onsets)
   function bars(t) {
     if (!lockS) return [];
@@ -597,14 +813,16 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   function model(t = duration) {
     const m = emptyModel({ duration: Math.round(duration * 1000) / 1000 });
     if (!lockS && !lock(t)) return m;
+    bars(t);
+    if (relock(t)) bars(t);
     const list = levels(bars(t));
-    Object.assign(m, { bpm: lockS.bpm, bpmCandidates: lockS.candidates, confidence: lockS.confidence, uncertain: !!lockS.uncertain, downbeat: Math.round(lockS.downbeat * 10000) / 10000, barSeconds: 240 / lockS.bpm, tapped: !!lockS.tapped, analysedTo: Math.min(duration, t) });
+    Object.assign(m, { ...(lockS.relocked ? { relocked: lockS.relocked } : {}), bpm: lockS.bpm, bpmCandidates: lockS.candidates, confidence: lockS.confidence, uncertain: !!lockS.uncertain, downbeat: Math.round(lockS.downbeat * 10000) / 10000, barSeconds: 240 / lockS.bpm, tapped: !!lockS.tapped, analysedTo: Math.min(duration, t) });
     m.bars = list.map(({ raw, chroma: c, chromaEx, ...b }) => b);
     m.key = keyOf(list);
     m.sections = [{ start: 0, bars: list.length, kind: 'verse' }];
     return m;
   }
-  return { duration, advance, lock, model, setTempo, resetTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), barsRaw: t => bars(t) };
+  return { duration, advance, lock, model, setTempo, resetTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), barsRaw: t => bars(t), topLineYin };
 }
 
 // level A's horizon (D8): the playhead plus the look ahead; values 'off', '2s', '4s', '2bars', '4bars'
