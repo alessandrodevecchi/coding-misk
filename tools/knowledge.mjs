@@ -47,6 +47,7 @@ import { SHELLS } from '../src/soul/shells.js';
 import { LAYOUTS, QUALITIES, CARDS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES } from '../src/video/layout.js';
 import { FORMATS as AUDIO_FORMATS, MP3_RATES } from '../src/export/encode.js';
 import GM from '../node_modules/@strudel/soundfonts/gm.mjs';
+import { LINE } from '../src/song/line-names.js';
 
 export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DIR = path.join(ROOT, 'docs', 'knowledge');
@@ -130,7 +131,8 @@ function liveCoder(file) {
   builds.set(file, out);
   return out;
 }
-const patternChains = codeText => chainLines(codeText).filter(l => /^\s*[_S]?\$:/.test(l));
+// (line-names: `$:` or a name at the start of the line)
+const patternChains = codeText => chainLines(codeText).filter(l => LINE.test(l));
 // the chain of a compiled song that plays a track in a section (by its lane name)
 const chainOf = (codeText, analyze, lane) => patternChains(codeText).find(l => l.includes(`.analyze("${analyze}")`) && (!lane || l.includes(`.mask(${lane})`))) || null;
 const jsBlock = s => ['```js', s.trimEnd(), '```'].join('\n');

@@ -13,7 +13,8 @@ import { CT_KEY, codeThemeSettings, resolveTheme, underlineRole, fontPx, FONTS, 
 const STRUDEL_TAGS = ['atom|bool|variableName*', 'labelName', 'keyword', 'operator', 'variableName*', 'typeName', 'atom', 'number', 'variableName*', 'string', 'string*', 'comment', 'variableName', 'tagName', 'bracket', 'meta', 'attributeName', 'propertyName', 'className', 'invalid', 'unit|punctuation'];
 const tagName = t => [t].flat().map(x => x.name + (x.modified && x.modified.length ? '*' : '')).join('|');
 // the lines of a muted block: a `_$:` line and the indented lines below it
-const START = /^\s*(_?)\$:/;
+// (line-names: `_$:` or `_kick:`)
+const START = /^\s*(_?)(?:\$|[a-z][a-z0-9]*):(?=\s|$)/;
 
 export function createCodeThemes({ store, root = document.documentElement, host = () => document.getElementById('edhost'), full = () => false }) {
   let ed = null, kit = null, installed = '', fontKey = '', state = null, warned = false, dimOn = false, dimTried = false;

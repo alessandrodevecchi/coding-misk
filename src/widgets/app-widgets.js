@@ -4,6 +4,7 @@
 // call, the window of notes it needs, its data and its painter. Pure: checked in Node (tools/check-code-over.mjs).
 import { HG_DEFAULTS, hitgridOptions, hitgridWindow, hitgridData, hitgridSize, paintHitgrid, cellForm } from './hitgrid.js';
 import { TC_DEFAULTS, tonecloudOptions, tonecloudWindow, tonecloudData, tonecloudSize, paintTonecloud } from './tonecloud.js';
+import { LINE, MUTED_LINE } from '../song/line-names.js';
 
 export const APP_WIDGETS = {
   hitgrid: { defaults: HG_DEFAULTS, options: hitgridOptions, window: hitgridWindow, data: (notes, cyc, o, ctx) => hitgridData(notes, cyc, o, ctx), size: hitgridSize, paint: paintHitgrid },
@@ -42,7 +43,7 @@ export const stripAppWidgets = text => (typeof text === 'string' && HAS_APP_CALL
 
 // the calls of a code: [{ kind, line (where the chain ends), start (the chain's first line), options, index (among the
 // calls of that kind) }]
-const PATTERN = /^\s*[_S]?\$:/;
+const PATTERN = LINE;
 export function appWidgetCalls(code) {
   const lines = String(code || '').split('\n'), out = [], count = {};
   lines.forEach((l, i) => {
@@ -52,7 +53,7 @@ export function appWidgetCalls(code) {
       let start = i; while (start > 0 && !PATTERN.test(lines[start]) && /^\s+(\.|\/\/ \.|\/\*)/.test(lines[start])) start--;
       let end = i; while (end + 1 < lines.length && /^\s+(\.|\/\/ \.|\/\*)/.test(lines[end + 1])) end++;
       const kind = m[1], index = count[kind] = (count[kind] ?? -1) + 1;
-      out.push({ kind, line: end, start, options: callOptions(m[2]), index, muted: /^\s*_\$:/.test(lines[start]) });
+      out.push({ kind, line: end, start, options: callOptions(m[2]), index, muted: MUTED_LINE.test(lines[start]) });
     }
   });
   return out;

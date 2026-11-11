@@ -8,6 +8,7 @@ import { memoOn, contextVersion, caches, currentOwner, timed } from '../endless/
 import { rle } from '../music.js';
 import { t } from '../i18n.js';
 import { typingPlan, mulberry, lineLike } from './typing.js';
+import { LINE, muteLine } from './line-names.js';
 
 const LANE = /^const (\w+) = "(<[^"]*>)"/;
 const GATE = /\.mask\((\w+)\)\.velocity\(\1\)/;
@@ -35,9 +36,9 @@ export function parseCode(code, { gated = false } = {}) {
     if (lane) lanes[lane[1]] = unrle(lane[2]);
     if (l.startsWith('// ==========')) { block = { header: l, items: [] }; blocks.push(block); clip = null; desc = null; continue; }
     if (!block) { head.push(l); continue; }
-    if (/^[_S]?\$:/.test(l)) {
+    if (LINE.test(l)) {
       let text = l;
-      while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1]) && !/^[_S]?\$:/.test(lines[i + 1])) text += '\n' + lines[++i];
+      while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1]) && !LINE.test(lines[i + 1])) text += '\n' + lines[++i];
       const g = text.match(GATE) || (gated ? text.match(PGATE) : null);
       block.items.push({ kind: 'layer', text, gate: g ? g[1] : null, gateText: g ? g[0] : null, mul: g && g[2] !== undefined ? g[2] : null, clip, desc });
       continue;
@@ -120,7 +121,7 @@ export function compileCompact(song, { muted = [], lines = 'joined' } = {}) {
         if (out[out.length - 1] !== comment) out.push(comment);
       }
       if (it.desc && it.desc !== lastDesc) { out.push(it.desc); lastDesc = it.desc; }
-      out.push(silent ? text.replace(/^[_S]?\$:/, '_$:') : text);
+      out.push(silent ? muteLine(text) : text);
     }
   }
   return out.join('\n');
@@ -269,7 +270,7 @@ export function compileNow(song, bar, { prepare = false, shownMuted = [], keepHe
     const put = (x, muted) => {
       if (x.comment && x.comment !== last) { body.push(x.comment); last = x.comment; }
       if (x.desc && !body.includes(x.desc)) body.push(x.desc);
-      body.push(muted ? x.text.replace(/^[_S]?\$:/, '_$:') : x.text);
+      body.push(muted ? muteLine(x.text) : x.text);
       if (x.gate) used.add(x.gate);
     };
     mine.forEach(x => put(x, silent || x.returning));
@@ -374,7 +375,7 @@ function typeCost(from, to, seed) {
   return costs.get(k);
 }
 function muteOrDelete(layers, keys, lanes, k, v, seed, span, shownText = x => x) {
-  const bare = it => shownText(it.text.replace(it.gateText || GATE, '')), mute = x => x.replace(/^[_S]?\$:/, '_$:');
+  const bare = it => shownText(it.text.replace(it.gateText || GATE, '')), mute = muteLine;
   const [ra, rz] = span(v.ret.bar), [pa, pz] = span(Math.max(0, ra - 1));
   // the lines of the track that sound in bars a to z, in their order (one line per text), without a fade out of the
   // section before (below 1 on the first two bars only: compileNow leaves it out of the code)
@@ -415,9 +416,9 @@ export function liftLanes(code, { gated = false } = {}) {
   // a pattern line and its continuation lines
   const groups = [];
   for (let i = 0; i < lines.length; i++) {
-    if (!/^[_S]?\$:/.test(lines[i])) { groups.push({ text: lines[i] }); continue; }
+    if (!LINE.test(lines[i])) { groups.push({ text: lines[i] }); continue; }
     let text = lines[i];
-    while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1]) && !/^\s*[_S]?\$:/.test(lines[i + 1])) text += '\n' + lines[++i];
+    while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1]) && !LINE.test(lines[i + 1])) text += '\n' + lines[++i];
     const lanes = [];
     const lifted = text.replace(gate, (all, n, mul) => (consts[n] ? (lanes.push(typeof mul !== 'string' ? bare(consts[n]) : `${bare(consts[n])} x ${bare(mul)}`), gates.add(n), '') : all)).replace(/\n[ \t]*(?=\n|$)/g, '');
     groups.push({ pattern: true, text: lifted, lanes: lanes.length ? lanes : null });

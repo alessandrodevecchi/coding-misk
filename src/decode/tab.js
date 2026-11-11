@@ -19,6 +19,7 @@ import { followSong } from '../song/crescendo.js';
 import { compileSong } from '../song/compile.js';
 import { FUNCTION_PRESETS } from '../song/writer.js';
 import { COMMENT_PRESETS } from '../song/comments.js';
+import { isLine } from '../song/line-names.js';
 
 const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const VIEWS = ['now', 'compact', 'track', 'sections'];
@@ -628,7 +629,7 @@ export function createDecodeTab({ root, app }) {
       standalone: c => copyOut(c, lc),
       buses: lc.buses, fns: lc.fns, build: null, ctl: C, doc: null, decode: true,
     };
-    const out = { at, code: shown, sg, lines: shown.split('\n').filter(l => /^\s*[_S]?\$:/.test(l)).length };
+    const out = { at, code: shown, sg, lines: shown.split('\n').filter(isLine).length };
     if (codeMemo.size > 400) codeMemo.clear();
     codeMemo.set(key, out);
     return out;

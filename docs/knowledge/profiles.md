@@ -55,6 +55,7 @@ Every control, its values and its default per profile. Texts come from the app's
 | `tracks` | `true`, `false` | `true` | `true` | `false` | Tracks (it: Tracce): The track names (// ===== bass =====) |
 | `notes` | `true`, `false` | `true` | `true` | `false` | Notes (it: Note): The section and pattern notes (// Intro · bars 1-8) |
 | `steps` | `true`, `false` | `true` | `true` | `false` | Step phrases (it: Frasi dei passi): The step phrases (// > …) and the phrase the narrator says |
+| `names` | `random`, `dollar`, `names` | `random` | `random` | `random` | no help text: described below |
 | `voice` | `true`, `false` | `true` | `false` | `false` | V:N code (it: Codice V:N): Voice: narrator: show its code in the panel; off: it still speaks, the code goes to the hidden code |
 | `spoken` | `true`, `false` | `true` | `false` | `false` | V:T code (it: Codice V:T): Voice: track: show its code in the panel; off: it still speaks, the code goes to the hidden code |
 | `highlights` | `false`, `true` | `false` | `false` | `true` | Lit notes (it: Note accese): In the code of videos and of the live picture the playing notes light up in time |
@@ -72,6 +73,8 @@ Every control, its values and its default per profile. Texts come from the app's
 | `pace` | `auto` automatic, `slow` slow, `medium` medium, `fast` fast | `auto` | `auto` | `auto` | Pace (it: Velocità): How many changes in the first minute. Slow: as before, sparse steps and long pauses. Medium: a step every 10 to 15 seconds. Fast: a step about every 8 seconds, small moves. With medium and fast the kick is whole within the first minute. The typing never rushes: a step that takes long to type comes later |
 | `development` | `auto` automatic, `by-type` by type, `as-written` as written, `masks` masks, `parameters` parameters only, `second-section` second section, `metamorphosis` metamorphosis | `auto` | `auto` | `auto` | Development (it: Sviluppo): In which order it grows. By type: drums, bass, pad, then the rest. As written: in the order the tracks come in the song. Masks: each instrument comes in, leaves and varies with its own mask. Parameters only: all come in at once, then filters, density, reverb and delay grow. Second section: new lines play alone with S$:, then all play. Metamorphosis: the whole song changes tempo, key and style, rewriting its lines one at a time |
 <!-- /generated -->
+
+`names` (line-names, prototype on `feat/82-line-names`): how each pattern line starts, Instrument name in the code options. `dollar` writes `$:`, `names` writes the instrument's name (`kick:`, `bass2:`, muted `_kick:`), `random` draws one of them from the song's id, so a song always looks the same. It changes only how the code looks: the growth, the steering and the written part's plan are measured on `$:` (`src/song/line-names.js`).
 
 Overrides saved before the Live coder growth used `natural` for what is now `gradual`. `migrateGrowth` moves them once (`PROFILE_STORE_VERSION` 2).
 

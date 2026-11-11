@@ -32,6 +32,7 @@ import { typingPlan, settleOthers, chainLines } from '../src/song/typing.js';
 import { hapsAt } from './mixer-checks.mjs';
 import { meterSteps } from '../src/music.js';
 import { energyOf } from '../src/endless/energy.js';
+import { MUTED_LINE } from '../src/song/line-names.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const WRITE = process.argv.includes('--write-fixtures');
@@ -532,7 +533,7 @@ const CHECKS = {
       const m = cmds.find(c => c.kind === 'mute'), rm = m && steer(x, [m]);
       if (rm && rm.commands.length) {
         const st = buildSteps(rm.song).find(s => s.by === 'listener' && s.mute === m.track);
-        if (st) { const code = liveCode(rm.song, AIR, { cols: () => 80 }).codeAt(st.at); assert(blockOf(code, rm.song, m.track).some(l => /^_\$:/.test(l)), `${x.id}: the muted line has no _$: at bar ${st.at}`); mutes++; }
+        if (st) { const code = liveCode(rm.song, AIR, { cols: () => 80 }).codeAt(st.at); assert(blockOf(code, rm.song, m.track).some(l => MUTED_LINE.test(l)), `${x.id}: the muted line has no _$: (or _name:) at bar ${st.at}`); mutes++; }
       }
       const vcmd = cmds.find(c => c.kind === 'volume'), rv = vcmd && steer(x, [vcmd]);
       if (rv && rv.commands.length) {

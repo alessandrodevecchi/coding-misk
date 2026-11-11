@@ -12,6 +12,7 @@ import { stripWidgets, installWidgets } from '../live/widgets.js';
 import { installAppWidgets } from '../widgets/app-widgets.js';
 import { EFFECTS, LIBRARY, LIBRARY_NAMES, nameOrder, NAMES } from './functions.js';
 import { hashString } from '../endless/random.js';
+import { LABEL_SPACE, isLine } from './line-names.js';
 
 export const FUNCTION_LEVELS = ['full', 'short', 'mixer', 'compact'];
 export const FUNCTION_OPTIONS = ['fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib', 'fnLanes'];
@@ -33,7 +34,8 @@ export const FUNCTIONS = FUNCTION_LEVELS;
 // besides Strudel's, and fails when one of them is a Strudel name)
 // (vox and melody: the decoded code's top line group, decode-refine D6; they evaluate to silence)
 export const HELPERS = ['chan', 'crunch', 'miskMix', 'vox', 'melody', ...LIBRARY_NAMES];
-const PATTERN = /^\s*[_S]?\$:\s*/;
+// (line-names: `$:` or a name; lineKey leaves the label out, so a line keeps its key under any name)
+const PATTERN = LABEL_SPACE;
 const NUM = /^-?\d*\.?\d+$/;
 // the calls of a chain: [{ name, args, text, ws }], ws the spaces after the call (a line break and its indent too)
 function calls(line) {
@@ -365,8 +367,8 @@ export function splitSpoken(code, keep = null) {
       // a unit: a line's quoting comment and the pattern lines after it (or a pattern line alone)
       let e = k + 1;
       if (/^\s*\/\//.test(body[k])) while (e < body.length && !/^\s*\/\//.test(body[e])) e++;
-      const unit = body.slice(k, e), pats = unit.filter(l => /^\s*[_S]?\$:/.test(l)), on = keep ? pats.filter(keep) : [];
-      if (on.length) { show.push(...unit.filter(l => !/^\s*[_S]?\$:/.test(l) || on.includes(l))); hide.push(...pats.filter(l => !on.includes(l))); }
+      const unit = body.slice(k, e), pats = unit.filter(isLine), on = keep ? pats.filter(keep) : [];
+      if (on.length) { show.push(...unit.filter(l => !isLine(l) || on.includes(l))); hide.push(...pats.filter(l => !on.includes(l))); }
       else hide.push(...unit);
       k = e;
     }

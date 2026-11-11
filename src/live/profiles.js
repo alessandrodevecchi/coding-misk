@@ -28,6 +28,9 @@ export const CONTROLS = {
   tracks: [true, false],
   notes: [true, false],
   steps: [true, false],
+  // line names (line-names): the label of each pattern line, `$:` or the instrument's name (`kick:`), drawn per song
+  // (Random, from the song's id) or always one of them; it changes only how the code looks, never what plays
+  names: ['random', 'dollar', 'names'],
   // the voices' code (voice-track-tuning D11, Options): "V:N code" (voice, the narrator's lines) and "V:T code"
   // (spoken, the voice track's lines); off, they play from the hidden code. Their defaults follow the build (codeDefaults)
   voice: [true, false],
@@ -54,18 +57,18 @@ export const CONTROLS = {
   development: ['auto', ...DEVELOPMENTS],
 };
 export const PROFILES = {
-  classic: { build: 'blocks', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, spoken: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
-  crescendo: { build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: false, spoken: false, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  classic: { names: 'random', build: 'blocks', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'sections', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: true, spoken: true, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  crescendo: { names: 'random', build: 'crescendo', growth: 'crescendo', duration: 'fitted', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'now', gen: 'standard', title: true, tracks: true, notes: true, steps: true, voice: false, spoken: false, highlights: false, wrap: false, fnBus: false, fnLevel: false, fnCrunch: false, fnVoice: false, fnSong: false, fnLib: false, fnLanes: false, typist: 'exact', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
   // Live coder (shown so since clear-names; the id stays switch in songs, recipes and storage); its comments are the
   // title only (radio-profiles 9.2): no track names, notes or phrases
-  switch: { build: 'crescendo', growth: 'natural', duration: 'free', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: false, notes: false, steps: false, voice: false, spoken: false, highlights: true, wrap: true, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true, fnLanes: true, typist: 'human', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
+  switch: { names: 'random', build: 'crescendo', growth: 'natural', duration: 'free', narrator: true, narrated: false, narratorStyle: 'auto', typing: 'normal', view: 'now', gen: 'idiomatic', title: true, tracks: false, notes: false, steps: false, voice: false, spoken: false, highlights: true, wrap: true, fnBus: true, fnLevel: true, fnCrunch: true, fnVoice: true, fnSong: true, fnLib: true, fnLanes: true, typist: 'human', mistakes: 'on', opening: 'auto', pace: 'auto', development: 'auto' },
 };
 export const PROFILE_IDS = Object.keys(PROFILES);
 // the controls that change only how the code looks, never the sound or the growth (radio-profiles 9.1): comments, technical
 // functions, the title, lit notes, line breaks, human typing and its mistakes. In the radio they apply to the song on air
 // from its next code edit; the others (build, growth, duration, shape, view, generator, narrator, narrated, narrator style, typing speed) from the
 // next song
-export const DISPLAY_CONTROLS = ['title', 'tracks', 'notes', 'steps', 'voice', 'spoken', 'highlights', 'wrap', 'fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib', 'fnLanes', 'typist', 'mistakes'];
+export const DISPLAY_CONTROLS = ['title', 'tracks', 'notes', 'steps', 'names', 'voice', 'spoken', 'highlights', 'wrap', 'fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib', 'fnLanes', 'typist', 'mistakes'];
 // the code options that also apply with the Live build off (profile-options): the song as written goes through the
 // live code when one of them is away from Classic's
 export const CODE_CONTROLS = DISPLAY_CONTROLS.filter(k => k !== 'typist' && k !== 'mistakes');

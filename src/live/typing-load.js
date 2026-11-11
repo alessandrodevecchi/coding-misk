@@ -4,6 +4,7 @@
 import { buildSteps } from '../song/build.js';
 import { meterSteps } from '../music.js';
 import { typingPlan, settleOthers, chainLines } from '../song/typing.js';
+import { isLine } from '../song/line-names.js';
 
 // seconds of one bar of the growth (the first section)
 export const barSeconds = song => { const s = song.sections[0]; return (meterSteps(s.meter || '4/4') / 4) * 60 / (s.bpm || 138); };
@@ -61,7 +62,7 @@ export function typingLoad(L, { seed = '', from = 1, to = Infinity } = {}) {
   // (codeLoad: the code with every voice-track line as written, voice-track-tuning D9)
   const memo = new Map(), codeAt = b => { if (!memo.has(b)) memo.set(b, (L.codeLoad || L.codeAt)(b)); return memo.get(b); };
   // reused-lines D3: the pattern lines shown at the steps before, for the typing to copy from (as L.earlier)
-  const seen = new Map(), show = c => { for (const l of chainLines(c)) if (/^\s*[_S]?\$:/.test(l)) { seen.delete(l); seen.set(l, true); } };
+  const seen = new Map(), show = c => { for (const l of chainLines(c)) if (isLine(l)) { seen.delete(l); seen.set(l, true); } };
   if (from > 1) for (const b of [...new Set(steps.map(x => x.at))].filter(b => b >= 1 && b < from).sort((a, b) => a - b)) show(codeAt(b));
   let prev = 0;
   show(codeAt(0));
