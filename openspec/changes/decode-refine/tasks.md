@@ -53,8 +53,8 @@ Two rounds (owner, 8 November). **Part 1** is done now: about 14 agent hours (11
 
 ### 8. Harmony and bass (about 3 h)
 
-- [ ] 8.1 Chord quality per section and root (design D5); verify at least 90 % right qualities on the radio seed.
-- [ ] 8.2 Bass octave range and the quiet-bass rule; verify the radio seed's bass in octave 2 and a 15-semitone span at most per section on the owner's vocal tracks (printed).
+- [x] 8.1 Chord quality per section and root (design D5); verify at least 90 % right qualities on the radio seed.
+- [x] 8.2 Bass octave range and the quiet-bass rule; verify the radio seed's bass in octave 2 and a 15-semitone span at most per section on the owner's vocal tracks (printed).
 
 ### 9. Top line and Lead part (about 7 h)
 

@@ -103,6 +103,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Decode: in Full, a section's main drum pattern is the majority of each step, and a variant must come back often.
 - Decode: in Live, the tempo and the beat are checked again after the first 8 bars with kicks, and the code restarts on the new grid.
 - Decode: stored analyses are made again once more for the new drum analysis.
+- Decode: in Full, a chord keeps the quality most bars of its section give its root.
+- Decode: in Full, the bass stays in one octave range per section and plays nothing where the bass is quiet.
+- Decode: a detuned bass under a kick is heard.
 - Decode: the code changes less often, in Live and in Full: a line waits a few bars between edits and changes only for a real musical difference.
 - Decode: the space bar only plays and pauses.
 - Decode: stored analyses are made again once, with a note in the tab.

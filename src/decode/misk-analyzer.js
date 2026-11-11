@@ -24,6 +24,8 @@ export const CLAP_RULE = { snare: 0.5, local: 1.3, seconds: 6, flat: 0.3 };
 export const HAT_RULE = { median: 0.5, bars: 4 };
 // level A's relock (D4): the tempo and the beat phase checked again on the first bars with kicks, this many
 export const RELOCK_BARS = 8;
+// the bass (D5): YIN's looser threshold for a bass that the usual one does not hear (a detuned unison)
+export const BASS_RULE = { loose: 0.35 };
 
 // ---------- FFT (radix 2, in place) ----------
 const ffts = new Map();
@@ -669,17 +671,22 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     const full = new Float64Array(12);
     for (let f = 0; f < done2; f++) { const tt = t2(f); if (tt < start + barSec * 0.04 || tt >= end - barSec * 0.04) continue; for (let c = 0; c < 12; c++) full[c] += chroma[f * 12 + c]; }
     const bestOf = x => { let best = null; for (const T of TEMPLATES) { const sc = cosSim(x, T.v) + (T.root === bassPc ? 0.06 : 0); if (!best || sc > best.s) best = { s: sc, T }; } return best; };
-    let chord = null, chordConf = 0;
+    let chord = null, chordConf = 0, third = false;
     if (full.some(x => x > 0)) {
       let best = bestOf(full);
       const ex = harm.length && v.some(x => x > 0) ? bestOf(v) : null;
       // (only major to minor: leaving the harmonics out removes major-third energy, so it never argues for major; the
       // minor third must hold a fair share of the root and beat the major third)
       const r0 = best.T.root, m3 = (r0 + 3) % 12, M3 = (r0 + 4) % 12;
-      if (ex && best.T.quality === 'maj' && v[m3] > 1.2 * v[M3] && v[m3] >= 0.3 * v[r0]) best = { s: best.s, T: TEMPLATES.find(T => T.root === r0 && T.quality === 'min') };
+      // (decode-refine D5: a quiet minor third, an eighth of the root, that beats the major third three times, as a stab
+      // under a distorted acid bass, only marks the bar `third`: a major chord whose third sits on a bass harmonic looks
+      // the same here, and level B decides with the key)
+      const fair = v[m3] > 1.2 * v[M3] && v[m3] >= 0.3 * v[r0], quiet = v[m3] > 3 * v[M3] && v[m3] >= 0.12 * v[r0];
+      if (ex && best.T.quality === 'maj' && fair) best = { s: best.s, T: TEMPLATES.find(T => T.root === r0 && T.quality === 'min') };
+      else if (ex && best.T.quality === 'maj' && quiet) third = true;
       chord = chordName(best.T.root, best.T.quality); chordConf = Math.round(Math.min(1, best.s) * 100) / 100;
     }
-    return { start: Math.round(start * 1000) / 1000, chord, chordConf, bass, drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, top: topOf(start, end, bass) };
+    return { start: Math.round(start * 1000) / 1000, chord, chordConf, ...(third ? { third: true } : {}), bass, drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, top: topOf(start, end, bass) };
   }
   // the top line of a bar (decode-refine D6): `up`, the median over its frames of the share of the tonal peaks'
   // energy between 400 and 2000 Hz (no harmonic of a bass note) in all of the frame's tonal energy (60 to 2100 Hz). A
@@ -712,15 +719,23 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       const s0 = (start + j * step) * decRate;
       const head = rmsOf(x, s0 + 0.1 * L, s0 + 0.5 * L), tail = rmsOf(x, s0 + 0.6 * L, s0 + 0.95 * L), before = rmsOf(x, s0 - 0.35 * L, s0 - 0.05 * L);
       bassTop = Math.max(bassTop, head);
-      const p1 = yin(x, Math.round(s0 + 0.1 * L), decRate, { w, threshold: 0.2, fmin: 30, fmax: 260 });
-      const late = s0 + 0.1 * L + w / 2, p2 = late + w + tmax < s0 + 0.95 * L ? yin(x, Math.round(late), decRate, { w, threshold: 0.2, fmin: 30, fmax: 260 }) : p1;
-      const m1 = p1 ? midiOf(p1.f0) : null, m2 = p2 ? midiOf(p2.f0) : null;
-      const voiced = m1 !== null && m2 !== null && Math.abs(m1 - m2) < 0.6 && head > 0.12 * bassTop;
+      // (YIN at 0.2, then, on the step after a kick, at BASS_RULE.loose: a detuned unison bass, a supersaw, under a kick's
+      // tail is periodic enough only for a looser threshold, decode-refine D5; elsewhere it found notes in a pad)
+      const late = s0 + 0.1 * L + w / 2, twice = th => { const a = yin(x, Math.round(s0 + 0.1 * L), decRate, { w, threshold: th, fmin: 30, fmax: 260 }), b = late + w + tmax < s0 + 0.95 * L ? yin(x, Math.round(late), decRate, { w, threshold: th, fmin: 30, fmax: 260 }) : a; return [a ? midiOf(a.f0) : null, b ? midiOf(b.f0) : null]; };
+      let [m1, m2] = twice(0.2);
+      const agree = (a, b) => a !== null && b !== null && Math.abs(a - b) < 0.6;
+      // (at the looser threshold one window alone may hold the pitch: the other sits in the kick's tail)
+      let loose = false;
+      if (!agree(m1, m2) && head > 0.12 * bassTop && kickAt(j - 1)) { const [l1, l2] = twice(BASS_RULE.loose); if (agree(l1, l2)) [m1, m2] = [l1, l2]; else if ((l1 === null) !== (l2 === null)) m1 = m2 = l1 ?? l2; loose = agree(m1, m2); }
+      const voiced = agree(m1, m2) && head > 0.12 * bassTop;
       // a kick alone: its low end dies within the step
       const kickOnly = kickAt(j) && tail < 0.45 * head;
       const midi = voiced ? Math.round((m1 + m2) / 2) : null;
       // a new note needs an attack, or a new pitch at about the same level (a kick's tail fades at its own pitch)
-      const fresh = voiced && !kickOnly && (head > 1.4 * before || (prev !== null && Math.abs(midi - prev) >= 1 && head > 0.7 * before));
+      // (or, D5, a pitch heard only at the looser threshold right after a kick: the kick's tail is louder than a short
+      // bass note and hides its attack; a kick's own tail is a clean sine the usual threshold hears, and never a note)
+      const underKick = loose && (out[j - 1] ?? null) === null && (out[j - 2] ?? null) === null;
+      const fresh = voiced && !kickOnly && (head > 1.4 * before || (prev !== null && Math.abs(midi - prev) >= 1 && head > 0.7 * before) || underKick);
       out.push(fresh ? midi : null);
       prev = m1 !== null ? Math.round(m1) : null;
       if (voiced && !kickOnly) heardPitches.add(midi);

@@ -235,6 +235,16 @@ if (process.argv[1] && process.argv[1].endsWith('decode-measure.mjs')) {
     for (const [g, list] of Object.entries(res)) for (const [id, r] of Object.entries(list)) console.log(`${g.padEnd(7)} ${id.padEnd(16)} tempo ${r.bpm} (truth ${r.bpmTruth}) downbeat ${r.downbeat}s key ${r.key ? `${['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'][r.key.root]} ${r.key.mode}` : '-'} ${r.keyOk ? 'ok' : 'WRONG'} chords ${r.chords} drums on/off ${r.drumsPresence} F1 bd ${r.f1.bd} cp ${r.f1.cp} hh ${r.f1.hh}${r.bass !== null ? ` bass ${r.bass}` : ''}${r.bounds ? ` bounds ${r.bounds.join(',')} (err ${r.boundsErr}, extra ${r.extra}) ending ${r.ending}` : ''}${r.essentiaTempo ? ` essentia tempo ${r.essentiaTempo.bpm} (confidence ${r.essentiaTempo.confidence}, tempo by ${r.engines.tempo})` : ''}${r.hard ? ' (new bench song)' : ''} · ${r.ms} ms`);
     if (!Object.keys(tls).length) console.log('timeline: no app song with its timeline in .cache/decode/wav: run tools/decode-export.cjs with the dev server');
     for (const [id, r] of Object.entries(tls)) for (const [lv, x] of Object.entries(r)) console.log(`timeline ${timelineLine(id, lv, x)}`);
+    // the owner's files (DECODE_OWNER_DIR), printed only: level B's bass span per section (decode-refine 8.2, at most 15
+    // semitones), with Essentia.js
+    if (process.env.DECODE_OWNER_DIR) {
+      const { readAudio } = await import('./decode-edits.mjs'), dir = process.env.DECODE_OWNER_DIR;
+      for (const f of fs.readdirSync(dir).filter(x => /\.(mp3|wav|flac|ogg|m4a|webm|mp4)$/i.test(x)).sort()) {
+        const m = await analyseFull(readAudio(path.join(dir, f)), { engine: nodeEssentia });
+        const spans = m.sections.map(s => { const n = m.bars.slice(s.start, s.start + s.bars).flatMap(b => (b.bass || []).filter(x => x !== null && x !== undefined)); return n.length ? Math.max(...n) - Math.min(...n) : '-'; });
+        console.log(`owner    ${f}: level B bass span per section (semitones) ${spans.join(',')}`);
+      }
+    }
     // the owner's files exported by the app with their timeline (DECODE_OWNER_DIR): level A as played, printed only
     if (process.env.DECODE_OWNER_DIR) {
       const { readAudio } = await import('./decode-edits.mjs'), dir = process.env.DECODE_OWNER_DIR;

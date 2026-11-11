@@ -24,7 +24,7 @@ import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
-import { analyseFull, pickTempo, barChords, settleMode } from '../src/decode/full.js';
+import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors } from '../src/decode/full.js';
 import { writeFull, inKey } from '../src/decode/writer.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
 import { followSong, crescendoSong } from '../src/song/crescendo.js';
@@ -381,7 +381,29 @@ if (process.argv.includes('--app')) {
   if (R) {
     check(R.B.rows.cp.falseHits <= 40, 'the radio seed: at most 40 false claps (flatness and the hats of the last seconds)', `${R.B.rows.cp.falseHits}`);
     check(R.B.perSection.every(n => n <= 2), 'the radio seed in level B: at most 2 drum patterns per section (the per-step majority)', R.B.perSection.join(','));
+    check(R.B.chordQuality >= 0.9, 'the radio seed in level B: at least 90 % of the chords with the right quality', `${R.B.chordQuality}`);
+    check(R.B.bassBars >= 0.5 * R.B.drumBars && R.B.bassPitch >= 0.9 && R.B.bassOctaveErrors <= 0.05, 'the radio seed in level B: its supersaw bass decoded, in its own octave', `bass in ${R.B.bassBars} bars, pitch ${R.B.bassPitch}, octave errors ${R.B.bassOctaveErrors}`);
   }
+}
+// decode-refine group 8 (D5): steady qualities, the bass's octave range, quiet bass bars, quiet minor thirds
+{
+  const bar = (chord, conf, bass = null, lv = 1) => ({ chord, chordConf: conf, bass: bass || Array(16).fill(null), level: { bass: lv } });
+  const q = ['Am', 'A', 'Am', 'Am', 'F', 'A', 'Am', 'F'].map(c => bar(c, 0.7));
+  steadyQualities(q, [{ start: 0, bars: 8 }]);
+  check(q.map(b => b.chord).join(' ') === 'Am Am Am Am F Am Am F', 'a chord\'s quality follows the section\'s majority for its root', q.map(b => b.chord).join(' '));
+  const c = ['A', 'Am', 'A', 'Am', 'Am', 'Am'].map((x, i) => bar(x, i === 0 || i === 2 ? 0.9 : 0.7));
+  steadyQualities(c, [{ start: 0, bars: 6 }]);
+  check(c[0].chord === 'A' && c[2].chord === 'A', 'the other quality stays where it wins clearly in two bars', c.map(b => b.chord).join(' '));
+  const t = ['A', 'A', 'Am', 'Am'].map(x => bar(x, 0.7));
+  steadyQualities(t, [{ start: 0, bars: 4 }], undefined, { root: 9, mode: 'minor' });
+  check(t.every(b => b.chord === 'Am'), 'a tie goes to the key\'s quality', t.map(b => b.chord).join(' '));
+  const notes = n => Array.from({ length: 16 }, (_, j) => (j % 4 === 0 ? n : null));
+  const bb = [bar('Am', 0.9, notes(33)), bar('Am', 0.9, notes(45)), bar('Am', 0.9, notes(64)), bar('Am', 0.9, notes(33), 0.1), bar('Am', 0.9, notes(21))];
+  bassRange(bb, [{ start: 0, bars: 5 }]);
+  check(bb[0].bass[0] === 33 && bb[1].bass[0] === 45 && bb[2].bass[0] === 40 && bb[3].bass.every(x => x === null) && bb[4].bass[0] === 33, 'the bass keeps one octave range per section (a riff\'s octave jump stays, a note far off moves by octaves) and a quiet bass bar has no notes', bb.map(b => b.bass[0]).join(','));
+  const qm = [{ chord: 'A', third: true }, { chord: 'C', third: true }, { chord: 'A' }];
+  quietMinors(qm, { root: 9, mode: 'minor' });
+  check(qm.map(b => b.chord).join() === 'Am,C,A', 'a quiet minor third turns a chord minor only where the key holds that minor chord', qm.map(b => b.chord).join());
 }
 // a tapped or stored tempo is never moved by the relock (decode-refine D4)
 {

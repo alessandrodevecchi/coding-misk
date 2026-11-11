@@ -3169,3 +3169,23 @@ Gruppi 7-10 di `decode-refine` approvati dal proprietario oggi. Gruppo 7 (D4), m
 - Anche: clap F1 di luci-rosse 0,39 → 0,67 (la spec chiede 0,75, il compito no); radio-bench-c clap 0,89 → 0,97, hat 0,92 → 0,94; decode-test-long e decode-test-arp nel livello A tornano in fase (cassa 0 e 0,30 → 1 e 0,97). La Luci Rosse MP3 del proprietario: battere a 25 ms alla battuta 12 (il ritardo dell'MP3 compreso). Il basso della radio (supersaw) resta non decodificato: è il gruppo 8.
 - **Somiglianza (livello B, `decode-similarity.cjs`):** luci-rosse ritmo basso 0,54 → 0,75, medio 0,39 → 0,57; acid ritmo basso 0,62 → 0,88, medio 0,28 → 0,61. Scendono la brillantezza di luci-rosse (0,67 → 0,59) e di acid (0,74 → 0,50): la batteria ora è giusta ma suona sull'808 (il kit è del gruppo 10). L'arco di decode-test-124, -90 e -174 fallisce contro lo snapshot anche con il codice di partenza (4493a3b) in questo worktree: sono brani piatti, la correlazione del volume per battuta segue l'export degli originali. Snapshot non aggiornato.
 - **Prove nel browser:** `tools/check-decode.cjs --refine` (con il nuovo caso del riaggancio su luci-rosse), la radio ndikot aperta e suonata nel tab (176 BPM alla battuta 10, 29 ms). `check:decode --app` 180 su 180.
+
+## 2026-11-11: Decodifica, parte 2, gruppo 8: armonia e basso (feat/91-decode-part-2, #91)
+
+- **Croma più nitido per la terza (prima di 8.1):** su luci-rosse la qualità sbagliata veniva dalla terza: il croma senza le armoniche del basso mostra una terza minore debole (un ottavo della radice) e nessuna maggiore, sotto il basso acido distorto. misk-analyzer segna questa battuta (`third`), e il livello B la rende minore quando la tonalità ha quell'accordo minore e non il maggiore (`quietMinors`). Applicare la regola direttamente nel livello A rompeva synth-174 (la terza vera di Do cade su un'armonica del basso e sparisce): perciò decide la tonalità. Il croma della misura di somiglianza non è stato toccato.
+- **8.1, qualità per sezione e radice** (`steadyQualities`, `HARMONY_RULE`): la maggioranza della sezione per quella radice, salvo l'altra qualità con confidenza sopra 0,8 in almeno due battute; un pareggio va alla qualità della tonalità. Nota: la confidenza degli accordi è quasi sempre sopra 0,8, quindi la regola del design cambia poco da sola; il pareggio con la tonalità fa il resto.
+- **8.2, il basso** (`bassRange`): un'ottava per sezione di 15 semitoni, la finestra che tiene più note (non mediana ± 7 come nel design: la mediana piegava il riff di luci-rosse che salta di ottava, errori d'ottava da 0 a 0,27), le note fuori spostate di ottave; nessuna nota nelle battute con il basso sotto il 20 % della più forte della sezione. Il basso supersaw della radio ora si sente: YIN con una soglia più larga (0,35, `BASS_RULE`) solo nel passo dopo una cassa, una finestra sola basta, e la nota parte anche senza attacco sotto la coda della cassa. Senza queste due condizioni la soglia larga trovava note nel pad di decode-test-124 (sezione falsa alla battuta 5) e nella coda delle casse sintetiche.
+- `ANALYSIS_VERSION` 4.
+
+| Misura | Prima | Dopo | Obiettivo |
+| --- | --- | --- | --- |
+| radio-bench-c qualità degli accordi (B) | 1 | 1 | almeno 0,9 |
+| radio-bench-c basso (B) | mai decodificato | 114 battute, nota 0,995, errori d'ottava 0,005 | nell'ottava giusta |
+| brano vocale A, ampiezza del basso per sezione | fino a 33 semitoni | al massimo 14 | al massimo 15 |
+| brano vocale B, ampiezza del basso per sezione | fino a 36 | al massimo 15 | al massimo 15 |
+| luci-rosse qualità degli accordi (B con Essentia.js / solo misk-analyzer) | 0,25 / 0,25 | 0,63 / 0,25 | (nessuno) |
+
+- Il basso della radio nella verità è G1, A1, B1 (ottava 1 nei nomi di Strudel): il compito dice «ottava 2»; il codice ora scrive `g1 a1 b1` come l'originale, e lo conto come raggiunto. Da confermare con il proprietario.
+- Accordi dei brani di prova con Essentia.js: decode-test-174 0,66 → 0,75, long 0,91 → 0,92, gli altri uguali; senza Essentia.js 174 0,56 → 0,59, arp 0,72 → 0,69.
+- **Somiglianza:** radio-bench-c croma del basso 0,90, ritmo basso 0,69; luci-rosse arco 0,49 → 0,66. Contro lo snapshot falliscono ancora la brillantezza di acid e luci-rosse (gruppo 10), l'arco di decode-test-124 e il ritmo alto di luci-rosse (0,41 → 0,35; 0,39 dopo il gruppo 7, varia da un export all'altro).
+- **Prove:** `check:decode --app` 187 su 187, `tools/check-decode.cjs --refine`, la radio aperta in Full nel browser (basso `g1 a1 b1`, accordi `G A Bm Bm`, nessun errore).
