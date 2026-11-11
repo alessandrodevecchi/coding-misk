@@ -756,6 +756,29 @@ const CHECKS = {
     assert(n >= 2, `only ${n} songs with a long growth`);
     console.log(`      risers pressed 1.6 bars before the second phrase: ${seen.join(', ')}`);
   },
+  '#82: a riser pressed inside a long Crescendo growth lands within two phrases of the press, on the grown song'() {
+    const seen = [];
+    grown().cres.forEach((x, i) => {
+      const g0 = x.song, ph = x.plan.phrase;
+      if (!g0.crescendo || g0.crescendo.growth < 8 * ph || seen.length >= 6) return;
+      const rec = recipeOf(i * 5 + 1, 'crescendo'), g = createSession(RECIPES, rec.seed).next(rec.options);
+      const c0 = { seed: rec.seed, song: g.song, plan: g.plan, opts: g.opts, g0 };
+      // the owner's case: pressed early in the growth (bar 30), and half way through it
+      for (const q of [30.4, Math.floor(g0.crescendo.growth / 2) + 0.4]) {
+        const at = airBoundaries('riser', q, c0.plan, g0)[0];
+        assert(at !== undefined, `${g0.id}: no boundary for a riser pressed on ${q}`);
+        const r = steerOnAir({ grown: g0, song: c0.song, plan: c0.plan, opts: c0.opts, commands: [{ kind: 'riser', bars: 'auto', dir: 'up', sound: 'noise', q, at, at0: at, pend: true, id: 1 }], seed: c0.seed, n: 0, ctx: { profile: 'crescendo', styles: STYLES, phrase: ph } });
+        const c = r.commands[0];
+        assert(c && c.air, `${g0.id}: the riser pressed on ${q} (Crescendo growth ${g0.crescendo.growth}) was not placed on the grown song: ${JSON.stringify(c)}`);
+        assert(c.air.start >= q + 1.5 && c.air.end <= q + 2 * ph, `${g0.id}: riser pressed on ${q} placed ${c.air.start}-${c.air.end}, not within two phrases`);
+        const riser = r.song.tracks.find(t => t.type === 'riser');
+        assert(riser && soundAt(r.song, c.air.start).tracks.some(t => t.id === riser.id), `${g0.id}: no riser heard on ${c.air.start}`);
+        seen.push(`${g0.id} ${q}→${c.air.start}-${c.air.end}`);
+      }
+    });
+    assert(seen.length >= 2, `only ${seen.length} Crescendo presses with a long growth`);
+    console.log(`      Crescendo risers: ${seen.join(', ')}`);
+  },
   'radio fixtures: Classic sessions rebuild the same items'() {
     for (const { name, recipe } of CLASSIC) {
       const a = sessionItems(RECIPES, recipe, SONGS), b = sessionItems(RECIPES, recipe, SONGS);

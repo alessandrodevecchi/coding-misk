@@ -3219,3 +3219,13 @@ Ramo `docs/91-docs-refresh` da `feat/44-themed-checks` (ef85658). Solo testi: ne
 - **11.1:** fatta la parte dei gruppi 6-9, scritto in `tasks.md`; resta aperta per il gruppo 10 (suoni per misura), che documenta l'altro agente.
 - **Trovato, non corretto:** la scheda Uscita live della Guida nomina un programma di cattura per nome; il README pubblico ha ancora la sezione «Idee e prossimi passi» superata (voci, live coding e video brevi esistono già) e link a un sito video nella storia del progetto: da decidere con il proprietario.
 - **Prove:** `check:guide`, `check:knowledge`, `check:decode`, `check:live-code`, `npm run build` prima di ogni commit; la Guida aperta nel browser (porta 5330) in inglese e italiano, testo nuovo presente, nessun errore della pagina.
+
+## 2026-11-12 riser nei brani che crescono: spec e controllo Crescendo (#82)
+
+Ramo `fix/82-riser-grown-songs` da `ef85658`.
+
+- **Stato:** la nota del proprietario del 7 novembre (riser che in un brano lungo entra quasi alla fine) era già corretta in `15511b9` (7 novembre, in `develop`): dentro la crescita il riser va sul brano cresciuto, entro due frasi dalla pressione (`riserAirTarget`, `riserAir`, `airRiser`). Mancavano la spec e un controllo sui brani Crescendo (quello esistente prova solo Live coder).
+- **Spec:** change OpenSpec `riser-grown-songs` (proposta, delta di `endless/steering` sul requisito «Riser row», task).
+- **Controllo:** nuovo caso in `check:radio-profiles`: riser premuti alla battuta 30,4 e a metà di crescite Crescendo di almeno 8 frasi finiscono entro due frasi sul brano cresciuto e si sentono (es. 30,4 → 32-40, 56,4 → 64-72). Con il posizionamento sul brano cresciuto spento il caso fallisce (il riser va per la strada della forma scritta, confine 40 e oltre).
+- **Tooltip:** il riser dice in inglese e italiano che, in un brano che cresce, mentre cresce arriva entro due frasi.
+- **Resta aperto (piccolo, non corretto):** il motivo «late» del pulsante su un brano cresciuto si calcola sulla forma scritta (`riserTarget`); verso la fine della crescita potrebbe disabilitare il pulsante anche se sul brano cresciuto il riser ci starebbe, e un riser che non trova posto entro due frasi viene lasciato cadere senza avviso.
