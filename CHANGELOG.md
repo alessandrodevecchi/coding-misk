@@ -86,6 +86,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Presets Strum (country guitar), Swell (ambient pad) and Two-feel (jazz bass).
 - Radio: a countdown badge next to Extend until it enters ("Extend +16 s · in 24 s").
 - `npm run check:steer-memo`: the radio steering with kept results compared with a full steering.
+- `npm run check:added-play`: tracks added with the radio console's "+" play every bar of the phrase they enter.
 - `tools/steer-bench.mjs`: steering time per console press.
 - One-row pianoroll looks: a pianoroll widget whose hits fall on one row draws thin ticks in a low strip when every hit is as loud, and shows accents by bar height, transparency or both, in the editor, on the stage panels and in videos.
 - Settings "One-row pianoroll, equal volume" (Thin, Full) and "One-row pianoroll, varying volume" (Height, Transparency, Both, Random) in the Code widgets card.
@@ -149,6 +150,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Radio: a track added with "+" on the half-phrase start just before a break or a charge plays its whole first phrase instead of leaving with the drums after 4 bars.
 - Stage widgets: after a song change, Monitor and the side panels show the new song's panels; no hit grid space is kept from the song before, and the hit grid keeps no rows of earlier songs.
 - Video on the stage: a seek in Decode keeps the last picture until the new one shows, instead of the normal look for a moment.
 - Backup: the default backup file is written compact like the one with all Decode analyses, so the two differ only by the analyses.
