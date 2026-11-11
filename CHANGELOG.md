@@ -7,6 +7,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Decode: All, Audio and Video filters in the library list, with the count of each, remembered and followed by Autoplay, Previous and Next.
 - Decode: a music note or video icon on every row of the library list and of mixtapes, and a "no sound" mark on videos without sound.
 - Decode: "Another file" opens a panel with "Choose a file…", the recent tracks and the files of the user's folders in one list; the empty tab shows the same list.
 - Decode: Add folder (Chrome, Edge), with subfolders, up to 2000 files per folder, the browser's permission asked once per visit, and a video icon for video files.
@@ -120,6 +121,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Decode: the library list keeps its scroll on Select, a tick, the Add to mixtape menu and Cancel; a new order starts it at the top like a new chip or kind.
 - Decode: in Full, Essentia.js's tempo is also taken from a confidence of 2.0 when the app's own tempo agrees, so a borderline track no longer changes the tempo's source from one run to the next.
 - Decode: a video without sound plays in silence for its length, with a placeholder in the code column, instead of doing nothing.
 - Decode: a file of the library that cannot open gives a note in the panel and no longer stops the open track.

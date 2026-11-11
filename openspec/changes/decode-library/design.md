@@ -93,6 +93,8 @@ Applied (implementation note): a folder chip or an order chosen in the panel whi
 
 Applied (owner test, 11 November): one function of the tab opens a row of a context with the skips (`openWithSkips`): it is used by Autoplay's end, Previous, Next and a mixtape's Play; rows "not found" or waiting are skipped by `nextOf` and `prevOf` without being opened (a video without sound plays), a row that fails when opened is added to the context's skipped rows and the next one is tried; the names of the skipped rows go into one note; with no playable row left the tab stops with a note (the skipped rows count as missing, so a mixtape with repeat ends instead of looping).
 
+Applied (owner, 11 November): a kind filter (`kind`: all, audio, video; a recent track counts by the record's video flag) is part of the context like the chip: the list remembers it with the chip and the order in `coding-misk-decode-list`, a kind picked while a list track plays becomes the context's kind, and Autoplay, Previous and Next step through the rows of that kind. Its counts come from the rows already built (one pass over them per chip and search), never from the files.
+
 ### D9. Preparation
 
 `prepareAt(duration, now)` returns the file time to start: `max(0, duration - 30)`. At that time, with Autoplay on and a next row, `autoplay.js`:
