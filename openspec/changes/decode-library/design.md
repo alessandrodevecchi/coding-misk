@@ -73,6 +73,8 @@ A decode record is keyed by the file's fingerprint, which needs three slices of 
 
 The panel opens over the tab panel (a positioned card below the file row, `max-height: 70vh`), with a close button and Escape. At 400 px it takes the full width of the tab panel. Top: "Choose a file…", "Add folder", search, order (Name / Recent), Autoplay switch, the chips row (All, one chip per folder with lock or ×, scrolling sideways inside itself). Then a segmented switch Tracks / Mixtapes.
 
+Applied (implementation note): Remove shows on every row with a stored analysis (a recent row, or a folder file decoded before); on a folder file it removes the analysis and the mark, the row stays.
+
 Rows have a fixed height (32 px, 40 px at phone width) and the list renders only the visible rows plus a margin (simple windowing), so 4000 rows cost about 30 nodes. Search is normalised once (lower case, accents removed) and filtered on input with a 60 ms debounce. Row: video icon if any, name (ellipsis), folder (muted, ellipsis), mark. ◆ and ◇ are text glyphs, coloured with the accent token, with a tooltip "Full analysis stored" / "Live analysis stored".
 
 Themes: tokens only; the hardware theme draws the panel like its other cards, the marks as small amber LEDs' colour; the light theme passes `check:light-theme` contrast rules.
@@ -84,6 +86,8 @@ Themes: tokens only; the hardware theme draws the panel like its other cards, th
 ### D8. The context and the next track
 
 When a row opens, the tab stores `context = { kind: 'list', chip, search, order, key }` or `{ kind: 'mixtape', id, row }`, where `key` identifies the row (`folderId/path` or a record `fp`). `nextOf(context, rows)` in `library.js` rebuilds the list with that chip, search and order, finds `key` and returns the next row that is not "not found" or waiting; for a mixtape it returns the next row, wrapping when repeat is on. A row missing from the rebuilt list (renamed meanwhile) continues from the position it had. "Choose a file…" and a drop set `context = null` (no next track).
+
+Applied (implementation note): a folder chip or an order chosen in the panel while a list track plays becomes the context's chip or order (the spec scenario "One at a time": a new chip drops the prepared track and prepares the new next one); the search typed meanwhile does not change it. A row that fails to open while Autoplay, Previous or Next go through a list is skipped until another list opens.
 
 ### D9. Preparation
 
@@ -100,6 +104,8 @@ When a row opens, the tab stores `context = { kind: 'list', chip, search, order,
 ### D10. Hand-over
 
 The playing original's end time on the audio clock is known (`createOriginal` start time plus remaining length). When ready, the next original's source is started at exactly that time, and the code of the next track starts through the existing `play(0)` path with the prepared worker as the tab's worker and its first model: the code column is cleared and starts from the new track's first lines, the original plays alone until the first downbeat as today. The tab's `cur`, title and stage swap at that moment. The current `frame()` end test (`stop`, `app.ended()`) runs only when there is no next track.
+
+Applied (implementation note): the code's start time is set by Strudel's scheduler when it evaluates, not by the tab, so the hand-over starts the code a little before the end (the measured scheduler delay plus 40 ms) and starts the next original at the end time with the offset the code's clock has already passed. Measured on generated tracks: no gap (0 to 11 ms), 40 to 56 ms of the next track's start skipped, the original and the code in step. With Next (D15) the end time is "now".
 
 When not ready at the end: silence, a status line "Next: <name>…" with the growing mark; when ready, it starts at once; after 3 seconds the original starts (if decoded) and the code joins when `takeModel` finds the tempo, which is the existing path for a track whose tempo is not locked yet. A next track that fails is skipped with a toast and the next one is tried at once (not prepared ahead); after the list ends the tab stops.
 
