@@ -6057,15 +6057,15 @@ function stageSectionInfo(cyc) {
 // (for the checks, until a folder exists: a list of files that stand in for the stage video folders)
 let svTestFiles = null;
 const svFiles = () => svTestFiles || (svFolders ? svFolders.playable() : []);
-// the Decode track with a video track, while the Decode track counts as the player (D3)
+// the Decode track with a video track, while the Decode track counts as the player: open in Decode, or playing (D3)
 const svTrack = () => {
-  if (!(decodeTab && decodeTab.open && (mode === 'decode' || decodeTab.playing))) return null;
+  if (!decodeHere()) return null;
   const f = decodeTab.videoFile;
   return f ? { key: `${f.name}|${f.size}|${f.lastModified}`, file: f, time: () => decodeTab.fileNow(), playing: decodeTab.playing } : null;
 };
 // the song on the stage, for one stage video per song (D5): the Decode track, the radio's song on air, the song in Compose
 const svSong = () => {
-  if (decodeTab && decodeTab.open && (mode === 'decode' || decodeTab.playing)) { const f = decodeTab.file; return f ? `decode:${f.name}|${f.size}` : 'decode'; }
+  if (decodeHere()) { const f = decodeTab.file; return f ? `decode:${f.name}|${f.size}` : 'decode'; }
   if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir]; return it ? `radio:${it.id}` : 'radio'; }
   // Compose: the song playing, else the song open
   const sg = isPlaying() ? song : null;
@@ -6078,7 +6078,7 @@ const svNext = () => {
 };
 // the open song's own look (D2): in the radio the song on air, in Decode none
 const ownLook = () => {
-  if (decodeTab && decodeTab.open && (mode === 'decode' || decodeTab.playing)) return null;
+  if (decodeHere()) return null;
   if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir]; return it && it.song ? it.song.look : null; }
   return T.look;
 };

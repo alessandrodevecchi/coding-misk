@@ -23,9 +23,9 @@ Estimate: about 25 agent hours (22 to 30), in the order below: the stage layer w
 
 ## 3. The Decode track video (about 3 h)
 
-- [ ] 3.1 Track video source (D3): the Decode file when the track counts as the player and `probe` finds a video track; the time from `decodeTab.fileNow()`; the last frame past the picture's end; Previous, Next and Autoplay's hand-over change the picture (about 1.5 h).
-- [ ] 3.2 A video without sound on the silent clock (from `fix/91-library-silent-video`) shows its picture for its length (about 0.5 h).
-- [ ] 3.3 Browser check: a video file in Decode (seek within 0.25 s, pause, Next to an audio file shows a stage video), a video without sound in a mixtape, another look decodes no picture, the master output equal with and without Video (about 1 h).
+- [x] 3.1 Track video source (D3): the Decode file when the track counts as the player and `probe` finds a video track; the time from `decodeTab.fileNow()`; the last frame past the picture's end; Previous, Next and Autoplay's hand-over change the picture (about 1.5 h).
+- [x] 3.2 A video without sound on the silent clock (from `fix/91-library-silent-video`) shows its picture for its length (about 0.5 h).
+- [x] 3.3 Browser check: a video file in Decode (seek within 0.25 s, pause, Next to an audio file shows a stage video), a video without sound in a mixtape, another look decodes no picture, the master output equal with and without Video (about 1 h).
 
 ## 4. The session video (about 1.5 h)
 

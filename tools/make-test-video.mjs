@@ -13,6 +13,10 @@
 //   blue.mp4      640 × 360, 30 fps, 6 s, H.264 with a tone
 //   tall.mp4      360 × 640, 30 fps, 4 s, H.264 (9:16) with a tone
 //   silent.mp4    640 × 360, 30 fps, 5 s, H.264, no audio track
+//   track.mp4     640 × 360, 30 fps, 32 s, H.264 with a generated song in AAC (tools/decode-audio.mjs): a video file
+//                 for Decode, its picture on the stage while Decode plays it
+//   short.mp4     3 s of picture and 10 s of the same song: the picture ends before the sound
+//   track.wav     the same song alone, an audio file for Decode
 //   broken.mkv    random bytes: a file no browser can play
 //   uhd.mp4       3840 × 2160, 30 fps, 4 s, H.264 (only with --4k)
 import { spawn } from 'node:child_process';
@@ -48,12 +52,12 @@ export function drawFrame(w, h, rgb, n, fps) {
   return px;
 }
 
-function encode(file, { w, h, fps = 30, seconds, rgb, tone = 0, codec = 'h264' }) {
+function encode(file, { w, h, fps = 30, seconds, rgb, tone = 0, codec = 'h264', wav = null, shortest = true }) {
   return new Promise((ok, fail) => {
     const vcodec = codec === 'vp9' ? ['-c:v', 'libvpx-vp9', '-b:v', '600k', '-deadline', 'realtime', '-cpu-used', '8'] : ['-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-g', String(fps)];
-    const audio = tone ? ['-f', 'lavfi', '-i', `sine=frequency=${tone}:sample_rate=48000:duration=${seconds}`] : [];
-    const acodec = tone ? (codec === 'vp9' ? ['-c:a', 'libopus', '-b:a', '96k', '-af', 'volume=6dB'] : ['-c:a', 'aac', '-b:a', '128k', '-af', 'volume=6dB']) : ['-an'];
-    const p = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${w}x${h}`, '-r', String(fps), '-i', 'pipe:0', ...audio, ...vcodec, ...acodec, '-shortest', file], { stdio: ['pipe', 'inherit', 'inherit'] });
+    const audio = wav ? ['-i', wav] : tone ? ['-f', 'lavfi', '-i', `sine=frequency=${tone}:sample_rate=48000:duration=${seconds}`] : [];
+    const acodec = wav ? ['-c:a', 'aac', '-b:a', '160k'] : tone ? (codec === 'vp9' ? ['-c:a', 'libopus', '-b:a', '96k', '-af', 'volume=6dB'] : ['-c:a', 'aac', '-b:a', '128k', '-af', 'volume=6dB']) : ['-an'];
+    const p = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${w}x${h}`, '-r', String(fps), '-i', 'pipe:0', ...audio, ...vcodec, ...acodec, ...(shortest ? ['-shortest'] : ['-t', '10']), file], { stdio: ['pipe', 'inherit', 'inherit'] });
     p.on('error', fail);
     p.on('close', c => (c === 0 ? ok() : fail(new Error(`ffmpeg exited ${c} for ${file}`))));
     (async () => {
@@ -83,6 +87,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     await encode(f, o);
     console.log(`wrote  ${f} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
   }
+  // a song for Decode: the repository's generated test music
+  const wav = join(OUT, 'track.wav');
+  if (!existsSync(wav) || FORCE) {
+    const { renderSong, writeWav } = await import('./decode-audio.mjs');
+    const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' };
+    writeWav(wav, renderSong({ bpm: 124, bars: 16, lead: 0.3, seed: 7, chords: ['Am', 'F', 'C', 'G'], drums: D, bass: 'x..x..x...x.x...' }).pcm);
+    console.log(`wrote  ${wav}`);
+  }
+  const track = join(OUT, 'track.mp4');
+  if (!existsSync(track) || FORCE) { await encode(track, { w: 640, h: 360, seconds: 32, rgb: [180, 90, 40], wav }); console.log(`wrote  ${track}`); }
+  const short = join(OUT, 'short.mp4');
+  if (!existsSync(short) || FORCE) { await encode(short, { w: 640, h: 360, seconds: 3, rgb: [60, 160, 160], wav, shortest: false }); console.log(`wrote  ${short}`); }
   const bad = join(OUT, 'broken.mkv');
   if (!existsSync(bad) || FORCE) { const b = Buffer.alloc(64 * 1024); for (let i = 0; i < b.length; i++) b[i] = (i * 2654435761) >>> 24; writeFileSync(bad, b); console.log(`wrote  ${bad}`); }
 }

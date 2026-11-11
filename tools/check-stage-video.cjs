@@ -26,7 +26,7 @@ const note = (name, extra) => console.log(`note  ${name}${extra ? ` (${extra})` 
 const shot = async (page, name, el = '#stagewrap') => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await page.locator(el).screenshot({ path: path.join(SHOTS, name) }); };
 const median = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 
-if (!fs.existsSync(path.join(VID, 'uhd.mp4'))) execFileSync('node', ['tools/make-test-video.mjs', '--4k'], { stdio: 'inherit' });
+if (!['uhd.mp4', 'track.mp4', 'short.mp4'].every(f => fs.existsSync(path.join(VID, f)))) execFileSync('node', ['tools/make-test-video.mjs', '--4k'], { stdio: 'inherit' });
 const FILE_RGB = { red: [200, 40, 50], green: [40, 170, 70], blue: [40, 80, 200], tall: [190, 150, 30], silent: [140, 60, 170], uhd: [30, 150, 160] };
 
 async function open(browser, store = {}, { width = 1400, height = 950 } = {}) {
@@ -575,6 +575,70 @@ const play = async page => { if (!(await page.evaluate(() => document.querySelec
       check(/Chrome|Edge/.test(txt) && !(await p2.isVisible('#sv-add')) && await p2.isVisible('[data-sv-size="fit"]'), 'no folder picker: the note and the size mode only', txt.slice(0, 120));
       await c2.close();
     }
+  }
+
+  // ---------- track: the Decode file's picture (D3, D4, spec decode/playback) ----------
+  if (ONLY.includes('track')) {
+    const T = page => page.evaluate(() => { const v = globalThis.codingMiskStageVideo.layer.element, d = globalThis.codingMiskDecode; return { el: v ? v.currentTime : null, paused: v ? v.paused : null, file: d.fileNow(), playing: d.playing, cur: globalThis.codingMiskStageVideo.state().cur, drawn: globalThis.codingMiskStageDrawn }; });
+    const openDecode = async (page, f) => {
+      await page.click('[data-mode="ascolta"]').catch(() => {}); await page.click('[data-tab="decode"]'); await sleep(400);
+      await page.setInputFiles('#dc-file', path.join(VID, f));
+      for (let i = 0; i < 80; i++) { await sleep(250); const s = await page.evaluate(() => globalThis.codingMiskDecode.state()); if (s.title && !(s.status && s.status.kind === 'busy')) return s; }
+      return null;
+    };
+    const peaks = {};
+    for (const l of ['palco', 'video']) {
+      const { page, ctx, errors } = await open(browser, { 'coding-misk-look': l });
+      await useFiles(page, ['green.mp4', 'blue.mp4']);
+      await tapOutput(page);
+      const s0 = await openDecode(page, 'track.mp4');
+      check(!!s0, `${l}: the video file opens in Decode`);
+      if (l === 'pixel') continue;
+      if (l === 'video') {
+        await sleep(800);
+        let t = await T(page);
+        check(t.cur && t.cur.kind === 'track', 'Decode opens a video file: the stage takes its picture, not a stage video', JSON.stringify(t.cur));
+        await shown(page);
+      }
+      await page.evaluate(() => globalThis.codingMiskDecode.play()); await sleep(500); await outputPeak(page);
+      await sleep(6000);
+      peaks[l] = await outputPeak(page);
+      if (l === 'video') {
+        let t = await T(page);
+        check(t.playing && !t.paused && Math.abs(t.el - t.file) < 0.25, 'playing: the picture follows the file time heard', `video ${t.el.toFixed(2)} s, file ${t.file.toFixed(2)} s`);
+        await page.evaluate(() => globalThis.codingMiskDecode.seek(20)); await sleep(1200);
+        t = await T(page);
+        check(Math.abs(t.el - t.file) < 0.25 && t.file > 20, 'a seek: the picture at the same time within 0.25 s', `video ${t.el.toFixed(2)} s, file ${t.file.toFixed(2)} s`);
+        await page.evaluate(() => globalThis.codingMiskDecode.pause()); await sleep(800);
+        t = await T(page);
+        check(t.paused && !t.playing && Math.abs(t.el - t.file) < 0.1, 'pause: the picture stops on the frame heard', `video ${t.el.toFixed(2)} s, file ${t.file.toFixed(2)} s`);
+        await shot(page, 'track-video.png');
+        // the next track, an audio file: a stage video
+        await openDecode(page, 'track.wav'); await sleep(800);
+        t = await T(page);
+        check(t.cur && t.cur.kind === 'stage', 'an audio file in Decode: a stage video shows', JSON.stringify(t.cur));
+        // a video without sound on the silent clock: its picture for its length
+        await openDecode(page, 'silent.mp4'); await sleep(500);
+        await page.evaluate(() => globalThis.codingMiskDecode.play()); await sleep(2500);
+        t = await T(page);
+        check(t.cur && t.cur.kind === 'track' && t.playing && !t.paused && Math.abs(t.el - t.file) < 0.25, 'a video without sound: its picture plays on the silent clock', `${JSON.stringify(t.cur)} video ${t.el} file ${t.file}`);
+        // a file whose picture (3 s) ends before its sound (10 s): the last frame stays
+        await openDecode(page, 'short.mp4'); await sleep(500);
+        await page.evaluate(() => globalThis.codingMiskDecode.play()); await sleep(5000);
+        t = await T(page);
+        // (the container is as long as its sound: the element holds the picture's last frame while its clock goes on)
+        const px = await stagePixel(page, 0.08, 0.5);
+        check(t.file > 4 && t.drawn === 'video' && close(px, [57, 152, 152], 45), 'past the picture\'s end the last frame stays', `file ${t.file.toFixed(2)} s, element ${t.el.toFixed(2)} s, ${t.drawn}, pixel ${px}`);
+        // another look decodes no picture
+        await page.evaluate(() => globalThis.codingMiskStageVideo.layer.setGraces({ look: 500 }));
+        await pickLook(page, 'pixel'); await sleep(3500);
+        t = await page.evaluate(() => globalThis.codingMiskStageVideo.state());
+        check(!t.src && !t.cur, 'another look: no picture decoded', JSON.stringify({ src: t.src, cur: t.cur }));
+      }
+      check(!errors.length, `track ${l}: no page errors`, errors.join('; '));
+      await ctx.close();
+    }
+    check(Math.abs(peaks.video - peaks.palco) <= 0.03, 'Decode playing a video file: the master output equal with and without Video', JSON.stringify(peaks));
   }
 
   await browser.close();
