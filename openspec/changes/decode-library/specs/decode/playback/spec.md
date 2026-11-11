@@ -49,3 +49,24 @@ The player bar SHALL play the decoded track like a song: Play, Stop, the timelin
 
 - **WHEN** the row after the open one is marked "not found" and the user presses Next
 - **THEN** the row after it opens
+
+## ADDED Requirements
+
+### Requirement: A video without sound
+
+A video without an audio track SHALL open and play in Decode like any track, in silence: the transport SHALL run for the video's length, read from the file's header without decoding it, and Play, Pause, Stop, seeking, Previous, Next and Autoplay SHALL work as for any track. The picture SHALL NOT be shown in this change.
+
+#### Scenario: A screen recording in a mixtape
+
+- **WHEN** a mixtape holds a song, a video without sound and another song, and Autoplay plays it
+- **THEN** the video's turn lasts its length in silence with the placeholder in the code column, and the next song follows at its end
+
+### Requirement: The code column of a video without sound
+
+While a video without sound plays, the code column SHALL show a short placeholder in comment form instead of decoded code, in the app's language, with a few variants that change while it plays; nothing SHALL be evaluated and nothing SHALL sound. No analysis SHALL be stored for it, so its row gets no ◆ or ◇ mark.
+
+#### Scenario: Nothing stored
+
+- **WHEN** a video without sound has played
+- **THEN** no analysis of it is stored and its row shows only the video icon and the "no sound" mark
+

@@ -82,7 +82,7 @@ Video files that Decode accepts SHALL be listed with a small video icon next to 
 
 ### Requirement: Videos without sound
 
-A video without an audio track is not a broken file: it SHALL be shown as a "video only" row in the normal style, with the video icon and a small "no sound" mark ("Video without sound: nothing for Decode to analyse"). It SHALL stay selectable and SHALL be allowed in mixtapes.
+A video without an audio track is not a broken file: it SHALL be shown as a "video only" row in the normal style, with the video icon and a small "no sound" mark ("Video without sound: nothing for Decode to analyse"). It SHALL stay selectable, SHALL be allowed in mixtapes, and SHALL open and play like any track, as the playback requirement "A video without sound" says.
 
 #### Scenario: In a mixtape
 
@@ -91,7 +91,7 @@ A video without an audio track is not a broken file: it SHALL be shown as a "vid
 
 ### Requirement: Finding videos without sound
 
-The app SHALL find a video without sound while it reads the tags in idle time, or when the file fails to open for that reason, and SHALL remember it in the folder's index with generic fields (`video: true`, `audio: false`), so a later feature can list such videos.
+The app SHALL find a video without sound while it reads the tags in idle time, or when it opens the file, and SHALL remember it in the folder's index with generic fields (`video: true`, `audio: false`), so a later feature can list such videos.
 
 #### Scenario: Found while reading tags
 
@@ -100,12 +100,12 @@ The app SHALL find a video without sound while it reads the tags in idle time, o
 
 ### Requirement: A row that fails to open
 
-A click on a video without sound SHALL show a short neutral note in the panel naming it ("Video without sound: nothing for Decode to analyse"); a click on a file that fails to open SHALL show a short note naming the file and the reason. In both cases the panel SHALL stay open and the open track SHALL NOT stop or change.
+A click on a file that fails to open SHALL show a short note in the panel naming the file and the reason. The panel SHALL stay open and the open track SHALL NOT stop or change.
 
-#### Scenario: A screen recording without sound
+#### Scenario: An unreadable file
 
-- **WHEN** a folder holds an MP4 with only a video track and the user clicks its row while another track plays
-- **THEN** the panel says that this video has no sound for Decode to analyse, the row shows the "no sound" mark in the normal style, the panel stays open and the other track keeps playing
+- **WHEN** the user clicks the row of a file the browser cannot decode while another track plays
+- **THEN** the panel names the file and says why it cannot open, the panel stays open and the other track keeps playing
 
 ### Requirement: A kind icon on every row
 
