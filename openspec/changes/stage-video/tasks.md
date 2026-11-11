@@ -29,8 +29,8 @@ Estimate: about 25 agent hours (22 to 30), in the order below: the stage layer w
 
 ## 4. The session video (about 1.5 h)
 
-- [ ] 4.1 The needed rule keeps the video for a recording whose layout draws the stage and for a live output view that draws it, and not for a view without the stage (D9, D11); the target canvas draws the video at the video's size (about 0.5 h).
-- [ ] 4.2 `tools/check-video.cjs` cases: a session video with a stage video in LED, the stage scrolled away while recording, the Decode real-time export of a video file; files checked with ffprobe (picture changes, one audio stream) (about 1 h).
+- [x] 4.1 The needed rule keeps the video for a recording whose layout draws the stage and for a live output view that draws it, and not for a view without the stage (D9, D11); the target canvas draws the video at the video's size (about 0.5 h).
+- [x] 4.2 `tools/check-video.cjs` cases: a session video with a stage video in LED, the stage scrolled away while recording, the Decode real-time export of a video file; files checked with ffprobe (picture changes, one audio stream) (about 1 h).
 
 ## 5. The fast video and fragments (about 6 h)
 

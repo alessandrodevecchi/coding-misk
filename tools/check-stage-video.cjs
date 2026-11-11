@@ -95,7 +95,7 @@ const shown = page => waitFor(page, () => { const s = globalThis.codingMiskStage
 const play = async page => { if (!(await page.evaluate(() => document.querySelector('strudel-editor').editor.repl.scheduler.started))) await page.click('#play'); await sleep(1500); };
 
 (async () => {
-  const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
+  const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required', '--auto-accept-this-tab-capture', '--use-fake-ui-for-media-stream'] });
 
   // ---------- look: the menu, a reload, a song's own look, the fallback (D1, D2) ----------
   if (ONLY.includes('look')) {
@@ -639,6 +639,61 @@ const play = async page => { if (!(await page.evaluate(() => document.querySelec
       await ctx.close();
     }
     check(Math.abs(peaks.video - peaks.palco) <= 0.03, 'Decode playing a video file: the master output equal with and without Video', JSON.stringify(peaks));
+  }
+
+  // ---------- session: the session video records the Video look (D11, spec endless/session-video) ----------
+  if (ONLY.includes('session')) {
+    const os = require('node:os');
+    const streams = f => { try { return JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-of', 'json', f]).toString()).streams; } catch (e) { return []; } };
+    // a frame of a file at t seconds, 64 × 36 RGB
+    const frameAt = (f, t) => execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', f, '-frames:v', '1', '-vf', 'scale=64:36', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']);
+    const diff = (a, b) => { let n = 0; for (let i = 0; i < Math.min(a.length, b.length); i++) n += Math.abs(a[i] - b[i]); return n / a.length; };
+    const px = (buf, x, y) => [0, 1, 2].map(c => buf[(y * 64 + x) * 3 + c]);
+    const ctx = await browser.newContext({ viewport: { width: 1300, height: 1000 }, acceptDownloads: true });
+    const page = await ctx.newPage(), errors = [], downloads = [];
+    page.on('pageerror', e => errors.push(e.message)); page.on('download', d => downloads.push(d));
+    await page.goto(URL0); await sleep(1500);
+    await page.evaluate(() => { localStorage.clear(); for (const [k, v] of Object.entries({ 'coding-misk-look': 'video', 'coding-misk-export-speed': 'real', 'coding-misk-video': { layout: 'visual', quality: '720p30', card: 'never', soulPanel: false, render: 'led' } })) localStorage.setItem(k, JSON.stringify(v)); });
+    await page.reload(); await sleep(3000);
+    await useFiles(page, ['green.mp4', 'blue.mp4']);
+    const saved = async (re, ext) => { for (let i = 0; i < 240; i++) { const d = downloads.find(x => re.test(x.suggestedFilename())); if (d) { const f = path.join(os.tmpdir(), `sv-${Date.now()}.${ext}`); await d.saveAs(f); downloads.splice(downloads.indexOf(d), 1); return f; } await sleep(500); } return null; };
+    // 1. a song's session video in LED, the stage scrolled away and the page told hidden while it records
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
+    const card = '#songs [data-song-id="kellerlicht"]';
+    await page.click(`${card} [data-out-kind]`); await sleep(200);
+    await page.click(`${card} [data-act="export"]`); await sleep(4000);
+    check(await shown(page), 'recording: the stage video shows');
+    await page.evaluate(() => { document.body.style.minHeight = '4000px'; window.scrollTo(0, 3000); Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+    await sleep(1500);
+    let s = await S(page);
+    check(s.hidden && s.needed && !s.paused, 'recording with the stage away and the page hidden: the video stays needed and plays', JSON.stringify({ hidden: s.hidden, needed: s.needed, paused: s.paused }));
+    await sleep(4500);
+    await page.evaluate(() => { delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); window.scrollTo(0, 0); });
+    await page.click('.video-bar [data-vid="stop"]');
+    const f1 = await saved(/^Kellerlicht.*\.(mp4|webm)$/i, 'mp4');
+    if (f1) {
+      const st = streams(f1), a = frameAt(f1, 1.5), b = frameAt(f1, 6.5);
+      check(st.filter(x => x.codec_type === 'video').length === 1 && st.filter(x => x.codec_type === 'audio').length === 1, 'the session video file: one picture and one audio stream', st.map(x => `${x.codec_type}:${x.codec_name}`).join(', '));
+      check(diff(a, b) > 4, 'the picture changes while the stage video plays (also while the stage was away)', `mean difference ${diff(a, b).toFixed(1)}`);
+      if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '5', '-i', f1, '-frames:v', '1', path.join(SHOTS, 'session-led.png')]); }
+    } else check(false, 'the session video saved');
+    // 2. the Decode real-time export of a video file: its picture in the file
+    await page.evaluate(() => localStorage.setItem('coding-misk-video', JSON.stringify({ layout: 'visual', quality: '720p30', card: 'never', soulPanel: false, render: 'normal' })));
+    await page.click('[data-tab="decode"]'); await sleep(400);
+    await page.setInputFiles('#dc-file', path.join(VID, 'track.mp4'));
+    for (let i = 0; i < 80; i++) { await sleep(250); const d = await page.evaluate(() => globalThis.codingMiskDecode.state()); if (d.title && !(d.status && d.status.kind === 'busy')) break; }
+    await page.evaluate(() => document.querySelector('#dc-export-card').scrollIntoView({ block: 'center' })); await sleep(300);
+    if (!/VIDEO/.test(await page.textContent('#dc-export-card [data-out-lcd]'))) { await page.click('#dc-export-card [data-out-kind]'); await sleep(300); }
+    await page.click('#dc-export');
+    const f2 = await saved(/\.(mp4|webm)$/i, 'mp4');
+    if (f2) {
+      const st = streams(f2), a = frameAt(f2, 5), b = frameAt(f2, 20), want = [171, 86, 38];
+      const near = (p, q, tol) => p.every((v, i) => Math.abs(v - q[i]) <= tol);
+      check(st.filter(x => x.codec_type === 'video').length === 1 && st.filter(x => x.codec_type === 'audio').length === 1, 'Decode real-time export of a video file: one picture and one audio stream', st.map(x => `${x.codec_type}:${x.codec_name}`).join(', '));
+      check(near(px(a, 5, 18), want, 50) && near(px(b, 5, 18), want, 50) && diff(a, b) > 1, 'the file shows the track\'s own picture, moving', `${px(a, 5, 18)} / ${px(b, 5, 18)}, difference ${diff(a, b).toFixed(1)}`);
+    } else check(false, 'the Decode real-time export saved');
+    check(!errors.length, 'session: no page errors', errors.join('; '));
+    await ctx.close();
   }
 
   await browser.close();

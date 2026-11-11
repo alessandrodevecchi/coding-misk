@@ -6085,9 +6085,19 @@ const ownLook = () => {
 // the "Stage videos" folders (D10): their list, access and scan; a change runs the layer's rules and redraws the card
 svFolders = createStageFolders({ onChange: () => { if (stageVideo) stageVideo.filesChanged(); syncSvChip(); if (settingsPage && !$('#tab-impostazioni').hidden) settingsPage.render(); } });
 if (look === 'video') svFolders.need();
+// a recording or the live output window draws the stage (D9, D11): the video stays needed while the page is hidden. A
+// layout or view whose stage area is not drawn (code only) does not keep it; the whole tab captures the page as it is
+const drawsStage = A => !!(A && A.stage && A.stage.w > 0 && A.stage.h > 0 && A.stage.a !== 0);
+const svKeep = () => {
+  try {
+    if (video.on) { const l = video.layout; return l === 'tab' || drawsStage(TIMELINE_LAYOUTS.includes(l) ? liveAreas(l, 1920, 1080) : layoutAreas(l, 1920, 1080)); }
+    if (video.live.on) { const p = video.live.preset; return drawsStage(liveAreas(p && p.view, 1920, 1080)); }
+  } catch (e) { /* no recording */ }
+  return false;
+};
 stageVideo = createStageVideo({
   look: () => look, soul: () => soulOverride, playing: () => isPlaying(), track: svTrack, files: svFiles, songKey: svSong, nextKey: svNext,
-  keep: () => false,
+  keep: svKeep,
   stageEl: $('#stagewrap'), codeFull: () => $('#codecol').classList.contains('full'),
   note: (kind, v) => { if (kind === 'skip') toast(t('svSkipped', v)); },
 });
