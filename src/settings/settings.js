@@ -3,7 +3,7 @@
 import { makeBackup, mergeBackup, backupParts } from './backup.js';
 import { DECODES_KEY, BACKUP_RECENT } from '../decode/store.js';
 import { MIXTAPES_KEY } from '../decode/mixtapes.js';
-import { downloadJson, pickJsonFiles } from '../library/library.js';
+import { pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { OWN_IDS, STRUDEL_IDS, FONTS, SIZES, themeName, fontName } from '../code-themes/themes.js';
 import { CODE_COLORS, REAL_SCOPES, LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SOULS, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, V_DEFAULTS } from '../video/layout.js';
@@ -351,7 +351,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     const mix = app.decodes ? await app.decodes.mixtapes().catch(() => null) : null;
     if (!all || !app.decodes) {
       const list = app.decodes ? await app.decodes.recent(BACKUP_RECENT).catch(() => []) : [];
-      downloadJson(`coding-misk-backup-${d}`, makeBackup(entries(), new Date(), list, mix));
+      // compact like the file in parts, so the checkbox alone sets the size
+      downloadBlob(`coding-misk-backup-${d}.json`, new Blob([JSON.stringify(makeBackup(entries(), new Date(), list, mix)), '\n'], { type: 'application/json' }));
     } else {
       const out = backupParts(makeBackup(entries(), new Date(), null, mix));
       await app.decodes.each(recs => out.add(recs), 50).catch(() => 0);

@@ -132,6 +132,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Backup: the default backup file is written compact like the one with all Decode analyses, so the two differ only by the analyses.
 - Decode: the library list keeps its scroll on Select, a tick, the Add to mixtape menu and Cancel; a new order starts it at the top like a new chip or kind.
 - Decode: in Full, Essentia.js's tempo is also taken from a confidence of 2.0 when the app's own tempo agrees, so a borderline track no longer changes the tempo's source from one run to the next.
 - Decode: a video without sound plays in silence for its length, with a placeholder in the code column, instead of doing nothing.
