@@ -10,6 +10,7 @@ import { layerOn, limitOf } from './visuals/stage-settings.js';
 import { createRenderer } from './visuals/render-styles.js';
 import { termPalette } from './visuals/term-grid.js';
 import { drawMonitorTerm, drawRulloTerm, drawMonitorAscii, drawRulloAscii, drawClaude, drawLayerGlyph } from './visuals/glyph-looks.js';
+import { videoRect } from './visuals/stage-video-rules.js';
 
 // Visual su canvas sincronizzati con l'audio.
 // Ogni strumento suona su un analizzatore separato (.analyze("kick"), .analyze("bass"), …):
@@ -24,6 +25,9 @@ import { drawMonitorTerm, drawRulloTerm, drawMonitorAscii, drawRulloAscii, drawC
 // word(key, vars) → a word of the text interface or null, lookName(look), renderName(render)
 // getS() → { look, render ('normal' by default), light ('auto' | 'on' | 'off', the light form on slow devices),
 // density ('coarse' | 'normal' | 'fine', the cells of the renders, denser-renders D8) }
+// the Video look (stage-video D2, D7, D8): stage.video() → the live picture (a <video> element) or null,
+// stage.videoSize() → 'fill' | 'fit' | 'stretch', stage.videoBands() → the bands' colour in Fit, stage.fallbackLook() →
+// the look drawn while Video has nothing to show
 export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readout, getInfo = () => ({}), soul = null, afterFrame = null, stage = null }) {
   const $ = (s, r = document) => r.querySelector(s);
   const cv = $('#stage'), vcx = cv.getContext('2d');
@@ -1054,8 +1058,28 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   const passTimes = globalThis.codingMiskPassTimes = [];
   // one picture of the scene: decays, then the look's drawing, then the render's pass
   // r: { render, light, fixed (no automatic light form: the fast video) }
+  // the time of the last video draws, in ms (for the checks: stage-video D9's 1.5 ms target)
+  const videoTimes = globalThis.codingMiskVideoTimes = [];
+  // the Video look's picture (D7, D8): drawn by the size mode, the bands of Fit in the theme's background
+  function drawVideo(src, size) {
+    const t0 = performance.now();
+    const vw = src.videoWidth || src.width, vh = src.videoHeight || src.height;
+    const R = videoRect(vw, vh, W, H, size);
+    cx.fillStyle = size === 'fit' && stage && stage.videoBands ? stage.videoBands() : '#000';
+    if (size === 'fit') cx.fillRect(0, 0, W, H);
+    cx.drawImage(src, R.sx, R.sy, R.sw, R.sh, R.dx, R.dy, R.dw, R.dh);
+    videoTimes.push(performance.now() - t0); if (videoTimes.length > 600) videoTimes.shift();
+  }
+  // r.video: the fast video's picture of this frame (a canvas, or null for the fallback), r.fallback: the look then
   function paint(look, cyc, dt, playing, r = {}) {
     const render = r.render || 'normal';
+    // the Video look: the picture, or the look the app would show without it while there is nothing to show (D2)
+    let vsrc = null;
+    if (look === 'video') {
+      vsrc = 'video' in r ? r.video : stage && stage.video ? stage.video() : null;
+      if (!vsrc) look = r.fallback || (stage && stage.fallbackLook ? stage.fallbackLook() : 'palco');
+    }
+    globalThis.codingMiskStageDrawn = look;
     curDensity = r.density || 'normal';
     if (!playing) echoes.length = 0;
     kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10); glitch *= Math.exp(-dt * 9); shake *= Math.exp(-dt * 12);
@@ -1066,10 +1090,12 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     let native = false;
     if (look === 'soul' && soul) soul.draw(cx, W, H, dpr, cyc, playing);
     else if (WIDGET_LOOKS.includes(look)) { if (soul) soul.hide(); native = widgetLook(look, cyc, playing, render); }
+    else if (look === 'video') { if (soul) soul.hide(); drawVideo(vsrc, r.size || (stage && stage.videoSize ? stage.videoSize() : 'fill')); if (!NATIVE_RENDERS.includes(render)) widgetLayer(look, cyc, playing); }
     // the layer over the scene: before the pass, or drawn natively after it in ASCII and Terminal (D2)
     else { if (soul) soul.hide(); (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing); if (!NATIVE_RENDERS.includes(render)) widgetLayer(look, cyc, playing); }
-    // (the widget looks have no flash: their panels flash on their own onsets)
-    if (flash > .02 && !reduce && look !== 'soul' && !WIDGET_LOOKS.includes(look)) { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
+    // (the widget looks have no flash: their panels flash on their own onsets; nor the Video look: a flash over footage
+    // reads as a glitch)
+    if (flash > .02 && !reduce && look !== 'soul' && look !== 'video' && !WIDGET_LOOKS.includes(look)) { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
     // D2: the pass over the finished frame, unless the look drew the render natively
     if (render !== 'normal' && !native) {
       const ms = renderer.apply(cx, cc, render, { look, theme: stage && stage.theme ? stage.theme() : 'neon', W, H, dpr, density: curDensity, light: r.light || 'auto', fixed: !!r.fixed, info: () => termInfo(cyc, playing, look, render) });
@@ -1087,9 +1113,12 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   // feed: { raw: { instrument: level }, wave: Float32Array(256), hook: Float32Array(128) }
   // render, light: the render of the video and its light form ('on' or 'off'; never automatic, so the frames repeat);
   // density: the Density of the renders, the stage's (denser-renders D8)
-  function drawAt({ now, cyc, look, feed: f, dt = 1 / 30, show = false, render = 'normal', light = 'off', density = 'normal' }) {
+  // video (the Video look, stage-video D12): the picture of this frame, a canvas or null; fallback: the look drawn
+  // without it; size: the size mode
+  function drawAt({ now, cyc, look, feed: f, dt = 1 / 30, show = false, render = 'normal', light = 'off', density = 'normal', video, fallback, size }) {
     feed = f; clock = () => now;
-    try { readAudio(dt, now); paint(look, cyc, dt, true, { render, light: light === 'on' ? 'on' : 'off', density, fixed: true }); if (show && target) showTarget(); }
+    const v = look === 'video' ? { video: video || null, fallback: fallback || 'palco', size } : {};
+    try { readAudio(dt, now); paint(look, cyc, dt, true, { render, light: light === 'on' ? 'on' : 'off', density, fixed: true, ...v }); if (show && target) showTarget(); }
     finally { feed = null; clock = () => performance.now(); }
   }
 

@@ -109,6 +109,10 @@ const STR = {
     setRenderDensity: 'Densità del render', 'setRenderDensity:coarse': 'Grossa', 'setRenderDensity:normal': 'Normale', 'setRenderDensity:fine': 'Fine',
     setRenderDensityHint: 'Quanto sono piccole le celle di LED, ASCII, 1-bit e Terminale: Grossa 1,4 volte, Fine 0,7 volte. Un solo valore per palco, video, frammenti e uscita live. Il CRT non cambia.',
     renderLightMark: 'Forma leggera: il render usa meno celle perché il dispositivo è lento',
+    // the Video look (stage-video)
+    svSkipped: 'Video saltato: {name} non si apre in questo browser',
+    svAllow: 'Consenti i video del palco',
+    svAllowTip: 'Le cartelle dei video del palco aspettano il permesso del browser: un clic lo chiede',
     renderStage: 'Come sul palco',
     'term:enter': 'entra', 'term:next': 'poi', 'term:inBars': 'tra {n} battute', 'term:silent': 'in silenzio', 'term:tracks': 'tracce', 'term:bringIn': 'fai entrare {list}', 'term:drop': 'togli {list}',
     'term:keep': 'tieni il groove', 'term:playing': 'in riproduzione', 'term:paused': 'in pausa', 'term:stage': 'palco', 'term:code': 'codice', 'term:scope': 'onda', 'term:spectrum': 'spettro', 'term:level': 'liv',
@@ -613,6 +617,10 @@ const STR = {
     setRenderDensity: 'Render density', 'setRenderDensity:coarse': 'Coarse', 'setRenderDensity:normal': 'Normal', 'setRenderDensity:fine': 'Fine',
     setRenderDensityHint: 'How small the cells of LED, ASCII, 1-bit and Terminal are: Coarse 1.4 times, Fine 0.7 times. One value for the stage, videos, fragments and the live output. CRT does not change.',
     renderLightMark: 'Light form: the render uses fewer cells because this device is slow',
+    // the Video look (stage-video)
+    svSkipped: 'Video skipped: {name} does not open in this browser',
+    svAllow: 'Allow stage videos',
+    svAllowTip: 'The stage video folders wait for the browser\'s permission: one click asks for it',
     renderStage: 'Same as the stage',
     'term:enter': 'enter', 'term:next': 'next', 'term:inBars': 'in {n} bars', 'term:silent': 'silent', 'term:tracks': 'tracks', 'term:bringIn': 'bring in {list}', 'term:drop': 'drop {list}',
     'term:keep': 'keep the groove', 'term:playing': 'playing', 'term:paused': 'paused', 'term:stage': 'stage', 'term:code': 'code', 'term:scope': 'scope', 'term:spectrum': 'spectrum', 'term:level': 'lvl',

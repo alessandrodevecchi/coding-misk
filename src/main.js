@@ -74,6 +74,8 @@ import SONG_ORDER from '../songs/index.json';
 import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
+import { createStageVideo } from './visuals/stage-video.js';
+import { SV_KEY, sizeOf as svSizeOf, fallbackLookOf } from './visuals/stage-video-rules.js';
 import { createVideo } from './video/video.js';
 import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, codeColsOf, TIMELINE_LAYOUTS, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
 import { liveAreas } from './live/presets.js';
@@ -613,6 +615,9 @@ const GROW_EYES = { hidden: EYE_CLOSED, compact: EYE_HALF, open: EYE_OPEN };
 let growView = GROW_VIEWS.includes(store.get('coding-misk-growth-view', 'compact')) ? store.get('coding-misk-growth-view', 'compact') : 'compact';
 let look = store.get('coding-misk-look', T.look || 'palco');
 if (!PICK_LOOKS.some(([k]) => k === look)) look = 'palco';
+// the Video look's live layer and its folders (stage-video), made with the stage; the look drawn while the first picture
+// loads
+let stageVideo = null, svFolders = null, lookBeforeVideo = null;
 // the render style of the stage (widget-render-styles D1, D8): next to the look, the user's own (a song carries none)
 const renderOf = v => (RENDERS.some(([k]) => k === v) ? v : 'normal');
 let render = renderOf(store.get('coding-misk-render', 'normal'));
@@ -4511,9 +4516,16 @@ const setUi = v => { uiPick = UIS.includes(v) ? v : 'neon'; store.set('coding-mi
 const setUiFollow = on => { uiFollow = !!on; store.set('coding-misk-ui-follow', uiFollow); applyUi(); };
 if (sysLight.addEventListener) sysLight.addEventListener('change', () => { if (uiFollow) applyUi(); });
 $$('[data-uitheme]').forEach(b => b.addEventListener('click', () => setUi(b.dataset.uitheme)));
-const setLook = l => { if (HIDDEN_LOOKS.includes(l)) l = 'palco'; if (!LOOKS.some(([k]) => k === l)) return; look = l; soulBase = l; store.set('coding-misk-look', l); syncAll(); };
-// a song's own visual, unless the listener is watching the soul
-const songLook = l => { if (l) setLook(l); };
+const setLook = l => {
+  if (HIDDEN_LOOKS.includes(l)) l = 'palco'; if (!LOOKS.some(([k]) => k === l)) return;
+  // the look that keeps drawing while the first video picture loads (stage-video D9)
+  if (l === 'video' && look !== 'video') lookBeforeVideo = look;
+  look = l; soulBase = l; store.set('coding-misk-look', l); syncAll();
+  if (stageVideo) stageVideo.tick();
+};
+// a song's own visual, unless the listener is watching the soul; a song never sets Video, and while the user has chosen
+// Video a song's own look does not replace it (stage-video D1)
+const songLook = l => { if (l && l !== 'video' && look !== 'video') setLook(l); };
 
 // a look picked while the radio plays becomes the radio's look (the stage by default; the studio, #28, is set aside)
 $('#looks').addEventListener('change', e => {
@@ -6036,6 +6048,47 @@ function stageSectionInfo(cyc) {
   return song && song.meta ? of(song.meta) : null;
 }
 // the render while a video records from the stage (not the whole tab): the video's own; else the stage's
+// the Video look (stage-video): the live layer, its sources and the look drawn while it has nothing to show
+// (for the checks, until a folder exists: a list of files that stand in for the stage video folders)
+let svTestFiles = null;
+const svFiles = () => svTestFiles || (svFolders ? svFolders.playable() : []);
+// the Decode track with a video track, while the Decode track counts as the player (D3)
+const svTrack = () => {
+  if (!(decodeTab && decodeTab.open && (mode === 'decode' || decodeTab.playing))) return null;
+  const f = decodeTab.videoFile;
+  return f ? { key: `${f.name}|${f.size}|${f.lastModified}`, file: f, time: () => decodeTab.fileNow(), playing: decodeTab.playing } : null;
+};
+// the song on the stage, for one stage video per song (D5): the Decode track, the radio's song on air, the song in Compose
+const svSong = () => {
+  if (decodeTab && decodeTab.open && (mode === 'decode' || decodeTab.playing)) { const f = decodeTab.file; return f ? `decode:${f.name}|${f.size}` : 'decode'; }
+  if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir]; return it ? `radio:${it.id}` : 'radio'; }
+  // Compose: the song playing, else the song open
+  const sg = isPlaying() ? song : null;
+  return `compose:${(sg && sg.id) || T.id || ''}`;
+};
+// the next song when it is known (the radio's next item), so its file is read ahead (D9b)
+const svNext = () => {
+  if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir + 1]; return it ? `radio:${it.id}` : null; }
+  return null;
+};
+// the open song's own look (D2): in the radio the song on air, in Decode none
+const ownLook = () => {
+  if (decodeTab && decodeTab.open && (mode === 'decode' || decodeTab.playing)) return null;
+  if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir]; return it && it.song ? it.song.look : null; }
+  return T.look;
+};
+stageVideo = createStageVideo({
+  look: () => look, soul: () => soulOverride, playing: () => isPlaying(), track: svTrack, files: svFiles, songKey: svSong, nextKey: svNext,
+  keep: () => false,
+  stageEl: $('#stagewrap'), codeFull: () => $('#codecol').classList.contains('full'),
+  note: (kind, v) => { if (kind === 'skip') toast(t('svSkipped', v)); },
+});
+let svBands = { ui: null, c: '#000' };
+const stageFallback = () => (stageVideo.loading && lookBeforeVideo && lookBeforeVideo !== 'video' ? lookBeforeVideo : fallbackLookOf(ownLook(), PICK_LOOKS.map(l => l[0])));
+globalThis.codingMiskStageVideo = {
+  layer: stageVideo, fallback: stageFallback, state: () => ({ ...stageVideo.state(), look, drawn: globalThis.codingMiskStageDrawn, fallbackLook: stageFallback(), song: svSong() }),
+  testFiles: list => { svTestFiles = list; stageVideo.filesChanged(); },
+};
 const recRender = () => { try { return video.on && video.layout !== 'tab' ? outRender(video.opts().render) : render; } catch (e) { return render; } };
 const visuals = startVisuals({
   // a video being recorded from the stage (not the whole tab) draws the video's render
@@ -6044,6 +6097,11 @@ const visuals = startVisuals({
   stage: {
     settings: () => stageWidgets().S, options: () => stageWidgets().sw, section: stageSection, theme: () => (ui === 'hw' ? 'hw' : 'neon'),
     sectionInfo: stageSectionInfo,
+    // the Video look (stage-video D2, D7): the live picture, the size mode, Fit's bands, the look without Video
+    video: () => { const f = stageVideo.frame(); if (f) lookBeforeVideo = null; return f; },
+    videoSize: () => svSizeOf(store.get(SV_KEY, null)),
+    videoBands: () => { if (svBands.ui !== ui) svBands = { ui, c: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#000' }; return svBands.c; },
+    fallbackLook: stageFallback,
     word: (k, vars) => { const key = `term:${k}`, v = t(key, vars); return v === key ? null : v; },
     lookName: l => { const x = LOOKS.find(([k]) => k === l); return x ? tx(x[1]) : l; },
     renderName: r => { const x = RENDERS.find(([k]) => k === r); return x ? tx(x[1]) : r; },
@@ -6061,7 +6119,7 @@ const visuals = startVisuals({
       const S = coSettings(); return S.stage ? (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right') : null;
     },
   },
-  afterFrame: (cyc, playing) => { video.frame(cyc, playing); drawStageOver(cyc); drawEditorWidgets(cyc); liveLink.tick(); },
+  afterFrame: (cyc, playing) => { stageVideo.tick(); video.frame(cyc, playing); drawStageOver(cyc); drawEditorWidgets(cyc); liveLink.tick(); },
   getInfo: stageInfo,
   getSteps: () => meterSteps(secFull().meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando

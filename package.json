@@ -32,6 +32,7 @@
     "check:radio-profiles": "node --no-warnings tools/check-radio-profiles.mjs",
     "check:steer-memo": "node --no-warnings tools/check-steer-memo.mjs",
     "check:video": "node --no-warnings tools/check-video.mjs",
+    "check:stage-video": "node --no-warnings tools/check-stage-video.mjs",
     "check:export": "node --no-warnings tools/check-export.mjs",
     "check:live": "node --no-warnings tools/check-live.mjs",
     "check:crescendo": "node --no-warnings tools/check-crescendo.mjs",

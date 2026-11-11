@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 117. With open tasks: 37. All tasks ticked, waiting to be archived: 80.
+OpenSpec changes not archived: 118. With open tasks: 38. All tasks ticked, waiting to be archived: 80.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -23,7 +23,7 @@ OpenSpec changes not archived: 117. With open tasks: 37. All tasks ticked, waiti
 | [console-add-ahead](../../openspec/changes/console-add-ahead/tasks.md) | 1 | 18 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
-| [decode-refine](../../openspec/changes/decode-refine/tasks.md) | 16 | 32 |
+| [decode-refine](../../openspec/changes/decode-refine/tasks.md) | 17 | 33 |
 | [fm-groove-lab](../../openspec/changes/fm-groove-lab/tasks.md) | 1 | 16 |
 | [generator-followups](../../openspec/changes/generator-followups/tasks.md) | 2 | 3 |
 | [growth-shapes](../../openspec/changes/growth-shapes/tasks.md) | 3 | 25 |
@@ -48,6 +48,7 @@ OpenSpec changes not archived: 117. With open tasks: 37. All tasks ticked, waiti
 | [radio-variation](../../openspec/changes/radio-variation/tasks.md) | 1 | 17 |
 | [settings-polish](../../openspec/changes/settings-polish/tasks.md) | 1 | 14 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
+| [stage-video](../../openspec/changes/stage-video/tasks.md) | 18 | 25 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [track-to-code](../../openspec/changes/track-to-code/tasks.md) | 11 | 42 |
 | [varied-openings](../../openspec/changes/varied-openings/tasks.md) | 1 | 28 |

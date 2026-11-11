@@ -144,6 +144,10 @@
   /* the stage widgets' quick switch (stage-app-widgets D5): a drawn icon of a picture with side panels, then the word */
   .sw-chip { display: inline-flex; align-items: center; gap: 5px; }
   .sw-chip[hidden] { display: none; }
+  /* the Video look's access chip (stage-video D2): beside the render menu while the folders wait for access */
+  .sv-chip { display: inline-flex; align-items: center; gap: 5px; border-color: var(--a2); }
+  .sv-chip[hidden] { display: none; }
+  @media (max-width: 640px) { .sv-chip span { display: none; } .sv-chip { padding: 4px 9px; } }
   .sw-ico { width: 14px; height: 10px; flex: none; }
   @media (max-width: 640px) { .sw-chip span { display: none; } .sw-chip { padding: 4px 9px; } }
   .stagewrap[data-soul="true"] .readout, .stagewrap[data-soul="true"] .say { display: none; }

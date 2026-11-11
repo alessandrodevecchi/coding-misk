@@ -1043,6 +1043,9 @@ export function createDecodeTab({ root, app }) {
     // the code of level B at a bar, as the player shows it (Open in Compose must show the same, D15)
     codeB: bar => (modelB ? playableB().codeAt(bar) : null),
     get open() { return !!cur; },
+    // the open file, and the same when it holds a video track (stage-video D3: its picture on the stage)
+    get file() { return cur ? cur.file : null; },
+    get videoFile() { return cur && cur.video ? cur.file : null; },
     get playing() { return playing; },
     get title() { return cur ? (cur.artist ? `${cur.title} · ${cur.artist}` : cur.title) : ''; },
     get duration() { return cur ? cur.duration : 0; },
