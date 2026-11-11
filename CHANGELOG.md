@@ -32,6 +32,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Decode: Auto button that goes back to the analysed tempo after a tapped, halved or doubled tempo.
 - Decode: the tab proposes Full after 8 bars in Live, once per track.
 - Decode: `vox(…)` and `melody(…)` lines at the end of the decoded code where a top line is heard; they play nothing, also in copied code.
+- Decode bench: an acid test song and an arp-and-lead test song in `tools/decode-songs.mjs`, with the lead notes in their truth.
+- `tools/decode-export.cjs`: also exports `luci-rosse` and a frozen radio song (`tests/snapshots/decode-radio-song.json`) with their timeline JSON.
+- `tools/decode-measure.mjs`: kick, clap and hat F1, recall and false hits, distinct drum grids, chord quality per bar and bass octave errors against the app songs' timelines.
+- `tools/decode-similarity.cjs`: similarity of the level B code's sound to the original, with scores in `tests/snapshots/decode-similarity.json`, the owner's files through `DECODE_OWNER_DIR` and an A/B listening set with and without Essentia.js (`--ab`).
 - `tools/decode-edits.mjs`: edits per minute, share of edited bars and edit sizes of the decoded code, on any audio file.
 - `tools/check-add-waves.cjs`: heads in phrases, moves by reason, long tasks and "too late" of console "+" waves on the baseline scenarios.
 - Every move of a pending console batch is recorded with its reason.
