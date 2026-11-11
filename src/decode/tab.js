@@ -230,7 +230,8 @@ export function createDecodeTab({ root, app }) {
       workerFor = cur;
       // the stored or tapped tempo goes to the analyser first, so the bars fall where they fell before
       if (cur.tempo) worker.postMessage({ type: 'tempo', bpm: cur.tempo.bpm, downbeat: cur.tempo.downbeat, tapped: !!cur.tempo.tapped });
-      else if (model && model.bpm) worker.postMessage({ type: 'tempo', bpm: model.bpm, downbeat: model.downbeat, tapped: false });
+      // (a model saved before level A's relock ran leaves the relock free to check it: decode-refine D4)
+      else if (model && model.bpm) worker.postMessage({ type: 'tempo', bpm: model.bpm, downbeat: model.downbeat, tapped: false, fixed: !!model.relockChecked });
     }
     status = old ? { kind: 'note', text: t('dcAnalysedAgain') } : match && model ? { kind: 'note', text: t('dcStored') } : cur.video ? { kind: 'note', text: t('dcVideoNote') } : null;
     if (match && cur.video) status = { kind: 'note', text: `${t('dcStored')} ${t('dcVideoNote')}` };

@@ -11,7 +11,7 @@
 // never importing Essentia.js, the level B writer (sections, loops, sounds by measure, Simple kit, parts where heard,
 // variations and a one-off fill, chords out of the key), the tempo pick, Open in Compose's configuration and the same
 // code at every step in Decode and in Compose with "Follow the song".
-import { createAnalyzer, horizonOf, tapTempo, LOOK_AHEAD, LOOK_AHEAD_DEFAULT } from '../src/decode/misk-analyzer.js';
+import { createAnalyzer, horizonOf, tapTempo, LOOK_AHEAD, LOOK_AHEAD_DEFAULT, quietBefore } from '../src/decode/misk-analyzer.js';
 import { writeSong, momentSong, partsByBar, soundsOf, loopAt, stepsMini, withVox, withoutVox, voxGroup, voxOf, topPlan, planA, differsEnough, steady, EDIT_RULE, TOP_HELPERS, VOX_PRELUDE, formatKey } from '../src/decode/writer.js';
 import { defaultMix, mixApply, gainsOf, heard, loudnessTrim } from '../src/decode/mix.js';
 import { titleFromName, fingerprint, sameFile } from '../src/decode/input.js';
@@ -24,7 +24,7 @@ import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
-import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey } from '../src/decode/full.js';
+import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
 import { writeFull, inKey, leadCode } from '../src/decode/writer.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
 import { followSong, crescendoSong } from '../src/song/crescendo.js';
@@ -441,6 +441,34 @@ if (process.argv.includes('--app')) {
   A.setTempo({ bpm: 124, downbeat: 0.31, tapped: true });
   const m = A.model(pcm.length / RATE);
   check(!m.relocked && m.downbeat === 0.31 && m.bpm === 124, 'the relock never moves a tapped tempo', JSON.stringify({ bpm: m.bpm, downbeat: m.downbeat, relocked: m.relocked }));
+}
+// review of groups 7 to 9 (decode-refine): four fixes
+{
+  // a two-bar groove keeps both bars: the per-step majority of an alternating pair is a grid never heard
+  const A = { bd: 'x.....x...x.....', cp: '....x.......x...', hh: '..x...x...x...x.', oh: E }, B = { ...A, bd: 'x...x.....x.x...' };
+  const M = { bpm: 120, downbeat: 0, barSeconds: 2, key: { root: 9, mode: 'minor' }, bars: Array.from({ length: 16 }, (_, i) => ({ start: i * 2, drums: i % 2 ? B : A, bass: Array(16).fill(null), chord: null, level: { drums: 1, bass: 0, chords: 0, other: 0 } })), sections: [{ start: 0, bars: 16, kind: 'verse' }], ending: 16 };
+  const d = writeFull(M, { title: 'pair' }).tracks.find(t => t.id === 'drums'), rows = Object.values(d.patterns).map(p => p.rows.bd).sort();
+  const byBar = []; for (const c of d.clips) for (let k = 0; k < c.bars; k++) byBar[c.start + k] = d.patterns[c.pattern].rows.bd;
+  check(rows.join() === [A.bd, B.bd].sort().join() && byBar.every((x, i) => x === (i % 2 ? B.bd : A.bd)), 'a two-bar groove is written as its two bars, in turn', rows.join(' / '));
+  // Essentia.js's chord on another root drops misk-analyzer's quiet minor third mark
+  const q = [takeChord({ chord: 'F', third: true }, { chord: 'E', conf: 0.9 }), takeChord({ chord: 'A', third: true }, { chord: 'A', conf: 0.9 })];
+  quietMinors(q, { root: 9, mode: 'minor' });
+  check(q.map(b => b.chord).join() === 'E,Am', 'a quiet minor third mark goes with its root when Essentia.js writes another chord', q.map(b => b.chord).join());
+  // a bass note under a kick on step 0 or 1 counts the bar before's last steps
+  check(!quietBefore([null], [null, 35], 1) && !quietBefore([], [35, null], 0) && quietBefore([null], [null, null], 1) && quietBefore([null, null], [35, 35], 2), 'a note on the bar before\'s last steps holds back a retrigger on steps 0 and 1');
+}
+// a stored level A tempo saved before the relock ran is still checked by it (decode-refine D4)
+{
+  const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' };
+  const { pcm } = renderSong({ bpm: 124, lead: 0.3, chords: ['Am', 'F'], bass: 'x..x..x...x.x...', bars: 20, drums: D });
+  const A = createAnalyzer(pcm), half = 60 / 124 / 2;
+  A.setTempo({ bpm: 124, downbeat: half, tapped: false, fixed: false });
+  const m = A.model(pcm.length / RATE);
+  check(!!m.relocked && m.relockChecked, 'a stored tempo saved before the relock ran is checked by it', JSON.stringify({ downbeat: m.downbeat, relocked: m.relocked }));
+  const B2 = createAnalyzer(pcm);
+  B2.setTempo({ bpm: 124, downbeat: half, tapped: false, fixed: true });
+  const m2 = B2.model(pcm.length / RATE);
+  check(!m2.relocked && m2.downbeat === Math.round(half * 10000) / 10000, 'a stored tempo the relock already checked stays', JSON.stringify({ downbeat: m2.downbeat }));
 }
 // ---------- decode-refine part 1: balanced code changes, the top line group ----------
 {

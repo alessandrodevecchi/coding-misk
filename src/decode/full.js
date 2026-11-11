@@ -79,6 +79,15 @@ export function snapToKey(x, key) {
   return Math.round(x);
 }
 
+// Essentia.js's chord for a bar replaces misk-analyzer's: the `third` mark (a quiet minor third over misk-analyzer's
+// chord) belongs to that chord's root and goes when the root changes, or quietMinors would make the new chord minor
+// (an F with a quiet minor third under Essentia.js's E turned Em). Changes the bar in place
+export function takeChord(b, c) {
+  const x = parseChord(b.chord), y = parseChord(c.chord);
+  if (!x || !y || x.root !== y.root) delete b.third;
+  b.chord = c.chord; b.chordConf = c.conf;
+  return b;
+}
 // harmony and bass per section (decode-refine D5); the numbers in one place
 export const HARMONY_RULE = { clear: 0.8, clearBars: 2, range: 7, quietBass: 0.2 };
 // a bar misk-analyzer marked `third` (a quiet minor third over a major third the bass's harmonics explain) is minor when
@@ -172,7 +181,7 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
       for (let i = 0; i <= m.bars.length; i++) ticks.push(downbeat + i * (240 / bpm));
       const per = E.chords(pcm, ticks.filter(x => x <= duration + 1e-6), { sr, onProgress: f => onProgress(0.72 + 0.2 * f, 'harmony') }), byBar = barChords(per, 1);
       let n = 0;
-      m.bars.forEach((b, i) => { const c = byBar[i]; if (b.chord && c) { const x = parseChord(b.chord), y = parseChord(c.chord); b.chord = c.chord; b.chordConf = c.conf; n++; } });
+      m.bars.forEach((b, i) => { const c = byBar[i]; if (b.chord && c) { takeChord(b, c); n++; } });
       if (n) engines.chords = 'essentia.js';
     } catch (e) { notes.push(`Essentia.js chords failed: ${e && e.message || e}`); }
     await pause();
