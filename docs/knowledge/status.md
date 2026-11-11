@@ -23,7 +23,7 @@ OpenSpec changes not archived: 122. With open tasks: 39. All tasks ticked, waiti
 | [console-add-ahead](../../openspec/changes/console-add-ahead/tasks.md) | 1 | 18 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
-| [decode-refine](../../openspec/changes/decode-refine/tasks.md) | 6 | 35 |
+| [decode-refine](../../openspec/changes/decode-refine/tasks.md) | 5 | 35 |
 | [decode-tab-audio](../../openspec/changes/decode-tab-audio/tasks.md) | 16 | 18 |
 | [fm-groove-lab](../../openspec/changes/fm-groove-lab/tasks.md) | 1 | 16 |
 | [generator-followups](../../openspec/changes/generator-followups/tasks.md) | 2 | 3 |
