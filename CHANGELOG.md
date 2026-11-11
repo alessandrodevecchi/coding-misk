@@ -98,6 +98,11 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Decode: a light index of the stored analyses feeds the lists; opening the tab no longer reads every stored analysis.
 - Settings backup: it carries the 100 Decode analyses used last by default, and the import counts Decode analyses and mixtapes.
 - Decode: the recent tracks are rows of the panel's list, without their length.
+- Decode: kicks under a loud bass are found when they fall on every beat of a bar.
+- Decode: quieter hats between loud ones are kept, and claps need noise darker than the hats just before them.
+- Decode: in Full, a section's main drum pattern is the majority of each step, and a variant must come back often.
+- Decode: in Live, the tempo and the beat are checked again after the first 8 bars with kicks, and the code restarts on the new grid.
+- Decode: stored analyses are made again once more for the new drum analysis.
 - Decode: the code changes less often, in Live and in Full: a line waits a few bars between edits and changes only for a real musical difference.
 - Decode: the space bar only plays and pauses.
 - Decode: stored analyses are made again once, with a note in the tab.

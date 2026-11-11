@@ -109,9 +109,13 @@ export function createDecodeTab({ root, app }) {
     if (!cur || !m) return;
     // a stored model of the bars heard stays until the new analysis reaches past it
     if (model && currentModel(model) && model.bars.length > (m.bars || []).length && model.bpm === m.bpm && model.downbeat === m.downbeat) return;
+    // the relock (decode-refine D4): level A checked its tempo and beat phase again on the first bars with kicks and the
+    // grid moved; the code restarts on the new grid as after a tapped tempo
+    const moved = !!(model && model.barSeconds && m.relocked && (model.bpm !== m.bpm || model.downbeat !== m.downbeat));
     model = m; modelSeq++; codeMemo.clear();
     if (cur.tempo && !m.tapped && m.bpm && cur.tempo.bpm !== m.bpm) cur.tempo = null;
     saveSoon();
+    if (moved && playing && startedCode && playLevel === 'A' && orig && orig.playing) { trace('relock', { bpm: m.bpm, downbeat: m.downbeat }); const f = orig.now(); orig.stop(); app.stopCode(); play(f); return; }
     if (playing && !startedCode && orig && orig.playing && model.barSeconds > 0) startCode();
     renderLight();
   }

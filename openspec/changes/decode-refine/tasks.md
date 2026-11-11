@@ -46,10 +46,10 @@ Two rounds (owner, 8 November). **Part 1** is done now: about 14 agent hours (11
 
 ### 7. Drums on dense mixes (about 6 h)
 
-- [ ] 7.1 Kick against bass note by the broadband click or pitch fall, and the every-beat rule (design D4); verify kick F1 at least 0.8 on the acid test song and on `luci-rosse`.
-- [ ] 7.2 Hat and clap thresholds per section; verify hat F1 at least 0.8 on `luci-rosse` and at most 40 false claps on the radio seed.
-- [ ] 7.3 Level B main grid by per-step majority; verify at most 2 patterns per section plus repeated variations on the radio seed.
-- [ ] 7.4 Level A phase and tempo relock when the kicks enter; verify `luci-rosse`'s downbeat within 30 ms by bar 12 and the radio song at 176 BPM by bar 16, in Node and in the browser.
+- [x] 7.1 Kick against bass note by the broadband click or pitch fall, and the every-beat rule (design D4); verify kick F1 at least 0.8 on the acid test song and on `luci-rosse`.
+- [x] 7.2 Hat and clap thresholds per section; verify hat F1 at least 0.8 on `luci-rosse` and at most 40 false claps on the radio seed.
+- [x] 7.3 Level B main grid by per-step majority; verify at most 2 patterns per section plus repeated variations on the radio seed.
+- [x] 7.4 Level A phase and tempo relock when the kicks enter; verify `luci-rosse`'s downbeat within 30 ms by bar 12 and the radio song at 176 BPM by bar 16, in Node and in the browser.
 
 ### 8. Harmony and bass (about 3 h)
 

@@ -23,7 +23,7 @@ import { compileSong } from '../src/song/compile.js';
 import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
-import { measureApp, measureSynth, measureFull } from './decode-measure.mjs';
+import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
 import { analyseFull, pickTempo, barChords, settleMode } from '../src/decode/full.js';
 import { writeFull, inKey } from '../src/decode/writer.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
@@ -352,7 +352,8 @@ if (process.argv.includes('--app')) {
     // first seconds; level B's whole-file grid is measured below)
     // (the new bench songs of decode-refine 6.1 carry what groups 7 to 10 fix: measured, not held to the old targets)
     if (r.hard) { console.log(`info  ${id} (level A, new bench song): tempo ${r.bpm}, downbeat ${r.downbeat} s, F1 ${JSON.stringify(r.f1)}, chords ${r.chords}`); continue; }
-    if (id === 'decode-test-long') { console.log(`info  ${id} (level A): tempo ${r.bpm}, downbeat ${r.downbeat} s (half a beat off on the hats-only intro), F1 ${JSON.stringify(r.f1)}`); continue; }
+    // (decode-refine 7.4: the long test song opens on offbeat hats alone; level A's relock puts its beat right once the
+    // kicks come, so it is held to the targets now)
     check(Math.abs(r.bpm - r.bpmTruth) <= 0.1, `${id} (app export): tempo`, `${r.bpm}`);
     check(r.downbeat < 0.03, `${id} (app export): downbeat within 30 ms of the start`, `${r.downbeat} s`);
     check(r.f1.bd >= 0.7 && r.f1.cp >= 0.9 && r.f1.hh >= 0.8, `${id} (app export): drum grids`, JSON.stringify(r.f1));
@@ -365,6 +366,32 @@ if (process.argv.includes('--app')) {
     check(r.boundsErr <= 1 && r.ms < r.seconds * 1000, `${id} (app export, level B): section bounds within one bar, faster than the file`, `bounds ${r.bounds.join(',') || '-'} (extra ${r.extra}), ${(r.ms / 1000).toFixed(1)} s for ${r.seconds} s`);
     console.log(`info  ${id} (level B): chords ${r.chords}, drums F1 ${JSON.stringify(r.f1)}, on/off ${r.drumsPresence}, engines ${JSON.stringify(r.engines)}`);
   }
+}
+// ---------- decode-refine group 7 on the bench (optional, with --app): drums on dense mixes, the relock ----------
+if (process.argv.includes('--app')) {
+  const app = measureApp(), full = await measureFull({ essentia: false, only: ['decode-test-acid'] }), tl = await measureTimelines({ full: true });
+  const acidA = app['decode-test-acid'], acidB = full['decode-test-acid'], L = tl['luci-rosse'], R = tl['radio-bench-c'];
+  if (acidA && acidB) check(acidA.f1.bd >= 0.8 && acidB.f1.bd >= 0.8, 'the acid test song: kick F1 at least 0.8 in both levels under its distorted bass (the every-beat rule)', `A ${acidA.f1.bd}, B ${acidB.f1.bd}`);
+  if (L) {
+    check(L.B.rows.bd.f1 >= 0.8 && L.A.rows.bd.f1 >= 0.8, 'luci-rosse: kick F1 at least 0.8 in both levels', `A ${L.A.rows.bd.f1}, B ${L.B.rows.bd.f1}`);
+    check(L.B.rows.hh.f1 >= 0.8, 'luci-rosse: hat F1 at least 0.8 (the hats\' floor per bars)', `${L.B.rows.hh.f1}`);
+    check(L.A.progress.at12 && L.A.progress.at12.err <= 30, 'luci-rosse in level A as played: the downbeat within 30 ms of a true one by bar 12 (the relock)', JSON.stringify(L.A.progress));
+    console.log(`info  luci-rosse clap F1 ${L.B.rows.cp.f1} (false ${L.B.rows.cp.falseHits}), drum patterns per section ${L.B.perSection.join(',')}`);
+  }
+  if (R) {
+    check(R.B.rows.cp.falseHits <= 40, 'the radio seed: at most 40 false claps (flatness and the hats of the last seconds)', `${R.B.rows.cp.falseHits}`);
+    check(R.B.perSection.every(n => n <= 2), 'the radio seed in level B: at most 2 drum patterns per section (the per-step majority)', R.B.perSection.join(','));
+  }
+}
+// a tapped or stored tempo is never moved by the relock (decode-refine D4)
+{
+  const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' };
+  const { pcm } = renderSong({ bpm: 124, lead: 0.3, chords: ['Am', 'F'], bass: 'x..x..x...x.x...', bars: 20, drums: D });
+  const A = createAnalyzer(pcm);
+  A.model(9);
+  A.setTempo({ bpm: 124, downbeat: 0.31, tapped: true });
+  const m = A.model(pcm.length / RATE);
+  check(!m.relocked && m.downbeat === 0.31 && m.bpm === 124, 'the relock never moves a tapped tempo', JSON.stringify({ bpm: m.bpm, downbeat: m.downbeat, relocked: m.relocked }));
 }
 // ---------- decode-refine part 1: balanced code changes, the top line group ----------
 {

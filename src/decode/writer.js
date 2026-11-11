@@ -355,6 +355,9 @@ export function steady(list, min = EDIT_RULE.runBars) {
   return out;
 }
 
+// level B's drum grids (decode-refine D4): a step of the main grid is on in at least `main` of a section's bars with
+// drums; a variant is a whole grid heard in at least `variant` of them (and twice)
+export const GRID_RULE = { main: 0.6, variant: 0.1 };
 const gridOf = b => Object.fromEntries(DRUM_ROWS.map(r => [r, (b.drums && b.drums[r]) || EMPTY]));
 // the loop of a part over the bars of a section (values by absolute bar, null where not heard): the smallest period of
 // 1, 2, 4 or 8 bars whose positions (bar mod L, as Strudel's `<…>` reads them) hold one value on 80 % of the bars;
@@ -382,12 +385,16 @@ function drumPlan(model) {
     const idx = range(sec.start, Math.min(sec.start + sec.bars, end)), on = steady(idx.map(i => drumsHeard(bars[i])));
     const keys = idx.map((i, j) => (on[j] && drumsHeard(bars[i]) ? gridKey(gridOf(bars[i])) : on[j] ? 'gap' : null));
     const count = new Map(); for (const k of keys) if (k && k !== 'gap') count.set(k, (count.get(k) || 0) + 1);
-    let main = null; for (const [k, n] of count) if (!main || n > count.get(main)) main = k;
-    if (!main) return { main: null, variants: [], perBar: idx.map(() => null), grid };
+    const heard = keys.filter(k => k && k !== 'gap');
+    if (!heard.length) return { main: null, variants: [], perBar: idx.map(() => null), grid };
+    // the main grid (decode-refine D4): per step, on when it is on in at least GRID_RULE.main of the bars with drums, so
+    // noise on a few steps does not split the section into many grids
+    const main = gridKey(Object.fromEntries(DRUM_ROWS.map((r, j) => [r, Array.from({ length: STEPS }, (_, s) => (heard.filter(k => k.split('|')[j][s] === 'x').length >= GRID_RULE.main * heard.length ? 'x' : '.')).join('')])));
     // (a grid within three steps of the main one, or one that only misses some of its hits, is the main one heard less
     // well: a kick under a loud bass, a hat under a crash)
     const near = k => { const g = grid(k), M0 = grid(main); return diffSteps(g, M0) <= 3 || DRUM_ROWS.every(r => [...g[r]].every((c, j) => c !== 'x' || M0[r][j] === 'x')); };
-    const variants = [...count].filter(([k, n]) => k !== main && n >= 2 && !near(k)).map(([k]) => k);
+    // a variant comes back: at least twice and in GRID_RULE.variant of the section's bars with drums
+    const variants = [...count].filter(([k, n]) => k !== main && n >= Math.max(2, Math.ceil(GRID_RULE.variant * heard.length)) && !near(k)).map(([k]) => k);
     const perBar = keys.map(k => (k === null ? null : variants.includes(k) ? k : main));
     return { main, variants, perBar, grid };
   });

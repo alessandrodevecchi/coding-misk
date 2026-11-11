@@ -8,11 +8,14 @@
 // false hits, distinct drum grids, chord root and quality per bar, bass pitch and octave errors (the chords and the bass
 // notes from the song's own haps, Strudel in Node); level A, and with --full level B with and without Essentia.js
 // (section bounds against the timeline's sections, the level B song's drum patterns).
+// decode-refine 7.3 and 7.4: the level B song's drum patterns per section, and level A as the tab drives it (the
+// tempo and the downbeat's distance to the true grid at bars 12 and 16, the relock); DECODE_OWNER_DIR=<folder>: the
+// same level A measure on the owner's app exports there that have their timeline JSON (printed only)
 //   node --no-warnings tools/decode-measure.mjs [--json] [--full]
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createAnalyzer } from '../src/decode/misk-analyzer.js';
+import { createAnalyzer, horizonOf, LOCK_SECONDS } from '../src/decode/misk-analyzer.js';
 import { analyseFull } from '../src/decode/full.js';
 import { nodeEssentia } from './essentia-node.mjs';
 import { drumsHeard, writeFull } from '../src/decode/writer.js';
@@ -122,7 +125,33 @@ export async function timelineTruth(tl, song) {
     for (const h of haps.filter(h => h.v.analyze === 'bass')) { const j = Math.round(h.at * 16); if (j < 16 && bass[j] === null) bass[j] = midiOfValue(h.v.note); }
     bars.push({ chord: fit.length === 1 ? { root: fit[0].root, quality: fit[0].quality } : null, bass });
   }
-  return { bpm, barSec, hits, starts: tl.sections.map(x => x.bar), bars };
+  return { bpm, barSec, hits, starts: tl.sections.map(x => x.bar), bars, firstDownbeat: tl.sections.length ? tl.sections[0].t || 0 : 0 };
+}
+// the drum patterns of a level B song per section (decode-refine 7.3: at most 2 each)
+export function patternsPerSection(song) {
+  const d = song.tracks.find(t => t.type === 'drums'), ends = []; let a = 0;
+  for (const x of song.sections) { a += x.bars; ends.push(a); }
+  const per = song.sections.map(() => new Set());
+  if (d) for (const c of d.clips) for (let b = c.start; b < c.start + c.bars; b++) { const k = ends.findIndex(e => b < e); if (k >= 0) per[k].add(c.pattern); }
+  return per.map(x => x.size);
+}
+// level A as the tab drives it (decode-refine 7.4): the first lock on the first seconds, then the model up to two bars
+// ahead of the playhead; per bar the tempo and the downbeat's distance to the true bar grid (ms). → { at12, at16,
+// relocked } (the tempo and the distance at the end of bars 12 and 16)
+export function levelAProgress(pcm, bpmTruth, dbTruth = 0) {
+  const A = createAnalyzer(pcm), barT = 240 / bpmTruth, rows = [];
+  let m = A.model(Math.max(horizonOf(0, '2bars', 2), LOCK_SECONDS + 0.5) + 0.1);
+  const err = db => { const x = (((db - dbTruth) % barT) + barT) % barT; return Math.round(Math.min(x, barT - x) * 1000); };
+  for (let f = 0; f < A.duration; f += 0.25) {
+    const h = horizonOf(f, '2bars', m.barSeconds || 2);
+    if (h > (m.analysedTo || 0) + 0.01) m = A.model(h + 0.5);
+    if (!m.barSeconds) continue;
+    const bar = Math.floor((f - m.downbeat) / m.barSeconds);
+    if (bar >= 0) rows[bar] = { bpm: m.bpm, err: err(m.downbeat), relocked: !!m.relocked };
+    if (bar > 16) break;
+  }
+  const at = k => rows[k] || rows.filter(Boolean).pop() || null;
+  return { at12: at(12), at16: at(16), relocked: rows.some(r => r && r.relocked) };
 }
 // a model against a timeline truth: per drum row F1, recall and false hits on the model's grid (each true hit on its
 // nearest step of the model's bars), distinct drum grids in the bars with drums, chords (root right, and the quality
@@ -168,11 +197,11 @@ export async function measureTimelines({ full = false, only = null } = {}) {
     const w = readWav(f), pcm = resample(w.pcm, w.rate, RATE);
     let t0 = Date.now();
     const A = createAnalyzer(pcm).model(pcm.length / RATE);
-    out[x.id] = { A: { ...timelineScore(A, truth), ms: Date.now() - t0 } };
+    out[x.id] = { A: { ...timelineScore(A, truth), ms: Date.now() - t0, progress: levelAProgress(pcm, truth.bpm, truth.firstDownbeat) } };
     if (full) for (const [k, engine] of [['B', nodeEssentia], ['Bown', null]]) {
       t0 = Date.now();
       const m = await analyseFull(pcm, { engine }), song = writeFull(m), drums = song.tracks.find(t => t.type === 'drums');
-      out[x.id][k] = { ...timelineScore(m, truth), ...boundsScore(m.sections, truth.starts), patterns: drums ? Object.keys(drums.patterns).length : 0, sections: m.sections.length, key: m.key, engines: m.engines, ...(m.essentiaTempo ? { essentiaTempo: m.essentiaTempo } : {}), ms: Date.now() - t0 };
+      out[x.id][k] = { ...timelineScore(m, truth), ...boundsScore(m.sections, truth.starts), patterns: drums ? Object.keys(drums.patterns).length : 0, perSection: patternsPerSection(song), sections: m.sections.length, key: m.key, engines: m.engines, ...(m.essentiaTempo ? { essentiaTempo: m.essentiaTempo } : {}), ms: Date.now() - t0 };
     }
   }
   return out;
@@ -180,7 +209,7 @@ export async function measureTimelines({ full = false, only = null } = {}) {
 const KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 export function timelineLine(id, level, r) {
   const row = k => `${k} F1 ${r.rows[k].f1} recall ${r.rows[k].recall} false ${r.rows[k].falseHits}`;
-  return `${id.padEnd(14)} ${level.padEnd(4)} tempo ${r.bpm} (truth ${r.bpmTruth}) downbeat ${r.downbeat}s · ${row('bd')} · ${row('cp')} · ${row('hh')} · grids ${r.grids} in ${r.drumBars} bars${r.patterns !== undefined ? ` (song: ${r.patterns} drum patterns, ${r.sections} sections)` : ''} · chords root ${r.chordRoot} quality ${r.chordQuality} (${r.chordBars} bars) · bass pitch ${r.bassPitch} octave errors ${r.bassOctaveErrors} (${r.bassSteps} steps, bass decoded in ${r.bassBars} bars)${r.bounds ? ` · bounds ${r.bounds.join(',')} (err ${r.boundsErr}, extra ${r.extra})` : ''}${r.key ? ` · key ${KEYS[r.key.root]} ${r.key.mode}` : ''}${r.engines ? ` · tempo by ${r.engines.tempo}` : ''} · ${r.ms} ms`;
+  return `${id.padEnd(14)} ${level.padEnd(4)} tempo ${r.bpm} (truth ${r.bpmTruth}) downbeat ${r.downbeat}s · ${row('bd')} · ${row('cp')} · ${row('hh')} · grids ${r.grids} in ${r.drumBars} bars${r.patterns !== undefined ? ` (song: ${r.patterns} drum patterns, ${r.sections} sections)` : ''} · chords root ${r.chordRoot} quality ${r.chordQuality} (${r.chordBars} bars) · bass pitch ${r.bassPitch} octave errors ${r.bassOctaveErrors} (${r.bassSteps} steps, bass decoded in ${r.bassBars} bars)${r.perSection ? ` · drum patterns per section ${r.perSection.join(',')}` : ''}${r.progress ? ` · level A as played: bar 12 ${r.progress.at12 ? `${r.progress.at12.bpm} BPM, downbeat ${r.progress.at12.err} ms off` : '-'}, bar 16 ${r.progress.at16 ? `${r.progress.at16.bpm} BPM` : '-'}${r.progress.relocked ? ', relocked' : ''}` : ''}${r.bounds ? ` · bounds ${r.bounds.join(',')} (err ${r.boundsErr}, extra ${r.extra})` : ''}${r.key ? ` · key ${KEYS[r.key.root]} ${r.key.mode}` : ''}${r.engines ? ` · tempo by ${r.engines.tempo}` : ''} · ${r.ms} ms`;
 }
 
 export const SYNTH = [
@@ -206,5 +235,15 @@ if (process.argv[1] && process.argv[1].endsWith('decode-measure.mjs')) {
     for (const [g, list] of Object.entries(res)) for (const [id, r] of Object.entries(list)) console.log(`${g.padEnd(7)} ${id.padEnd(16)} tempo ${r.bpm} (truth ${r.bpmTruth}) downbeat ${r.downbeat}s key ${r.key ? `${['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'][r.key.root]} ${r.key.mode}` : '-'} ${r.keyOk ? 'ok' : 'WRONG'} chords ${r.chords} drums on/off ${r.drumsPresence} F1 bd ${r.f1.bd} cp ${r.f1.cp} hh ${r.f1.hh}${r.bass !== null ? ` bass ${r.bass}` : ''}${r.bounds ? ` bounds ${r.bounds.join(',')} (err ${r.boundsErr}, extra ${r.extra}) ending ${r.ending}` : ''}${r.essentiaTempo ? ` essentia tempo ${r.essentiaTempo.bpm} (confidence ${r.essentiaTempo.confidence}, tempo by ${r.engines.tempo})` : ''}${r.hard ? ' (new bench song)' : ''} · ${r.ms} ms`);
     if (!Object.keys(tls).length) console.log('timeline: no app song with its timeline in .cache/decode/wav: run tools/decode-export.cjs with the dev server');
     for (const [id, r] of Object.entries(tls)) for (const [lv, x] of Object.entries(r)) console.log(`timeline ${timelineLine(id, lv, x)}`);
+    // the owner's files exported by the app with their timeline (DECODE_OWNER_DIR): level A as played, printed only
+    if (process.env.DECODE_OWNER_DIR) {
+      const { readAudio } = await import('./decode-edits.mjs'), dir = process.env.DECODE_OWNER_DIR;
+      for (const f of fs.readdirSync(dir).filter(x => /\.timeline\.json$/.test(x))) {
+        const audio = fs.readdirSync(dir).find(x => x !== f && x.startsWith(f.replace(/\.timeline\.json$/, '.')) && /\.(mp3|wav|flac|ogg|m4a|webm)$/i.test(x));
+        if (!audio) continue;
+        const tl = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')), p = levelAProgress(readAudio(path.join(dir, audio)), tl.bpm[0], tl.sections.length ? tl.sections[0].t || 0 : 0);
+        console.log(`owner    ${audio}: level A as played: bar 12 ${p.at12 ? `${p.at12.bpm} BPM, downbeat ${p.at12.err} ms off` : '-'}, bar 16 ${p.at16 ? `${p.at16.bpm} BPM (truth ${tl.bpm[0]})` : '-'}${p.relocked ? ', relocked' : ''}`);
+      }
+    }
   }
 }
