@@ -748,6 +748,9 @@ export function createDecodeTab({ root, app }) {
       sg, song: songB(), title: cur.title, artist: cur.artist, key: cur.fp ? cur.fp.key : 'decode', mix,
       cover: { title: cur.title, artist: cur.artist, attribution: cur.attribution, original: mix.hasOriginal },
       seconds: cur.duration, whole: () => wholeJob(parts), fragment: () => fragmentJob(parts),
+      // the file's picture for the Video look in the fast video (stage-video D12): the file time is the song's plus the
+      // downbeat
+      video: cur.video ? { file: cur.file, downbeat: modelB.downbeat } : null,
     };
   }
   // cancel (analysis spec: Cancel): the worker ends, nothing is stored for level B, level A stays
@@ -1043,6 +1046,9 @@ export function createDecodeTab({ root, app }) {
     // the code of level B at a bar, as the player shows it (Open in Compose must show the same, D15)
     codeB: bar => (modelB ? playableB().codeAt(bar) : null),
     get open() { return !!cur; },
+    // the open file, and the same when it holds a video track (stage-video D3: its picture on the stage)
+    get file() { return cur ? cur.file : null; },
+    get videoFile() { return cur && cur.video ? cur.file : null; },
     get playing() { return playing; },
     get title() { return cur ? (cur.artist ? `${cur.title} · ${cur.artist}` : cur.title) : ''; },
     get duration() { return cur ? cur.duration : 0; },

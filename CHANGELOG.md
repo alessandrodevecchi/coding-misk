@@ -8,6 +8,17 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - Decode: All, Audio and Video filters in the library list, with the count of each, remembered and followed by Autoplay, Previous and Next.
+- Stage: Video look in the look menu and the arrows, showing a muted video with every render style, Code over, the widgets and the captions over it.
+- Stage: with Video chosen and nothing to show, the stage shows the song's own look or Palco, and the menu keeps Video.
+- Guide: "Video on the stage" card for the Video look and the Stage videos card.
+- Fast video and fragments: the Video look decoded from the files frame by frame, the same frames in every export of the same song, and Video offered as a fixed visual and a fragment visual.
+- Session video: a recording with the Video look keeps the stage video playing while the stage is scrolled away or the tab is in the background.
+- Decode: with the Video look, the stage shows the picture of the video file Decode plays, in sync with the sound, also for a video without sound.
+- Settings: "Stage videos" card with the folders of the Video look (Chrome, Edge), their number of videos, Allow access, remove with confirmation, and the size mode Fill, Fit or Stretch.
+- Stage: "Allow stage videos" chip beside the render menu while the stage video folders wait for the browser's permission.
+- `tools/make-test-video.mjs`: numbered, coloured test videos drawn by the repository, with and without sound, 9:16, 4K and an unplayable file.
+- `npm run check:stage-video` and `tools/check-stage-video.cjs` for the Video look.
+
 - Decode: a music note or video icon on every row of the library list and of mixtapes, and a "no sound" mark on videos without sound.
 - Decode: "Another file" opens a panel with "Choose a file…", the recent tracks and the files of the user's folders in one list; the empty tab shows the same list.
 - Decode: Add folder (Chrome, Edge), with subfolders, up to 2000 files per folder, the browser's permission asked once per visit, and a video icon for video files.

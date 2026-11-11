@@ -37,8 +37,10 @@ export function lookFor(dir, looks, at) {
   const v = dir.visual || 'stage';
   if (v === 'stage') return at.stage && looks.includes(at.stage) ? at.stage : at.own && looks.includes(at.own) ? at.own : looks[0];
   if (v.startsWith('fixed:')) return looks.includes(v.slice(6)) ? v.slice(6) : looks[0];
-  if (v === 'song-cycle') return looks[((at.n || 1) - 1) % looks.length];
-  if (v === 'section-cycle') return looks[(at.section || 0) % looks.length];
+  // the cycles never pick Video (stage-video D12): it would need files the viewer did not choose
+  const cyc = looks.filter(l => l !== 'video');
+  if (v === 'song-cycle') return cyc[((at.n || 1) - 1) % cyc.length];
+  if (v === 'section-cycle') return cyc[(at.section || 0) % cyc.length];
   return at.own && looks.includes(at.own) ? at.own : looks[0];
 }
 

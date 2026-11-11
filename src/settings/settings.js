@@ -10,7 +10,8 @@ import { CODE_COLORS, REAL_SCOPES, LAYOUTS, QUALITIES, CARDS, VIDEO_DEFAULTS, SO
 import { FORMATS, MP3_RATES, formatOf } from '../export/encode.js';
 import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from '../soul/data.js';
 import { nextTagline } from '../video/fragments.js';
-import { DICE, REVERT } from '../icons.js';
+import { DICE, REVERT, VIDEO_FILE, BIN, PLUS, LOCK } from '../icons.js';
+import { SV_KEY, SIZE_MODES, sizeOf as svSizeOf } from '../visuals/stage-video-rules.js';
 import { confirmInline } from '../library/songs-view.js';
 import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf, SHAPE_KEEPS, shapeKeepOf, LONG_SONG, LONG_SONG_MIN, LONG_SONG_MAX, longSongOf } from '../song/crescendo.js';
 import { shapeCounts } from '../song/shapes.js';
@@ -128,6 +129,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         ${widgetsCard()}
         ${codeOverCard()}
         ${stageCard()}
+        ${stageVideosCard()}
         <div class="card set-card" id="set-advanced"><h3>${esc(t('setAdvanced'))}</h3>
           <p class="muted">${esc(t('setAdvancedIntro'))}</p>
           <p class="muted" id="set-shape-count" data-shapes="${counts.shapes}">${esc(t('setShapeCount', counts))}</p>
@@ -161,6 +163,27 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setCodeSize'), seg('data-set-code-size', Object.keys(SIZES).map(k => [k, t(`codeSize:${k}`)]), C.size), t('setCodeSizeHint'))}
           ${row(t('setCodeDim'), seg('data-set-code-dim', [['1', t('cwYes')], ['0', t('cwNo')]], C.dim ? '1' : '0'), t('setCodeDimHint'))}
           ${row(t('setCodeLit'), seg('data-set-code-lit', [['outline', t('codeLit:outline')], ['fill', t('codeLit:fill')], ['underline', t('codeLit:underline')]], C.lit || 'outline'), t('setCodeLitHint'))}`;
+  }
+
+  // the "Stage videos" card (stage-video D7, D10): the folders of the Video look, their access and the size mode
+  let svMsg = '';
+  function stageVideosCard() {
+    const V = app.stageVideos;
+    if (!V) return '';
+    const size = svSizeOf(store.get(SV_KEY, null)), rows = V.list();
+    const state = f => (f.scanning ? t('svScanning') : f.state === 'granted' ? t(f.capped ? 'svCountCapped' : 'svCount', { n: f.count }) : `${t(f.capped ? 'svCountCapped' : 'svCount', { n: f.count })} · ${t('svWaiting')}`);
+    const list = !V.supported ? `<p class="hint muted sv-unsupported">${esc(t('svNoFolders'))}</p>` : `<ul class="sv-list">${rows.length ? rows.map(f => `<li class="sv-row${f.state === 'granted' ? '' : ' waiting'}" data-sv-row="${esc(f.id)}">
+        <span class="sv-ico" aria-hidden="true">${VIDEO_FILE}</span><span class="sv-name">${esc(f.name)}</span><span class="sv-count muted">${esc(state(f))}</span>
+        ${f.state === 'granted' ? '' : `<button class="btn small sv-allow-one" data-sv-allow="${esc(f.id)}">${LOCK}<span>${esc(t('svAllowOne'))}</span></button>`}
+        <button class="btn icon small sv-remove" data-sv-remove="${esc(f.id)}" aria-label="${esc(t('svRemove', { name: f.name }))}" title="${esc(t('svRemove', { name: f.name }))}">${BIN}</button>
+        ${f.note ? `<span class="hint sv-note">${esc(t(`svNote:${f.note}`))}</span>` : ''}</li>`).join('') : `<li class="sv-empty muted">${esc(t('svEmpty'))}</li>`}</ul>
+      <div class="actions"><button class="btn" id="sv-add">${PLUS}<span>${esc(t('svAdd'))}</span></button></div>`;
+    return `<div class="card set-card" id="set-stage-videos"><h3>${esc(t('setSv'))}</h3>
+      <p class="muted">${esc(t('setSvIntro'))}</p>
+      ${list}
+      ${row(t('svSize'), seg('data-sv-size', SIZE_MODES.map(k => [k, t(`svSize:${k}`)]), size), t('svSizeHint'))}
+      <p class="hint muted sv-msg" role="status">${esc(svMsg)}</p>
+    </div>`;
   }
 
   // "Code over" (code-over-visual D13): the stage mode, side, width, opacity, the edited line, lit tokens, long lines
@@ -342,6 +365,18 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
     if (b.dataset.setUiFollow) { app.setUiFollow(b.dataset.setUiFollow === '1'); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
+    // the "Stage videos" card: the picker and the permission only inside this click
+    if (b.id === 'sv-add') {
+      app.stageVideos.add().then(r => { svMsg = r.kind === 'dup' ? t('svDup', { name: r.name }) : r.kind === 'added' ? t('svAdded', { name: r.name, n: r.count }) : r.kind === 'error' ? t('svAddError') : ''; render(); });
+      return;
+    }
+    if (b.dataset.svAllow) { svMsg = ''; app.stageVideos.allow(b.dataset.svAllow).then(() => render()); return; }
+    if (b.dataset.svRemove) {
+      const f = app.stageVideos.list().find(x => x.id === b.dataset.svRemove);
+      if (!f || !confirmTwice(`sv-remove-${f.id}`, t('svRemoveConfirm', { name: f.name }))) return;
+      svMsg = ''; app.stageVideos.remove(f.id).then(() => render()); return;
+    }
+    if (b.dataset.svSize) { if (b.dataset.svSize === 'fill') store.remove(SV_KEY); else store.set(SV_KEY, { size: b.dataset.svSize }); return render(); }
     if (b.dataset.phSetSave) { app.phrases.set({ save: b.dataset.phSetSave }); return render(); }
     if (b.dataset.phSetShare) { app.phrases.set({ share: b.dataset.phSetShare }); return render(); }
     if (b.dataset.phSetOpen !== undefined) return app.phrases.open('samples');
@@ -423,7 +458,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       if (!confirmTwice('set-reset', t('setResetConfirm'))) return;
       const keys = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('coding-misk-')) keys.push(k); }
       keys.forEach(k => { try { localStorage.removeItem(k); } catch (err) {} });
-      location.reload();
+      // the stage video folders go too (stage-video D10: a reset clears the folders and the size mode)
+      Promise.resolve(app.stageVideos ? app.stageVideos.clear() : null).catch(() => {}).finally(() => location.reload());
     }
   });
   root.addEventListener('input', e => { if (e.target.id === 'set-volume') { app.setVolume(+e.target.value); e.target.nextElementSibling.textContent = `${e.target.value}%`; } });

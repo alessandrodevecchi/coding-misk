@@ -74,6 +74,11 @@ import SONG_ORDER from '../songs/index.json';
 import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
+import { createStageVideo } from './visuals/stage-video.js';
+import { createStageFolders } from './visuals/stage-video-folders.js';
+import { SV_KEY, sizeOf as svSizeOf, fallbackLookOf, folderSignature, seededPick, trackTime, loopTime, decodeSize } from './visuals/stage-video-rules.js';
+import { createVideoFrames } from './video/stage-video-frames.js';
+import { passSizes } from './visuals/render-styles.js';
 import { createVideo } from './video/video.js';
 import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, codeColsOf, TIMELINE_LAYOUTS, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
 import { liveAreas } from './live/presets.js';
@@ -613,6 +618,9 @@ const GROW_EYES = { hidden: EYE_CLOSED, compact: EYE_HALF, open: EYE_OPEN };
 let growView = GROW_VIEWS.includes(store.get('coding-misk-growth-view', 'compact')) ? store.get('coding-misk-growth-view', 'compact') : 'compact';
 let look = store.get('coding-misk-look', T.look || 'palco');
 if (!PICK_LOOKS.some(([k]) => k === look)) look = 'palco';
+// the Video look's live layer and its folders (stage-video), made with the stage; the look drawn while the first picture
+// loads
+let stageVideo = null, svFolders = null, lookBeforeVideo = null;
 // the render style of the stage (widget-render-styles D1, D8): next to the look, the user's own (a song carries none)
 const renderOf = v => (RENDERS.some(([k]) => k === v) ? v : 'normal');
 let render = renderOf(store.get('coding-misk-render', 'normal'));
@@ -1662,7 +1670,7 @@ async function exportDecode(kind) {
   if (!d) return;
   if (fastJob || rec || capture || decodeRec) return toast(t('dcExportBusy'));
   const job = d.whole(), asVideo = outKind() === 'video';
-  const dec = { job, seconds: d.seconds, timeline: { cover: { title: d.cover.title, artist: d.cover.artist, attribution: d.cover.attribution }, start: job.start }, texts: { cover: d.cover, textsTitle: d.cover.attribution ? d.title : t('dcHeading'), seconds: d.seconds } };
+  const dec = { job, seconds: d.seconds, video: d.video, timeline: { cover: { title: d.cover.title, artist: d.cover.artist, attribution: d.cover.attribution }, start: job.start }, texts: { cover: d.cover, textsTitle: d.cover.attribution ? d.title : t('dcHeading'), seconds: d.seconds } };
   if (exportSpeed() === 'fast' && (!asVideo || video.opts().layout !== 'tab')) {
     if (await (asVideo ? exportVideoFast(d.sg, d.title, { seed: d.key, dec }) : exportFast(d.sg, d.title, null, null, { seed: d.key, dec }))) return;
     toast(t('exportFastFailed'));
@@ -1861,6 +1869,9 @@ async function exportVideoFast(...args) {
   try { return await exportVideoFastIn(...args); } finally { exportCols = null; }
 }
 async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = null, cut = null, frag = null, seed = null, dec = null } = {}) {
+  // the Video look may need stage video folders waiting for access: asked first, while the export's click still counts
+  // (stage-video D12); refused, those parts use the fallback look
+  { const v0 = video.opts().visual || 'stage'; if (svFolders && svFolders.waiting() && (look === 'video' || v0 === 'fixed:video' || (frag && frag.o.look === 'video'))) await svFolders.allow().catch(() => []); }
   // texts on stage off for this one export (spoken-text-on-stage D7): the fragment menu's choice, or Settings → Video
   const noCaptions = frag ? !!frag.noCaptions : capsSkipNext;
   if (!frag) capsSkipNext = false;
@@ -1956,11 +1967,52 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start, ct } : null;
   // a fragment's visual and soul view: the song's own, one at random (from the fragment's code), or one chosen
   const pickOf = (choice, list) => (choice === 'random' ? list[hashString(`${frag.code}/${list.length}`) % list.length] : list.includes(choice) ? choice : null);
-  const fragLook = frag ? pickOf(frag.o.look, looks) : null;
+  // (a fragment's "random" never picks Video: it would need files the viewer did not choose)
+  const fragLook = frag ? pickOf(frag.o.look, frag.o.look === 'random' ? looks.filter(l => l !== 'video') : looks) : null;
   // the render of the file (widget-render-styles D7): the fragment's or the video's own, else the stage's
   const fRender = outRender(frag ? frag.o.render : o.render);
   if (frag) soul.force(pickOf(frag.o.soulView, SOUL_VIEWS));
   const EQ = ['kick', 'snare', 'hats', 'bass', 'arp', 'pad', 'hook'];
+  // the Video look (stage-video D12, D13): one file per part (the Decode file, the video the stage shows for the song
+  // open, else the seeded pick), its frames decoded offline before each frame; its time is the song's (the file time
+  // for a track video, the song's seconds modulo the video's length for a stage video), so two exports and a fragment
+  // give the same frames
+  const partOf = cyc => parts.find(x => cyc >= x.start && cyc < x.end) || parts[parts.length - 1];
+  const lookOfPart = p => fragLook || lookFor(o, looks, { n: p.n, section: p.first, own, stage: stageLook });
+  const vParts = parts.filter(p => lookOfPart(p) === 'video');
+  const vSize = svSizeOf(store.get(SV_KEY, null));
+  const vFallback = p => fallbackLookOf(songs ? ((songs[p.n - 1] || {}).song || {}).look : sg.look, looks);
+  let vf = null, vCanvas = null;
+  const vSrc = new Map(), vFailed = new Set(), VT = tempoClock(job.bpm.map ? job.bpm : sg.meta.bpm.map(Number)), vOff = job.start || 0;
+  const vTime = (p, t, dur) => (vSrc.get(p.n).kind === 'track' ? trackTime(vOff + t + dec.video.downbeat, dur) : loopTime(vOff + t - VT.seconds(p.start), dur));
+  if (vParts.length) {
+    const files = svFiles(), sig = folderSignature(files), live = stageVideo.state();
+    for (const p of vParts) {
+      if (dec && dec.video) { vSrc.set(p.n, { key: 'track', kind: 'track', file: dec.video.file, name: dec.video.file.name }); continue; }
+      const it = songs ? songs[p.n - 1] : null, songId = it && it.song && it.song.id ? it.song.id : `${sg.id || title}${songs ? `/${p.n}` : ''}`;
+      // WYSIWYG (D5): the song open on the stage keeps the stage video the stage shows
+      let f = !songs && !dec && live.pick && live.cur && live.cur.kind === 'stage' && live.pick.song === svSong() && svSong() === `compose:${sg.id}` ? files.find(x => x.key === live.pick.key) : null;
+      if (!f) f = seededPick(files, songId, p.n, sig);
+      if (f) vSrc.set(p.n, { key: f.key, kind: 'stage', open: f.open, name: f.name });
+    }
+    const P = passSizes(fRender, stageA.w, stageA.h, { density: renderDensity() }), work = P && P.w && P.h ? { w: P.w, h: P.h } : null;
+    vf = createVideoFrames({ fps: q.fps, need: decodeSize(fRender, stageA, work), size: vSize, log: line => console.info(line) });
+    const total = (job.cut || VT.seconds(job.bpm.length) + (job.tail || 0)) - vOff, nFrames = Math.ceil(total * q.fps);
+    // the video times of a part's frames, in order (the frames of that part only)
+    vf.timesFor = (p, dur) => { const out = []; for (let fi = 0; fi < nFrames; fi++) { const t = fi / q.fps; if (partOf(Math.max(0, VT.cycleAt(vOff + t))) === p) out.push(vTime(p, t, dur)); } return out; };
+    if (!vSrc.size) console.info('[fast video] Video: no stage video and no Decode file; the frames use the fallback look');
+  }
+  const prepareFrame = vf ? async (t, cyc) => {
+    vCanvas = null;
+    const p = partOf(cyc), src = vSrc.get(p.n);
+    if (!src || vFailed.has(p.n) || lookOfPart(p) !== 'video') return;
+    const key = `${p.n}:${src.key}`;
+    if (vf.key !== key) {
+      const file = src.file || await src.open().catch(() => null);
+      if (!file || !(await vf.open({ key, kind: src.kind, file }, d => vf.timesFor(p, d)))) { vFailed.add(p.n); if (!file) console.info(`[fast video] Video: "${src.name}" cannot be read; its frames use the fallback look`); return; }
+    }
+    vCanvas = await vf.frame(vTime(p, t, vf.duration));
+  } : null;
   visuals.hold(true);
   let clockT = 0;
   soul.setClock(() => clockT);
@@ -1984,13 +2036,14 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own, stage: stageLook });
       fv.look = fLook; exportLooks.add(fLook);
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
-      visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0, render: fRender, light: renderLight() === 'on' ? 'on' : 'off', density: renderDensity() });
+      visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0, render: fRender, light: renderLight() === 'on' ? 'on' : 'off', density: renderDensity(), video: vCanvas, fallback: vFallback(p), size: vSize });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
       else video.composeAt({ layout, q, ct }, cyc, t);
     },
     onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
     onNotes: cw ? (block, more) => cw.addNotes(block, more) : null,
     onStageNotes: block => { for (const [k, list] of Object.entries(block)) for (const n of list) stageNotes.add(k, n); },
+    prepareFrame,
     onLit: overOn ? L => { for (const x of L.haps) { const src = L.codes[x[2]]; let k = litCodes.lastIndexOf(src); if (k < 0) k = litCodes.push(src) - 1; lits.push([x[0], x[1], k, x[3]]); } lits.sort((a, b) => a[0] - b[0]); } : null,
   });
   if (preview) preview.stop();
@@ -2013,6 +2066,8 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   } finally {
     fastJob = null; fv = null;
     soul.setClock(null); soul.force(null); visuals.hold(false); visuals.setTarget(null);
+    // the Video look's decoding: the export log line, then the decoder closed (D13)
+    if (vf) { const S = vf.stats; globalThis.codingMiskFastVideoStats = { ...S }; console.info(`[fast video] Video: ${S.parts} part(s), decoded at ${[...new Set(S.sizes)].join(', ') || '—'}, ${S.decoded} frames decoded, ${S.reused} reused, ${S.cached} from the loop cache${S.failed.length ? `, failed: ${S.failed.join(', ')}` : ''}`); vf.close(); }
   }
 }
 // code-widgets D11 (cw-5): the instruments of the scope and spectrum widgets rendered alone, mono at a quarter of the
@@ -4511,9 +4566,18 @@ const setUi = v => { uiPick = UIS.includes(v) ? v : 'neon'; store.set('coding-mi
 const setUiFollow = on => { uiFollow = !!on; store.set('coding-misk-ui-follow', uiFollow); applyUi(); };
 if (sysLight.addEventListener) sysLight.addEventListener('change', () => { if (uiFollow) applyUi(); });
 $$('[data-uitheme]').forEach(b => b.addEventListener('click', () => setUi(b.dataset.uitheme)));
-const setLook = l => { if (HIDDEN_LOOKS.includes(l)) l = 'palco'; if (!LOOKS.some(([k]) => k === l)) return; look = l; soulBase = l; store.set('coding-misk-look', l); syncAll(); };
-// a song's own visual, unless the listener is watching the soul
-const songLook = l => { if (l) setLook(l); };
+const setLook = l => {
+  if (HIDDEN_LOOKS.includes(l)) l = 'palco'; if (!LOOKS.some(([k]) => k === l)) return;
+  // the look that keeps drawing while the first video picture loads (stage-video D9)
+  if (l === 'video' && look !== 'video') lookBeforeVideo = look;
+  look = l; soulBase = l; store.set('coding-misk-look', l); syncAll();
+  // the folders are read (and scanned once per session) only when the Video look needs them (D9)
+  if (l === 'video' && svFolders) svFolders.need();
+  if (stageVideo) { stageVideo.tick(); syncSvChip(); }
+};
+// a song's own visual, unless the listener is watching the soul; a song never sets Video, and while the user has chosen
+// Video a song's own look does not replace it (stage-video D1)
+const songLook = l => { if (l && l !== 'video' && look !== 'video') setLook(l); };
 
 // a look picked while the radio plays becomes the radio's look (the stage by default; the studio, #28, is set aside)
 $('#looks').addEventListener('change', e => {
@@ -4696,7 +4760,7 @@ function showTab(name) {
   if (name === 'radio' && radio) radio.render();
   if (name === 'decode' && decodeTab) decodeTab.render();
   if (name === 'playlist' && playlistsTab) playlistsTab.render();
-  if (name === 'impostazioni' && settingsPage) settingsPage.render();
+  if (name === 'impostazioni' && settingsPage) { settingsPage.render(); if (svFolders) svFolders.rescan(); }
   if (name === 'generi' && genresTab) genresTab.render();
   if (name === 'voci' && voicesTab) voicesTab.render();
   $('#open-settings').setAttribute('aria-pressed', name === 'impostazioni');
@@ -5883,6 +5947,8 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.da
 // settings page (#31): the gear opens it, a second press goes back to the tab before
 settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
+    // the "Stage videos" card (stage-video D10)
+    get stageVideos() { return svFolders; },
     // decoded tracks (track-to-code D3): their records travel in the backup without the files' handles
     // (decode-library D14): the 100 used last by default, every record in batches with "Include all Decode analyses"; the
     // import compares with the light index; mixtapes and folder names without handles (D11)
@@ -6036,6 +6102,69 @@ function stageSectionInfo(cyc) {
   return song && song.meta ? of(song.meta) : null;
 }
 // the render while a video records from the stage (not the whole tab): the video's own; else the stage's
+// the Video look (stage-video): the live layer, its sources and the look drawn while it has nothing to show
+// (for the checks, until a folder exists: a list of files that stand in for the stage video folders)
+let svTestFiles = null;
+const svFiles = () => svTestFiles || (svFolders ? svFolders.playable() : []);
+// the Decode track with a video track, while the Decode track counts as the player: open in Decode, or playing (D3)
+const svTrack = () => {
+  if (!decodeHere()) return null;
+  const f = decodeTab.videoFile;
+  return f ? { key: `${f.name}|${f.size}|${f.lastModified}`, file: f, time: () => decodeTab.fileNow(), playing: decodeTab.playing } : null;
+};
+// the song on the stage, for one stage video per song (D5): the Decode track, the radio's song on air, the song in Compose
+const svSong = () => {
+  if (decodeHere()) { const f = decodeTab.file; return f ? `decode:${f.name}|${f.size}` : 'decode'; }
+  if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir]; return it ? `radio:${it.id}` : 'radio'; }
+  // Compose: the song playing, else the song open
+  const sg = isPlaying() ? song : null;
+  return `compose:${(sg && sg.id) || T.id || ''}`;
+};
+// the next song when it is known (the radio's next item), so its file is read ahead (D9b)
+const svNext = () => {
+  if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir + 1]; return it ? `radio:${it.id}` : null; }
+  return null;
+};
+// the open song's own look (D2): in the radio the song on air, in Decode none
+const ownLook = () => {
+  if (decodeHere()) return null;
+  if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir]; return it && it.song ? it.song.look : null; }
+  return T.look;
+};
+// the "Stage videos" folders (D10): their list, access and scan; a change runs the layer's rules and redraws the card
+svFolders = createStageFolders({ onChange: () => { if (stageVideo) stageVideo.filesChanged(); syncSvChip(); if (settingsPage && !$('#tab-impostazioni').hidden) settingsPage.render(); } });
+if (look === 'video') svFolders.need();
+// a recording or the live output window draws the stage (D9, D11): the video stays needed while the page is hidden. A
+// layout or view whose stage area is not drawn (code only) does not keep it; the whole tab captures the page as it is
+const drawsStage = A => !!(A && A.stage && A.stage.w > 0 && A.stage.h > 0 && A.stage.a !== 0);
+const svKeep = () => {
+  try {
+    if (video.on) { const l = video.layout; return l === 'tab' || drawsStage(TIMELINE_LAYOUTS.includes(l) ? liveAreas(l, 1920, 1080) : layoutAreas(l, 1920, 1080)); }
+    if (video.live.on) { const p = video.live.preset; return drawsStage(liveAreas(p && p.view, 1920, 1080)); }
+  } catch (e) { /* no recording */ }
+  return false;
+};
+stageVideo = createStageVideo({
+  look: () => look, soul: () => soulOverride, playing: () => isPlaying(), track: svTrack, files: svFiles, songKey: svSong, nextKey: svNext,
+  keep: svKeep,
+  stageEl: $('#stagewrap'), codeFull: () => $('#codecol').classList.contains('full'),
+  note: (kind, v) => { if (kind === 'skip') toast(t('svSkipped', v)); },
+});
+let svBands = { ui: null, c: '#000' };
+const stageFallback = () => (stageVideo.loading && lookBeforeVideo && lookBeforeVideo !== 'video' ? lookBeforeVideo : fallbackLookOf(ownLook(), PICK_LOOKS.map(l => l[0])));
+// the stage's "Allow stage videos" chip (D2): Video chosen, nothing to show because the folders wait for access
+let svChip = null;
+function syncSvChip() {
+  const b = $('#sv-allow'); if (!b || !stageVideo) return;
+  const on = look === 'video' && !soulOverride && !svTrack() && !!svFolders && svFolders.waiting();
+  if (on !== svChip) { svChip = on; b.hidden = !on; }
+}
+$('#sv-allow').addEventListener('click', () => { svFolders.allow().then(() => { stageVideo.tick(); syncSvChip(); }); });
+globalThis.codingMiskStageVideo = {
+  folders: () => ({ list: svFolders.list(), playable: svFolders.playable().map(f => f.key), waiting: svFolders.waiting() }),
+  layer: stageVideo, fallback: stageFallback, state: () => ({ ...stageVideo.state(), look, drawn: globalThis.codingMiskStageDrawn, fallbackLook: stageFallback(), song: svSong() }),
+  testFiles: list => { svTestFiles = list; stageVideo.filesChanged(); },
+};
 const recRender = () => { try { return video.on && video.layout !== 'tab' ? outRender(video.opts().render) : render; } catch (e) { return render; } };
 const visuals = startVisuals({
   // a video being recorded from the stage (not the whole tab) draws the video's render
@@ -6044,6 +6173,11 @@ const visuals = startVisuals({
   stage: {
     settings: () => stageWidgets().S, options: () => stageWidgets().sw, section: stageSection, theme: () => (ui === 'hw' ? 'hw' : 'neon'),
     sectionInfo: stageSectionInfo,
+    // the Video look (stage-video D2, D7): the live picture, the size mode, Fit's bands, the look without Video
+    video: () => { const f = stageVideo.frame(); if (f) lookBeforeVideo = null; return f; },
+    videoSize: () => svSizeOf(store.get(SV_KEY, null)),
+    videoBands: () => { if (svBands.ui !== ui) svBands = { ui, c: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#000' }; return svBands.c; },
+    fallbackLook: stageFallback,
     word: (k, vars) => { const key = `term:${k}`, v = t(key, vars); return v === key ? null : v; },
     lookName: l => { const x = LOOKS.find(([k]) => k === l); return x ? tx(x[1]) : l; },
     renderName: r => { const x = RENDERS.find(([k]) => k === r); return x ? tx(x[1]) : r; },
@@ -6061,7 +6195,7 @@ const visuals = startVisuals({
       const S = coSettings(); return S.stage ? (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right') : null;
     },
   },
-  afterFrame: (cyc, playing) => { video.frame(cyc, playing); drawStageOver(cyc); drawEditorWidgets(cyc); liveLink.tick(); },
+  afterFrame: (cyc, playing) => { stageVideo.tick(); syncSvChip(); video.frame(cyc, playing); drawStageOver(cyc); drawEditorWidgets(cyc); liveLink.tick(); },
   getInfo: stageInfo,
   getSteps: () => meterSteps(secFull().meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando

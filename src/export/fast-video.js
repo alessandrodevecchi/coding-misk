@@ -25,7 +25,9 @@ async function pickFormat(mb, q) {
 // rate), for the widget looks' spectrum columns, up to HISTORY seconds back
 const HISTORY = 2;
 // onLit(list): the places in the code of the haps of each block, before its frames (code-over-visual D6)
-export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, writable = null, onNotes = null, onStageNotes = null, onLit = null }) {
+// prepareFrame(t, cyc, index): awaited before each frame is drawn (stage-video D12: the Video look's picture is decoded
+// there); without it every frame is drawn as before
+export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, writable = null, onNotes = null, onStageNotes = null, onLit = null, prepareFrame = null }) {
   let audio = null, cancelled = false;
   const promise = (async () => {
     const mb = await import('mediabunny');
@@ -73,7 +75,9 @@ export function renderVideo({ job, canvas, q, drawFrame, onProgress = () => {}, 
           for (let i = 0; i < 256; i++) wave[i] = hist[at - 2048 + i * 8] || 0;
           for (let i = 0; i < 128; i++) hook[i] = hist[at - 2048 + i * 16] || 0;
           const waveAt = (at, m = 128) => { const e = Math.round(at * sr) - histAt, out = new Float32Array(m); for (let i = 0; i < m; i++) out[i] = hist[e - (m - i) * 4] || 0; return out; };
-          drawFrame(t, Math.max(0, T.cycleAt(offset + t)), { raw: levelsAt(t), wave, hook, waveAt }, codeAt, fi);
+          const cyc = Math.max(0, T.cycleAt(offset + t));
+          if (prepareFrame) await prepareFrame(t, cyc, fi);
+          drawFrame(t, cyc, { raw: levelsAt(t), wave, hook, waveAt }, codeAt, fi);
           await vs.add(t, 1 / q.fps);
           drawn++;
           if (fi % 15 === 0) report('frames');

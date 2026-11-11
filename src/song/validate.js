@@ -32,6 +32,8 @@ export function validateSong(song, opts = {}) {
   if (typeof song.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(song.id)) err('id', 'lowercase letters, digits and hyphens, for example "night-drive"');
   if (typeof song.title !== 'string' || !song.title.trim()) err('title', 'a non-empty string');
   if (song.look !== undefined && !LOOKS.some(([k]) => k === song.look)) warn('look', `unknown visual "${song.look}"; known: ${LOOKS.map(([k]) => k).join(', ')}`);
+  // Video is the user's choice, never a song's (stage-video D1): a song that names it keeps the stage's look
+  else if (song.look === 'video') warn('look', 'a song cannot carry the Video look; the stage keeps the look the user chose');
 
   // what inspired the song (#57): a short note per language, used by the texts for sharing
   if (song.inspiration !== undefined) {

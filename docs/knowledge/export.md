@@ -41,6 +41,8 @@ Long exports (over 10 minutes) are written to disk while they render, so memory 
 
 Every option has its help text in Settings. The lists live in `src/export/encode.js` and `src/video/layout.js`.
 
+**The Video look in exports** (stage-video D11-D13). The session video records the stage as it is, the video included (a recording keeps the video needed while the stage is hidden). The fast video and the fragments decode the file offline with mediabunny (`src/video/stage-video-frames.js`), awaited before each frame (`prepareFrame` in `renderVideo`): one file per part (the Decode file for a decoded video file; the stage video the stage shows for the song open, so the export matches it; else a seeded pick, the same file for the same song every time), at the song's time (the file time for a track video, the song's seconds modulo the video's length for a stage video), so two exports and a fragment give the same frames. Only the video track is read. Speed work: the frame times go to the sink in order (`canvasesAtTimestamps`), the picture is decoded at the size the frame needs (the stage area in Normal and CRT, twice the render's work picture otherwise), a frame already decoded is drawn again at a higher export rate, a short loop is kept as bitmaps within 256 MB, one decoder at a time; the export log says the decode size, the cache and the frames reused. A file that cannot be decoded: its frames use the fallback look, and the log says so. The direction's song and section cycles and a fragment's "random" never pick Video; "fixed: Video" and a fragment's Video do. Target: at most 2× the export on Palco (a warning in the check, never a failure).
+
 ## Example
 
 The fast export of the Voices example, in the browser check:

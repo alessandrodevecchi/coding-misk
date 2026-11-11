@@ -144,6 +144,10 @@
   /* the stage widgets' quick switch (stage-app-widgets D5): a drawn icon of a picture with side panels, then the word */
   .sw-chip { display: inline-flex; align-items: center; gap: 5px; }
   .sw-chip[hidden] { display: none; }
+  /* the Video look's access chip (stage-video D2): beside the render menu while the folders wait for access */
+  .sv-chip { display: inline-flex; align-items: center; gap: 5px; border-color: var(--a2); }
+  .sv-chip[hidden] { display: none; }
+  @media (max-width: 640px) { .sv-chip span { display: none; } .sv-chip { padding: 4px 9px; } }
   .sw-ico { width: 14px; height: 10px; flex: none; }
   @media (max-width: 640px) { .sw-chip span { display: none; } .sw-chip { padding: 4px 9px; } }
   .stagewrap[data-soul="true"] .readout, .stagewrap[data-soul="true"] .say { display: none; }
@@ -2079,3 +2083,17 @@ summary .vt-cs-dot { margin-left: 0; }
 :root[data-ui="hw"] .dcl-mark, :root[data-ui="hw"] .dcl-mark.live { color: var(--lcd-fg); }
 :root[data-ui="hw"] .dcl-list .dcl-vid .ico-no-sound { background: var(--lcd-bg); color: var(--lcd-fg); }
 .sp-row .sp-add { flex: none; font-weight: 700; }
+
+/* the "Stage videos" card (stage-video D10): the folders of the Video look */
+.sv-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.sv-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); }
+.sv-row.waiting { border-style: dashed; }
+.sv-ico { display: inline-flex; color: var(--a2); }
+.sv-ico svg, .sv-allow-one svg, #sv-add svg, .sv-remove svg { width: 14px; height: 14px; }
+.sv-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
+.sv-count { font-size: 12px; flex: 1 1 auto; }
+.sv-allow-one, #sv-add { display: inline-flex; align-items: center; gap: 6px; }
+.sv-note { flex-basis: 100%; color: var(--danger); font-size: 12px; }
+.sv-empty { padding: 4px 0; }
+.sv-msg:empty { display: none; }
+@media (max-width: 560px) { .sv-name { max-width: 100%; flex-basis: 60%; } }
