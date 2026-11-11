@@ -15,7 +15,10 @@
 // decode-refine part 1 (--refine runs only these): the Full proposal after 8 bars, T with a mute button focused, the
 // Tap button's count and tooltip, Auto, Space only plays and pauses, Full before Play, the melody lines muted outside a
 // generated hook and playing in it, never evaluated, kept by Copy with their helpers.
-// Needs ffmpeg. Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-decode.cjs [shots-dir] [--long] [--full] [--refine]   (dev server)
+// decode-library (--library runs only these, also at the end of a whole run): tools/check-decode-library.cjs, the panel,
+// folders, the list, marks, Autoplay and the hand-over, Previous and Next, mixtapes, the backup's analyses, the cap and the
+// light index, with fake folders in the origin private file system.
+// Needs ffmpeg. Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-decode.cjs [shots-dir] [--long] [--full] [--refine] [--library]   (dev server)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), { execFileSync } = require('node:child_process');
 const { exportTestSongs, DIR } = require('./decode-export.cjs');
@@ -227,7 +230,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
     await page.click('[data-dc-level="B"]'); await sleep(400);
     await page.click('#dc-full-cancel'); await sleep(600);
     s = await stNow();
-    const stored = await page.evaluate(() => globalThis.codingMiskDecode.store.list().then(l => l.map(r => ({ title: r.title, b: !!r.modelB }))));
+    const stored = await page.evaluate(() => globalThis.codingMiskDecode.store.entries().then(l => l.map(r => ({ title: r.title, b: r.mark === 'full' }))));
     check(!s.full && s.level === 'A' && !s.modelB && /cancelled/.test(s.status && s.status.text) && stored.some(r => r.title === 'decode-test-90' && !r.b), 'Cancel: the analysis stops, nothing is stored for level B, Live stays', s.status && s.status.text);
     await page.click('#dc-play'); await sleep(2500); s = await stNow();
     check(s.playing && s.playLevel === 'A', 'after Cancel, Live plays');
@@ -246,8 +249,8 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
     await page.reload(); await sleep(3000);
     s = await open(LONGW);
     check(s.level === 'B' && s.modelB && !s.full, 'reopened: the stored level B analysis opens in Full, no analysis runs');
-    const badge = await page.evaluate(() => globalThis.codingMiskDecode.store.list().then(l => l.filter(r => r.modelB).length));
-    check(badge >= 2, 'the stored records keep level B (the recent list says "Full ready")', `${badge}`);
+    const badge = await page.evaluate(() => globalThis.codingMiskDecode.store.entries().then(l => l.filter(r => r.mark === 'full').length));
+    check(badge >= 2, 'the stored records keep level B (the list marks them ◆ Full)', `${badge}`);
 
     // Open in Compose: the same code at every step, the Live coder with "Follow the song"
     const steps = [0, 8, 16, 30, 48, 64, 90, 111];
@@ -524,6 +527,13 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
     console.log(failed ? `${failed} failed` : 'all passed');
     process.exit(failed ? 1 : 0);
   }
+  // the library (decode-library): its own check, with fake folders in the origin private file system
+  const library = () => {
+    console.log('info  library group: tools/check-decode-library.cjs');
+    try { process.stdout.write(execFileSync('node', [path.join(__dirname, 'check-decode-library.cjs'), ...(shots ? [shots] : [])], { env: process.env, encoding: 'utf8', maxBuffer: 1 << 26 })); }
+    catch (e) { process.stdout.write(String(e.stdout || '')); failed++; }
+  };
+  if (process.argv.includes('--library')) { await browser.close(); library(); console.log(failed ? `${failed} failed` : 'all passed'); process.exit(failed ? 1 : 0); }
   if (ONLY_E) {
     await page.reload(); await sleep(3000);
     await page.click('[data-lang="en"]'); await sleep(300);
@@ -700,14 +710,17 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   const idb = await page.evaluate(() => new Promise(res => { const o = indexedDB.open('coding-misk-decodes'); o.onsuccess = () => { const r = o.result.transaction('decodes').objectStore('decodes').getAll(); r.onsuccess = () => { const list = r.result; res({ n: list.length, size: JSON.stringify(list).length, typed: list.some(x => Object.values(x).some(v => v instanceof Float32Array || v instanceof ArrayBuffer || v instanceof Blob)) }); }; }; o.onerror = () => res(null); }));
   check(idb && idb.n >= 1 && !idb.typed && idb.size < 400000, 'storage holds the analysis and settings, no audio', JSON.stringify(idb));
   await page.reload(); await sleep(3000);
-  const rec = await page.$$eval('#tab-decode .dc-rrow', rows => rows.map(r => r.innerText.replace(/\s+/g, ' ')));
-  check(rec.some(r => /Night Run/.test(r) && /1:5\d/.test(r)), 'after a reload the recent list shows the track with its length', rec.join(' | '));
+  // decode-library: the recent tracks are rows of the library's list, with a mark and without a length
+  await page.click('[data-tab="decode"]').catch(() => {}); await sleep(400);
+  const rec = await page.$$eval('#tab-decode .dcl-row', rows => rows.map(r => r.innerText.replace(/\s+/g, ' ')));
+  check(rec.some(r => /Night Run/.test(r) && /Recent/.test(r) && /◇|◆/.test(r) && !/\d:\d\d/.test(r)), 'after a reload the list shows the track as Recent with its mark, no length', rec.join(' | '));
   s = await open(F('renamed copy.wav'));
   check(s.title === 'Night Run' && s.status && /Stored analysis/.test(s.status.text) && s.tempo && s.tempo.tapped, 'a renamed matching file opens with the stored analysis, title and tapped tempo', JSON.stringify({ status: s.status, tempo: s.tempo, title: s.title }));
   check(s.settings.options.comments === 'essential', 'the Options are stored with the track', s.settings.options.comments);
   await page.reload(); await sleep(3000);
   // a recent track without a file handle: the tab names the file and asks for it again
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }).catch(() => null), page.click('#tab-decode [data-dc-reopen]')]);
+  await page.click('[data-tab="decode"]').catch(() => {}); await sleep(400);
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }).catch(() => null), page.click(`#tab-decode .dcl-row[data-dcl-row="${await page.$$eval('#tab-decode .dcl-row', xs => (xs.find(x => /Night Run/.test(x.innerText)) || xs[0]).dataset.dclRow)}"]`)]);
   await sleep(300);
   const asked = await stNow();
   check(asked.status && /Pick the file "renamed copy.wav"/.test(asked.status.text), 'pick again: the tab names the expected file and asks for it', asked.status && asked.status.text);
@@ -715,9 +728,10 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   s = await stNow();
   check(s.title === 'Night Run' && s.status && /Stored analysis/.test(s.status.text), 'the picked file opens with its stored analysis', s.status && s.status.text);
   await page.reload(); await sleep(3000);
-  const n0 = await page.$$eval('#tab-decode .dc-rrow', r => r.length);
-  await page.click('#tab-decode [data-dc-remove]'); await sleep(800);
-  const n1 = await page.$$eval('#tab-decode .dc-rrow', r => r.length);
+  await page.click('[data-tab="decode"]').catch(() => {}); await sleep(400);
+  const n0 = await page.$$eval('#tab-decode .dcl-row', r => r.length);
+  await page.click('#tab-decode [data-dcl-remove]'); await sleep(800);
+  const n1 = await page.$$eval('#tab-decode .dcl-row', r => r.length);
   check(n1 === n0 - 1, 'remove from the list', `${n0} → ${n1}`);
 
   // ---------- pictures and 400 px ----------
@@ -762,6 +776,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   await page.click('#dc-stop').catch(() => {});
   check(!errors.length, 'no page errors', errors.slice(0, 3).join(' | '));
   await browser.close();
+  library();
   console.log(failed ? `${failed} failed` : 'all passed');
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

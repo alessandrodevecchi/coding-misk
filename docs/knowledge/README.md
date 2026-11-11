@@ -23,7 +23,7 @@ The detailed references stay in `docs/*.md`. Each note links them.
 13. [artists.md](artists.md): artists, a taste over styles and knobs.
 14. [voice.md](voice.md), [narrator.md](narrator.md) and [phrases.md](phrases.md): the voices and the user's phrases.
 15. [sounds.md](sounds.md) and [sound-and-levels.md](sound-and-levels.md): every sound, the missing ones, levels.
-16. [visuals.md](visuals.md), [code-widgets.md](code-widgets.md), [export.md](export.md), [library.md](library.md), [settings.md](settings.md).
+16. [visuals.md](visuals.md), [code-widgets.md](code-widgets.md), [export.md](export.md), [library.md](library.md), [decode.md](decode.md), [settings.md](settings.md).
 17. Before a task: [checks.md](checks.md), [pitfalls.md](pitfalls.md), [decisions.md](decisions.md), [status.md](status.md), [glossary.md](glossary.md).
 
 ## The notes
@@ -54,6 +54,7 @@ The detailed references stay in `docs/*.md`. Each note links them.
 | [code-widgets.md](code-widgets.md) | Strudel's inline widgets written in the code panel: lines, counts, wrapper, settings |
 | [export.md](export.md) | Real time and fast export, formats, video, fragments |
 | [library.md](library.md) | Songs tab, filters, playlists, trash, backup |
+| [decode.md](decode.md) | The Decode tab's library: the panel, folders, marks, Autoplay, mixtapes, the light index |
 | [settings.md](settings.md) | Appearance, audio, video, fragments, radio defaults, data |
 | [from-a-reference.md](from-a-reference.md) | From a song, video, audio, MIDI, score or description to a style, artist, song or patterns |
 | [recipes-music.md](recipes-music.md) | Recipes: artists, styles, genres, material from a reference |

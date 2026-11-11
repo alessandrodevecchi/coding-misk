@@ -7,6 +7,14 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Decode: "Another file" opens a panel with "Choose a file…", the recent tracks and the files of the user's folders in one list; the empty tab shows the same list.
+- Decode: Add folder (Chrome, Edge), with subfolders, up to 2000 files per folder, the browser's permission asked once per visit, and a video icon for video files.
+- Decode: search, a chip per folder, order by name or by recent, and the marks ◆ Full and ◇ Live in the list.
+- Decode: Autoplay, off by default, that prepares the next track of the list or mixtape before the end and hands over without a gap.
+- Decode: Previous and Next on the player bar for a track opened from the list or a mixtape.
+- Decode: mixtapes, ordered references to the user's files, with drag, File…, repeat, rename and delete, in the settings backup without file handles.
+- Settings: "Include all Decode analyses" checkbox in the backup card.
+- `npm run check:decode-library` and `tools/check-decode-library.cjs` (fake folders in the origin private file system); `tools/check-decode.cjs --library`.
 - Decode: Tap button next to ½× and 2×, with the count of taps, and the T key to tap the tempo.
 - Decode: Auto button that goes back to the analysed tempo after a tapped, halved or doubled tempo.
 - Decode: the tab proposes Full after 8 bars in Live, once per track.
@@ -67,6 +75,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Decode: the store keeps up to 2000 analyses instead of 50 and drops Live-only analyses before full ones.
+- Decode: a light index of the stored analyses feeds the lists; opening the tab no longer reads every stored analysis.
+- Settings backup: it carries the 100 Decode analyses used last by default, and the import counts Decode analyses and mixtapes.
+- Decode: the recent tracks are rows of the panel's list, without their length.
 - Decode: the code changes less often, in Live and in Full: a line waits a few bars between edits and changes only for a real musical difference.
 - Decode: the space bar only plays and pauses.
 - Decode: stored analyses are made again once, with a note in the tab.
@@ -105,6 +117,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Decode: the name of a track not heard keeps its contrast in the light theme.
 - Decode: in Full, a part heard every other bar no longer mutes and unmutes on every bar.
 - A curve or energy command on a grown radio song no longer builds the director's view on the page while it waits for its steering.
 - Radio: a song's own drum machine and sample sounds are loaded ahead, notes out of a soundfont's range play from another font of the instrument, and a resume, a console change or the next song no longer makes the scheduler skip notes on a slow computer.

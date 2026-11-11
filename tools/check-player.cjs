@@ -97,6 +97,35 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
   check((await bar()).vol === 55, 'radio volume and bar volume in sync');
   await page.click('#radio-start'); await sleep(300);
 
+  // Decode (decode-library D15): a picked file has no Previous or Next; a track of the list has them, each disabled at
+  // its end (the library's browser check covers the folders, mixtapes and a prepared track)
+  {
+    const { renderSong, writeWav } = await import('./decode-audio.mjs');
+    const os = require('node:os'), path = require('node:path'), fs = require('node:fs');
+    const D = { bd: 'x...x...x...x...', hh: '..x...x...x...x.' }, dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-dec-'));
+    const f1 = path.join(dir, 'one.wav'), f2 = path.join(dir, 'two.wav');
+    writeWav(f1, renderSong({ bpm: 124, bars: 6, chords: ['Am'], drums: D }).pcm); writeWav(f2, renderSong({ bpm: 120, bars: 6, chords: ['C'], drums: D, seed: 3 }).pcm);
+    await page.click('[data-mode="ascolta"]').catch(() => {}); await page.click('[data-tab="decode"]'); await sleep(400);
+    const opened = async n => { for (let i = 0; i < 60; i++) { await sleep(250); const s = await page.evaluate(() => globalThis.codingMiskDecode.state()); if (s.track && s.track.name === n && !(s.status && s.status.kind === 'busy')) return s; } return null; };
+    await page.setInputFiles('#dc-file', f1); await opened('one.wav');
+    await page.setInputFiles('#dc-file', f2); await opened('two.wav');
+    await sleep(400);
+    const dis = async () => page.evaluate(() => [document.getElementById('pb-prev').disabled, document.getElementById('pb-next').disabled].join());
+    check((await dis()) === 'true,true', 'Decode: a picked file has Previous and Next disabled', await dis());
+    // the recent tracks, by name: one, two
+    await page.click('#dc-another'); await sleep(300);
+    await page.click('#dcl [data-dcl-order="name"]'); await sleep(200);
+    const keys = await page.$$eval('#dcl .dcl-row', xs => xs.map(x => [x.querySelector('.dcl-name').firstChild.textContent.trim(), x.dataset.dclRow]));
+    const two = keys.find(k => k[0] === 'two');
+    // a recent track without a handle asks for the file: give it the same file
+    const [fc] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }).catch(() => null), page.click(`#dcl [data-dcl-row="${two[1]}"]`)]);
+    if (fc) await fc.setFiles(f2);
+    await opened('two.wav'); await sleep(400);
+    const st = await page.evaluate(() => globalThis.codingMiskDecode.state());
+    check(!st.nav || (await dis()) === 'true,true', 'Decode: a recent track picked again is a picked file (no list context)', `${JSON.stringify(st.nav)} ${await dis()}`);
+    await page.evaluate(() => globalThis.codingMiskDecode.stop());
+  }
+
   // phone width: the bar fits
   await page.setViewportSize({ width: 400, height: 800 }); await sleep(500);
   const w = await page.evaluate(() => { const r = document.getElementById('pbar').getBoundingClientRect(); return { right: r.right, width: innerWidth, h: r.height }; });

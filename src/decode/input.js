@@ -75,11 +75,17 @@ async function sinkDecode(track, ctx) {
   for (const { b, at } of parts) { const o = Math.max(0, Math.round(at * rate)); for (let c = 0; c < out.numberOfChannels; c++) out.getChannelData(c).set(b.getChannelData(Math.min(c, b.numberOfChannels - 1)).subarray(0, Math.max(0, len - o)), o); }
   return out;
 }
-// the mono analysis copy at 44.1 kHz (D2): channels averaged, resampled when the file has another rate
-export async function analysisCopy(buffer) {
+// the mono analysis copy at 44.1 kHz (D2): channels averaged, resampled when the file has another rate. chunk: seconds
+// averaged at a time with a pause between them (decode-library D9: a track prepared while another plays)
+export async function analysisCopy(buffer, { chunk = 0 } = {}) {
   if (buffer.sampleRate === ANALYSIS_RATE) {
-    const n = buffer.length, out = new Float32Array(n), k = 1 / buffer.numberOfChannels;
-    for (let c = 0; c < buffer.numberOfChannels; c++) { const d = buffer.getChannelData(c); for (let i = 0; i < n; i++) out[i] += d[i] * k; }
+    const n = buffer.length, out = new Float32Array(n), k = 1 / buffer.numberOfChannels, step = chunk > 0 ? Math.round(chunk * ANALYSIS_RATE) : n;
+    const ch = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c));
+    for (let a = 0; a < n; a += step) {
+      const b = Math.min(n, a + step);
+      for (const d of ch) for (let i = a; i < b; i++) out[i] += d[i] * k;
+      if (chunk > 0 && b < n) await new Promise(r => setTimeout(r, 0));
+    }
     return out;
   }
   const n = Math.ceil((buffer.duration * ANALYSIS_RATE)), off = new OfflineAudioContext(1, n, ANALYSIS_RATE), src = off.createBufferSource();

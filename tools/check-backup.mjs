@@ -1,6 +1,6 @@
 // Checks for the backup of everything in the browser (#31). No browser.
 //   node --no-warnings tools/check-backup.mjs
-import { makeBackup, mergeBackup, BACKUP_FORMAT } from '../src/settings/backup.js';
+import { makeBackup, mergeBackup, backupParts, BACKUP_FORMAT } from '../src/settings/backup.js';
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
 const CHECKS = {
   'code widgets settings travel in the backup, the open sections of their card do not (code-widgets 2.2)'() {
@@ -155,6 +155,17 @@ const CHECKS = {
     const bad = mergeBackup({ format: BACKUP_FORMAT, data: { [K]: { format: 1, en: { kathy: ['clear', 'robott', 'robot'], bob: ['deep'], fred: 'echo' }, it: { albert: ['deep'] }, fr: {} } } }, k => (k === K ? { format: 1, en: { fred } } : null)).values[K];
     assert(JSON.stringify(bad) === JSON.stringify({ format: 1, en: { fred, kathy: ['clear', 'robot'] } }), `malformed parts dropped: ${JSON.stringify(bad)}`);
     assert(JSON.stringify(mergeBackup({ format: BACKUP_FORMAT, data: { [K]: 'oops' } }, k => (k === K ? { format: 1, en: { fred } } : null)).values[K]) === JSON.stringify({ format: 1, en: { fred } }), 'a value that is not an object changes nothing');
+  },
+  'Decode analyses in parts and the mixtapes, without handles (decode-library D11, D14; the store side in npm run check:decode-library)'() {
+    const recs = Array.from({ length: 120 }, (_, i) => ({ fp: `r${i}`, title: `R${i}`, used: i, handle: { kind: 'file' } }));
+    const mix = { format: 1, folders: [{ id: 'f1', name: 'Demos' }], mixtapes: [{ id: 'm1', name: 'Tape', repeat: true, updated: 5, rows: [{ id: 'x', name: 'a', ref: { folderId: 'f1', folderName: 'Demos', path: 'a.wav' } }] }] };
+    const parts = backupParts(makeBackup([['coding-misk-ui', 'hw']], new Date(0), null, mix));
+    for (let i = 0; i < recs.length; i += 50) parts.add(recs.slice(i, i + 50));
+    const all = JSON.parse(parts.end().join(''));
+    assert(all.data['coding-misk-decodes'].length === 120 && !JSON.stringify(all).includes('"handle"') && all.data['coding-misk-decode-mixtapes'].mixtapes[0].name === 'Tape', 'every analysis in parts, the mixtapes, no handle');
+    // the import compares analyses with the store's index (the settings page passes no current records here)
+    const { values, counts } = mergeBackup(all, k => (k === 'coding-misk-decodes' ? [] : k === 'coding-misk-decode-mixtapes' ? { format: 1, folders: [], mixtapes: [{ ...mix.mixtapes[0], name: 'Newer here', updated: 9 }] } : null));
+    assert(values['coding-misk-decodes'].length === 120 && counts.decodes === 120 && values['coding-misk-decode-mixtapes'].mixtapes[0].name === 'Newer here' && counts.mixtapes === 1, `merge: ${JSON.stringify(counts)}`);
   },
   'a file that is not a backup is refused'() { assert(mergeBackup({ format: 'x' }, () => null).error, 'accepted'); },
 };

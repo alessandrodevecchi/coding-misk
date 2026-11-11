@@ -92,8 +92,13 @@ for (const [id, r] of Object.entries(synth)) {
   check(fpA.key === fpB.key, 'fingerprint: a renamed file matches');
   check(fpA.key !== fpC.key && fpA.size === fpC.size, 'fingerprint: a file of the same size and different content does not');
   check(sameFile(fpA, { fp: fpA.key, durationMs: 60050 }) && !sameFile(fpA, { fp: fpA.key, durationMs: 61000 }), 'a match needs the length within 0.1 s');
-  const list = Array.from({ length: 53 }, (_, i) => ({ fp: `k${i}`, used: i }));
-  check(overCap(list).join() === 'k0,k1,k2' && DECODE_CAP === 50, 'store cap 50: the least recently used go first');
+  const list = Array.from({ length: 2003 }, (_, i) => ({ fp: `k${i}`, used: i }));
+  check(overCap(list).join() === 'k0,k1,k2' && DECODE_CAP === 2000, 'store cap 2000: the least recently used go first');
+  // decode-library D12: Live-only tracks go before full ones, on index entries
+  const ents = Array.from({ length: 2003 }, (_, i) => ({ fp: `e${i}`, used: i, mark: i < 2 ? 'live' : i % 2 ? 'full' : 'live', version: ANALYSIS_VERSION }));
+  ents[1].mark = 'full';
+  const dropped = overCap(ents);
+  check(dropped.join() === 'e0,e2,e4' && overCap(ents.map(e => ({ ...e, mark: 'full' }))).join() === 'e0,e1,e2', 'store cap: Live-only tracks are dropped first, least recently used first; with only full ones the least recently used', dropped.join());
   const rec = plainRecord({ fp: 'x', handle: {}, pcm: [1], buffer: {}, modelA: {} });
   check(!('handle' in rec) && !('pcm' in rec) && !('buffer' in rec) && 'modelA' in rec, 'a stored or backed up record holds no handle and no audio');
   check(mergeDecodes([{ fp: 'a', used: 2, title: 'x' }], [{ fp: 'a', used: 1, title: 'y' }])[0].title === 'x', 'backup merge: the record used last wins');
