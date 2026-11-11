@@ -95,6 +95,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Guide: the Decode card describes the Lead track in Full, the tempo checked again after 8 bars with a kick in Live, Essentia.js for the top line and the video picture with the Video visual.
+- Guide: the Settings card says what the backup holds of Decode and the "Include all Decode analyses" choice.
+- Guide: the "Video on the stage" card says that the fast video and fragments offer Video as a chosen visual.
+- Guide: the Stage widgets card says that the hit grid panel comes in with the first drum line and that a new song chooses its panels again.
 - Decode: the store keeps up to 2000 analyses instead of 50 and drops Live-only analyses before full ones.
 - Decode: a light index of the stored analyses feeds the lists; opening the tab no longer reads every stored analysis.
 - Settings backup: it carries the 100 Decode analyses used last by default, and the import counts Decode analyses and mixtapes.

@@ -411,7 +411,7 @@ Artists (`docs/ARTISTS.md`) are tastes the director samples for every song: favo
 
 ## Later phases
 
-Planned in `openspec/changes/endless-director/design.md` and in issues `#22` to `#26`: steering buttons (`#24`), continuing a Compose song in the radio (`#29`), long spoken passages (`#39`), session recording, agents and live voice, an MCP server. Ideas for later still: several directors with their own personality and quirks, and a video made from a session (`#27`).
+Planned in `openspec/changes/archive/2026-10-08-endless-director/design.md` and in issues `#22` to `#26`: steering buttons (`#24`), continuing a Compose song in the radio (`#29`), long spoken passages (`#39`), session recording, agents and live voice, an MCP server. Ideas for later still: several directors with their own personality and quirks, and a video made from a session (`#27`).
 
 ## Compilation (`#49`)
 
