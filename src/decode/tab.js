@@ -4,6 +4,9 @@
 // main.js wires it: the player (Strudel's scheduler, the code column's typing) and the master stage.
 import { probe, decode, fingerprint, sameFile, analysisCopy, MAX_SECONDS, ANALYSIS_RATE } from './input.js';
 import { createDecodeStore, freshModel } from './store.js';
+import { createLibraryPanel } from './library-panel.js';
+import { nextOf, prevOf } from './library.js';
+import { prepareTrack, prepareAt, endStep } from './autoplay.js';
 import { horizonOf, LOOK_AHEAD, LOOK_AHEAD_DEFAULT, LOCK_SECONDS, tapTempo } from './misk-analyzer.js';
 import { momentSong, writeFull, withVox, withoutVox, voxGroup, voxOf, VOX_PRELUDE, keyName, SOUND_PRESETS } from './writer.js';
 import { defaultMix, mixApply, gainsOf, loudnessTrim, codeBus, setGain, ORIG } from './mix.js';
@@ -68,7 +71,13 @@ export function createDecodeTab({ root, app }) {
   let cur = null;          // the open track: { file, name, fp, info, buffer, duration, trim, title, artist, attribution, settings, video, handle }
   let model = null;        // the song model (level A, bars analysed so far)
   let status = null;       // { kind: 'busy' | 'error' | 'note', text }
-  let recent = [];
+  // the library (decode-library): the context the open track came from (the list or a mixtape, D8; null for a picked or
+  // dropped file), the next track prepared ahead (D9), the end of a track waiting for it (D10), the last hand-over
+  let nav = null, prep = null, prepNone = false, waitNext = null, handing = false, lastHand = null, handDelta = 0.12, navVer = 0, navMemo = null;
+  const skipped = new Set();
+  // what the library did last (the checks read it): { at, kind, name, f }
+  const trail = [];
+  const trace = (kind, extra = {}) => { trail.push({ at: Math.round(performance.now()), kind, name: cur ? cur.name : null, ...extra }); if (trail.length > 40) trail.shift(); };
   let worker = null, workerFor = null, ask = 0, waiting = null, modelSeq = 0;
   let orig = null, origGain = null, origAn = null, codeAn = null, origFor = null;
   let playing = false, startedCode = false, pendingStart = null, lastUi = 0, taps = [], optionsOpen = false, inflight = 0;
@@ -79,19 +88,21 @@ export function createDecodeTab({ root, app }) {
   const orbitAn = new Map(), orbitGains = new Set();
 
   // ---------- the worker ----------
+  const newWorker = () => new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+  function onWorker(e) {
+    const m = e.data || {};
+    if (m.type === 'model') {
+      inflight = 0;
+      if (waiting && m.id === waiting.id) { const w = waiting; waiting = null; w.resolve(m.model); }
+      if (m.id !== ask) return;
+      takeModel(m.model);
+    }
+    if (m.type === 'error') console.warn('[decode]', m.message);
+  }
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
-    worker.onmessage = e => {
-      const m = e.data || {};
-      if (m.type === 'model') {
-        inflight = 0;
-        if (waiting && m.id === waiting.id) { const w = waiting; waiting = null; w.resolve(m.model); }
-        if (m.id !== ask) return;
-        takeModel(m.model);
-      }
-      if (m.type === 'error') console.warn('[decode]', m.message);
-    };
+    worker = newWorker();
+    worker.onmessage = onWorker;
     return worker;
   }
   function takeModel(m) {
@@ -114,54 +125,79 @@ export function createDecodeTab({ root, app }) {
   }
 
   // ---------- opening ----------
-  async function openFile(file, handle = null) {
-    if (!file) return;
-    stop();
+  // the file read, probed and decoded, its fingerprint and stored analysis looked up. → { info, buffer, fp, rec, match }
+  // or { error } (a status text)
+  async function readFile(file) {
     status = { kind: 'busy', text: t('dcReading') }; render();
     let info;
     try { info = await probe(file); } catch (e) { info = { duration: null, audio: true, video: false }; }
-    if (info.duration && info.duration > MAX_SECONDS + 1) { status = { kind: 'error', text: t('dcErrLong', { len: clock(info.duration) }) }; render(); return; }
+    if (info.duration && info.duration > MAX_SECONDS + 1) return { error: t('dcErrLong', { len: clock(info.duration) }) };
     status = { kind: 'busy', text: t('dcDecoding') }; render();
     let buffer;
     try { buffer = await decode(file, app.ctx(), info); }
     catch (e) {
       const code = e && e.code;
-      status = { kind: 'error', text: t(code === 'nosound' ? 'dcErrNoSound' : code === 'long' ? 'dcErrLong' : code === 'memory' ? 'dcErrMemory' : 'dcErrFormat', { len: info.duration ? clock(info.duration) : '' }) };
-      render(); return;
+      return { error: t(code === 'nosound' ? 'dcErrNoSound' : code === 'long' ? 'dcErrLong' : code === 'memory' ? 'dcErrMemory' : 'dcErrFormat', { len: info.duration ? clock(info.duration) : '' }) };
     }
     const fp = await fingerprint(file, buffer.duration * 1000).catch(() => null);
-    const rec = fp ? await store.get(fp.key) : null, match = rec && sameFile(fp, rec);
-    // the previous track's worker and buffers go (D2: free the buffers when the track closes)
+    const rec = fp ? await store.get(fp.key) : null;
+    return { info, buffer, fp, rec, match: !!(rec && sameFile(fp, rec)) };
+  }
+  // where: the folder and path it came from (decode-library D5); ctx: the list or mixtape it came from (D8), null for a
+  // picked or dropped file
+  async function openFile(file, handle = null, where = null, ctx = null) {
+    if (!file) return false;
+    stop(); dropPrep();
+    const r = await readFile(file);
+    if (r.error) { status = { kind: 'error', text: r.error }; render(); return false; }
+    await install({ file, handle, where, ...r }, { ctx });
+    return true;
+  }
+  // a read (or prepared, D9) track becomes the open one: the previous track's worker and buffers go (D2), the stored
+  // models and settings come back; a prepared track brings its worker and its first model (no analysis copy again)
+  async function install(p, { quick = false, ctx = null } = {}) {
+    const { file, handle, where, info, buffer, fp, rec, match } = p;
     if (worker) { worker.terminate(); worker = null; }
     if (full) { full.w.terminate(); full = null; }
     model = null; modelB = null; bMemo = null; codeMemo.clear();
     cur = {
       file, name: file.name, fp, info, buffer, duration: buffer.duration, handle: handle || (match && rec.handle) || null,
+      where: where || (match && rec.where) || null, created: match ? rec.created || null : null,
       title: match ? rec.title : info.title, artist: match ? rec.artist : info.artist, attribution: match ? rec.attribution !== false : true,
       settings: match && rec.settings ? { ...DEFAULT_SETTINGS(), ...rec.settings, options: { ...DEFAULT_OPTIONS, ...(rec.settings.options || {}) } } : DEFAULT_SETTINGS(),
       tempo: match && rec.tempo ? rec.tempo : null, video: !!info.video,
-      trim: loudnessTrim(buffer.getChannelData(0), buffer.sampleRate),
+      trim: p.trim || loudnessTrim(buffer.getChannelData(0), buffer.sampleRate),
     };
+    // the rows that failed to open stay skipped while Autoplay or Previous and Next go through the same list
+    if (!quick && !(ctx && nav && ctx.kind === nav.kind && (ctx.kind === 'mixtape' ? ctx.id === nav.id : ctx.chip === nav.chip && ctx.order === nav.order && ctx.search === nav.search))) skipped.clear();
+    nav = ctx || null; navVer++; prepNone = false;
     if (match && freshModel(rec.modelA)) model = rec.modelA;
     // a stored analysis of an older analyser is made again, and the tab says so (decode-refine: Stored analysis)
     const old = match && ((rec.modelA && !freshModel(rec.modelA)) || (rec.modelB && !freshModel(rec.modelB)));
     // a track with a stored level B analysis opens in Full (owner answer 1)
     if (match && freshModel(rec.modelB) && rec.modelB.level === 'B') { modelB = rec.modelB; modelBSeq++; }
     setLevel(modelB ? 'B' : 'A', { quiet: true });
-    ensureWorker();
-    const pcm = await analysisCopy(buffer);
-    worker.postMessage({ type: 'load', pcm, rate: ANALYSIS_RATE }, [pcm.buffer]);
-    workerFor = cur;
-    // the stored or tapped tempo goes to the analyser first, so the bars fall where they fell before
-    if (cur.tempo) worker.postMessage({ type: 'tempo', bpm: cur.tempo.bpm, downbeat: cur.tempo.downbeat, tapped: !!cur.tempo.tapped });
-    else if (model && model.bpm) worker.postMessage({ type: 'tempo', bpm: model.bpm, downbeat: model.downbeat, tapped: false });
+    if (p.worker) {
+      // the prepared worker (D9): already loaded, its first answer kept or still on its way
+      worker = p.worker; p.worker = null; worker.onmessage = onWorker; ask = p.askId; workerFor = cur;
+    } else {
+      ensureWorker();
+      const pcm = await analysisCopy(buffer);
+      worker.postMessage({ type: 'load', pcm, rate: ANALYSIS_RATE }, [pcm.buffer]);
+      workerFor = cur;
+      // the stored or tapped tempo goes to the analyser first, so the bars fall where they fell before
+      if (cur.tempo) worker.postMessage({ type: 'tempo', bpm: cur.tempo.bpm, downbeat: cur.tempo.downbeat, tapped: !!cur.tempo.tapped });
+      else if (model && model.bpm) worker.postMessage({ type: 'tempo', bpm: model.bpm, downbeat: model.downbeat, tapped: false });
+    }
     status = old ? { kind: 'note', text: t('dcAnalysedAgain') } : match && model ? { kind: 'note', text: t('dcStored') } : cur.video ? { kind: 'note', text: t('dcVideoNote') } : null;
     if (match && cur.video) status = { kind: 'note', text: `${t('dcStored')} ${t('dcVideoNote')}` };
-    await save();
+    if (p.model) takeModel(p.model);
+    // a hand-over saves after the sound started (quick)
+    if (quick) setTimeout(save, 400); else await save();
     render();
     // the first window: the tempo and the first bars, so Play is ready at once
     // the tempo locks on the first seconds of music (D7, the tempo is the whole track's), whatever the look ahead
-    analyse(Math.max(horizonOf(0, cur.settings.look, model && model.barSeconds ? model.barSeconds : 2), LOCK_SECONDS + 0.5));
+    if (!p.model) analyse(Math.max(horizonOf(0, cur.settings.look, model && model.barSeconds ? model.barSeconds : 2), LOCK_SECONDS + 0.5));
   }
   let saveT = 0;
   // a save at most every 1.5 s (a timer that later changes do not push back, so a playing track is saved too)
@@ -171,37 +207,217 @@ export function createDecodeTab({ root, app }) {
     const rec = {
       fp: cur.fp.key, size: cur.fp.size, durationMs: cur.fp.durationMs, fileName: cur.name, title: cur.title, artist: cur.artist, attribution: cur.attribution,
       settings: cur.settings, tempo: cur.tempo || null, modelA: model && model.bpm ? model : null, modelB: modelB || null, version: model ? model.version : null, video: cur.video,
+      where: cur.where || null,
       ...(cur.handle ? { handle: cur.handle } : {}),
+      ...(cur.created ? { created: cur.created } : {}),
     };
-    const old = await store.get(cur.fp.key);
-    if (old && old.created) rec.created = old.created;
     await store.put(rec);
-    recent = await store.list();
   }
   async function pick() {
     if (globalThis.showOpenFilePicker) {
       try {
         const [h] = await globalThis.showOpenFilePicker({ multiple: false, types: [{ description: 'Audio or video', accept: { 'audio/*': ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus', '.oga', '.weba'], 'video/*': ['.mp4', '.m4v', '.mov', '.webm', '.mkv'] } }], excludeAcceptAllOption: false });
-        if (h) return openFile(await h.getFile(), h);
+        if (h) { closePanel(); return openFile(await h.getFile(), h); }
       } catch (e) { if (e && e.name === 'AbortError') return; }
     }
     root.querySelector('#dc-file').click();
   }
-  async function reopen(fp) {
+  // a recent track (decode-library: a row of the list without a folder): its stored handle, the permission asked in the
+  // click; else the tab names the file and asks for it again. ask false (Autoplay): no prompt, false when not allowed
+  async function reopen(fp, ctx = null, ask = true) {
     const rec = await store.get(fp);
-    if (!rec) return;
-    if (rec.handle && rec.handle.queryPermission) {
+    if (!rec) return false;
+    if (rec.handle) {
       try {
-        let p = await rec.handle.queryPermission({ mode: 'read' });
-        if (p !== 'granted') p = await rec.handle.requestPermission({ mode: 'read' });
-        if (p === 'granted') return openFile(await rec.handle.getFile(), rec.handle);
-        app.toast(t('dcPermission'));
+        let p = rec.handle.queryPermission ? await rec.handle.queryPermission({ mode: 'read' }) : 'granted';
+        if (p !== 'granted' && ask && rec.handle.requestPermission) p = await rec.handle.requestPermission({ mode: 'read' });
+        if (p === 'granted') { const file = await rec.handle.getFile(); closePanel(); return openFile(file, rec.handle, rec.where || null, ctx); }
+        if (ask) app.toast(t('dcPermission'));
+        return false;
       } catch (e) { /* a handle that no longer works: pick the file again */ }
     }
+    if (!ask) return false;
     status = { kind: 'note', text: t('dcPickExpect', { name: rec.fileName || rec.title }) };
+    closePanel();
     render();
     pick();
+    return false;
   }
+  // a row of the list or a mixtape (D7): its file found through its folder (permission asked in the click), a file gone
+  // marked "not found"; a track that was playing goes on with the new one, a mixtape plays
+  async function openRow(row, ctx, ask = true, { andPlay = null } = {}) {
+    const wasPlaying = playing;
+    let ok = false;
+    if (row.kind === 'recent') ok = await reopen(row.fp, ctx, ask);
+    else {
+      let got = null;
+      try { got = await panel.fileOf(row, ask); }
+      catch (e) { if (ask) panel.note({ kind: 'error', text: t('dclGone', { name: row.name }) }); return false; }
+      if (!got) return false;
+      closePanel();
+      ok = await openFile(got.file, got.handle, got.where, ctx);
+    }
+    if (ok && (andPlay ?? (wasPlaying || (ctx && ctx.kind === 'mixtape')))) play(0);
+    return ok;
+  }
+
+  // ---------- the library: Autoplay, Previous and Next (decode-library D8, D9, D10, D15) ----------
+  const autoplayOn = () => !!(nav && !app.exportJob() && (panel.autoplay || (nav.kind === 'mixtape')));
+  const rowId = r => (r ? (r.kind === 'mix' ? r.id : r.key) : null);
+  // the rows the context steps through, with the rows that failed to open marked as missing
+  function srcOf(ctx) {
+    if (ctx.kind === 'mixtape') { const m = panel.mixRows(ctx.id); return { ...m, rows: m.rows.map(r => (skipped.has(r.id) ? { ...r, missing: true } : r)) }; }
+    const list = panel.listFor(ctx);
+    return { list: skipped.size ? list.map(r => (skipped.has(r.key) ? { ...r, missing: true } : r)) : list };
+  }
+  const stepNav = (n, ctx = nav) => (ctx.kind === 'mixtape' ? { ...ctx, rowId: n.row.id, pos: n.pos } : { ...ctx, key: n.row.key, pos: n.pos });
+  // the next and previous rows, kept until the list, a mixtape or the context changes (the player bar asks every frame)
+  function navInfo() {
+    if (!nav) return null;
+    if (navMemo && navMemo.ver === navVer && navMemo.nav === nav) return navMemo;
+    const src = srcOf(nav);
+    navMemo = { ver: navVer, nav, next: nextOf(nav, src), prev: prevOf(nav, src) };
+    return navMemo;
+  }
+  const canStep = dir => { const n = navInfo(); return !!(n && (dir > 0 ? n.next : n.prev)); };
+  // the list, a mixtape or the Autoplay switch changed (the panel): the context follows a new chip or order, a prepared
+  // track that is no longer the next one goes (D9: one at a time)
+  function libraryChanged(kind) {
+    if (kind === 'list' && nav && nav.kind === 'list') { const p = panel.prefs(); nav = { ...nav, chip: p.chip, order: p.order }; }
+    navVer++; prepNone = false;
+    if (!autoplayOn()) { dropPrep(); return; }
+    if (prep) { const n = navInfo(); if (!n || !n.next || rowId(n.next.row) !== rowId(prep.row)) dropPrep(); }
+  }
+  function dropPrep() { if (prep) prep.drop(); prep = null; prepNone = false; }
+  // the next track prepared (D9). now: at the end of a track, when nothing was prepared
+  function startPrep() {
+    const n = navInfo();
+    if (!n || !n.next) { prepNone = true; return null; }
+    const p = prepareTrack(n.next.row, {
+      ctx: app.ctx, store, worker: newWorker, horizon: 4, slow: +globalThis.codingMiskSlowPrep || 0,
+      read: async row => {
+        if (row.kind === 'recent') {
+          const rec = await store.get(row.fp);
+          if (!rec || !rec.handle) return null;
+          const q = rec.handle.queryPermission ? await rec.handle.queryPermission({ mode: 'read' }) : 'granted';
+          return q === 'granted' ? { file: await rec.handle.getFile(), handle: rec.handle, where: rec.where || null } : null;
+        }
+        return panel.fileOf(row, false);
+      },
+    });
+    p.nav = stepNav(n.next);
+    prep = p;
+    p.ready.then(() => {
+      if (prep !== p) return;
+      // a next track that cannot open is skipped with a note, and the one after it is prepared (autoplay spec)
+      if (p.state === 'failed') { skipped.add(rowId(p.row)); navVer++; if (p.error !== 'waiting') app.toast(t('dclSkipped', { name: p.row.name })); prep = null; prepNone = false; }
+    });
+    return p;
+  }
+  // the hand-over (D10): 'end' starts the next original exactly where the playing one ends, 'now' at once (Next)
+  async function handOver(p, why) {
+    handing = true;
+    trace('handover', { why, to: p.row.name, f: orig && orig.playing ? orig.now() : null });
+    const ctx = app.ctx(), old = orig, oldCur = cur;
+    const end = why === 'end' && old && old.info ? old.info.at + (oldCur.duration - old.info.from) : ctx.currentTime;
+    prep = null; waitNext = null;
+    if (saveT) { clearTimeout(saveT); saveT = 0; save(); }
+    // the playing original stops at its end (or now); the new one gets its own source
+    if (old) old.stop(why === 'end' ? Math.max(ctx.currentTime, end) : 0);
+    orig = null;
+    resetOrbits();
+    playing = false; startedCode = false; cur = null;
+    try {
+      await install(p, { quick: true, ctx: p.nav });
+      playing = true; startedCode = false; cur.paused = null;
+      app.stopOthers();
+      const M = level() === 'B' ? modelB : model;
+      if (M && M.barSeconds > 0) {
+        // the code starts a little before `end` on the new file's clock; the original takes the rest (startCode)
+        const f = ctx.currentTime + handDelta - (end - 0.04);
+        await startCode(f, { endAt: end });
+      } else {
+        ensureAudio();
+        const info = orig.start(Math.max(ctx.currentTime, end), 0);
+        lastHand = { end, start: info.at, offset: 0, gapMs: Math.max(0, (info.at - end) * 1000), why };
+      }
+    } finally { handing = false; }
+    render();
+  }
+  // the end of a track with a next one (D10): ready → the hand-over; else silence, a status line, the 3-second rule
+  function endWithNext() {
+    const p = prep || startPrep();
+    if (!p) return false;
+    if (p.state === 'ready') { handOver(p, 'end'); return true; }
+    trace('wait', { to: p.row.name, state: p.state });
+    stop();
+    if (cur) cur.paused = 0;
+    waitNext = { p, t0: performance.now(), audio: false };
+    status = { kind: 'busy', text: t('dclNextWait', { name: p.row.name }) };
+    render();
+    return true;
+  }
+  async function waitTick() {
+    const w = waitNext, p = w.p;
+    if (w.busy) return;
+    const step = endStep({ ready: p.state === 'ready', decoded: !!p.decoded, failed: p.state === 'failed' || p.state === 'dropped', waited: (performance.now() - w.t0) / 1000 });
+    if (step === 'wait') { if (p.state === 'deferred' && !w.finishing) { w.finishing = true; p.finish(); } return; }
+    w.busy = true;
+    if (step === 'skip') {
+      waitNext = null; prep = null;
+      if (p.state === 'failed') { skipped.add(rowId(p.row)); navVer++; }
+      if (!endWithNext()) { status = null; stop(); app.ended(); render(); }
+      return;
+    }
+    // ready: from the beginning, like a track opened by hand; else the sound now and the code when the tempo is found
+    waitNext = null; prep = null;
+    await install(p, { quick: true, ctx: p.nav });
+    if (step === 'start') { play(0); return; }
+    // a preparation still running gives its buffer and goes: the tab analyses the track itself (or took its worker)
+    p.drop();
+    playing = true; startedCode = false;
+    app.stopOthers();
+    ensureAudio();
+    orig.start(app.ctx().currentTime + 0.05, 0);
+    trace('audio', { waited: performance.now() - w.t0 });
+    renderLight();
+  }
+  // Previous and Next on the player bar (D15): a prepared next track hands over at once
+  async function step(dir) {
+    const n = navInfo(), to = n && (dir > 0 ? n.next : n.prev);
+    if (!to) return false;
+    trace('step', { dir, to: to.row.name, prep: prep ? prep.state : null });
+    if (dir > 0 && prep && prep.state === 'ready' && rowId(prep.row) === rowId(to.row)) { await handOver(prep, 'now'); return true; }
+    const wasPlaying = playing || !!waitNext, ctx0 = nav;
+    waitNext = null; dropPrep();
+    // a row that cannot be read is skipped with a note, and the one after it (in the same direction) is tried
+    for (let k = 0, row = to; row && k < 20; k++) {
+      if (await openRow(row.row, stepNav(row, ctx0), true, { andPlay: wasPlaying || ctx0.kind === 'mixtape' })) return true;
+      if (!(status && status.kind === 'error')) return false;
+      skipped.add(rowId(row.row)); navVer++;
+      app.toast(t('dclSkipped', { name: row.row.name }));
+      const src = srcOf(ctx0), from = stepNav(row, ctx0);
+      row = dir > 0 ? nextOf(from, src) : prevOf(from, src);
+    }
+    return false;
+  }
+  // the panel over the tab ("Another file") or inline in the empty tab
+  let panelOpen = false;
+  function closePanel() { if (panelOpen) { panelOpen = false; panel.close(); } }
+  const panel = createLibraryPanel({
+    app: { t, esc, toast: app.toast, confirmInline: app.confirmInline },
+    store,
+    hooks: {
+      openRow: (row, ctx, ask) => openRow(row, ctx, ask),
+      openRecent: (fp, ctx) => openRow({ kind: 'recent', fp }, ctx, true),
+      pick: () => pick(),
+      removeRecent: fp => store.remove(fp).then(() => { app.toast(t('dcRemoved')); panel.entriesChanged(); navVer++; }),
+      playing: () => (!cur ? null : nav && nav.kind === 'mixtape' ? { mixId: nav.id, mixRowId: nav.rowId } : { key: nav && nav.kind === 'list' ? nav.key : cur.where ? `${cur.where.folderId}/${cur.where.path}` : cur.fp ? `fp:${cur.fp.key}` : null }),
+      changed: kind => libraryChanged(kind),
+      closed: () => { panelOpen = false; },
+    },
+  });
+  store.onChange(() => { navVer++; });
 
   // ---------- playing ----------
   const look = () => (cur ? cur.settings.look : LOOK_AHEAD_DEFAULT);
@@ -231,10 +447,13 @@ export function createDecodeTab({ root, app }) {
   }
   // starts the code on Strudel's clock at file time f (D12), the original at the audio time of that cycle; a source
   // already playing hands over to the new one at that time
-  async function startCode(f = null) {
+  // endAt (a hand-over, decode-library D10): the original starts no earlier than that audio time, skipping the few
+  // milliseconds of its start the code's clock has already passed, so there is no gap and the two stay in sync
+  async function startCode(f = null, { endAt = null } = {}) {
     if (!cur || pendingStart) return;
     if (level() === 'B' ? !(modelB && modelB.barSeconds > 0) : !(model && model.barSeconds > 0)) return;
     startedCode = true;
+    trace('code', { f });
     pendingStart = (async () => {
       ensureAudio();
       const at = f ?? (orig && orig.playing ? orig.now() + 0.15 : 0), B = level() === 'B';
@@ -244,14 +463,21 @@ export function createDecodeTab({ root, app }) {
       if (B) { sg = playableB(); code = bar < 0 ? sg.silent : sg.codeAt(bar); }
       else { const P = playableAt(Math.min(bar, knownBar(at))); sg = P.sg; code = P.code; }
       playLevel = B ? 'B' : 'A';
+      const t0 = app.ctx().currentTime;
       const r = await app.play({ cycle: c, sg, code, title: cur.title, level: t(B ? 'dcFullLvl' : 'dcLive') });
       if (!playing || !r || !Number.isFinite(r.time)) return;
-      orig.start(r.time, fileOfCycle(M, c));
+      handDelta = Math.max(0.02, Math.min(0.5, r.time - t0));
+      if (endAt === null) { orig.start(r.time, fileOfCycle(M, c)); return; }
+      // the audio time of the file's start on the code's clock
+      const zero = r.time - fileOfCycle(M, c), when = Math.max(endAt, zero, app.ctx().currentTime);
+      const info = orig.start(when, when - zero);
+      lastHand = { end: endAt, start: info.at, offset: info.from, gapMs: Math.max(0, (info.at - endAt) * 1000), why: endAt > t0 ? 'end' : 'now' };
     })().finally(() => { pendingStart = null; });
     return pendingStart;
   }
   function stop({ keep = false } = {}) {
     if (saveT) { clearTimeout(saveT); saveT = 0; save(); }
+    if (waitNext) { waitNext = null; if (status && status.kind === 'busy') status = null; }
     resetOrbits();
     if (cur && keep && orig && orig.playing) cur.paused = orig.now();
     playing = false; startedCode = false;
@@ -488,13 +714,23 @@ export function createDecodeTab({ root, app }) {
 
   // ---------- every frame ----------
   function frame() {
-    if (!cur) return;
+    if (!cur || handing) return;
+    if (waitNext) { waitTick(); return; }
     if (playing && !pendingStart && (startedCode ? app.mode() !== 'decode' : app.othersPlaying())) { stop(); return; }
     if (!playing && orig && orig.playing) orig.stop();
     if (cur || codeAn) audio();
     if (!playing) return;
     const f = orig ? orig.now() : 0;
-    if (f !== null && f >= cur.duration - 0.03) { stop(); cur.paused = 0; app.ended(); return; }
+    // the original playing alone (no tempo yet, or a next track started without its code): the code joins as soon as
+    // the model has the tempo
+    if (!startedCode && !pendingStart && orig && orig.playing && level() !== 'B' && model && model.barSeconds > 0) startCode();
+    // Autoplay (decode-library D9, D10): the next track prepared 30 s before the end; ready, it hands over just before the
+    // end so its sound starts where this one ends
+    if (autoplayOn() && f !== null) {
+      if (!prep && !prepNone && f >= prepareAt(cur.duration)) startPrep();
+      if (prep && prep.state === 'ready' && orig && orig.playing && f >= cur.duration - (handDelta + 0.08)) { handOver(prep, 'end'); return; }
+    } else if (prep) dropPrep();
+    if (f !== null && f >= cur.duration - 0.03) { trace('end', { f }); if (autoplayOn() && endWithNext()) return; stop(); cur.paused = 0; app.ended(); return; }
     // level A: keep the model ahead of the horizon (one request at a time, a little past it)
     const want = horizon(f ?? 0);
     // one request in flight at a time, a little past the horizon (a lost answer frees the slot after 3 s)
@@ -585,17 +821,19 @@ export function createDecodeTab({ root, app }) {
     const stat = status ? `<p class="dc-status ${status.kind}" role="${status.kind === 'error' ? 'alert' : 'status'}">${status.kind === 'busy' ? '<span class="growing-mark dc-grow" aria-hidden="true"></span>' : ''}${esc(status.text)}</p>` : '';
     const input = `<input type="file" id="dc-file" accept="audio/*,video/*,.flac,.opus,.m4a" hidden>`;
     if (!cur) {
-      const rows = recent.map(r => `<li class="dc-rrow"><span class="dc-thumb">${ICON.wave}</span><span class="dc-rname"><b>${esc(r.title || r.fileName || '?')}</b><small>${esc(r.artist || t('dcNoArtist'))}</small></span><span class="dc-len">${esc(clock((r.durationMs || 0) / 1000))}</span><span class="badge${r.modelB ? ' ok' : ''}">${esc(t(r.modelB ? 'dcFullReady' : 'dcLiveOnly'))}</span>
-        <span class="dc-racts"><button class="btn" data-dc-reopen="${esc(r.fp)}">${r.hasHandle ? `▶ ${esc(t('dcOpen'))}` : `${ICON.file} ${esc(t('dcPickAgain'))}`}</button><button class="btn icon" data-dc-remove="${esc(r.fp)}" title="${esc(t('dcRemove'))}" aria-label="${esc(t('dcRemove'))}">${ICON.x}</button></span></li>`).join('');
+      // the empty tab: the drop area, then the library's list (decode-library: the same list as the panel)
       root.innerHTML = `${head}${input}<div class="dc-drop" id="dc-drop" tabindex="0" role="button" aria-label="${esc(t('dcChoose'))}">${ICON.drop}<h3>${esc(t('dcDrop'))}</h3><div><button class="btn primary" id="dc-choose">${ICON.file} ${esc(t('dcChoose'))}</button></div>
         <div class="dc-fmts">${esc(t('dcFormats'))}</div><p class="note">${esc(t('dcNote'))}</p></div>${stat}
-        <div class="lbl dc-rlbl">${esc(t('dcRecent'))}</div>${rows ? `<ul class="dc-recent">${rows}</ul>` : `<p class="note">${esc(t('dcNoRecent'))}</p>`}`;
+        <div class="card dc-panel dc-lib-inline" id="dc-lib-slot"></div>`;
+      panelOpen = false;
+      panel.mount(root.querySelector('#dc-lib-slot'), false);
       return;
     }
     const s = cur.settings, mix = s.mix;
     root.innerHTML = `${head}${input}
       <div class="card dc-panel" id="dc-drop">
-        <div class="dc-filerow"><span class="dc-fname">${ICON.file} <span>${esc(cur.name)} · ${esc(clock(cur.duration))}</span></span><button class="btn" id="dc-another">${esc(t('dcAnother'))}</button></div>
+        <div class="dc-filerow"><span class="dc-fname">${ICON.file} <span>${esc(cur.name)} · ${esc(clock(cur.duration))}</span></span><button class="btn" id="dc-another" aria-expanded="${panelOpen}">${esc(t('dcAnother'))}</button></div>
+        <div class="dc-lib-slot" id="dc-lib-slot"></div>
         ${stat}
         <div class="dc-grid2"><label class="ctrl"><span class="lbl">${esc(t('dcTitle'))}</span><input id="dc-title" type="text" maxlength="120" value="${esc(cur.title)}" autocomplete="off" data-no-knob></label>
           <label class="ctrl"><span class="lbl">${esc(t('dcArtist'))}</span><input id="dc-artist" type="text" maxlength="120" value="${esc(cur.artist)}" autocomplete="off" data-no-knob></label>
@@ -620,6 +858,7 @@ export function createDecodeTab({ root, app }) {
       <div class="card dc-panel dc-export" id="dc-export-card"><div class="lbl">${esc(t('dcExport'))}</div>
         <div class="dc-acts">${app.outCombo(`<button class="btn" id="dc-export" title="${esc(t('dcExportTip'))}">${esc(t('exportWav'))}</button>`)}<button class="btn" id="dc-frag" title="${esc(t('dcFragTip'))}">${esc(t('fragBtn'))}</button></div>
         <p class="note">${esc(t('dcExportNote'))}</p></div>`;
+    if (panelOpen) panel.mount(root.querySelector('#dc-lib-slot'), true);
     renderLight(true);
   }
   // the parts that move while playing, without rebuilding the panel
@@ -652,11 +891,12 @@ export function createDecodeTab({ root, app }) {
   };
 
   root.addEventListener('click', e => {
-    const b = e.target.closest('button, [data-dc-reopen]');
+    if (e.target.closest('#dcl')) return;
+    const b = e.target.closest('button');
     if (!b) { if (e.target.closest('#dc-drop.dc-drop')) pick(); return; }
-    if (b.id === 'dc-choose' || b.id === 'dc-another') { pick(); return; }
-    if (b.dataset.dcReopen) { reopen(b.dataset.dcReopen); return; }
-    if (b.dataset.dcRemove) { store.remove(b.dataset.dcRemove).then(async () => { recent = await store.list(); app.toast(t('dcRemoved')); render(); }); return; }
+    if (b.id === 'dc-choose') { pick(); return; }
+    // "Another file" opens the panel, never the file picker (decode-library: the panel)
+    if (b.id === 'dc-another') { if (panelOpen) closePanel(); else { panelOpen = true; panel.mount(root.querySelector('#dc-lib-slot'), true); panel.open(); } b.setAttribute('aria-expanded', panelOpen); return; }
     if (!cur) return;
     if (b.id === 'dc-play') { toggle(); return; }
     if (b.id === 'dc-stop') { stop(); cur.paused = 0; renderLight(); return; }
@@ -676,10 +916,11 @@ export function createDecodeTab({ root, app }) {
     if (b.dataset.dcSolo) { setMix({ type: 'solo', id: b.dataset.dcSolo }); return; }
   });
   root.addEventListener('pointerdown', e => { const tb = e.button === 0 && e.target.closest('#dc-tap'); if (tb && !tb.disabled) { e.preventDefault(); tap(); } });
-  root.addEventListener('keydown', e => { if (e.target.id === 'dc-drop' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(); } });
+  root.addEventListener('keydown', e => { if (e.target.closest && e.target.closest('#dcl')) return; if (e.target.id === 'dc-drop' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(); } });
   root.addEventListener('toggle', e => { if (e.target.id === 'dc-options') optionsOpen = e.target.open; }, true);
   root.addEventListener('change', e => {
     const el = e.target;
+    if (el.closest && el.closest('#dcl')) return;
     if (el.id === 'dc-file') { const f = el.files && el.files[0]; el.value = ''; if (f) openFile(f); return; }
     if (!cur) return;
     if (el.id === 'dc-look') { cur.settings.look = LOOK_AHEAD.includes(el.value) ? el.value : LOOK_AHEAD_DEFAULT; saveSoon(); return; }
@@ -689,6 +930,7 @@ export function createDecodeTab({ root, app }) {
   });
   root.addEventListener('input', e => {
     const el = e.target;
+    if (el.closest && el.closest('#dcl')) return;
     if (!cur) return;
     if (el.id === 'dc-title') { cur.title = el.value.trim() || cur.title; optionChanged(); return; }
     if (el.id === 'dc-artist') { cur.artist = el.value.trim(); optionChanged(); return; }
@@ -709,10 +951,12 @@ export function createDecodeTab({ root, app }) {
     openFile(file, handle && handle.kind === 'file' ? handle : null);
   });
 
-  store.list().then(list => { recent = list; if (!cur) render(); });
+  panel.loaded.then(() => { if (!cur) render(); });
   render();
   const api = {
-    render, frame, next, tap, toggle, play, pause, seek, stop, openFile, runFull, cancelFull, setLevel, openCompose, exportSource, requestExport, exportLabel, fullForExport,
+    render, frame, next, tap, step, canStep,
+    get panel() { return panel; },
+    get autoplay() { return autoplayOn(); }, toggle, play, pause, seek, stop, openFile, runFull, cancelFull, setLevel, openCompose, exportSource, requestExport, exportLabel, fullForExport,
     get level() { return level(); },
     get modelB() { return modelB; },
     // the code of level B at a bar, as the player shows it (Open in Compose must show the same, D15)
@@ -724,7 +968,7 @@ export function createDecodeTab({ root, app }) {
     fileNow,
     get model() { return model; },
     // for the browser checks (tools/check-decode.cjs)
-    state: () => (cur ? { bar: shownModel() && shownModel().barSeconds ? cycleOfFile(shownModel(), fileNow()) : null, title: cur.title, artist: cur.artist, attribution: cur.attribution, settings: JSON.parse(JSON.stringify(cur.settings)), playing, startedCode, file: fileNow(), duration: cur.duration, trim: cur.trim, bars: model ? model.bars.length : 0, bpm: model ? model.bpm : 0, downbeat: model ? model.downbeat : 0, tempo: cur.tempo, levels: { orig: peakOf(origAn), code: peakOf(codeAn), ...Object.fromEntries(playLevel === 'B' ? codeIds().map(id => [id, orbitPeak(id)]) : []) }, gains: gainsOf(cur.settings.mix), level: level(), playLevel, full: full ? { f: full.f, stage: full.stage, then: full.then } : null, modelB: modelB ? { bpm: modelB.bpm, downbeat: modelB.downbeat, bars: modelB.bars.length, sections: modelB.sections, ending: modelB.ending, engines: modelB.engines, key: modelB.key, ms: modelB.ms } : null, orbits: bMemo ? bMemo.sg.orbits : null, sync: orig && orig.info ? { ...orig.info } : null, status } : { status, recent: recent.length }),
+    state: () => (cur ? { bar: shownModel() && shownModel().barSeconds ? cycleOfFile(shownModel(), fileNow()) : null, title: cur.title, artist: cur.artist, attribution: cur.attribution, settings: JSON.parse(JSON.stringify(cur.settings)), playing, startedCode, file: fileNow(), duration: cur.duration, trim: cur.trim, bars: model ? model.bars.length : 0, bpm: model ? model.bpm : 0, downbeat: model ? model.downbeat : 0, tempo: cur.tempo, levels: { orig: peakOf(origAn), code: peakOf(codeAn), ...Object.fromEntries(playLevel === 'B' ? codeIds().map(id => [id, orbitPeak(id)]) : []) }, gains: gainsOf(cur.settings.mix), level: level(), playLevel, full: full ? { f: full.f, stage: full.stage, then: full.then } : null, modelB: modelB ? { bpm: modelB.bpm, downbeat: modelB.downbeat, bars: modelB.bars.length, sections: modelB.sections, ending: modelB.ending, engines: modelB.engines, key: modelB.key, ms: modelB.ms } : null, orbits: bMemo ? bMemo.sg.orbits : null, sync: orig && orig.info ? { ...orig.info } : null, status, ...libState() } : { status, ...libState() }),
     store,
     // the original and the code at the same moment (two long analysers before the master stage), to measure their sync
     probe() {
@@ -739,5 +983,14 @@ export function createDecodeTab({ root, app }) {
     },
   };
   const syncTaps = {};
+  // the library's part of the state (tools/check-decode-library.cjs)
+  function libState() {
+    const n = navInfo();
+    return {
+      nav, canPrev: canStep(-1), canNext: canStep(1), next: n && n.next ? n.next.row.name : null, prev: n && n.prev ? n.prev.row.name : null,
+      prep: prep ? { state: prep.state, name: prep.row.name, times: prep.times, error: prep.error } : null, waitNext: waitNext ? { name: waitNext.p.row.name, state: waitNext.p.state } : null,
+      lastHand, handDelta, trail: trail.slice(-12), autoplay: autoplayOn(), panelOpen, reads: store.stats.reads, track: cur ? { name: cur.name, where: cur.where } : null,
+    };
+  }
   return api;
 }

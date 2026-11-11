@@ -4957,7 +4957,7 @@ playlistsTab = createPlaylistsTab({ root: $('#tab-playlist'), t, esc, clock, pla
 // the decoded track plays on Strudel's clock (D12): the tab gives the cycle and the code of the moment, the player starts
 // the scheduler there and answers with the audio time of that cycle, where the tab starts the original
 decodeTab = createDecodeTab({ root: $('#tab-decode'), app: {
-  t, esc, toast,
+  t, esc, toast, confirmInline,
   ctx: () => { initAudioOnce(); return globalThis.getAudioContext(); },
   output: () => { try { const c = globalThis.getSuperdoughAudioController && globalThis.getSuperdoughAudioController(); return c && c.output; } catch (e) { return null; } },
   mode: () => mode,
@@ -5349,6 +5349,8 @@ function neighbour(dir) {
   return i < 0 ? -1 : i + dir >= 0 && i + dir < list.length ? i + dir : -1;
 }
 function goNeighbour(dir) {
+  // Decode (decode-library D15): the track before or after in the list or mixtape the open track came from
+  if (decodeHere()) { if (decodeTab.canStep(dir)) decodeTab.step(dir); return; }
   const j = neighbour(dir);
   if (typeof j !== 'number' || j < 0) return;
   const wasPlaying = isPlaying(), { tr, p } = cards[j];
@@ -5419,14 +5421,17 @@ function renderPlayerBar() {
   if (!onRadio && queue && queue.current === currentSongId()) { const q = queue.position; pos = `${queue.name} · ${q.n} / ${q.total}${pos ? ` · ${pos}` : ''}`; }
   const onair = onRadio && !radio.paused;
   const canNav = !dec && (onRadio || (currentSongId() !== null && (mode === 'track' || (source && source.kind === 'song'))));
+  // Decode: Previous and Next only with a list or mixtape context, each disabled at its end (decode-library D15)
+  const decTab = dec || (decodeHere() ? decodeTab : null);
+  const canPrev = decTab ? decTab.canStep(-1) : canNav, canNext = decTab ? decTab.canStep(1) : canNav;
   const barTxt = bars ? t('pbBar', bars) : '';
-  const key = [title, pos, barTxt, onair, canNav, shuffleOn, repeatMode, !!dec].join('|');
+  const key = [title, pos, barTxt, onair, canPrev, canNext, shuffleOn, repeatMode, !!dec].join('|');
   if (key === pbLast) return;
   pbLast = key;
   $('#pb-title').textContent = title || ''; $('#pb-pos').textContent = pos; { const k = barTxt.indexOf(' '); $('#pb-bar').innerHTML = k > 0 ? `<span class="pb-bar-w">${esc(barTxt.slice(0, k + 1))}</span>${esc(barTxt.slice(k + 1))}` : esc(barTxt); }
   $('#pb-onair').classList.toggle('on', onair);
   $('#pbar').classList.toggle('radio', onRadio);
-  $('#pb-prev').disabled = !canNav; $('#pb-next').disabled = !canNav;
+  $('#pb-prev').disabled = !canPrev; $('#pb-next').disabled = !canNext;
   renderModes(onRadio);
 }
 // shuffle and repeat (#36): remembered, off in the radio
@@ -5872,7 +5877,15 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.da
 settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
     // decoded tracks (track-to-code D3): their records travel in the backup without the files' handles
-    decodes: { all: () => (decodeTab ? decodeTab.store.all() : Promise.resolve([])), import: list => (decodeTab ? decodeTab.store.importMany(list) : Promise.resolve(0)) },
+    // (decode-library D14): the 100 used last by default, every record in batches with "Include all Decode analyses"; the
+    // import compares with the light index; mixtapes and folder names without handles (D11)
+    decodes: {
+      recent: n => (decodeTab ? decodeTab.store.recent(n) : Promise.resolve([])),
+      each: (fn, batch) => (decodeTab ? decodeTab.store.each(fn, batch) : Promise.resolve(0)),
+      import: list => (decodeTab ? decodeTab.store.importMany(list) : Promise.resolve(0)),
+      mixtapes: () => (decodeTab ? decodeTab.panel.exportMixtapes() : Promise.resolve(null)),
+      importMixtapes: v => (decodeTab ? decodeTab.panel.importMixtapes(v) : Promise.resolve(0)),
+    },
     // voices and phrases (my-phrases D3, D4, D6): the card's settings, the space of the samples, the link to the Voci tab
     phrases: {
       settings: () => phr.settings, set: patch => phr.setSettings(patch), count: () => phr.items.length, open: s => openVoices(s),

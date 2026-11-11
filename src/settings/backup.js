@@ -7,6 +7,7 @@ import { DRAFTS_KEY, mergeDrafts } from '../library/pattern-drafts.js';
 import { mergeUses } from '../library/patterns.js';
 import { PHRASES_KEY, mergePhrases } from '../voices/phrases.js';
 import { DECODES_KEY, mergeDecodes, plainRecord } from '../decode/store.js';
+import { MIXTAPES_KEY, mergeMixtapes } from '../decode/mixtapes.js';
 import { COMBOS_KEY, normalizeOverrides, COMBO_LANGS } from '../voices/combos.js';
 
 export const BACKUP_FORMAT = 'coding-misk/backup';
@@ -17,12 +18,27 @@ const SKIP = new Set(['coding-misk-draft', 'coding-misk-tab', 'coding-misk-panel
 // (coding-misk-voices-sub: the section of the Voci tab open last, my-phrases D9)
 
 // entries: [[key, value]] of the browser storage (values parsed). Returns the backup object.
-// decodes: the decoded tracks (track-to-code D3, IndexedDB), carried without their file handles
-export function makeBackup(entries, now = new Date(), decodes = null) {
+// decodes: the decoded tracks (track-to-code D3, IndexedDB), carried without their file handles (by default the 100
+// used last, decode-library D14); mixtapes: the Decode mixtapes and their folders' names, without handles (D11)
+export function makeBackup(entries, now = new Date(), decodes = null, mixtapes = null) {
   const data = {};
   for (const [k, v] of entries) if (k.startsWith(PREFIX) && !SKIP.has(k) && v !== null && v !== undefined) data[k] = v;
+  if (mixtapes && Array.isArray(mixtapes.mixtapes) && mixtapes.mixtapes.length) data[MIXTAPES_KEY] = mixtapes;
   if (Array.isArray(decodes) && decodes.length) data[DECODES_KEY] = decodes.map(plainRecord).filter(Boolean);
   return { format: BACKUP_FORMAT, version: 1, created: now.toISOString(), data };
+}
+// the backup file in parts (D14, "Include all Decode analyses"): the backup without its analyses, then each batch of
+// records as its own string, so neither every record nor one huge string is in memory at once. `base` has no
+// DECODES_KEY; batches: arrays of records. → string parts for a Blob; their join parses to the whole backup
+export function backupParts(base) {
+  const s = JSON.stringify(base), head = s.slice(0, -2), n = Object.keys(base.data || {}).length;
+  const parts = [head, `${n ? ',' : ''}${JSON.stringify(DECODES_KEY)}:[`];
+  let first = true;
+  return {
+    add(records) { for (const r of records) { const p = plainRecord(r); if (!p) continue; parts.push(`${first ? '' : ','}${JSON.stringify(p)}`); first = false; } },
+    // an empty list of analyses leaves no key, as makeBackup does
+    end() { return first ? [s, '\n'] : [...parts, ']}}\n']; },
+  };
 }
 
 const byId = (a, b) => { const out = (Array.isArray(a) ? a : []).slice(); for (const x of Array.isArray(b) ? b : []) { if (!x || !x.id) continue; const i = out.findIndex(y => y && y.id === x.id); if (i >= 0) out[i] = x; else out.push(x); } return out; };
@@ -32,7 +48,7 @@ const byId = (a, b) => { const out = (Array.isArray(a) ? a : []).slice(); for (c
 // Returns { values: { key: value }, counts } or { error }.
 export function mergeBackup(backup, get) {
   if (!backup || backup.format !== BACKUP_FORMAT || !backup.data || typeof backup.data !== 'object') return { error: 'format' };
-  const values = {}, counts = { songs: 0, versions: 0, playlists: 0, styles: 0, artists: 0, patterns: 0, phrases: 0, settings: 0 };
+  const values = {}, counts = { songs: 0, versions: 0, playlists: 0, styles: 0, artists: 0, patterns: 0, phrases: 0, settings: 0, decodes: 0, mixtapes: 0 };
   for (let [k, v] of Object.entries(backup.data)) {
     if (!k.startsWith(PREFIX)) continue;
     if (k === 'coding-misk-library') {
@@ -95,6 +111,10 @@ export function mergeBackup(backup, get) {
       // decoded tracks (track-to-code D3) by fingerprint: the one used last wins; the import writes them to IndexedDB
       values[k] = mergeDecodes(get(k), v);
       counts.decodes = (counts.decodes || 0) + (Array.isArray(v) ? v.length : 0);
+    } else if (k === MIXTAPES_KEY) {
+      // the Decode mixtapes (decode-library D11) by id: the one changed last wins; the import writes them to IndexedDB
+      values[k] = mergeMixtapes(get(k), v);
+      counts.mixtapes += v && Array.isArray(v.mixtapes) ? v.mixtapes.length : 0;
     } else if (k === 'coding-misk-artist-voice') {
       continue;
     } else if (k === 'coding-misk-radio-history') {

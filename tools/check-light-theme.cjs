@@ -121,9 +121,21 @@ const SCENES = [
   { id: 'lezioni', tab: 'lezioni' },
   { id: 'riferimenti', tab: 'riferimenti' },
   { id: 'impostazioni', settings: true },
+  // the Decode tab: the empty tab with the library's list, and a track open with the "Another file" panel (decode-library)
+  { id: 'decodifica', tab: 'decode' },
+  { id: 'decodifica-pannello', tab: 'decode', go: async p => { await p.setInputFiles('#dc-file', await decodeWav()); for (let i = 0; i < 40 && !(await p.$('#dc-another')); i++) await sleep(250); await sleep(500); await p.click('#dc-another'); await sleep(500); } },
   { id: 'componi-suona', tab: 'componi', play: true, go: async p => { await p.click('#play'); await sleep(6000); } },
   { id: 'radio-in-onda', tab: 'radio', play: true, go: async p => { await p.fill('#radio-seed', 'light-check'); await p.click('#radio-start'); await sleep(6000); } },
 ];
+// a short generated track for the Decode scenes
+let wavFile = null;
+async function decodeWav() {
+  if (wavFile) return wavFile;
+  const { renderSong, writeWav } = await import('./decode-audio.mjs');
+  wavFile = require('node:path').join(require('node:os').tmpdir(), 'light-decode.wav');
+  writeWav(wavFile, renderSong({ bpm: 124, bars: 4, chords: ['Am'], drums: { bd: 'x...x...x...x...' } }).pcm);
+  return wavFile;
+}
 const LAB = new Set(['artisti', 'stili', 'generi', 'suoni', 'voci', 'pattern', 'guida', 'lezioni', 'riferimenti']);
 
 (async () => {

@@ -1,7 +1,8 @@
 // The settings page (#31): appearance, audio, radio defaults and the data kept in this browser.
 // It is opened from the gear in the top bar; theme and language stay in the top bar too, for quick tests.
-import { makeBackup, mergeBackup } from './backup.js';
-import { DECODES_KEY } from '../decode/store.js';
+import { makeBackup, mergeBackup, backupParts } from './backup.js';
+import { DECODES_KEY, BACKUP_RECENT } from '../decode/store.js';
+import { MIXTAPES_KEY } from '../decode/mixtapes.js';
 import { downloadJson, pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { OWN_IDS, STRUDEL_IDS, FONTS, SIZES, themeName, fontName } from '../code-themes/themes.js';
@@ -140,6 +141,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         <div class="card set-card"><h3>${esc(t('setData'))}</h3>
           <p class="muted">${esc(t('setDataIntro'))}</p>
           <div class="actions"><button class="btn primary" id="set-export">${esc(t('setExport'))}</button><button class="btn" id="set-import">${esc(t('setImport'))}</button><button class="btn danger" id="set-reset">${esc(t('setReset'))}</button></div>
+          <label class="rx-opt set-dc-all" title="${esc(t('setDecodeAllTip'))}"><input type="checkbox" id="set-decode-all" aria-describedby="set-decode-all-tip" data-no-knob> <span>${esc(t('setDecodeAll'))}</span></label>
+          <p class="muted small" id="set-decode-all-tip" role="tooltip">${esc(t('setDecodeAllTip'))}</p>
         </div>
       </div>`;
     if (app.videoPreview) app.videoPreview(root.querySelector('#set-vid-preview'));
@@ -318,6 +321,22 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   const setFrag = (k, v) => store.set('coding-misk-fragments', { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), [k]: v });
   const setVid = (k, v) => store.set('coding-misk-video', { ...VIDEO_DEFAULTS, ...(store.get('coding-misk-video', {}) || {}), [k]: v });
   const entries = () => { const out = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); out.push([k, store.get(k, null)]); } return out; };
+  // Export everything (decode-library D14): the 100 Decode analyses used last; with "Include all Decode analyses" every
+  // one, read in batches and written as parts of the file; the mixtapes without their files' handles (D11)
+  async function exportBackup() {
+    const d = new Date().toISOString().slice(0, 10), all = !!(root.querySelector('#set-decode-all') || {}).checked;
+    const mix = app.decodes ? await app.decodes.mixtapes().catch(() => null) : null;
+    if (!all || !app.decodes) {
+      const list = app.decodes ? await app.decodes.recent(BACKUP_RECENT).catch(() => []) : [];
+      downloadJson(`coding-misk-backup-${d}`, makeBackup(entries(), new Date(), list, mix));
+    } else {
+      const out = backupParts(makeBackup(entries(), new Date(), null, mix));
+      await app.decodes.each(recs => out.add(recs), 50).catch(() => 0);
+      downloadBlob(`coding-misk-backup-${d}.json`, new Blob(out.end(), { type: 'application/json' }));
+    }
+    toast(t('setExported'));
+  }
+  const downloadBlob = (name, blob) => { const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
@@ -383,13 +402,19 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (b.dataset.vidSoul) { setVid('soulPanel', b.dataset.vidSoul === '1'); return render(); }
     // hidden built-in songs (#68, D3b): all of them back in the list, after a confirmation in the card
     if (b.id === 'set-show-hidden') { confirmInline({ anchor: b.closest('.actions'), trigger: b, key: 'show-hidden', msg: t('setShowHiddenAsk'), ok: t('setShowHiddenOk'), t, esc, onConfirm: () => { toast(t('setShowHiddenDone', { n: app.showHiddenSongs() })); render(); } }); return; }
-    if (b.id === 'set-export') { const d = new Date().toISOString().slice(0, 10); (app.decodes ? app.decodes.all() : Promise.resolve([])).catch(() => []).then(list => { downloadJson(`coding-misk-backup-${d}`, makeBackup(entries(), new Date(), list)); toast(t('setExported')); }); return; }
+    if (b.id === 'set-export') { exportBackup(); return; }
     if (b.id === 'set-import') {
       return pickJsonFiles(async data => {
-        const cur = app.decodes ? await app.decodes.all().catch(() => []) : [];
-        const r = mergeBackup(data, k => (k === DECODES_KEY ? cur : store.get(k, null)));
+        // the analyses are compared with the decode store's light index there (decode-library D14), not read here; the
+        // mixtapes merge with the ones in IndexedDB (D11)
+        const mix = app.decodes ? await app.decodes.mixtapes().catch(() => null) : null;
+        const r = mergeBackup(data, k => (k === DECODES_KEY ? [] : k === MIXTAPES_KEY ? mix : store.get(k, null)));
         if (r.error) { toast(t('setImportBad')); return; }
-        for (const [k, v] of Object.entries(r.values)) { if (k === DECODES_KEY) { if (app.decodes) await app.decodes.import(v).catch(() => 0); continue; } store.set(k, v); }
+        for (const [k, v] of Object.entries(r.values)) {
+          if (k === DECODES_KEY) { if (app.decodes) await app.decodes.import(v).catch(() => 0); continue; }
+          if (k === MIXTAPES_KEY) { if (app.decodes) await app.decodes.importMixtapes(v).catch(() => 0); continue; }
+          store.set(k, v);
+        }
         toast(t('setImported', r.counts));
         setTimeout(() => location.reload(), 900);
       });

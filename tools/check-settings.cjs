@@ -167,6 +167,16 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
   check(lib2.tracks && lib2.tracks.some(x => x.id === 'u-short'), 'import brings the songs into another browser');
   await p2.context().close();
 
+  // "Include all Decode analyses" (decode-library D14): off, its tooltip, off again after a reload
+  {
+    if (!(await page.isVisible('#set-decode-all'))) { await page.click('#open-settings'); await sleep(300); }
+    const tip = await page.getAttribute('label.set-dc-all', 'title'), off = !(await page.isChecked('#set-decode-all'));
+    await page.check('#set-decode-all');
+    await page.reload(); await sleep(2500);
+    if (!(await page.isVisible('#set-decode-all'))) { await page.click('#open-settings'); await sleep(300); }
+    check(off && /every stored Decode analysis/.test(tip) && /20 kB per minute/.test(tip) && !(await page.isChecked('#set-decode-all')), '"Include all Decode analyses": off by default, its tooltip, off again after a reload', tip);
+  }
+
   // reset: two presses
   await page.click('#set-reset'); await sleep(200);
   check(await page.evaluate(() => !!localStorage.getItem('coding-misk-library')), 'first press does not reset');
