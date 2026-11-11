@@ -3045,3 +3045,11 @@ Ramo `fix/91-library-kind-filter` da `feat/44-themed-checks` (2b7c415). Richiest
 - **Contesto:** fa parte del contesto come il chip: riproduzione automatica, Precedente e Successivo restano nel tipo scelto; un tipo scelto mentre suona un brano dell'elenco diventa il contesto (la stessa regola dell'ordine). I conteggi vengono dalle righe già in memoria, un passaggio per chip e ricerca, nessuna lettura di file.
 - **Prove:** `check:decode-library` (74, quattro nuovi), gruppo `silent` di `check-decode-library.cjs` (18, cinque nuovi: Video con tre video e i conteggi 5/2/3, Audio, ricordato dopo il ricaricamento, Successivo e Precedente tra i video, il tipo cambiato mentre è aperto un brano), più le prove elencate nel rapporto.
 
+## 2026-11-11: Decodifica, la lista della libreria non torna in cima (fix/91-library-scroll-keep, #91)
+
+Ramo `fix/91-library-scroll-keep` da `fix/91-library-kind-filter` (59f039b). Bug del proprietario: scorrendo la lista e premendo «Seleziona» la lista tornava in cima.
+
+- **Causa:** il pannello ricostruisce il suo HTML e rimetteva lo scroll di prima su una lista ancora vuota (il distanziatore prende l'altezza solo quando si disegnano le righe), quindi il browser lo riportava a 0. Succedeva con Seleziona, una spunta, il menu «Aggiungi alla mixtape» e Annulla.
+- **Correzione:** il distanziatore prende l'altezza della lista prima di rimettere lo scroll. Un ordine nuovo ora riparte dalla cima, come un chip, un tipo o una ricerca nuovi (il contenuto cambia).
+- **Prove:** nuovo controllo nel gruppo `long` di `check-decode-library.cjs` (4000 righe, scroll a 3000 px: Seleziona, spunta, menu, Annulla restano a 3000; ordine e tipo nuovi tornano a 0); con il codice di prima fallisce (3000 → 0); `check-decode.cjs --library` completo, `check:decode-library`, `check:guide`, `check:knowledge`, `npm run build`.
+

@@ -388,7 +388,9 @@ export function createLibraryPanel({ app, store, hooks }) {
     el.innerHTML = `${head}${acts}${notes}${views}${view === 'tracks' || !supported ? tracksHtml() : mixtapesHtml()}`;
     lastWin = '';
     const box = el.querySelector('#dcl-list');
-    if (box) { box.scrollTop = keepScroll; renderList(true); }
+    // the scroll stays where it was (Select, Cancel, the mixtape menu, a tick): the spacer gets its height first, else the
+    // browser clamps the scroll of an empty list to the top; a new chip, kind, order or search sets it to 0 before this
+    if (box) { box.querySelector('.dcl-spacer').style.height = `${listFor({ ...prefs, search }).length * rowH()}px`; box.scrollTop = keepScroll; renderList(true); }
     if (focus) { const f = el.querySelector(`#${focus}`); if (f) { f.focus(); if (f.id === 'dcl-search') f.setSelectionRange(f.value.length, f.value.length); } }
   }
 
@@ -415,7 +417,7 @@ export function createLibraryPanel({ app, store, hooks }) {
     if (b.id === 'dcl-autoplay') { autoplay = !autoplay; ls.set(AUTOPLAY_KEY, autoplay); b.setAttribute('aria-pressed', autoplay); hooks.changed(); return; }
     if (b.dataset.dclView) { view = b.dataset.dclView; selecting = false; menuOpen = false; render(); return; }
     if (b.dataset.dclMedia) { setPrefs({ media: b.dataset.dclMedia }); const bx = el.querySelector('#dcl-list'); if (bx) bx.scrollTop = 0; render(); hooks.changed('list'); readTagsSoon(); return; }
-    if (b.dataset.dclOrder) { setPrefs({ order: b.dataset.dclOrder }); render(); hooks.changed('list'); readTagsSoon(); return; }
+    if (b.dataset.dclOrder) { setPrefs({ order: b.dataset.dclOrder }); const bx = el.querySelector('#dcl-list'); if (bx) bx.scrollTop = 0; render(); hooks.changed('list'); readTagsSoon(); return; }
     if (b.dataset.dclChip) { setPrefs({ chip: b.dataset.dclChip }); const bx = el.querySelector('#dcl-list'); if (bx) bx.scrollTop = 0; render(); hooks.changed('list'); readTagsSoon(); return; }
     if (b.dataset.dclAllow) { const f = folderOf(b.dataset.dclAllow); if (f) allow(f); return; }
     if (b.dataset.dclRmf) {

@@ -538,6 +538,30 @@ const INIT = () => {
     measures.searchMs = lat.out;
     check(lat.out.every(x => x <= 150), 'a typed search updates the list within 150 ms (60 ms of them the typing pause)', lat.out.join(','));
     check(lt.every(x => x.ms <= 100) && lat.nodes < 80, 'searching and scrolling 4000 rows: no task over 100 ms, a few dozen row nodes', `${lt.map(x => Math.round(x.ms)).join(',')} · ${lat.nodes} nodes`);
+    // the scroll stays across re-renders that keep the list (Select, a tick, the mixtape menu, Cancel); a new order or
+    // kind starts at the top (owner bug: Select jumped to the top)
+    const top = () => page.$eval('#dcl-list', b => b.scrollTop);
+    const scrollTo = y => page.$eval('#dcl-list', (b, v) => { b.scrollTop = v; b.dispatchEvent(new Event('scroll')); }, y);
+    await scrollTo(3000); await sleep(300);
+    const y0 = await top();
+    await page.click('#dcl-select'); await sleep(300);
+    const y1 = await top();
+    const vis = await page.$$eval('#dcl .dcl-row', xs => { const box = document.querySelector('#dcl-list').getBoundingClientRect(); const x = xs.find(r => { const b = r.getBoundingClientRect(); return b.top > box.top + 40 && b.bottom < box.bottom - 40; }); return x && x.dataset.dclRow; });
+    await page.click(`#dcl [data-dcl-row="${vis}"]`); await sleep(300);
+    const y2 = await top();
+    await page.click('#dcl-addto'); await sleep(300);
+    const y3 = await top();
+    await page.click('#dcl-addto'); await sleep(200);
+    await page.click('#dcl-selcancel'); await sleep(300);
+    const y4 = await top();
+    check(y0 > 2500 && [y1, y2, y3, y4].every(y => Math.abs(y - y0) < 2), 'the list keeps its scroll on Select, a tick, the Add to mixtape menu and Cancel', `${y0} → ${[y1, y2, y3, y4].join(', ')}`);
+    await page.click('#dcl [data-dcl-order="recent"]'); await sleep(300);
+    const y5 = await top();
+    await scrollTo(3000); await sleep(200);
+    await page.click('#dcl [data-dcl-media="audio"]'); await sleep(300);
+    const y6 = await top();
+    await page.click('#dcl [data-dcl-media="all"]'); await page.click('#dcl [data-dcl-order="name"]'); await sleep(200);
+    check(y5 === 0 && y6 === 0, 'a new order or kind starts the list at the top', `${y5}, ${y6}`);
     // 2000 stored analyses: the tab and the panel read none
     await page.evaluate(async () => { const v = (await import('/src/decode/model.js')).ANALYSIS_VERSION; const list = Array.from({ length: 2000 }, (_, i) => ({ fp: `many-${i}`, title: `Many ${i}`, fileName: `many ${i}.wav`, used: 5000 + i, modelA: { version: v, level: 'A', bars: Array.from({ length: 40 }, () => ({ chord: 'Am', drums: { bd: 'x...x...x...x...' } })) } })); for (let i = 0; i < list.length; i += 200) await globalThis.codingMiskDecode.store.importMany(list.slice(i, i + 200)); });
     const n = await page.evaluate(async () => (await globalThis.codingMiskDecode.store.entries()).length);
