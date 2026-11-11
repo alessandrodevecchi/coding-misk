@@ -196,7 +196,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 ## Fixtures and versions
 
 <!-- generated:fixtures -->
-Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/endless-v14.json`, `tests/snapshots/endless.json`, `tests/snapshots/invented-styles.json`, `tests/snapshots/kit-rows.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`.
+Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/decode-radio-song.json`, `tests/snapshots/decode-similarity.json`, `tests/snapshots/endless-v14.json`, `tests/snapshots/endless.json`, `tests/snapshots/invented-styles.json`, `tests/snapshots/kit-rows.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`.
 <!-- /generated -->
 
 | Fixture | Guards | Rewrite only when | Then |

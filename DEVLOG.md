@@ -3053,3 +3053,37 @@ Ramo `fix/91-library-scroll-keep` da `fix/91-library-kind-filter` (59f039b). Bug
 - **Correzione:** il distanziatore prende l'altezza della lista prima di rimettere lo scroll. Un ordine nuovo ora riparte dalla cima, come un chip, un tipo o una ricerca nuovi (il contenuto cambia).
 - **Prove:** nuovo controllo nel gruppo `long` di `check-decode-library.cjs` (4000 righe, scroll a 3000 px: Seleziona, spunta, menu, Annulla restano a 3000; ordine e tipo nuovi tornano a 0); con il codice di prima fallisce (3000 → 0); `check-decode.cjs --library` completo, `check:decode-library`, `check:guide`, `check:knowledge`, `npm run build`.
 
+
+## 2026-11-11: Decodifica, banco di prova e controllo di somiglianza (feat/91-decode-bench, #91)
+
+Ramo `feat/91-decode-bench` da `feat/44-themed-checks` (5d2a6e8). Gruppo 6 della parte 2 di `decode-refine` (6.1-6.3 fatti, 6.4 solo misurato: la decisione resta al proprietario).
+
+- **6.1, due brani di prova nuovi** in `tools/decode-songs.mjs`: `decode-test-acid` (126 BPM, La minore, cassa 909 con `crunch` su ogni battito sotto un basso a dente di sega distorto su A1 con lo sweep risonante del basso di luci-rosse, un hook square, un crash all'inizio delle sezioni principali, niente pad) e `decode-test-arp` (150 BPM, Re minore, cassa sincopata `0,4,7,8,10,12`, arpeggio, pad, un lead solo nella sua sezione). Il lead è una traccia `code` con le note scritte, così la verità ha le note del lead per sedicesimo (`truthOf(...).bars[i].lead`). `HARD_SONGS` li segna: `check:decode --app` li misura senza gli obiettivi dei brani vecchi (sono il lavoro dei gruppi 7-10).
+- **6.2, verità dalle timeline dell'app:** `tools/decode-export.cjs` esporta anche `luci-rosse` e un brano della radio congelato in `tests/snapshots/decode-radio-song.json` (artista hype, seme `bench-c`, versione del regista 20, «Aurora Slancio», 134 BPM, 192 battute, senza la traccia voce), ognuno con il suo `.timeline.json`. Il brano della radio del proprietario (`ndikot`) oggi il regista lo fa diverso, per questo il brano è congelato. `tools/decode-measure.mjs` legge le battute di cassa, clap e hat e gli inizi delle sezioni dalla timeline; accordi e note del basso dagli haps del brano stesso (Strudel in Node con un `transpose` vero: quello di `mixer-checks.mjs` non fa niente e `@strudel/tonal` in Node qui non si carica).
+
+| Brano (timeline) | Livello | Cassa F1 (recall) | Clap F1 (falsi) | Hat F1 (recall) | Griglie | Accordi: radice / qualità | Basso: nota / errori d'ottava |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| luci-rosse | A | 0,46 (30 %) | 0,39 (68) | 0,59 (42 %) | 44 in 53 battute | 1 / 0,25 (16 battute) | 0,45 / 0,42 |
+| luci-rosse | B | 0,45 (29 %) | 0,39 (68) | 0,60 (43 %) | 43 (6 pattern nel brano) | 1 / 0,25 | 1 / 0 |
+| radio-bench-c | A e B | 0,97 (94 %) | 0,89 (99) | 0,92 (98 %), 229 falsi | 60 in 192 (7 pattern) | 0,91 / 1 | nessun basso decodificato |
+
+- Il livello A di luci-rosse aggancia il battere a 1,69 s (mezzo battito in ritardo, come nella diagnosi). Il basso della radio (supersaw corto in terzine) non viene mai decodificato; il livello B della radio trova una sola sezione su quattro.
+- **6.3, `tools/decode-similarity.cjs`** (con `tools/decode-similarity.mjs` per le misure, senza browser): livello B in Node come lo scrive «Apri in Componi», export veloce dell'app (Classic, WAV), confronto sulla griglia dell'originale. Punteggi in `tests/snapshots/decode-similarity.json` (margine 0,05; `--write` li riscrive). `DECODE_OWNER_DIR` stampa i file del proprietario e non salva niente fuori da `.cache/decode/sim/`.
+
+| File | Ritmo basso / medio / alto | Croma / basso | Brillantezza | Quote basso/medio/alto orig. contro codice | Arco |
+| --- | --- | --- | --- | --- | --- |
+| decode-test-124 | 0,26 / 0,89 / 0,87 | 0,91 / 0,86 | 1,36 | 0,56/0,43/0,01 contro 0,52/0,44/0,04 | 0,56 |
+| decode-test-90 | 0,11 / 0,33 / 0,98 | 0,88 / 0,83 | 1,45 | 0,59/0,35/0,06 contro 0,24/0,71/0,06 | 0,99 |
+| decode-test-174 | 0,69 / 0,63 / 0,97 | 0,94 / 0,85 | 1,38 | 0,53/0,44/0,03 contro 0,21/0,71/0,09 | 0,10 |
+| decode-test-long | 0,57 / 0,90 / 0,89 | 0,90 / 0,83 | 1,31 | 0,55/0,44/0,02 contro 0,42/0,53/0,05 | 0,68 |
+| decode-test-acid | 0,62 / 0,28 / 0,64 | 0,95 / 0,98 | 0,74 | 0,77/0,21/0,01 contro 0,85/0,10/0,05 | 0,38 |
+| decode-test-arp | 0,50 / 0,12 / 0,94 | 0,94 / 0,89 | 0,94 | 0,55/0,43/0,02 contro 0,42/0,53/0,05 | 0,15 |
+| luci-rosse | 0,54 / 0,39 / 0,41 | 0,95 / 0,96 | 1,50 | 0,76/0,20/0,04 contro 0,76/0,17/0,07 | 0,49 |
+| radio-bench-c | 0,68 / 0,95 / 0,81 | 0,94 / 0,90 | 0,63 | 0,52/0,46/0,01 contro 0,32/0,61/0,07 | 0,48 |
+| Pavimento (due coppie) | -0,01-0,02 / -0,01-0,05 / 0,00 | 0,82-0,90 / 0,79-0,87 | | | -0,16 / -0,02 |
+
+- Il croma di questo strumento non separa bene: il pavimento è 0,82-0,90 (nel design 0,60), perché le coppie sono nella stessa tonalità o vicina; il ritmo e l'arco invece sì. Gli obiettivi della spec («Similarity targets») non sono ancora raggiunti: lo snapshot tiene i valori di oggi, così i gruppi 7-10 possono solo migliorarli.
+- I file del proprietario (stampati, non salvati): Luci Rosse ritmo basso 0,53, brillantezza 1,32; radio ndikot ritmo basso 0,37, arco -0,15; brano vocale 1 brillantezza 0,36, quota media 0,23 contro 0,51; brano vocale 2 ritmo medio 0,17, brillantezza 0,37.
+- **6.4, Essentia.js sì o no (solo le misure):** tempo esatto su tutti i brani con e senza. Chiave giusta con Essentia.js e sbagliata senza su decode-test-174 (Do maggiore invece di Re minore), decode-test-acid e luci-rosse (La maggiore invece di La minore); sbagliata in entrambi su decode-test-arp (Do maggiore). Accordi per battuta con / senza: 124 0,98 / 0,94, 90 0,92 / 1, 174 0,72 / 0,56, long 0,88 / 0,90, arp 0,94 / 0,81. Tempo del livello B 3-5 volte più lungo (da 1-4 s a 3-16 s per file). Download 2,75 MB, 0,81 MB compressi. Casi al limite della confidenza del tempo: Luci Rosse del proprietario 2,488 (preso perché d'accordo con misk-analyzer; in un'altra corsa 2,633), decode-test-174 2,50-2,57 (Essentia.js dice 116, i 2/3, riportato a 174), brano vocale 2 1,66 (non preso), radio ndikot 88 con 2,70 (metà, riportato a 176).
+- **Ascolto A/B** in `notes/decode-ab-2026-11-11/` (ignorata da git): 12 file × 2 MP3, A e B a caso, la chiave in `key.md` nella stessa cartella. Due coppie sono identiche (decode-test-90 e radio-bench-c: con e senza danno lo stesso brano), le altre dieci differiscono. Nessuna decisione scritta in `decisions.md`; 6.4 resta aperto.
+- **Prove:** `decode-similarity.cjs` due volte (la seconda contro lo snapshot: tutto entro 0,05), `decode-measure.mjs --full`, la catena dei controlli nel rapporto.
