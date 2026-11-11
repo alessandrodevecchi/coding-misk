@@ -408,7 +408,16 @@ function drumPlan(model) {
     if (!heard.length) return { main: null, variants: [], perBar: idx.map(() => null), grid };
     // the main grid (decode-refine D4): per step, on when it is on in at least GRID_RULE.main of the bars with drums, so
     // noise on a few steps does not split the section into many grids
-    const main = gridKey(Object.fromEntries(DRUM_ROWS.map((r, j) => [r, Array.from({ length: STEPS }, (_, s) => (heard.filter(k => k.split('|')[j][s] === 'x').length >= GRID_RULE.main * heard.length ? 'x' : '.')).join('')])));
+    const majority = list => gridKey(Object.fromEntries(DRUM_ROWS.map((r, j) => [r, Array.from({ length: STEPS }, (_, s) => (list.filter(k => k.split('|')[j][s] === 'x').length >= GRID_RULE.main * list.length ? 'x' : '.')).join('')])));
+    let main = majority(heard);
+    // (a two-bar groove: the per-step majority keeps only the hits both bars share, a grid never heard. Then each bar
+    // position, even and odd, has its own majority: when both were heard and differ, the odd one is a variant on the
+    // odd bars; else the main grid is the most common grid heard)
+    if (!count.has(main)) {
+      const half = p => keys.map((k, j) => (j % 2 === p && k && k !== 'gap' ? k : null)).filter(Boolean), m0 = majority(half(0)), m1 = half(1).length ? majority(half(1)) : null;
+      if (m1 && m0 !== m1 && count.has(m0) && count.has(m1)) return { main: m0, variants: [m1], pair: true, perBar: keys.map((k, j) => (k === null ? null : j % 2 ? m1 : m0)), grid };
+      main = [...count].sort((a, b) => b[1] - a[1])[0][0];
+    }
     // (a grid within three steps of the main one, or one that only misses some of its hits, is the main one heard less
     // well: a kick under a loud bass, a hat under a crash)
     const near = k => { const g = grid(k), M0 = grid(main); return diffSteps(g, M0) <= 3 || DRUM_ROWS.every(r => [...g[r]].every((c, j) => c !== 'x' || M0[r][j] === 'x')); };
@@ -423,7 +432,7 @@ function drumPlan(model) {
 export function variationsOf(model) {
   const out = [];
   drumPlan(model).forEach((p, k) => {
-    if (!p.variants.length) return;
+    if (!p.variants.length || p.pair) return;
     const sec = model.sections[k];
     out.push({ section: k, part: 'drums', bars: p.perBar.map((x, j) => (x && x !== p.main ? sec.start + j : null)).filter(x => x !== null) });
   });
@@ -467,7 +476,8 @@ export function writeFull(model, opts = {}) {
         const b = s0 + j, prev = j ? out[j - 1] : null;
         if (events.has(b)) lastAny = b;
         let y = x;
-        if (x !== null && prev !== null && x !== p.main && x !== prev && !(b - lastLine >= rule.lineBars && b - lastAny >= rule.anyBars)) y = p.main;
+        // (a two-bar groove's second bar is the groove itself, not a variant: it never waits)
+        if (!p.pair && x !== null && prev !== null && x !== p.main && x !== prev && !(b - lastLine >= rule.lineBars && b - lastAny >= rule.anyBars)) y = p.main;
         if (j && y !== prev) { lastLine = b; lastAny = b; }
         out.push(y);
       });

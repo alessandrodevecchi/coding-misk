@@ -5,7 +5,9 @@
 //   chroma            cosine of the 12-note energy per beat, all notes (27-2000 Hz); bass chroma 27-250 Hz
 //   brightness        median spectral centroid of the code over the original's
 //   shares            each band's share of the energy (low 20-150, mid 150-2000, high 2000-16000), original and code
-//   arc               correlation of the loudness per bar
+//   arc               correlation of the loudness per bar (dB), each curve's variance floored at ARC_DB² (decode-refine
+//                     11.3): a song whose bars differ by a few tenths of a dB has no arc, and its plain correlation was
+//                     noise that moved between two exports; such a song now scores near 0 every run
 // score(): the numbers a later run must not lose by more than MARGIN (higher is better for each).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,6 +22,9 @@ export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'
 export const SIM_DIR = path.join(ROOT, '.cache', 'decode', 'sim');
 export const SNAPSHOT = path.join(ROOT, 'tests', 'snapshots', 'decode-similarity.json');
 export const MARGIN = 0.05;
+// the arc's floor (dB): about the smallest change of loudness a listener hears. A part that enters or stops moves a
+// bar by 3 to 10 dB; two exports of one song differ by well under it
+export const ARC_DB = 1;
 export const RATE = ANALYSIS_RATE;
 export { readAudio };
 
@@ -90,6 +95,14 @@ export function features(pcm) {
 const pearson = (a, b) => { const n = Math.min(a.length, b.length); let ma = 0, mb = 0; for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; } ma /= n; mb /= n; let d = 0, x = 0, y = 0; for (let i = 0; i < n; i++) { d += (a[i] - ma) * (b[i] - mb); x += (a[i] - ma) ** 2; y += (b[i] - mb) ** 2; } return x && y ? d / Math.sqrt(x * y) : 0; };
 const cosine = (a, b) => { let d = 0, x = 0, y = 0; for (let i = 0; i < a.length; i++) { d += a[i] * b[i]; x += a[i] * a[i]; y += b[i] * b[i]; } return x && y ? d / Math.sqrt(x * y) : null; };
 const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+// the arc score of two loudness curves (dB per bar): their correlation with each variance floored at ARC_DB²
+export function arcScore(a, b) {
+  const n = Math.min(a.length, b.length);
+  if (!n) return null;
+  let ma = 0, mb = 0; for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; } ma /= n; mb /= n;
+  let d = 0, x = 0, y = 0; for (let i = 0; i < n; i++) { d += (a[i] - ma) * (b[i] - mb); x += (a[i] - ma) ** 2; y += (b[i] - mb) ** 2; }
+  return d / n / Math.sqrt((x / n + ARC_DB ** 2) * (y / n + ARC_DB ** 2));
+}
 const r3 = x => (x === null || x === undefined || Number.isNaN(x) ? null : Math.round(x * 1000) / 1000);
 
 // the original's features against the code's, on the grid: the original's step k at downbeat + k × step, the code's at
@@ -116,7 +129,7 @@ export function compare(fo, fc, grid) {
   const shares = list => { const t = { l: 0, m: 0, h: 0 }; for (const x of list) { t.l += x.sl; t.m += x.sm; t.h += x.sh; } const s = t.l + t.m + t.h || 1; return [r3(t.l / s), r3(t.m / s), r3(t.h / s)]; };
   const level = (f, t0) => Array.from(perWindow(f.fr.map(x => x.tot), f.hop, t0, grid.barSeconds, bars, true), v => 10 * Math.log10(v + 1e-10));
   const shO = shares(so), shC = shares(sc), co = cen(so), cc = cen(sc);
-  return { bars, rhythm, chroma: r3(chromaScore('all')), bassChroma: r3(chromaScore('bass')), brightness: r3(co ? cc / co : null), shares: { orig: shO, code: shC }, arc: r3(pearson(level(fo, grid.downbeat), level(fc, 0))) };
+  return { bars, rhythm, chroma: r3(chromaScore('all')), bassChroma: r3(chromaScore('bass')), brightness: r3(co ? cc / co : null), shares: { orig: shO, code: shC }, arc: r3(arcScore(Array.from(level(fo, grid.downbeat)), Array.from(level(fc, 0)))) };
 }
 
 // the numbers held by the snapshot, each higher is better: the brightness ratio as its closeness to 1, the shares as one

@@ -3263,3 +3263,31 @@ Ramo `docs/91-decode-tab-audio` da c6d6525. Solo la change OpenSpec `decode-tab-
 - **Parti separate:** HT Demucs ONNX con pesi fp16 (158 MB) in onnxruntime-node sulla CPU, 4 thread: 0,16 del tempo reale (circa 10 s per minuto), picco di memoria 5,0 GB; lo stesso modello in WebAssembly non si carica (`std::bad_alloc`, limite di 4 GB). I modelli a 4 parti mettono lead, pad e arp insieme in «other», quindi non aiutano il punto debole misurato in 9.1 (13 %). Raccomandazione: non ora; prima una sonda in Node sul banco (circa 4 ore), poi decidere.
 - **Domande al proprietario** con la risposta consigliata in `design.md`: dove va il pulsante, suono dell'altra scheda solo attraverso Decodifica, look ahead come ritardo, registrazione in memoria per Completa, salvataggio dell'analisi con un nome, export con il suono catturato, Firefox e Safari, parti separate, telefoni.
 - Nessun nome di servizi o siti nei file del repository.
+
+## 2026-11-12: Decodifica, controllo di somiglianza stabile (feat/91-decode-group-10, #91, compito 11.3)
+
+Ramo `feat/91-decode-group-10` da `feat/44-themed-checks` (ef85658).
+
+- **Causa 1, export non ripetibili:** due export veloci dello stesso brano di prova differivano di -2 / -10 dB di energia residua (luci-rosse di -60 dB). Il supersaw del pad sceglie le fasi delle voci con `Math.random` nel worklet audio; la pagina di render seminava già una sequenza, ma l'ordine in cui le voci la leggono dipende da quando i nodi riusati dal pool e i messaggi arrivano al thread audio. Il livello B scriveva un brano diverso da due export dello stesso originale su 6 file del banco su 8 (un confine di sezione spostato di una battuta, altre note di basso, la tonalità del brano arp). **Correzione** in `src/render/page.js`: ogni chiamata di un processore del worklet riparte dalla semina della sua voce (inizio e frequenza), quindi una voce ha sempre le stesse fasi. Due export di decode-test-90: -62 dB (prima -2 dB); il livello B scrive lo stesso brano da entrambi.
+- **Causa 2, l'arco dei brani piatti:** l'arco era la correlazione del volume per battuta; un brano con le battute a 0,16 dB l'una dall'altra (decode-test-174) dà la correlazione del rumore (0,26 fra due export dello stesso originale). Ora è la correlazione con la varianza di ogni curva portata almeno a 1 dB² (`ARC_DB`, circa il più piccolo cambio di volume che si sente): un brano piatto vale circa 0 a ogni giro, un brano con un arco vero tiene la sua correlazione. Provata prima una distanza in dB: dava 0,87 alle coppie pavimento (brani che non c'entrano), quanto alle coppie vere. Scartata.
+
+| Arco (B) | Prima (snapshot) | Dopo (misura nuova) |
+| --- | --- | --- |
+| decode-test-124 / 90 / 174 / long | 0,56 / 0,99 / 0,10 / 0,68 | 0,41 / 0,91 / -0,01 / 0,60 |
+| decode-test-acid / arp | 0,38 / 0,15 | 0,08 / 0,07 |
+| luci-rosse / radio-bench-c | 0,49 / 0,48 | 0,45 / 0,01 |
+| coppie pavimento | -0,02 / -0,16 | -0,03 / -0,02 |
+
+- **Prova:** snapshot scritto da un giro, poi due giri del controllo, ognuno con la cache vuota (originali e brani del livello B riesportati): passano entrambi e i punteggi dei due giri sono uguali tranne decode-test-acid (al massimo 0,005). Margine 0,05 invariato.
+- **Snapshot aggiornato:** tutti gli archi (misura nuova) e i cali dei gruppi 7-9 con il loro motivo: brillantezza di acid 0,74 → 0,50 e di luci-rosse 0,67 → 0,61 (la batteria giusta suona sull'808 finché il gruppo 10 non sceglie il kit), ritmo alto di luci-rosse 0,41 → 0,35 (misurato prima con gli export rumorosi).
+- Il testo del compito 10.3 ora dice che il seme della radio non ha distorsione (`drive 0`): la 909 con distorsione vale solo per luci-rosse.
+
+## 2026-11-12: Decodifica, quattro correzioni dalla revisione dei gruppi 7-9 (feat/91-decode-group-10, #91)
+
+Una revisione indipendente del codice unito dei gruppi 7-9 ha trovato quattro errori; il proprietario ha approvato le correzioni. Ognuna ha un caso in `check:decode` che fallisce senza la correzione (provato con il codice di prima) e passa con essa.
+
+- **Griglia a due battute** (`drumPlan`, `src/decode/writer.js`): la maggioranza per passo al 60 % su un groove che alterna due battute teneva solo i colpi comuni, una griglia mai sentita (`x.....x...x.....` / `x...x.....x.x...` → `x.........x.....`), e `near()` ci piegava sopra le due battute vere. Ora, se la griglia per passo non è fra quelle sentite, ogni posizione (pari, dispari) ha la sua maggioranza: se sono due griglie sentite e diverse, la dispari suona sulle battute dispari (`pair`, senza l'attesa delle varianti: è il groove, non una variante, e non conta fra le variazioni); altrimenti la griglia principale è la più frequente sentita.
+- **Terza minore di un altro accordo** (`full.js`): Essentia.js sostituiva l'accordo di misk-analyzer ma il segno `third` restava, e `quietMinors` rendeva minore il nuovo accordo (F con terza minore debole, Essentia.js E → Em). `takeChord` toglie il segno quando la radice cambia; tolte anche le variabili non usate.
+- **Basso sotto la cassa ai passi 0 e 1** (`misk-analyzer.js`): la regola guardava solo i passi della battuta in corso; ora conta anche gli ultimi due passi della battuta prima (`quietBefore`). Sul banco nessuna nota cambia (livello A: 263 note sul seme della radio, 135 sull'arp, prima e dopo): la regola era sbagliata ma qui non scattava.
+- **Tempo salvato prima del riaggancio** (`tab.js`, `worker.js`, `misk-analyzer.js`): un modello di livello A salvato prima che il riaggancio girasse tornava al worker come tempo fisso, e il riaggancio non girava più (il caso della revisione: la radio salvata dopo 10 s resterebbe a 117,46 invece di 176; qui provato su un brano generato). Il modello porta `relockChecked`; senza, il tempo salvato resta libero per il riaggancio. Un tempo battuto o scelto resta fisso.
+- Banco (livello B con Essentia.js, gli stessi WAV): brani uguali su 7 file su 8; su decode-test-124 cambia solo il pattern di rumore nella pausa senza batteria (battute 35-38): la cassa `..x...x.......x.` diventa `......x.......x.` (la griglia più frequente al posto di una mai sentita). `ANALYSIS_VERSION` 6.

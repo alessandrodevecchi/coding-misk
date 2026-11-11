@@ -151,6 +151,13 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Fixed
 
 - Radio: a track added with "+" on the half-phrase start just before a break or a charge plays its whole first phrase instead of leaving with the drums after 4 bars.
+
+- Decode: in Full, a two-bar drum groove is written as its two bars in turn, not as the hits they share.
+- Decode: in Full, a chord from Essentia.js on another root no longer turns minor from the old chord's quiet third.
+- Decode: a bass note at the end of a bar no longer starts again on the next bar's second step under a kick.
+- Decode: a track saved in Live before the tempo check ran gets that check when it is opened again.
+- Fast export: two exports of a song with a supersaw give the same sound.
+- Decode: the similarity check gives the same scores on two runs.
 - Stage widgets: after a song change, Monitor and the side panels show the new song's panels; no hit grid space is kept from the song before, and the hit grid keeps no rows of earlier songs.
 - Video on the stage: a seek in Decode keeps the last picture until the new one shows, instead of the normal look for a moment.
 - Backup: the default backup file is written compact like the one with all Decode analyses, so the two differ only by the analyses.
