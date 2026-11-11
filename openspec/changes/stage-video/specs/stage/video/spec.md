@@ -74,7 +74,7 @@ While the Decode track counts as the player (open in Decode, or playing) and its
 
 ### Requirement: Always muted
 
-A video on the stage SHALL never make a sound: the stage SHALL not play or decode a video's audio, live or in an export. Video files with an audio track SHALL be allowed.
+A video on the stage SHALL never make a sound: the stage SHALL not play a video's audio, live or in an export, and SHALL never connect a video to the app's audio. Live, the muted element MAY decode the file's audio track inside the browser's media pipeline (browsers do this for a muted element; it is never heard); the exports SHALL not decode it. Video files with an audio track SHALL be allowed.
 
 #### Scenario: A clip with sound
 

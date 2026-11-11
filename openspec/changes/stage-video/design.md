@@ -75,7 +75,7 @@ Exports pick by a seed instead, so two exports give the same frames (the render-
 
 ### D6. Always muted
 
-The live element is created with `muted = true`, `defaultMuted = true`, `volume = 0`, `playsInline`, and is never connected to Web Audio. The fast video only reads video samples (mediabunny's video track sinks); it never opens the audio track. Files with sound are allowed. Decode's own audio of a video file keeps its path (the decoded original); the stage element adds no second sound.
+The live element is created with `muted = true`, `defaultMuted = true`, `volume = 0`, `playsInline`, and is never connected to Web Audio. The fast video only reads video samples (mediabunny's video track sinks); it never opens the audio track. Files with sound are allowed. Decode's own audio of a video file keeps its path (the decoded original); the stage element adds no second sound. Measured in task 1.6: Chrome still decodes the audio track of a muted element (`webkitAudioDecodedByteCount` grows), off the main thread and never heard; a page cannot switch that off for a plain `<video>` (the audio track list is not in stable Chrome), and a picture-only pipeline (Media Source with the video track alone, or WebCodecs for the live stage) would add a demuxer in the page for a few kilobytes of audio decoding. The spec says so: the live element may decode the audio inside the media pipeline; the exports never do.
 
 ### D7. Size modes
 
