@@ -80,6 +80,33 @@ Video files that Decode accepts SHALL be listed with a small video icon next to 
 - **WHEN** a folder holds `clip.mp4`
 - **THEN** its row shows the video icon, and a click opens its sound in Decode
 
+### Requirement: Rows that cannot play
+
+A file that the app has found to hold no sound (a video without an audio track) SHALL be shown as a row that cannot play: dimmed, with the video icon and a small "no sound" mark with a tooltip. The app SHALL find it while it reads the tags in idle time, or when the file fails to open for that reason, and SHALL remember it in the folder's index.
+
+#### Scenario: Found while reading tags
+
+- **WHEN** the tags of the folder's files have been read
+- **THEN** the MP4 without sound shows the "no sound" mark before anyone clicks it
+
+### Requirement: A row that fails to open
+
+A click on a row that cannot play, or on a file that fails to open, SHALL show a short note in the panel naming the file and the reason ("This video has no sound"). The panel SHALL stay open and the open track SHALL NOT stop or change.
+
+#### Scenario: A screen recording without sound
+
+- **WHEN** a folder holds an MP4 with only a video track and the user clicks its row while another track plays
+- **THEN** the panel says that this video has no sound, the row is marked "no sound", the panel stays open and the other track keeps playing
+
+### Requirement: A kind icon on every row
+
+Every row of the track list and of a mixtape SHALL show a small drawn icon of its kind: a music note for an audio file, a video icon for a video file. A video without sound SHALL also show the "no sound" mark. The icons SHALL take their colour from the theme's tokens.
+
+#### Scenario: Icons
+
+- **WHEN** the list holds an MP3, an MP4 with sound and an MP4 without sound
+- **THEN** their rows show a music note, a video icon, and a video icon with the "no sound" mark
+
 ### Requirement: The rows of the list
 
 The list SHALL show one compact row per track: its name, its folder and, when an analysis of the track is stored, a mark: ◆ Full when a full analysis is stored, ◇ Live when only a Live analysis is stored. The row SHALL NOT show the track's length; the length SHALL show when the track is open. The track that is open SHALL be highlighted.
