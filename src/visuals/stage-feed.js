@@ -75,17 +75,22 @@ export function noteStore() {
 
 // Live: the notes of the playing pattern, queried one cycle at a time (never twice for a cycle while the pattern stays),
 // ahead of the playhead up to `need`. A new pattern (an evaluation) drops the notes from the current cycle on.
+// drops: the notes forgotten so far, { n (a count), from (the first cycle forgotten by the last drop; -Infinity for all) },
+// so the caches built on the notes (the panels of a section) are built again
 export function liveNotes(store) {
   let pat = null, next = null, at = -Infinity;
+  const drops = { n: 0, from: Infinity };
+  const dropped = c => { drops.n++; drops.from = c; };
   return {
+    drops,
     // → the first cycle not yet queried. from: after a jump, the notes are read again from this cycle (the section's
     // start and the window before it, so its panels are the same as when it is played from its start)
     pump(pattern, cyc, need, max = 1, from = Infinity) {
       if (!pattern || typeof pattern.queryArc !== 'function') return next ?? -Infinity;
       const c = Math.floor(cyc);
       // (behind by more than 4 cycles: a jump, unless it is the reading back from the last jump's cycle `at`)
-      if (next === null || cyc < next - 80 || (next < c - 4 && c > at + 4)) { store.clear(); next = Math.max(0, Math.min(c - 2, Math.floor(from))); at = c; pat = pattern; }
-      else if (pattern !== pat) { pat = pattern; store.dropFrom(c); next = Math.min(next, c); }
+      if (next === null || cyc < next - 80 || (next < c - 4 && c > at + 4)) { store.clear(); dropped(-Infinity); next = Math.max(0, Math.min(c - 2, Math.floor(from))); at = c; pat = pattern; }
+      else if (pattern !== pat) { pat = pattern; store.dropFrom(c); dropped(c); next = Math.min(next, c); }
       for (let k = 0; k < max && next < need; k++, next++) {
         let haps = [];
         try { haps = pattern.queryArc(next, next + 1); } catch (e) { haps = []; }
@@ -101,7 +106,7 @@ export function liveNotes(store) {
       if (c % 16 === 0) store.dropBefore(c - 80);
       return next;
     },
-    reset() { next = null; pat = null; at = -Infinity; store.clear(); },
+    reset() { next = null; pat = null; at = -Infinity; store.clear(); dropped(-Infinity); },
   };
 }
 

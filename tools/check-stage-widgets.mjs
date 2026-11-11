@@ -111,6 +111,12 @@ function song() {
   const P2 = fake('p2');
   L.pump(P2, 7.5, 10, 3);
   check(calls[0] === 'p2:7' && st.around('bass', 9, 10).length === 1, 'a new pattern: the notes from the current cycle on are queried again', calls.join(' '));
+  // #82 (gx1): the drops tell the stage's caches which sections to choose again (the first pump, from nothing, is one)
+  check(L.drops.n === 2 && L.drops.from === 7, 'a new pattern counts a drop from its cycle', JSON.stringify(L.drops));
+  L.pump(fake('p3'), 0.2, 3, 3);
+  check(L.drops.n === 3 && L.drops.from === 0, 'the next song\'s pattern from cycle 0: a drop from 0 (every section)', JSON.stringify(L.drops));
+  L.reset();
+  check(L.drops.n === 4 && L.drops.from === -Infinity && !st.instruments.length, 'a reset forgets every note and counts a drop of all', JSON.stringify(L.drops));
 }
 // a jump into the middle of a section (#79): the notes are read again from the section's start (and the window before
 // it), so its panels are those it has when played from its start (the hook plays only in its first bars)
