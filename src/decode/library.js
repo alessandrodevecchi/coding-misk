@@ -35,7 +35,7 @@ export function buildRows({ folders = [], files = [], entries = [] } = {}) {
     rows.push({
       key, kind: 'file', folderId: f.folderId, folderName: folder.name, path: f.path, fileName: f.name, size: f.size, modified: f.modified,
       name, artist, mark: e ? markOf(e) : null, used: e ? e.used || 0 : 0, fp: e ? e.fp : null, video: !!f.video,
-      waiting: !folder.granted, missing: !!f.missing, norm: norm(`${name} ${artist} ${f.name}`),
+      waiting: !folder.granted, missing: !!f.missing, silent: f.audio === false, norm: norm(`${name} ${artist} ${f.name}`),
     });
   }
   for (const e of entries) {
@@ -69,7 +69,8 @@ export function usedSnapshot(rows) {
   for (const r of rows) if (r.used) out[r.key] = r.used;
   return out;
 }
-// a row Autoplay and Previous and Next can open: not "not found", not waiting for access
+// a row Autoplay, Previous, Next and a mixtape's Play can open: not "not found", not waiting for access (a video without
+// sound plays, in silence)
 export const playable = r => !!r && !r.missing && !r.waiting;
 
 // the context of the open track (D8): { kind: 'list', chip, search, order, key, pos } | { kind: 'mixtape', id, rowId,

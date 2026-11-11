@@ -126,6 +126,29 @@ const rows = buildRows({ folders, files, entries });
   check(nextOf({ ...mctx, rowId: 'r2' }, { rows: mrows.map(r => ({ ...r, missing: true })), repeat: true }) === null, 'a mixtape whose rows are all missing has no next track');
 }
 
+// ---------- rows that cannot play (owner test: screen recordings without sound) ----------
+{
+  const L = [{ id: 'S', name: 'Screens', granted: true }];
+  const F = [{ folderId: 'S', path: 'a.wav', name: 'a.wav', size: 1, modified: 1 }, { folderId: 'S', path: 'b rec.mp4', name: 'b rec.mp4', size: 2, modified: 2, video: true, audio: false }, { folderId: 'S', path: 'c.wav', name: 'c.wav', size: 3, modified: 3 }];
+  const R = buildRows({ folders: L, files: F, entries: [] });
+  const silentRow = R.find(r => r.name === 'b rec');
+  check(silentRow.silent && !R.find(r => r.name === 'a').silent, 'a file stored with audio: false is marked as a video without sound');
+  const ctx = listContext({ chip: 'S', order: 'name' }, '', 'S/a.wav', R);
+  check(nextOf(ctx, R).row.name === 'b rec' && prevOf({ ...ctx, key: 'S/c.wav', pos: 2 }, R).row.name === 'b rec', 'Next and Previous do not skip a video without sound (it plays in silence)');
+  const cx = { folders: new Map([['S', { granted: true }]]), files: new Set(['S/a.wav', 'S/b rec.mp4']), singles: new Map([['s1', { granted: true }]]), silent: new Set(['S/b rec.mp4', 's:s1']) };
+  check(rowStatus({ ref: { folderId: 'S', path: 'b rec.mp4' } }, cx) === 'nosound' && rowStatus({ ref: { singleId: 's1' } }, cx) === 'nosound' && rowStatus({ ref: { folderId: 'S', path: 'a.wav' } }, cx) === 'ok', 'mixtape rows: a folder file and a single file without sound have the status "nosound"');
+  const mrows = [{ id: 'm1', name: 'gone', missing: true }, { id: 'm2', name: 'rec 1', silent: true }, { id: 'm3', name: 'song' }];
+  const first = nextOf({ kind: 'mixtape', id: 'x', rowId: null, pos: 0 }, { rows: mrows, repeat: true });
+  check(first && first.row.id === 'm2' && first.pos === 1, 'a mixtape\'s Play starts at the first playable row: past a missing row, a video without sound included');
+  const none = mrows.map(r => ({ ...r, missing: true }));
+  check(nextOf({ kind: 'mixtape', id: 'x', rowId: null, pos: 0 }, { rows: none, repeat: true }) === null && nextOf({ kind: 'mixtape', id: 'x', rowId: 'm1', pos: 0 }, { rows: none, repeat: true }) === null, 'a mixtape of rows that cannot play has no first or next row, also with repeat (no loop)');
+  const { createSilentClock } = await import('../src/decode/sync.js');
+  const fake = { currentTime: 10 }, clk = createSilentClock(fake, 30);
+  clk.start(10, 5); fake.currentTime = 12;
+  const at = clk.now(); fake.currentTime = 100;
+  check(Math.abs(at - 7) < 1e-9 && clk.now() === 30 && clk.playing && (clk.stop(), !clk.playing && clk.now() === null), 'the silent clock of a video without sound: position, the end, stop');
+}
+
 // ---------- 4.1 mixtapes ----------
 {
   let m = createMixtape('Tape', 1);

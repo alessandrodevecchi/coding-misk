@@ -47,3 +47,15 @@ export function createOriginal(ctx, buffer, dest) {
     now: () => (info ? Math.min(buffer.duration, fileTimeAt(info, ctx.currentTime)) : null),
   };
 }
+// a video without sound (decode-library: A video without sound): the original's clock without a source, with the same
+// start, stop, position and playing state, so seeking, Previous, Next and Autoplay's hand-over work as for a sound
+export function createSilentClock(ctx, duration) {
+  let info = null;
+  return {
+    start(at, from) { const when = Math.max(ctx.currentTime, at); info = { at: when, from: Math.max(0, from + (when - at)) }; return info; },
+    stop() { info = null; },
+    get playing() { return !!info; },
+    get info() { return info; },
+    now: () => (info ? Math.min(duration, fileTimeAt(info, ctx.currentTime)) : null),
+  };
+}

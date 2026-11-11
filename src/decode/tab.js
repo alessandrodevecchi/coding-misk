@@ -10,7 +10,7 @@ import { prepareTrack, prepareAt, endStep } from './autoplay.js';
 import { horizonOf, LOOK_AHEAD, LOOK_AHEAD_DEFAULT, LOCK_SECONDS, tapTempo } from './misk-analyzer.js';
 import { momentSong, writeFull, withVox, withoutVox, voxGroup, voxOf, VOX_PRELUDE, keyName, SOUND_PRESETS } from './writer.js';
 import { defaultMix, mixApply, gainsOf, loudnessTrim, codeBus, setGain, ORIG } from './mix.js';
-import { cycleOfFile, fileOfCycle, decodeMeta, createOriginal } from './sync.js';
+import { cycleOfFile, fileOfCycle, decodeMeta, createOriginal, createSilentClock } from './sync.js';
 import { currentModel } from './model.js';
 import { exportMix, mixForParts, wholeJob, fragmentJob } from './export.js';
 import { liveCode } from '../live/live-code.js';
@@ -131,25 +131,63 @@ export function createDecodeTab({ root, app }) {
     status = { kind: 'busy', text: t('dcReading') }; render();
     let info;
     try { info = await probe(file); } catch (e) { info = { duration: null, audio: true, video: false }; }
-    if (info.duration && info.duration > MAX_SECONDS + 1) return { error: t('dcErrLong', { len: clock(info.duration) }) };
+    if (info.duration && info.duration > MAX_SECONDS + 1) return { error: t('dcErrLong', { len: clock(info.duration) }), code: 'long' };
+    // a video without sound plays in silence for its length, read from its header (decode-library: A video without sound)
+    if (info.video && !info.audio && info.duration > 0) return { videoOnly: true, info };
     status = { kind: 'busy', text: t('dcDecoding') }; render();
     let buffer;
     try { buffer = await decode(file, app.ctx(), info); }
     catch (e) {
       const code = e && e.code;
-      return { error: t(code === 'nosound' ? 'dcErrNoSound' : code === 'long' ? 'dcErrLong' : code === 'memory' ? 'dcErrMemory' : 'dcErrFormat', { len: info.duration ? clock(info.duration) : '' }) };
+      return { error: t(code === 'nosound' ? 'dcErrNoSound' : code === 'long' ? 'dcErrLong' : code === 'memory' ? 'dcErrMemory' : 'dcErrFormat', { len: info.duration ? clock(info.duration) : '' }), code: code || 'format' };
     }
     const fp = await fingerprint(file, buffer.duration * 1000).catch(() => null);
     const rec = fp ? await store.get(fp.key) : null;
     return { info, buffer, fp, rec, match: !!(rec && sameFile(fp, rec)) };
   }
+  // a video without sound (decode-library: A video without sound): no decoding, no worker, no stored record; the
+  // transport runs on a silent clock for the length read from the header, the code column shows a placeholder
+  function installVideoOnly(p, { quick = false, ctx = null } = {}) {
+    const { file, handle, where, info } = p;
+    cur = {
+      file, name: file.name, fp: null, info, buffer: null, duration: info.duration, handle: handle || null, where: where || null, created: null,
+      title: info.title, artist: info.artist, attribution: true, settings: DEFAULT_SETTINGS(), tempo: null, video: true, trim: 1, videoOnly: true,
+    };
+    if (!quick && !(ctx && nav && ctx.kind === nav.kind && (ctx.kind === 'mixtape' ? ctx.id === nav.id : ctx.chip === nav.chip && ctx.order === nav.order && ctx.search === nav.search))) skipped.clear();
+    nav = ctx || null; navVer++; prepNone = false; vcIdx = -1;
+    status = { kind: 'note', text: t('dclVideoOnlyNote') };
+    render();
+  }
+  let vcIdx = -1;
+  // the placeholder in the code column: a few variants in comment form, changed every 8 s; nothing is evaluated
+  function showVideoCode(force = false) {
+    if (!cur || !cur.videoOnly) return;
+    const i = Math.floor(fileNow() / 8) % 3;
+    if (!force && i === vcIdx) return;
+    vcIdx = i;
+    app.showCode(`// ${cur.title}\n// ${t(`dclVideoCode${i + 1}`, { len: clock(cur.duration) })}\n`, cur.title, t('dclVideoOnly'));
+  }
   // where: the folder and path it came from (decode-library D5); ctx: the list or mixtape it came from (D8), null for a
   // picked or dropped file
-  async function openFile(file, handle = null, where = null, ctx = null) {
+  // The file is read and decoded before the open track stops (decode-library: a row that fails to open): a file that
+  // cannot open leaves the open track playing. row: the library row it came from (a file without sound is marked);
+  // inPanel: the note goes into the panel, which stays open; onRead: called once the file is readable (closes the panel)
+  let lastFail = null;
+  async function openFile(file, handle = null, where = null, ctx = null, { row = null, inPanel = false, onRead = null } = {}) {
     if (!file) return false;
-    stop(); dropPrep();
+    const prev = status;
     const r = await readFile(file);
-    if (r.error) { status = { kind: 'error', text: r.error }; render(); return false; }
+    if (r.error) {
+      lastFail = { code: r.code, text: r.error };
+      if (row && r.code === 'nosound') panel.markSilent(row);
+      if (inPanel && row) { status = prev; render(); panel.note(r.code === 'nosound' ? { kind: 'note', text: t('dclNoSound', { name: row.name }) } : { kind: 'error', text: `${row.name}: ${r.error}` }); }
+      else { status = { kind: 'error', text: r.error }; render(); }
+      return false;
+    }
+    lastFail = null;
+    if (r.videoOnly && row) panel.markSilent(row);
+    if (onRead) onRead();
+    stop(); dropPrep();
     await install({ file, handle, where, ...r }, { ctx });
     return true;
   }
@@ -160,6 +198,7 @@ export function createDecodeTab({ root, app }) {
     if (worker) { worker.terminate(); worker = null; }
     if (full) { full.w.terminate(); full = null; }
     model = null; modelB = null; bMemo = null; codeMemo.clear();
+    if (p.videoOnly) return installVideoOnly(p, { quick, ctx });
     cur = {
       file, name: file.name, fp, info, buffer, duration: buffer.duration, handle: handle || (match && rec.handle) || null,
       where: where || (match && rec.where) || null, created: match ? rec.created || null : null,
@@ -231,7 +270,7 @@ export function createDecodeTab({ root, app }) {
       try {
         let p = rec.handle.queryPermission ? await rec.handle.queryPermission({ mode: 'read' }) : 'granted';
         if (p !== 'granted' && ask && rec.handle.requestPermission) p = await rec.handle.requestPermission({ mode: 'read' });
-        if (p === 'granted') { const file = await rec.handle.getFile(); closePanel(); return openFile(file, rec.handle, rec.where || null, ctx); }
+        if (p === 'granted') { const file = await rec.handle.getFile(); return openFile(file, rec.handle, rec.where || null, ctx, { onRead: closePanel }); }
         if (ask) app.toast(t('dcPermission'));
         return false;
       } catch (e) { /* a handle that no longer works: pick the file again */ }
@@ -245,17 +284,17 @@ export function createDecodeTab({ root, app }) {
   }
   // a row of the list or a mixtape (D7): its file found through its folder (permission asked in the click), a file gone
   // marked "not found"; a track that was playing goes on with the new one, a mixtape plays
-  async function openRow(row, ctx, ask = true, { andPlay = null } = {}) {
+  async function openRow(row, ctx, ask = true, { andPlay = null, inPanel = false } = {}) {
     const wasPlaying = playing;
     let ok = false;
+    lastFail = null;
     if (row.kind === 'recent') ok = await reopen(row.fp, ctx, ask);
     else {
       let got = null;
       try { got = await panel.fileOf(row, ask); }
-      catch (e) { if (ask) panel.note({ kind: 'error', text: t('dclGone', { name: row.name }) }); return false; }
+      catch (e) { lastFail = { code: 'gone' }; if (ask) panel.note({ kind: 'error', text: t('dclGone', { name: row.name }) }); return false; }
       if (!got) return false;
-      closePanel();
-      ok = await openFile(got.file, got.handle, got.where, ctx);
+      ok = await openFile(got.file, got.handle, got.where, ctx, { row, inPanel, onRead: closePanel });
     }
     if (ok && (andPlay ?? (wasPlaying || (ctx && ctx.kind === 'mixtape')))) play(0);
     return ok;
@@ -316,7 +355,7 @@ export function createDecodeTab({ root, app }) {
     p.ready.then(() => {
       if (prep !== p) return;
       // a next track that cannot open is skipped with a note, and the one after it is prepared (autoplay spec)
-      if (p.state === 'failed') { skipped.add(rowId(p.row)); navVer++; if (p.error !== 'waiting') app.toast(t('dclSkipped', { name: p.row.name })); prep = null; prepNone = false; }
+      if (p.state === 'failed') { trace('prepfail', { to: p.row.name, error: p.error }); skipped.add(rowId(p.row)); navVer++; if (p.error === 'nosound') panel.markSilent(p.row); if (p.error !== 'waiting') app.toast(t('dclSkipped', { name: p.row.name })); prep = null; prepNone = false; }
     });
     return p;
   }
@@ -346,6 +385,7 @@ export function createDecodeTab({ root, app }) {
         ensureAudio();
         const info = orig.start(Math.max(ctx.currentTime, end), 0);
         lastHand = { end, start: info.at, offset: 0, gapMs: Math.max(0, (info.at - end) * 1000), why };
+        if (cur.videoOnly) showVideoCode(true);
       }
     } finally { handing = false; }
     render();
@@ -396,16 +436,33 @@ export function createDecodeTab({ root, app }) {
     if (dir > 0 && prep && prep.state === 'ready' && rowId(prep.row) === rowId(to.row)) { await handOver(prep, 'now'); return true; }
     const wasPlaying = playing || !!waitNext, ctx0 = nav;
     waitNext = null; dropPrep();
-    // a row that cannot be read is skipped with a note, and the one after it (in the same direction) is tried
-    for (let k = 0, row = to; row && k < 20; k++) {
-      if (await openRow(row.row, stepNav(row, ctx0), true, { andPlay: wasPlaying || ctx0.kind === 'mixtape' })) return true;
-      if (!(status && status.kind === 'error')) return false;
-      skipped.add(rowId(row.row)); navVer++;
-      app.toast(t('dclSkipped', { name: row.row.name }));
+    return openWithSkips(to, ctx0, dir, wasPlaying || ctx0.kind === 'mixtape');
+  }
+  // One rule for the rows that cannot play (decode-library, owner test): rows "not found", waiting or without sound are
+  // skipped by nextOf and prevOf without being opened; a row that fails when opened joins the skipped rows and the next
+  // one is tried; one note names the rows skipped; with no playable row left the tab stops with a note. Previous, Next
+  // and a mixtape's Play use it. names: rows already passed over before `first`
+  async function openWithSkips(first, ctx0, dir, andPlay, names = []) {
+    for (let k = 0, row = first; row && k < 50; k++) {
+      if (await openRow(row.row, stepNav(row, ctx0), true, { andPlay })) { if (names.length) app.toast(t('dclSkippedMany', { names: names.join(', ') })); return true; }
+      // a permission refused or a click undone is not a failure of the file
+      if (!lastFail) return false;
+      names.push(row.row.name); skipped.add(rowId(row.row)); navVer++;
       const src = srcOf(ctx0), from = stepNav(row, ctx0);
       row = dir > 0 ? nextOf(from, src) : prevOf(from, src);
     }
+    app.toast(names.length ? `${t('dclNonePlayable')} ${t('dclSkippedMany', { names: names.join(', ') })}` : t('dclNonePlayable'));
     return false;
+  }
+  // a mixtape's Play: its first playable row, the rows before it that cannot play named in the note
+  function playMix(id) {
+    const ctx0 = { kind: 'mixtape', id, rowId: null, pos: 0 };
+    if (!(nav && nav.kind === 'mixtape' && nav.id === id)) skipped.clear();
+    const src = srcOf(ctx0), first = nextOf(ctx0, src);
+    if (!first) { app.toast(t('dclNonePlayable')); return false; }
+    const before = src.rows.slice(0, first.pos).map(r => r.name);
+    waitNext = null; dropPrep();
+    return openWithSkips(first, ctx0, 1, true, before);
   }
   // the panel over the tab ("Another file") or inline in the empty tab
   let panelOpen = false;
@@ -414,7 +471,8 @@ export function createDecodeTab({ root, app }) {
     app: { t, esc, toast: app.toast, confirmInline: app.confirmInline },
     store,
     hooks: {
-      openRow: (row, ctx, ask) => openRow(row, ctx, ask),
+      openRow: (row, ctx, ask) => openRow(row, ctx, ask, { inPanel: true }),
+      playMix: id => playMix(id),
       openRecent: (fp, ctx) => openRow({ kind: 'recent', fp }, ctx, true),
       pick: () => pick(),
       removeRecent: fp => store.remove(fp).then(() => { app.toast(t('dcRemoved')); panel.entriesChanged(); navVer++; }),
@@ -438,6 +496,7 @@ export function createDecodeTab({ root, app }) {
     const f = Math.max(0, Math.min(cur.duration - 0.05, from ?? (cur.paused || 0)));
     cur.paused = null;
     playing = true; startedCode = false;
+    if (cur.videoOnly) { ensureAudio(); orig.start(app.ctx().currentTime + 0.05, f); showVideoCode(true); renderLight(); return; }
     // level A (D8): the first window up to the horizon is analysed before the sound starts; level B knows every bar
     if (level() !== 'B') {
       const m = await analyse(Math.max(horizon(f), (model && model.bpm ? 0 : LOCK_SECONDS + 0.5)) + 0.1, true);
@@ -457,7 +516,7 @@ export function createDecodeTab({ root, app }) {
   // endAt (a hand-over, decode-library D10): the original starts no earlier than that audio time, skipping the few
   // milliseconds of its start the code's clock has already passed, so there is no gap and the two stay in sync
   async function startCode(f = null, { endAt = null } = {}) {
-    if (!cur || pendingStart) return;
+    if (!cur || pendingStart || cur.videoOnly) return;
     if (level() === 'B' ? !(modelB && modelB.barSeconds > 0) : !(model && model.barSeconds > 0)) return;
     startedCode = true;
     trace('code', { f });
@@ -512,7 +571,7 @@ export function createDecodeTab({ root, app }) {
       origAn = ctx.createAnalyser(); origAn.fftSize = 1024; origGain.connect(origAn);
       orig = null; origFor = null;
     }
-    if (!orig || orig.buffer !== cur.buffer) { if (orig) orig.stop(); orig = createOriginal(ctx, cur.buffer, origGain); orig.buffer = cur.buffer; }
+    if (!orig || orig.track !== cur) { if (orig) orig.stop(); orig = cur.videoOnly ? createSilentClock(ctx, cur.duration) : createOriginal(ctx, cur.buffer, origGain); orig.track = cur; }
     audio();
   }
   // every frame: the original into the master stage's level node, the code's bus gain from the mix (1 outside Decode)
@@ -625,6 +684,7 @@ export function createDecodeTab({ root, app }) {
   // level B runs in a worker of its own (cancel ends it; level A goes on); then: 'switch' (to Full), 'compose' (Open in
   // Compose) or null (stored only)
   async function runFull(then = 'switch') {
+    if (cur && cur.videoOnly) return;
     if (!cur || full) { if (full && then) full.then = then; return; }
     const w = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }), id = ++fullSeq, track = cur;
     full = { w, id, f: 0, stage: 'frames', then, t0: performance.now() };
@@ -657,7 +717,7 @@ export function createDecodeTab({ root, app }) {
   // export starts by itself. kind: 'out' (audio or video as the display says) or 'frag'
   let pendingExport = null;
   function requestExport(kind, anchor = null) {
-    if (!cur) { app.toast(t('dcExportNone')); return; }
+    if (!cur || cur.videoOnly) { app.toast(t('dcExportNone')); return; }
     if (app.exportJob()) { if (kind === 'out') app.exportDecode('cancel'); return; }
     if (!modelB) { pendingExport = { kind, anchor }; if (full) full.then = 'export'; else runFull('export'); status = { kind: 'note', text: t('dcExportFull') }; render(); return; }
     if (kind === 'frag') app.openFragments('decode', root.querySelector('#dc-frag') || anchor); else app.exportDecode('out');
@@ -700,7 +760,7 @@ export function createDecodeTab({ root, app }) {
   // Open in Compose (D15): the level B song saved as a song of the user's, with the Live coder profile, "Follow the
   // song", narrator off and the cover; level B runs first when missing
   function openCompose() {
-    if (!cur) return;
+    if (!cur || cur.videoOnly) return;
     if (!modelB) { runFull('compose'); return; }
     const song = { ...songB(`u-${Date.now()}`), config: composeConfig(cur.settings.options) };
     stop();
@@ -728,6 +788,7 @@ export function createDecodeTab({ root, app }) {
     if (cur || codeAn) audio();
     if (!playing) return;
     const f = orig ? orig.now() : 0;
+    if (cur.videoOnly) showVideoCode();
     // the original playing alone (no tempo yet, or a next track started without its code): the code joins as soon as
     // the model has the tempo
     if (!startedCode && !pendingStart && orig && orig.playing && level() !== 'B' && model && model.barSeconds > 0) startCode();
@@ -737,7 +798,7 @@ export function createDecodeTab({ root, app }) {
       if (!prep && !prepNone && f >= prepareAt(cur.duration)) startPrep();
       if (prep && prep.state === 'ready' && orig && orig.playing && f >= cur.duration - (handDelta + 0.08)) { handOver(prep, 'end'); return; }
     } else if (prep) dropPrep();
-    if (f !== null && f >= cur.duration - 0.03) { trace('end', { f }); if (autoplayOn() && endWithNext()) return; stop(); cur.paused = 0; app.ended(); return; }
+    if (f !== null && f >= cur.duration - 0.03) { trace('end', { f }); if (autoplayOn() && endWithNext()) return; if (autoplayOn() && skipped.size) app.toast(t('dclNoMorePlayable')); stop(); cur.paused = 0; app.ended(); return; }
     // level A: keep the model ahead of the horizon (one request at a time, a little past it)
     const want = horizon(f ?? 0);
     // one request in flight at a time, a little past the horizon (a lost answer frees the slot after 3 s)
@@ -834,6 +895,19 @@ export function createDecodeTab({ root, app }) {
         <div class="card dc-panel dc-lib-inline" id="dc-lib-slot"></div>`;
       panelOpen = false;
       panel.mount(root.querySelector('#dc-lib-slot'), false);
+      return;
+    }
+    if (cur.videoOnly) {
+      // a video without sound (decode-library): the file row, the note and the transport; nothing to analyse
+      root.innerHTML = `${head}${input}
+      <div class="card dc-panel" id="dc-drop">
+        <div class="dc-filerow"><span class="dc-fname">${ICON.file} <span>${esc(cur.name)} · ${esc(clock(cur.duration))}</span></span><button class="btn" id="dc-another" aria-expanded="${panelOpen}">${esc(t('dcAnother'))}</button></div>
+        <div class="dc-lib-slot" id="dc-lib-slot"></div>
+        ${stat}
+        <div class="dc-acts"><button class="btn primary" id="dc-play">${esc(playing ? t('pause') : t('dcPlay'))}</button><button class="btn" id="dc-stop">${esc(t('dcStop'))}</button><span class="dc-time" id="dc-time"></span></div>
+      </div>`;
+      if (panelOpen) panel.mount(root.querySelector('#dc-lib-slot'), true);
+      renderLight(true);
       return;
     }
     const s = cur.settings, mix = s.mix;

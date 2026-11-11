@@ -4,7 +4,10 @@
 // and to answer "prompt" after a reload (design, Risks: fake handles). Groups: the panel ("Another file" opens it, not
 // the picker; Escape), folders (two added, a duplicate refused, subfolders, skipped names, the video icon), the list
 // (search with accents, chips, order, marks ◆ and ◇ from the index, a ◆ row opening in Full with one record read), the
-// permission after a reload (one click, then no more; denied), a deleted file "not found", Autoplay (prepared before
+// permission after a reload (one click, then no more; denied), a deleted file "not found", videos without sound (an MP4
+// with no audio track made by ffmpeg: kind icons, it plays in silence for its length with the placeholder code and
+// nothing evaluated, Previous and Next, no record stored and the index fields, the row's mark, Autoplay moving on at its
+// end in a mixtape, a mixtape whose only row cannot open ending with a note, the idle tag read finding one), Autoplay (prepared before
 // the end, the hand-over gap on the audio clock, the code from the new track's first lines, an unreadable file skipped,
 // the end of the list, a slow preparation: the pause, the sound after about 3 s and the code after), Previous and Next
 // (the ends, a prepared track, a picked file), mixtapes (four rows, drag, rename, reload, repeat on and off, a moved
@@ -33,6 +36,7 @@ const ff = a => execFileSync('ffmpeg', ['-v', 'error', '-y', ...a]);
 // "prompt" after a reload when the check asks for it, "granted" once requested, "denied" when the check says so
 const INIT = () => {
   const S = k => sessionStorage.getItem(k);
+  if (S('dclNoTags') === '1') window.codingMiskNoTags = true;
   if (S('dclNoIDB') === '1') { try { Object.defineProperty(window, 'indexedDB', { get: () => undefined, configurable: true }); } catch (e) {} }
   if (!window.FileSystemHandle) return;
   const P = FileSystemHandle.prototype, granted = new Set();
@@ -57,6 +61,9 @@ const INIT = () => {
   const A = song('a.wav', 124, 11, 1), B = song('b.wav', 128, 11, 2), C = song('c.wav', 120, 11, 3), N = song('night.wav', 126, 11, 4), M = song('mid.wav', 122, 10, 5), Z = song('zeta.wav', 124, 10, 6);
   const MP4 = path.join(CACHE, 'clip.mp4');
   if (!fs.existsSync(MP4)) ff(['-f', 'lavfi', '-i', 'color=c=black:s=160x120:r=10', '-i', C, '-t', '18', '-shortest', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', MP4]);
+  // a screen recording: an h264 video stream and no audio track (owner test)
+  const SILENT = path.join(CACHE, 'silent-rec-18.mp4');
+  if (!fs.existsSync(SILENT)) ff(['-f', 'lavfi', '-i', 'testsrc=s=160x120:r=10', '-t', '18', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', SILENT]);
   const TAGGED = path.join(CACHE, 'tagged.mp3');
   if (!fs.existsSync(TAGGED)) ff(['-i', A, '-t', '4', '-metadata', 'title=Tagged Title', '-metadata', 'artist=Tag Artist', '-b:a', '128k', TAGGED]);
   const b64 = f => fs.readFileSync(f).toString('base64');
@@ -102,7 +109,7 @@ const INIT = () => {
   const reload = async () => { await page.reload(); await sleep(2200); await openTab(); await waitFor(async () => (await pst()).scanning === 0, 8000); };
   const addFolder = async name => { await page.evaluate(n => { window.__dclPick = [n]; }, name); await page.click('#dcl-add'); await waitFor(async () => { const s = await pst(); return s.folders.some(f => f.name === name) && !s.scanning; }, 15000); await sleep(300); };
   // the rows drawn now: name, folder, mark, states
-  const rowsNow = () => page.$$eval('#dcl .dcl-row', xs => xs.map(x => ({ key: x.dataset.dclRow, name: x.querySelector('.dcl-name').firstChild.textContent.trim(), folder: x.querySelector('.dcl-folder').textContent, mark: x.querySelector('.dcl-mark').textContent, video: !!x.querySelector('.dcl-vid svg'), wait: x.classList.contains('wait'), miss: x.classList.contains('miss'), on: x.classList.contains('on') })));
+  const rowsNow = () => page.$$eval('#dcl .dcl-row', xs => xs.map(x => ({ key: x.dataset.dclRow, name: x.querySelector('.dcl-name').firstChild.textContent.trim(), folder: x.querySelector('.dcl-folder').textContent, mark: x.querySelector('.dcl-mark').textContent, video: !!x.querySelector('.ico-video-file'), audio: !!x.querySelector('.ico-audio-file'), wait: x.classList.contains('wait'), miss: x.classList.contains('miss'), on: x.classList.contains('on') })));
   const rowKey = async (name, folder) => (await rowsNow()).find(r => r.name === name && (!folder || r.folder === folder))?.key;
   const clickRow = async (name, folder) => { const k = await rowKey(name, folder); if (!k) return false; await page.click(`#dcl [data-dcl-row="${k}"]`); return true; };
   const chip = async id => page.click(`#dcl [data-dcl-chip="${id}"]`);
@@ -121,7 +128,7 @@ const INIT = () => {
     await addFolder('Live sets');
     let rows = await rowsNow();
     check(rows.map(r => r.name).sort().join() === 'a,b,broken,c,clip', 'subfolders at any depth; notes.txt and the dot folder skipped', rows.map(r => r.name).join());
-    check(rows.find(r => r.name === 'clip')?.video && !rows.find(r => r.name === 'a')?.video, 'the MP4 row has the video icon');
+    check(rows.find(r => r.name === 'clip')?.video && !rows.find(r => r.name === 'a')?.video && rows.find(r => r.name === 'a')?.audio, 'the MP4 row has the video icon, an audio row the music note');
     check(rows.every(r => !/\d:\d\d/.test(r.name + r.folder)), 'no row shows a length');
     await addFolder('Demos');
     const chips = await page.$$eval('#dcl-chips [data-dcl-chip]', xs => xs.map(x => x.textContent.replace(/\s+\d+\+?$/, '').trim()));
@@ -394,6 +401,84 @@ const INIT = () => {
     states = await page.$$eval('#dcl-mrows li', xs => xs.map(x => (x.classList.contains('miss') ? 'miss' : 'ok')));
     check(states.join() === 'ok,ok,ok,ok', 'adding folders with the same names links the rows again', states.join());
     await shot('lib-mixtape');
+  }
+
+  // ---------- videos without sound (owner test): video only rows, an inline note, skipped by Play, Next and Previous ----------
+  if (want('silent')) {
+    for (const [p, f] of [['Screens/rec 1.mp4', SILENT], ['Screens/rec 2.mp4', SILENT], ['Screens/song.wav', M]]) await opfs('write', p, b64(f));
+    await opfs('write', 'Screens/zz broken.wav', 'broken');
+    await page.evaluate(() => { sessionStorage.setItem('dclNoTags', '1'); localStorage.setItem('coding-misk-decode-autoplay', 'false'); });
+    await reload();
+    if (!(await page.$('#dcl'))) { await page.click('#dc-another'); await sleep(300); }
+    await page.click('#dcl [data-dcl-view="tracks"]').catch(() => {});
+    await addFolder('Screens');
+    await chip(await folderId('Screens')); await page.click('#dcl [data-dcl-order="name"]'); await sleep(300);
+    const kinds = await page.$$eval('#dcl .dcl-row', xs => xs.map(x => ({ name: x.querySelector('.dcl-name').firstChild.textContent.trim(), audio: !!x.querySelector('.ico-audio-file'), video: !!x.querySelector('.ico-video-file'), none: !!x.querySelector('.ico-no-sound') })));
+    check(kinds.find(k => k.name === 'song').audio && kinds.filter(k => k.name.startsWith('rec')).every(k => k.video && !k.none), 'kind icons: a music note for the WAV, a video icon for the MP4s (their sound not known yet)', JSON.stringify(kinds));
+    // a click on a video without sound while a song plays: it opens and plays in silence, with the placeholder code
+    await clickRow('song'); await opened('song.wav');
+    await page.click('#dc-play'); await sleep(1500);
+    if (!(await page.$('#dcl.over'))) { await page.click('#dc-another'); await sleep(400); }
+    await chip(await folderId('Screens')); await sleep(300);
+    const entries0 = await page.evaluate(async () => (await globalThis.codingMiskDecode.store.entries()).length);
+    check(await clickRow('rec 1'), 'the video row is in the panel');
+    let s = await waitFor(async () => { const x = await dec(); return x.track && x.track.name === 'rec 1.mp4' ? x : null; }, 8000);
+    check(!!s && !(await page.$('#dcl.over')), 'a video without sound opens like any track and the panel closes');
+    await sleep(2500);
+    s = await dec();
+    const code = await page.evaluate(() => (globalThis.codingMiskPhrases ? globalThis.codingMiskPhrases.code() : ''));
+    const ev = await page.evaluate(() => (globalThis.codingMiskEvaluated ? globalThis.codingMiskEvaluated() : ''));
+    check(s.playing && s.file > 1 && Math.abs(s.duration - 18) < 0.6 && /video only: no audio track/.test(code) && !/\$:/.test(code) && !/video only/.test(ev || ''), 'it plays in silence for its length (from the header), the code column shows the placeholder, nothing evaluated', `${s.file && s.file.toFixed(1)} / ${s.duration} s · ${code.split('\n')[1]}`);
+    await page.evaluate(() => globalThis.codingMiskDecode.seek(9)); await sleep(800);
+    const code2 = await page.evaluate(() => globalThis.codingMiskPhrases.code());
+    check(/video only: nothing to decode, 0:18 of silence/.test(code2), 'the placeholder changes while it plays (seek to 0:09)', code2.split('\n')[1]);
+    s = await dec();
+    check(s.canNext && s.next === 'rec 2' && !s.canPrev && !(await page.$eval('#pb-next', b => b.disabled)), 'Previous and Next work as for any track (the first row: Next to rec 2, no Previous)', `${s.prev} · ${s.next}`);
+    const entries1 = await page.evaluate(async () => (await globalThis.codingMiskDecode.store.entries()).length);
+    const stored = await page.evaluate(() => new Promise(res => { const o = indexedDB.open('coding-misk-decode-library'); o.onsuccess = () => { const r = o.result.transaction('files').objectStore('files').getAll(); r.onsuccess = () => res(r.result.filter(f => f.path.startsWith('rec')).map(f => ({ path: f.path, video: f.video, audio: f.audio }))); }; }));
+    check(entries1 === entries0 && stored.some(f => f.path === 'rec 1.mp4' && f.video === true && f.audio === false), 'no analysis stored for it; the folder index keeps video: true and audio: false', `${entries0} → ${entries1} · ${JSON.stringify(stored)}`);
+    await page.click('#dc-another'); await sleep(400);
+    await chip(await folderId('Screens')); await sleep(300);
+    const r1 = await page.$eval(`#dcl [data-dcl-row="${await rowKey('rec 1')}"]`, x => ({ none: !!x.querySelector('.ico-no-sound'), cls: x.className, mark: x.querySelector('.dcl-mark').textContent, style: getComputedStyle(x.querySelector('.dcl-name')).fontStyle, tip: x.querySelector('.dcl-vid').title }));
+    check(r1.none && !/miss|wait/.test(r1.cls) && !r1.mark && r1.style === 'normal' && /nothing for Decode to analyse/.test(r1.tip), 'its row: the "no sound" mark in the normal style, no ◆ or ◇', JSON.stringify(r1));
+    await page.keyboard.press('Escape');
+    // Autoplay moves on at its end: a mixtape of the video and the song
+    await page.click('#dc-stop'); await sleep(300);
+    await page.click('#dc-another'); await sleep(300);
+    await page.click('#dcl-select'); await sleep(200);
+    await clickRow('rec 2'); await clickRow('song');
+    await page.click('#dcl-addto'); await sleep(200); await page.click('#dcl [data-dcl-addto=""]'); await sleep(600);
+    await page.click('#dcl [data-dcl-play]');
+    s = await waitFor(async () => { const x = await dec(); return x.playing && x.track && x.track.name === 'rec 2.mp4' ? x : null; }, 8000);
+    check(!!s, 'a mixtape\'s Play starts with the video without sound');
+    await page.evaluate(() => globalThis.codingMiskDecode.seek(globalThis.codingMiskDecode.duration - 2));
+    s = await waitFor(async () => { const x = await dec(); return x.playing && x.track.name === 'song.wav' ? x : null; }, 15000, 100);
+    await sleep(2500);
+    const line = await firstLine();
+    check(!!s && /song/.test(line), 'at the video\'s end Autoplay moves on to the next track, its code from its first lines', `${line} · ${JSON.stringify((await dec()).trail.slice(-6))} · ${JSON.stringify((await dec()).prep)}`);
+    await page.click('#dc-stop'); await sleep(300);
+    // a mixtape of a file that cannot open, repeat on: skipped with a note, nothing plays, no loop
+    await page.click('#dc-another'); await sleep(300);
+    await page.click('#dcl [data-dcl-view="tracks"]'); await sleep(200);
+    await page.click('#dcl-select'); await sleep(200);
+    await clickRow('zz broken');
+    await page.click('#dcl-addto'); await sleep(200); await page.click('#dcl [data-dcl-addto=""]'); await sleep(600);
+    await page.click('#dcl-repeat'); await sleep(300);
+    const t0 = (await dec()).trail.length;
+    await page.click('#dcl [data-dcl-play]'); await sleep(4000);
+    s = await dec();
+    const toast = await page.innerText('.toast').catch(() => '');
+    check(!s.playing && s.track.name === 'song.wav' && /No track here can play/.test(toast) && /zz broken/.test(toast) && s.trail.length - t0 <= 1, 'a mixtape whose only row cannot open, repeat on: a note naming it, nothing plays, no loop', toast);
+    // found while reading tags: a new silent video shows the mark before any click
+    await page.evaluate(() => { globalThis.codingMiskNoTags = false; sessionStorage.removeItem('dclNoTags'); });
+    await opfs('write', 'Screens/rec 3.mp4', b64(SILENT));
+    if (!(await page.$('#dcl.over'))) { await page.click('#dc-another'); await sleep(300); }
+    await page.click('#dcl [data-dcl-view="tracks"]'); await sleep(200);
+    await page.evaluate(id => globalThis.codingMiskDecode.panel.rescan(id), await folderId('Screens'));
+    const found = await waitFor(async () => { const k = await rowKey('rec 3'); return k && (await page.$(`#dcl [data-dcl-row="${k}"] .ico-no-sound`)); }, 20000, 400);
+    check(!!found, 'the idle tag read finds a video without sound before any click');
+    await shot('lib-silent');
+    await page.keyboard.press('Escape');
   }
 
   // ---------- long lists, 2000 stored analyses, the index rebuilt ----------
