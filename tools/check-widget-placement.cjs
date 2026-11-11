@@ -1,7 +1,8 @@
 // Where the code widgets go (owner decisions of 2026-10-31, code-over-visual cd1 and cd5), in the browser:
 //  - the hit grid shows every row the song will use from the first bar, empty until its sound enters, so it keeps its size
 //    (Settings → Code widgets → App widgets → Hit grid → Rows: All of the song / Only the sounds playing), in the editor,
-//    over the stage and in the fast video's frames;
+//    over the stage and in the fast video's frames; with a typed opening (no drum line plays while the first line is
+//    typed) the grid comes with the first drum line that plays, with the song's rows and one height from its first frame;
 //  - at most one tone cloud on screen at a time, on three built-in songs: one with a pad, one without, one with a voice line;
 //  - on the stage (stage-app-widgets): Monitor and the side panels live and a fast video on Monitor, never two tone clouds,
 //    one hit grid with the song's rows from the first frame.
@@ -14,8 +15,13 @@ let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
 const PAD = 'luci-rosse', NO_PAD = 'prova-breakbeat', VOICE = 'switch-test-breve';
 const CW = { on: true, max: 8 };
+// (varied-openings: the two Live coder songs now draw a typed opening, silent with no drum line while their first line is
+// typed, so there is no hit grid for the first 8-11 bars. The cases below keep the drum opening they had, through a trial
+// of each song, as check-playlists.cjs does; case 1c checks a typed opening as drawn)
+const SOUNDING = { 'coding-misk-song-trials': Object.fromEntries([NO_PAD, VOICE].map(id => [id, { profile: 'switch', live: true, options: { opening: 'full-kick' } }])) };
 
-async function open(browser, store = {}, theme = null) {
+async function open(browser, store = {}, theme = null, typed = false) {
+  if (!typed) store = { ...SOUNDING, ...store };
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 950 }, acceptDownloads: true });
   const page = await ctx.newPage(), errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -77,6 +83,18 @@ const shot = async (page, name) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
       check(id === PAD ? w.clouds === 1 : w.clouds <= 1, `${id}: with every line asking for the tone cloud, ${id === PAD ? 'exactly one is drawn' : 'never more than one'}`, `most ${w.clouds}`);
       await song.ctx.close();
     }
+  }
+
+  // 1c. a typed opening (the song's own draw): no drum line plays while the first line is typed, so the grid comes with
+  // the first drum line that plays, with the song's rows from its first frame, at one height, never at another size
+  {
+    const song = await open(browser, { 'coding-misk-code-over': { stage: true }, 'coding-misk-code-widgets': CW }, null, true);
+    await playSong(song.page, VOICE);
+    const w = await watch(song.page, 32);
+    check(w.rows.length > 10 && Math.min(...w.rows) === Math.max(...w.rows), `${VOICE} (typed opening): the hit grid has the song's rows from the frame it comes in`, `${w.rows.length} frames with a grid, rows ${[...new Set(w.rows)]}`);
+    check(w.grids.size === 1 && ![...w.grids].includes(''), `${VOICE} (typed opening): the hit grid in the editor has one height from its first frame`, [...w.grids].join(', '));
+    check(!song.errors.length, `${VOICE} (typed opening): no page errors`, song.errors.join('; '));
+    await song.ctx.close();
   }
 
   // 2. the old setting: only the sounds playing, so fewer rows at the start of a song with later drum sounds
