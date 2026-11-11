@@ -32,7 +32,8 @@ export function createStageVideo({ look, soul = () => false, playing, track = ()
   // the last picture of the file before, held while the next song's file loads (no other look flashes in between)
   let snap = null;
   function snapshot(v) {
-    const k = Math.min(1, 1280 / v.videoWidth), c = snap && snap.canvas ? snap.canvas : document.createElement('canvas');
+    // (small: it shows only while the next file loads, a fraction of a second, and the copy runs at a song change)
+    const k = Math.min(1, 480 / v.videoWidth), c = snap && snap.canvas ? snap.canvas : document.createElement('canvas');
     c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
     try { c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); } catch (e) { return null; }
     return { canvas: c };
@@ -139,14 +140,16 @@ export function createStageVideo({ look, soul = () => false, playing, track = ()
     if (!file) { failed.add(w.kind === 'stage' ? w.file : w.key); note('skip', { name: w.name }); if (w.kind === 'stage') pick = null; tick(); return; }
     const v = element();
     if (cur && cur.ready && v.videoWidth && cur.kind === w.kind) snap = snapshot(v);
-    // one file at a time: the old one goes before the next opens
-    dropFile();
+    // one file at a time: the new source replaces the old one in a single load (no empty load in between, D9b), then the
+    // old object URL is revoked
+    const old = cur;
     const url = URL.createObjectURL(file); stats.urls++;
     cur = { key: w.key, kind: w.kind, url, ready: false, name: w.name, file: w.kind === 'stage' ? w.file : w.key, t0: performance.now() };
     stats.opens++;
     v.loop = w.kind === 'stage';
     v.preload = 'auto';
     v.src = url;
+    if (old && old.url) { URL.revokeObjectURL(old.url); stats.urls--; }
     // a track video starts at the file time heard; a stage video from its beginning, with no seek
     if (w.kind === 'track') { try { v.currentTime = trackTime(w.track.time(), 0); lastSeek = performance.now(); } catch (e) {} }
   }
@@ -167,7 +170,8 @@ export function createStageVideo({ look, soul = () => false, playing, track = ()
     lastNeeded = true;
     cancelRelease();
     const w = wanted();
-    if (!w) { if (cur && el && !el.paused) el.pause(); return; }
+    // nothing to show any more (the folders removed or no file playable): the file goes, the fallback look draws (D2)
+    if (!w) { if (cur) { log('release', { key: cur.key, why: 'nothing' }); dropFile(); snap = null; } return; }
     if (!cur || cur.key !== w.key) {
       if (!opening || opening.key !== w.key) open(w);
       return;

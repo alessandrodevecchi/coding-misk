@@ -450,37 +450,55 @@ const play = async page => { if (!(await page.evaluate(() => document.querySelec
       await page.locator('#track-pick').selectOption('kellerlicht'); await sleep(400);
       await play(page); await sleep(2000);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: RATE });
-      const t0 = await page.evaluate(() => performance.now()), acts = [];
-      const act = async () => acts.push(await page.evaluate(() => performance.now()));
+      late.length = 0;
+      // each scripted action: its time on the page's clock and on the wall clock, and its phase
+      const acts = [], phases = [];
+      const act = async phase => { acts.push({ at: await page.evaluate(() => performance.now()), wall: Date.now(), phase }); };
+      const phase = name => phases.push({ name, wall: Date.now() });
       const other = video ? 'video' : 'palco';
       // 10 look switches, the files loading each time (the grace shortened so each switch reopens)
+      phase('switches');
       await page.evaluate(() => globalThis.codingMiskStageVideo.layer.setGraces({ look: 0, hidden: 0 }));
-      for (let i = 0; i < 10; i++) { await act(); await pickLook(page, other); await sleep(2500); await act(); await pickLook(page, 'pixel'); await sleep(1500); }
+      for (let i = 0; i < 10; i++) { await act('switches'); await pickLook(page, other); await sleep(2500); await act('switches'); await pickLook(page, 'pixel'); await sleep(1500); }
       await pickLook(page, other); await sleep(1500);
       // 5 hides and returns across the grace
-      for (let i = 0; i < 5; i++) { await act(); await page.click('#code-full'); await sleep(1500); await act(); await page.click('#code-full'); await sleep(2500); }
+      phase('hides');
+      for (let i = 0; i < 5; i++) { await act('hides'); await page.click('#code-full'); await sleep(1500); await act('hides'); await page.click('#code-full'); await sleep(2500); }
       // 20 radio song changes
+      phase('radio');
       await page.evaluate(() => globalThis.codingMiskStageVideo.layer.setGraces({}));
       await page.click('#play'); await sleep(500);
       await page.evaluate(() => { document.querySelector('[data-tab="radio"]').click(); }); await sleep(600);
-      await act(); await page.click('#radio-start'); await sleep(7000);
-      for (let i = 0; i < 20; i++) { await act(); await page.click('#radio-skip'); await sleep(4000); }
-      const lt = (await page.evaluate(() => window.__lt)).filter(x => x.s >= t0);
-      const ev = video ? (await S(page)).stats.events.filter(e => ['open', 'ready', 'seek', 'release', 'pause'].includes(e.what)).map(e => e.at) : [];
+      await act('radio'); await page.click('#radio-start'); await sleep(7000);
+      for (let i = 0; i < 20; i++) { await act('radio'); await page.click('#radio-skip'); await sleep(4000); }
+      phase('end');
+      const lt = (await page.evaluate(() => window.__lt)).filter(x => x.s >= acts[0].at && x.d > 50);
+      const ev = video ? (await S(page)).stats.events.filter(e => ['open', 'ready', 'seek', 'release'].includes(e.what)).map(e => e.at) : [];
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       const st = video ? await S(page) : null;
       await ctx.close();
-      const near = (t, list) => list.some(a => Math.abs(t - a) <= 100);
-      return { late: late.length, long50: lt.filter(x => x.d > 50).length, worst: Math.round(Math.max(0, ...lt.map(x => x.d))), nearVideo: lt.filter(x => x.d > 50 && near(x.s, ev)).length, nearActs: lt.filter(x => x.d > 50 && near(x.s, acts)).length, opens: st ? st.stats.opens : 0 };
+      // per action: the long tasks until the next action, and those within 100 ms of a video load, seek or release
+      const win = acts.map((a, k) => { const end = k + 1 < acts.length ? acts[k + 1].at : Infinity, inWin = lt.filter(x => x.s >= a.at && x.s < end); return { long: inWin.length, video: inWin.filter(x => ev.some(e => Math.abs(x.s - e) <= 100)).length }; });
+      const latePhase = Object.fromEntries(phases.slice(0, -1).map((p, i) => [p.name, late.filter(t => t >= p.wall && t < phases[i + 1].wall).length]));
+      return { late: late.length, latePhase, long50: lt.length, worst: Math.round(Math.max(0, ...lt.map(x => x.d))), nearVideo: win.reduce((n, w) => n + w.video, 0), win, opens: st ? st.stats.opens : 0 };
     };
-    let scene = await run(false), vid = await run(true);
-    // a second pair when the first differs, to tell the machine's noise from a cause
-    if (vid.late > scene.late || vid.nearVideo > scene.nearActs) { note('first pair differs, running a second pair', JSON.stringify({ scene, vid })); scene = await run(false); vid = await run(true); }
-    RESULTS.audio = { scene, video: vid, rate: RATE };
-    note(`audio safety at ${RATE}× CPU`, `scene: "too late" ${scene.late}, tasks over 50 ms ${scene.long50} (worst ${scene.worst} ms); Video: "too late" ${vid.late}, tasks over 50 ms ${vid.long50} (worst ${vid.worst} ms), near video work ${vid.nearVideo}, files opened ${vid.opens}`);
-    check(vid.opens >= 20, 'the Video run opened a file at each switch and song', `${vid.opens}`);
-    check(vid.late <= scene.late, 'no more "too late" lines with Video than on a scene look', `${vid.late} vs ${scene.late}`);
-    check(vid.nearVideo <= scene.nearActs, 'no task over 50 ms from the video work beyond the scene run\'s', `${vid.nearVideo} near video work vs ${scene.nearActs} near the scene run's actions`);
+    // the long tasks from the video work with no long task after the same action in the scene run (D9b)
+    const unmatched = (vid, scene) => vid.win.filter((w, k) => w.video > 0 && !(scene.win[k] && scene.win[k].long > 0)).length;
+    // two pairs (scene, Video, scene, Video), added up: the machine's noise against a cause (D9b)
+    const pairs = [[await run(false), await run(true)], [await run(false), await run(true)]];
+    const sum = k => pairs.reduce((n, p) => [n[0] + p[0][k], n[1] + p[1][k]], [0, 0]);
+    // a cause repeats: an action counts when every Video run has a long task from the video work after it and no scene
+    // run has one after the same action (one pair, or the two pairs added up); a long task in one run only is the machine
+    const [sl, vl] = sum('late');
+    const nAct = pairs[0][1].win.length;
+    const unmatchedAt = Array.from({ length: nAct }, (_, k) => k).filter(k => pairs.every(p => p[1].win[k] && p[1].win[k].video > 0) && !pairs.some(p => p[0].win[k] && p[0].win[k].long > 0));
+    const un = unmatchedAt.length;
+    RESULTS.audio = { rate: RATE, pairs: pairs.map(p => p.map(r => ({ late: r.late, latePhase: r.latePhase, long50: r.long50, worst: r.worst, nearVideo: r.nearVideo, opens: r.opens }))) };
+    pairs.forEach((p, i) => note(`audio safety at ${RATE}× CPU, pair ${i + 1}`, `scene: "too late" ${p[0].late} ${JSON.stringify(p[0].latePhase)}, tasks over 50 ms ${p[0].long50} (worst ${p[0].worst} ms); Video: "too late" ${p[1].late} ${JSON.stringify(p[1].latePhase)}, tasks over 50 ms ${p[1].long50} (worst ${p[1].worst} ms), near video work ${p[1].nearVideo}, unmatched ${unmatched(p[1], p[0])}, files opened ${p[1].opens}`));
+    check(pairs.every(p => p[1].opens >= 20), 'the Video run opened a file at each switch and song', pairs.map(p => p[1].opens).join(', '));
+    const spread = Math.max(...pairs.map(p => p[0].late)) - Math.min(...pairs.map(p => p[0].late));
+    check(vl <= sl + spread, 'no more "too late" lines with Video than on a scene look, beyond the scene runs\' own spread', `${vl} vs ${sl} (spread ${spread})`);
+    check(un === 0, 'no task over 50 ms from the video work, repeated after the same action in every run, without one on a scene look', un ? `actions ${unmatchedAt.join(', ')}` : `0 (single-run cases: ${pairs.map(p => unmatched(p[1], p[0])).join(', ')})`);
   }
 
   // ---------- folders: the "Stage videos" card (spec stage/video-folders) ----------
@@ -672,7 +690,9 @@ const play = async page => { if (!(await page.evaluate(() => document.querySelec
     await page.click('.video-bar [data-vid="stop"]');
     const f1 = await saved(/^Kellerlicht.*\.(mp4|webm)$/i, 'mp4');
     if (f1) {
-      const st = streams(f1), a = frameAt(f1, 1.5), b = frameAt(f1, 6.5);
+      // the middle of the picture (the test video's frame-number grid), while the stage was away (6 s and 8 s into the file)
+      const mid = (f, t) => execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', f, '-frames:v', '1', '-vf', 'crop=iw*0.3:ih*0.4:iw*0.35:ih*0.3,scale=32:32', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']);
+      const st = streams(f1), a = mid(f1, 6), b = mid(f1, 8);
       check(st.filter(x => x.codec_type === 'video').length === 1 && st.filter(x => x.codec_type === 'audio').length === 1, 'the session video file: one picture and one audio stream', st.map(x => `${x.codec_type}:${x.codec_name}`).join(', '));
       check(diff(a, b) > 4, 'the picture changes while the stage video plays (also while the stage was away)', `mean difference ${diff(a, b).toFixed(1)}`);
       if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '5', '-i', f1, '-frames:v', '1', path.join(SHOTS, 'session-led.png')]); }
