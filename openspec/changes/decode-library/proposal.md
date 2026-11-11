@@ -15,7 +15,10 @@ The "Recent tracks" part of the change `decode-refine` moves here, so one change
 - **Mixtapes** (the name is "Mixtape" in English and Italian). An ordered selection of files to decode one after another. A mixtape stores references to files (a folder and a path inside it, or a single file), never audio. Create, add tracks from the list (several at once), reorder by dragging, rename, delete, play in order with autoplay, repeat on or off. Tracks may come from different folders, or be single files added with "File…". A file that moved or is gone stays as a row marked "not found". Mixtapes are part of the app's backup; the files are not, so on another computer the rows show "not found".
 - **Mixtapes are not playlists.** The app's playlists hold generated songs (code). A user who wants a decoded track in a playlist opens it in Compose and saves it there, as today.
 - **Other browsers.** Without the File System Access API the panel offers "Choose a file…" and the recent tracks only; folders and mixtapes are not shown, with a note that this browser cannot open folders.
-- **Stored analyses.** The store keeps up to 100 tracks instead of 50 and drops tracks with a Live analysis only before tracks with a full analysis, so autoplay through a folder does not push out the full analyses.
+- **Previous and Next in Decode.** The player bar's Previous and Next, disabled in Decode today, work when the open track came from the list or a mixtape: Next opens the next track at once (the prepared one when it is ready), Previous the one before.
+- **Stored analyses.** A stored analysis is about 20 kB per minute of audio. The store keeps up to 2000 tracks instead of 50 (about 150 MB) and drops tracks with a Live analysis only before tracks with a full analysis, so autoplay through a folder does not push out the full analyses.
+- **A light index.** The browser stays light and loads only what is needed. A small index of the stored tracks (name, mark, where the file was opened from, last use) feeds the list and the marks; a stored analysis is read only when its track opens. Opening the tab no longer reads every stored analysis.
+- **Backup of the analyses.** The settings backup carries the 100 analyses used last by default. A checkbox "Include all Decode analyses", off by default, adds every stored analysis, with a tooltip that says the file can get large. Import merges as today.
 - Guide card, knowledge notes, Italian and English strings, the hardware theme and the light theme, and checks: Node checks and a browser check with a fake folder.
 
 Out of scope:
@@ -37,15 +40,16 @@ Out of scope:
 
 ### Modified Capabilities
 
-- `decode/track-input`: "Reopen a recent track" (moved from `decode-refine`, now the panel's list) and "Stored tracks are bounded" (100 tracks, Live-only analyses dropped first).
+- `decode/track-input`: "Reopen a recent track" (moved from `decode-refine`, now the panel's list), "Stored tracks are bounded" (2000 tracks, Live-only analyses dropped first), and new requirements for the light index, loading an analysis only when its track opens, and the analyses in the settings backup.
+- `decode/playback`: "The player bar" (Previous and Next enabled with a list or mixtape context).
 
 These capabilities are defined in the change `track-to-code`, which is not archived yet. This change is applied after `track-to-code` is archived and after part 1 of `decode-refine`, which no longer carries the recent tracks.
 
 ## Impact
 
 - New modules in `src/decode/`: `library.js` (the list: index, names, marks, filter, order, next track; no DOM), `folders.js` (folder picker, permission, scan), `library-store.js` (IndexedDB `coding-misk-decode-library`: folders, file index, single files, mixtapes), `mixtapes.js` (mixtape operations and backup merge; no DOM), `autoplay.js` (preparation and hand-over), `library-panel.js` (the panel).
-- `src/decode/tab.js` ("Another file", the empty tab's list, opening from the list with the file's location, the end of a track), `src/decode/store.js` (the file's location in a record, the cap of 100), `src/decode/input.js` (open a file from a handle).
-- `src/main.js` (the end of a track in Decode), `src/settings/backup.js` (mixtapes and folder names in the backup), `src/i18n.js`, `src/guide.js`, `src/style.css`, `src/theme-light.css`.
-- Tools: `tools/check-decode-library.mjs` (`npm run check:decode-library`), `tools/check-decode-library.cjs` (browser, fake folder), `tools/check-backup.mjs` (mixtapes), `AGENTS.md` tooling lines.
+- `src/decode/tab.js` ("Another file", the empty tab's list from the index, opening from the list with the file's location, the end of a track, Previous and Next), `src/decode/store.js` (the file's location in a record, the cap of 2000, the `index` store and database version 2, the record read by key only), `src/decode/input.js` (open a file from a handle).
+- `src/main.js` (the end of a track in Decode, Previous and Next on the player bar), `src/settings/backup.js` (mixtapes and folder names in the backup, the 100 analyses used last or all), `src/settings/settings.js` (the backup card's "Include all Decode analyses" checkbox and tooltip, export and import through the index), `src/i18n.js`, `src/guide.js`, `src/style.css`, `src/theme-light.css`.
+- Tools: `tools/check-decode-library.mjs` (`npm run check:decode-library`), `tools/check-decode-library.cjs` (browser, fake folder), `tools/check-backup.mjs` (mixtapes, the 100 analyses used last, all analyses), `tools/check-player.cjs` (Previous and Next in Decode), `AGENTS.md` tooling lines.
 - Docs: `docs/knowledge/` (decode note, decisions, checks), `docs/ARCHITECTURE.md` (persistence), `DEVLOG.md`.
 - No new dependency. No change to the analysis, the writer or `ANALYSIS_VERSION`.

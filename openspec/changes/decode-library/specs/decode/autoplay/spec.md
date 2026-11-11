@@ -59,7 +59,7 @@ With Autoplay on, the tab SHALL prepare the next track about 30 seconds before t
 
 ### Requirement: One prepared track within a memory budget
 
-Only one track SHALL be prepared at a time. A prepared track SHALL be dropped when the playing track changes, the list or mixtape changes its next track, or Autoplay is turned off. The prepared track's decoded sound SHALL stay within a memory budget (design: about 120 MB); a track whose sound would not fit SHALL be read but decoded only at the hand-over.
+Only one track SHALL be prepared at a time. A prepared track SHALL be dropped when the playing track changes, the list or mixtape changes its next track, or Autoplay is turned off. The prepared track's decoded sound SHALL stay within a memory budget of 120 MB; a track whose sound would not fit SHALL be read but decoded only at the hand-over.
 
 #### Scenario: A long next track
 
