@@ -224,6 +224,12 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   // per source of notes: the panels of each section, the pitches, the spectrum columns
   const wcache = new WeakMap();
   const cacheOf = src => { let c = wcache.get(src); if (!c) { c = { rosters: new Map(), pitches: new Map(), ranges: new Map(), rolls: new Map(), cols: columnCache(), S: null, appMemo: new Map(), appNotes: notesOfStore(src, () => src.instruments) }; wcache.set(src, c); } return c; };
+  // forget what was cached for the sections starting at cycle `from` or later (-Infinity: every section). Keys: the
+  // panels `start|max|silent`, the pitches `inst|start|known`, the ranges `melodic|start|known`, the rolls `inst|start|end`
+  const forget = (C, from) => {
+    const drop = (m, at) => { for (const k of [...m.keys()]) if (!(+k.split('|')[at] < from)) m.delete(k); };
+    drop(C.rosters, 0); drop(C.pitches, 1); drop(C.ranges, 1); drop(C.rolls, 1);
+  };
   const WIDGET_LOOKS = ['monitor', 'rullo', 'claude'];
   // (for the checks: the time of the last widget look frames, in ms)
   const stageTimes = globalThis.codingMiskStageTimes = [];
@@ -252,6 +258,15 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     const src = feed && feed.store ? feed.store : liveStore, C = cacheOf(src), sec = sectionAt(cyc);
     // a change of the settings: the panels of every section are chosen again
     if (C.S !== S) { C.S = S; C.rosters.clear(); }
+    // another song (#82, gx1): its notes are read from its start and nothing of the song before is kept (the panels of
+    // each section, the pitches, the hit grid's rows seen). The caches are kept by the source of notes, and the live
+    // source stays the same from song to song: a section of the new song kept the earlier song's panels once their notes
+    // were known (an empty Monitor, or a hit grid with no drums playing, until widgets were turned off and on)
+    const seed = stage.seed ? stage.seed() : '';
+    if (C.song !== seed) {
+      C.song = seed; forget(C, -Infinity); C.appMemo.clear();
+      if (!(feed && feed.store)) live.reset();
+    }
     let known = Infinity;
     if (!(feed && feed.store)) {
       const P = playing && sched && sched() ? sched().pattern : null, c = Math.floor(cyc);
@@ -260,8 +275,11 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       known = live.pump(P, cyc, c + 3, 3, from);
       if (known >= c + 3) known = live.pump(P, cyc, Math.min(sec.end, c + 24), 1);
       if (!P) known = -Infinity;
+      // notes forgotten (a new pattern from a cycle on, a jump, a new song's pattern from its first cycle): the sections
+      // from there are chosen again from the notes read now
+      if (C.drops !== live.drops.n) { C.drops = live.drops.n; forget(C, live.drops.from); }
     }
-    const seed = stage.seed ? stage.seed() : '', silent = O.silent === 'hidden' ? 'hidden' : 'dimmed', full = S.notes === 'full';
+    const silent = O.silent === 'hidden' ? 'hidden' : 'dimmed', full = S.notes === 'full';
     // the panels of a section, chosen again while its notes are still coming in (live: the first frames of the section,
     // or of a jump into it), then kept
     const rosterAt = s => {
