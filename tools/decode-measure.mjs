@@ -3,6 +3,11 @@
 // downbeat, key, chord accuracy per bar, drum grid F1 per band and drum presence per bar; returns the numbers. With
 // --full also level B on the test songs, with Essentia.js and with misk-analyzer alone: the same scores, the section
 // bounds against the songs' sections (the largest distance in bars) and the time.
+// decode-refine 6.2: the app's songs of the bench (luci-rosse and the frozen radio song, exported with their timeline
+// JSON) measured against their timeline: kick, clap and hat F1 and recall from the hit times on the model's bar grid,
+// false hits, distinct drum grids, chord root and quality per bar, bass pitch and octave errors (the chords and the bass
+// notes from the song's own haps, Strudel in Node); level A, and with --full level B with and without Essentia.js
+// (section bounds against the timeline's sections, the level B song's drum patterns).
 //   node --no-warnings tools/decode-measure.mjs [--json] [--full]
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,9 +15,13 @@ import { fileURLToPath } from 'node:url';
 import { createAnalyzer } from '../src/decode/misk-analyzer.js';
 import { analyseFull } from '../src/decode/full.js';
 import { nodeEssentia } from './essentia-node.mjs';
-import { drumsHeard } from '../src/decode/writer.js';
+import { drumsHeard, writeFull } from '../src/decode/writer.js';
+import { parseChord, DRUM_ROWS as DRUM_ROWS_ALL } from '../src/decode/model.js';
+import { createRequire, register as registerHook } from 'node:module';
+import { installHelpers } from '../src/song/writer.js';
 import { readWav, resample, renderSong, RATE } from './decode-audio.mjs';
-import { TEST_SONGS, truthOf } from './decode-songs.mjs';
+import { TEST_SONGS, truthOf, HARD_SONGS, midiOf } from './decode-songs.mjs';
+import { compileSong } from '../src/song/compile.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'), WAV = path.join(ROOT, '.cache', 'decode', 'wav');
 const ROWS = ['bd', 'cp', 'hh'];
@@ -46,7 +55,7 @@ export function measureApp() {
     if (!fs.existsSync(f)) continue;
     const w = readWav(f), pcm = resample(w.pcm, w.rate, RATE), t0 = Date.now();
     const A = createAnalyzer(pcm), m = A.model(pcm.length / RATE);
-    out[s.id] = { ...score(m, truthOf(s)), ms: Date.now() - t0, seconds: Math.round(pcm.length / RATE) };
+    out[s.id] = { ...score(m, truthOf(s)), ms: Date.now() - t0, seconds: Math.round(pcm.length / RATE), ...(HARD_SONGS.includes(s.id) ? { hard: true } : {}) };
   }
   return out;
 }
@@ -67,10 +76,113 @@ export async function measureFull({ essentia = true, only = null } = {}) {
     if (!fs.existsSync(f)) continue;
     const w = readWav(f), pcm = resample(w.pcm, w.rate, RATE), t0 = Date.now(), truth = truthOf(s);
     const m = await analyseFull(pcm, { engine: essentia ? nodeEssentia : null });
-    out[s.id] = { ...score(m, truth), ...boundsScore(m.sections, truth.starts), ending: m.ending, engines: m.engines, ms: Date.now() - t0, seconds: Math.round(pcm.length / RATE) };
+    out[s.id] = { ...score(m, truth), ...boundsScore(m.sections, truth.starts), ending: m.ending, engines: m.engines, ...(m.essentiaTempo ? { essentiaTempo: m.essentiaTempo } : {}), ms: Date.now() - t0, seconds: Math.round(pcm.length / RATE), ...(HARD_SONGS.includes(s.id) ? { hard: true } : {}) };
   }
   return out;
 }
+// ---------- decode-refine 6.2: truth from the app's timelines ----------
+// the timeline's instruments that are the model's drum rows (the hats row holds the open hats too)
+const TL_ROWS = { bd: 'kick', cp: 'snare', hh: 'hats' };
+const TRIADS = [];
+for (let r = 0; r < 12; r++) { TRIADS.push({ root: r, quality: 'maj', set: [r, (r + 4) % 12, (r + 7) % 12] }); TRIADS.push({ root: r, quality: 'min', set: [r, (r + 3) % 12, (r + 7) % 12] }); }
+const midiOfValue = x => (typeof x === 'number' ? x : typeof x === 'string' ? midiOf(x.toLowerCase()) : null);
+// Strudel in Node with the app's helpers and a transpose that moves the notes (tools/mixer-checks.mjs makes it a no-op:
+// it compares the mix only; @strudel/tonal does not load in Node here). Only `note` values are read as pitches: scale
+// and voicing stay no-ops, so the truth leaves out notes written as degrees
+let strudel = null;
+async function strudelTonal() {
+  registerHook(`data:text/javascript,${encodeURIComponent("export async function resolve(s, c, next) { return s === '@kabelsalat/web' ? { url: 'data:text/javascript,export class SalatRepl {}', shortCircuit: true } : next(s, c); }")}`);
+  const log = console.log;
+  console.log = () => {};
+  try {
+    const core = await import('@strudel/core'), mini = await import('@strudel/mini'), { transpiler } = await import('@strudel/transpiler');
+    await core.evalScope(core, mini);
+    const up = (x, k) => { const m = midiOfValue(x); return m === null ? x : m + Number(k); };
+    core.register('transpose', (k, pat) => pat.withValue(v => (v && typeof v === 'object' && 'note' in v ? { ...v, note: up(v.note, k) } : typeof v === 'object' ? v : up(v, k))));
+    for (const name of ['scale', 'voicing', 'voicings', 'rootNotes']) if (!(name in core.Pattern.prototype)) core.register(name, (x, pat) => pat);
+    installHelpers({ register: core.register, Pattern: core.Pattern });
+    let error = null;
+    const R = core.repl({ transpiler, defaultOutput: () => {}, getTime: () => 0, onEvalError: e => { error = e; } });
+    return { evaluate: async code => { error = null; const p = await R.evaluate(code, false); if (!p || error) throw new Error((error && error.message) || 'evaluation failed'); return p; } };
+  } finally { console.log = log; }
+}
+// the truth of an app song exported with its timeline: { bpm, barSec, hits: { bd|cp|hh: [seconds] }, starts, bars:
+// [{ chord: { root, quality } | null, bass: [16 midi or null] }] } from the timeline (hit times, sections) and the song's
+// own haps (the pad's notes of a bar make its chord when they hold exactly one triad; the bass notes on their nearest step)
+export async function timelineTruth(tl, song) {
+  const bpm = tl.bpm[0], barSec = 240 / bpm, hits = {};
+  for (const [row, inst] of Object.entries(TL_ROWS)) hits[row] = (tl.instruments[inst] || []).map(x => x[0]);
+  if (!strudel) strudel = await strudelTonal();
+  const p = await strudel.evaluate(compileSong(song)), bars = [];
+  for (let i = 0; i < tl.bars; i++) {
+    const haps = p.queryArc(i, i + 1).filter(h => h.hasOnset()).map(h => ({ at: h.whole.begin.valueOf() - i, v: h.value || {} }));
+    const pcs = new Set(haps.filter(h => h.v.analyze === 'pad').map(h => midiOfValue(h.v.note)).filter(x => x !== null).map(x => ((x % 12) + 12) % 12));
+    const fit = pcs.size >= 3 ? TRIADS.filter(t => t.set.every(x => pcs.has(x))) : [];
+    const bass = Array(16).fill(null);
+    for (const h of haps.filter(h => h.v.analyze === 'bass')) { const j = Math.round(h.at * 16); if (j < 16 && bass[j] === null) bass[j] = midiOfValue(h.v.note); }
+    bars.push({ chord: fit.length === 1 ? { root: fit[0].root, quality: fit[0].quality } : null, bass });
+  }
+  return { bpm, barSec, hits, starts: tl.sections.map(x => x.bar), bars };
+}
+// a model against a timeline truth: per drum row F1, recall and false hits on the model's grid (each true hit on its
+// nearest step of the model's bars), distinct drum grids in the bars with drums, chords (root right, and the quality
+// right where the root is), bass (pitch class right, and octave errors where it is)
+export function timelineScore(m, truth) {
+  const stepSec = m.barSeconds / 16, n = m.bars.length, r3 = x => Math.round(x * 1000) / 1000;
+  const out = { bpm: m.bpm, bpmTruth: truth.bpm, downbeat: m.downbeat, bars: n, rows: {} };
+  for (const row of Object.keys(TL_ROWS)) {
+    const want = new Set();
+    for (const t of truth.hits[row]) { const k = Math.round((t - m.downbeat) / stepSec); if (k >= 0 && k < n * 16) want.add(k); }
+    let tp = 0, fp = 0;
+    m.bars.forEach((b, i) => {
+      const d = b.drums || {}, g = row === 'hh' ? [...(d.hh || E)].map((c, j) => (c === 'x' || (d.oh || E)[j] === 'x' ? 'x' : '.')) : [...(d[row] || E)];
+      g.forEach((c, j) => { if (c !== 'x') return; if (want.has(i * 16 + j)) tp++; else fp++; });
+    });
+    const fn = want.size - tp;
+    out.rows[row] = { f1: tp ? r3((2 * tp) / (2 * tp + fp + fn)) : 0, recall: want.size ? r3(tp / want.size) : null, falseHits: fp, hits: want.size };
+  }
+  const withDrums = m.bars.filter(b => drumsHeard(b));
+  out.grids = new Set(withDrums.map(b => DRUM_ROWS_ALL.map(r => (b.drums && b.drums[r]) || E).join('|'))).size;
+  out.drumBars = withDrums.length;
+  let rootN = 0, rootOk = 0, qualOk = 0, bassN = 0, pcOk = 0, octErr = 0;
+  m.bars.forEach((b, i) => {
+    const tb = truth.bars[Math.round((m.downbeat + i * m.barSeconds) / truth.barSec)];
+    if (!tb) return;
+    const c = parseChord(b.chord);
+    if (tb.chord && c) { rootN++; if (c.root === tb.chord.root) { rootOk++; if (c.quality === tb.chord.quality) qualOk++; } }
+    (b.bass || []).forEach((x, j) => { const y = tb.bass[j]; if (x === null || x === undefined || y === null) return; bassN++; if ((((x - y) % 12) + 12) % 12 === 0) { pcOk++; if (x !== y) octErr++; } });
+  });
+  out.bassBars = m.bars.filter(b => (b.bass || []).some(x => x !== null && x !== undefined)).length;
+  Object.assign(out, { chordBars: rootN, chordRoot: rootN ? r3(rootOk / rootN) : null, chordQuality: rootOk ? r3(qualOk / rootOk) : null, bassSteps: bassN, bassPitch: bassN ? r3(pcOk / bassN) : null, bassOctaveErrors: pcOk ? r3(octErr / pcOk) : null });
+  return out;
+}
+// the app songs of the bench exported with their timelines: { id: { A, B?, Bown? } }; full adds level B with Essentia.js
+// and with misk-analyzer alone (section bounds against the timeline's, the level B song's drum patterns)
+export async function measureTimelines({ full = false, only = null } = {}) {
+  const { APP_SONGS, appSong } = createRequire(import.meta.url)('./decode-export.cjs'), out = {};
+  for (const x of APP_SONGS) {
+    if (only && !only.includes(x.id)) continue;
+    const f = path.join(WAV, `${x.id}.wav`), tf = path.join(WAV, `${x.id}.timeline.json`);
+    if (!fs.existsSync(f) || !fs.existsSync(tf)) continue;
+    const truth = await timelineTruth(JSON.parse(fs.readFileSync(tf, 'utf8')), appSong(x));
+    const w = readWav(f), pcm = resample(w.pcm, w.rate, RATE);
+    let t0 = Date.now();
+    const A = createAnalyzer(pcm).model(pcm.length / RATE);
+    out[x.id] = { A: { ...timelineScore(A, truth), ms: Date.now() - t0 } };
+    if (full) for (const [k, engine] of [['B', nodeEssentia], ['Bown', null]]) {
+      t0 = Date.now();
+      const m = await analyseFull(pcm, { engine }), song = writeFull(m), drums = song.tracks.find(t => t.type === 'drums');
+      out[x.id][k] = { ...timelineScore(m, truth), ...boundsScore(m.sections, truth.starts), patterns: drums ? Object.keys(drums.patterns).length : 0, sections: m.sections.length, key: m.key, engines: m.engines, ...(m.essentiaTempo ? { essentiaTempo: m.essentiaTempo } : {}), ms: Date.now() - t0 };
+    }
+  }
+  return out;
+}
+const KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+export function timelineLine(id, level, r) {
+  const row = k => `${k} F1 ${r.rows[k].f1} recall ${r.rows[k].recall} false ${r.rows[k].falseHits}`;
+  return `${id.padEnd(14)} ${level.padEnd(4)} tempo ${r.bpm} (truth ${r.bpmTruth}) downbeat ${r.downbeat}s · ${row('bd')} · ${row('cp')} · ${row('hh')} · grids ${r.grids} in ${r.drumBars} bars${r.patterns !== undefined ? ` (song: ${r.patterns} drum patterns, ${r.sections} sections)` : ''} · chords root ${r.chordRoot} quality ${r.chordQuality} (${r.chordBars} bars) · bass pitch ${r.bassPitch} octave errors ${r.bassOctaveErrors} (${r.bassSteps} steps, bass decoded in ${r.bassBars} bars)${r.bounds ? ` · bounds ${r.bounds.join(',')} (err ${r.boundsErr}, extra ${r.extra})` : ''}${r.key ? ` · key ${KEYS[r.key.root]} ${r.key.mode}` : ''}${r.engines ? ` · tempo by ${r.engines.tempo}` : ''} · ${r.ms} ms`;
+}
+
 export const SYNTH = [
   { id: 'synth-90', bpm: 90 }, { id: 'synth-124', bpm: 124 }, { id: 'synth-174', bpm: 174 },
 ].map(x => ({ ...x, spec: { bpm: x.bpm, bars: 40, lead: 0.3, chords: ['Am', 'F', 'C', 'G'], drums: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' }, bass: 'x..x..x...x.x...', drumsOff: [[32, 36]] } }));
@@ -88,6 +200,11 @@ export function measureSynth() {
 if (process.argv[1] && process.argv[1].endsWith('decode-measure.mjs')) {
   const res = { app: measureApp(), synth: measureSynth() };
   if (process.argv.includes('--full')) { res.fullEss = await measureFull({ essentia: true }); res.fullOwn = await measureFull({ essentia: false }); }
-  if (process.argv.includes('--json')) console.log(JSON.stringify(res, null, 2));
-  else for (const [g, list] of Object.entries(res)) for (const [id, r] of Object.entries(list)) console.log(`${g.padEnd(7)} ${id.padEnd(16)} tempo ${r.bpm} (truth ${r.bpmTruth}) downbeat ${r.downbeat}s key ${r.key ? `${['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'][r.key.root]} ${r.key.mode}` : '-'} ${r.keyOk ? 'ok' : 'WRONG'} chords ${r.chords} drums on/off ${r.drumsPresence} F1 bd ${r.f1.bd} cp ${r.f1.cp} hh ${r.f1.hh}${r.bass !== null ? ` bass ${r.bass}` : ''}${r.bounds ? ` bounds ${r.bounds.join(',')} (err ${r.boundsErr}, extra ${r.extra}) ending ${r.ending}` : ''} · ${r.ms} ms`);
+  const tls = await measureTimelines({ full: process.argv.includes('--full') });
+  if (process.argv.includes('--json')) console.log(JSON.stringify({ ...res, timeline: tls }, null, 2));
+  else {
+    for (const [g, list] of Object.entries(res)) for (const [id, r] of Object.entries(list)) console.log(`${g.padEnd(7)} ${id.padEnd(16)} tempo ${r.bpm} (truth ${r.bpmTruth}) downbeat ${r.downbeat}s key ${r.key ? `${['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'][r.key.root]} ${r.key.mode}` : '-'} ${r.keyOk ? 'ok' : 'WRONG'} chords ${r.chords} drums on/off ${r.drumsPresence} F1 bd ${r.f1.bd} cp ${r.f1.cp} hh ${r.f1.hh}${r.bass !== null ? ` bass ${r.bass}` : ''}${r.bounds ? ` bounds ${r.bounds.join(',')} (err ${r.boundsErr}, extra ${r.extra}) ending ${r.ending}` : ''}${r.essentiaTempo ? ` essentia tempo ${r.essentiaTempo.bpm} (confidence ${r.essentiaTempo.confidence}, tempo by ${r.engines.tempo})` : ''}${r.hard ? ' (new bench song)' : ''} · ${r.ms} ms`);
+    if (!Object.keys(tls).length) console.log('timeline: no app song with its timeline in .cache/decode/wav: run tools/decode-export.cjs with the dev server');
+    for (const [id, r] of Object.entries(tls)) for (const [lv, x] of Object.entries(r)) console.log(`timeline ${timelineLine(id, lv, x)}`);
+  }
 }

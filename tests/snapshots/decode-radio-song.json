@@ -1,0 +1,287 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "endless-bench-c-1",
+  "title": "Aurora Slancio",
+  "style": {
+    "en": "Endless · Trance · B · 134 BPM · late-peak",
+    "it": "Endless · Trance · B · 134 BPM · late-peak"
+  },
+  "tags": {
+    "styles": [
+      "trance"
+    ]
+  },
+  "origin": "endless",
+  "sections": [
+    {
+      "name": "Intro",
+      "bars": 16,
+      "bpm": 134,
+      "key": "B",
+      "chords": "euforica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Build",
+      "bars": 144,
+      "bpm": 134,
+      "key": "B",
+      "chords": "euforica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Peak",
+      "bars": 16,
+      "bpm": 134,
+      "key": "B",
+      "chords": "euforica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Outro",
+      "bars": 16,
+      "bpm": 134,
+      "key": "B",
+      "chords": "euforica",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "kick",
+      "name": "Kick",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.85,
+        "cutoff": 20000,
+        "drive": 0,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "bd": "x...x...x...x.x."
+          }
+        },
+        "B": {
+          "rows": {
+            "bd": "x...x..xx...x..."
+          }
+        },
+        "C": {
+          "rows": {
+            "bd": "x...x..xx.x.x.x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 192,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "beat",
+      "name": "Beat",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.6,
+        "cutoff": 20000,
+        "drive": 0,
+        "grit": 0
+      },
+      "patterns": {
+        "A": {
+          "rows": {
+            "cp": "....x.......x...",
+            "hh": "..xx..xx..xx..xx"
+          }
+        },
+        "B": {
+          "rows": {
+            "cp": "....x..x....x...",
+            "hh": "..xx.xxx..xx..xx"
+          }
+        },
+        "C": {
+          "rows": {
+            "cp": "....x.......x..x",
+            "hh": ".xxx..xx.xxx..x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 192,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "name": "Bass",
+      "type": "bass",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.8,
+        "cutoff": 538,
+        "move": "lento",
+        "reso": 9.56,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "idea": {
+            "rhythm": "[~ x x]",
+            "per": "beat",
+            "half": "[~ x]"
+          }
+        },
+        "B": {
+          "idea": {
+            "rhythm": "[x ~ x x]",
+            "per": "beat",
+            "half": "[x ~]"
+          }
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 192,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "name": "Arp",
+      "type": "arp",
+      "settings": {
+        "wave": "sawtooth",
+        "gain": 0.4,
+        "cutoff": 1966,
+        "move": "lento",
+        "reso": 4,
+        "delay": 0.35,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "sugiu",
+          "speed": "16"
+        },
+        "B": {
+          "preset": "sugiu",
+          "speed": "16",
+          "notes": "0 1 3 2 3 1 0 1"
+        },
+        "C": {
+          "preset": "sugiu",
+          "speed": "16",
+          "notes": "0 1 2 3 2 1 3 0"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 192,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "name": "Lead",
+      "type": "hook",
+      "settings": {
+        "wave": "square",
+        "gain": 0.3,
+        "cutoff": 3000,
+        "move": "fisso",
+        "delay": 0.4,
+        "mode": "minor",
+        "fm": 0,
+        "vowel": "",
+        "grit": 0,
+        "drive": 0,
+        "harmony": "",
+        "octave": "4"
+      },
+      "patterns": {
+        "A": {
+          "preset": "eroico"
+        },
+        "B": {
+          "preset": "eroico",
+          "notes": "<[0 ~ 2 4 7 ~ 4 2] [3 ~ 2 0 -1 ~ 0 2] [0 ~ 2 4 7 ~ 5 2] [4 2 0 2 4 ~ ~ ~]>"
+        },
+        "C": {
+          "preset": "eroico",
+          "notes": "<[0 ~ 2 4 7 ~ 4 2] [3 ~ 3 0 0 ~ 0 2] [4 ~ 5 7 9 ~ 7 5] [4 2 0 2 4 ~ ~ ~]>"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 192,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "name": "Pad",
+      "type": "pad",
+      "settings": {
+        "wave": "gm_synth_strings_1",
+        "gain": 0.28,
+        "cutoff": 2074,
+        "move": "lento",
+        "room": 0.85,
+        "drive": 0
+      },
+      "patterns": {
+        "A": {
+          "preset": "sidechain"
+        },
+        "B": {
+          "preset": "pump"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 192,
+          "pattern": "A"
+        }
+      ]
+    },
+    {
+      "id": "riser",
+      "name": "Riser",
+      "type": "riser",
+      "settings": {
+        "gain": 0.25,
+        "bars": "8",
+        "dir": "up"
+      },
+      "patterns": {
+        "A": {}
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 192,
+          "pattern": "A"
+        }
+      ]
+    }
+  ]
+}
