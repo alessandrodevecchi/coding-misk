@@ -7,6 +7,8 @@ import { createAnalyzer, ANALYSIS_RATE } from './misk-analyzer.js';
 import { chordName, parseChord } from './model.js';
 import { sectionsOf } from './sections.js';
 import { variationsOf } from './writer.js';
+import { mixMeasures, nearestKit } from './kit-measure.js';
+import { KIT_MEASURES } from './kits.js';
 
 export const MISK = 'misk-analyzer';
 // Essentia.js's tempo is taken when its confidence (RhythmExtractor2013 multifeature, 0 to about 5.3) is at least this
@@ -210,6 +212,14 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   steadyQualities(m.bars, sections, HARMONY_RULE, m.key);
   bassRange(m.bars, sections);
   m.variations = variationsOf(m);
+  // 9. the drum machine by measure (decode-refine D3): the kicks' decay and the hats' brightness of the track against the
+  // app's machines measured from their samples; "Our sounds" writes the nearest
+  {
+    const bs = m.barSeconds, st = bs / 16, kicks = [], hats = [];
+    m.bars.forEach((b, i) => { for (let j = 0; j < 16; j++) { const t = m.downbeat + i * bs + j * st; if ((b.drums.bd || '')[j] === 'x') kicks.push(t); if ((b.drums.hh || '')[j] === 'x') hats.push(t); } });
+    const meas = mixMeasures(pcm, sr, kicks, hats), kit = nearestKit(meas, KIT_MEASURES);
+    m.drumSound = { kickDecay: meas.kickDecay === null ? null : Math.round(meas.kickDecay * 1000) / 1000, hatBright: meas.hatBright === null ? null : Math.round(meas.hatBright), kit };
+  }
   // (Essentia.js's own tempo and confidence, to read why the engine was or was not taken)
   if (ess) m.essentiaTempo = { bpm: Math.round(ess.bpm * 1000) / 1000, confidence: Math.round(ess.confidence * 1000) / 1000 };
   Object.assign(m, { level: 'B', engines, ms: Date.now() - t0, ...(notes.length ? { notes } : {}), ...(E ? { essentia: E.version } : {}) });

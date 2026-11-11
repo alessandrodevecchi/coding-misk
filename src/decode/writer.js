@@ -13,6 +13,9 @@ import { STEPS, DRUM_ROWS, noteName, NOTE_NAMES, parseChord } from './model.js';
 import { KITS } from '../music.js';
 
 export const SOUND_PRESETS = ['ours', 'simple'];
+// sounds by measure (decode-refine D3): the bass band's brightness range over a bar that makes a moving filter (Hz;
+// measured: luci-rosse and the acid song about 470, the radio seed's resonant supersaw 370, plain basses 120 to 260)
+export const SOUND_RULE = { move: 350 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -122,7 +125,8 @@ export function leadCode(loop, key, snd = '') {
 
 // sounds by measure (D10): "Our sounds" picks from the generator's tables by the model's brightness and low-end
 // weight; "Simple kit" is one fixed set. bars: the bars heard so far (level A) or the section's (level B)
-export function soundsOf(bars, preset = 'ours') {
+// whole: the bars of the whole track (level B), where the bass's moving filter is decided once (decode-refine D3)
+export function soundsOf(bars, preset = 'ours', whole = bars) {
   if (preset === 'simple' || !bars.length) return { kit: 'RolandTR909', bass: '.s("sawtooth").lpf(700).gain(.75)', chords: '.s("supersaw").lpf(2000).gain(.3)', lead: '.s("square").lpf(2400).gain(.25)', why: 'simple' };
   const avg = k => bars.reduce((a, b) => a + (b[k] || 0), 0) / bars.length;
   const bright = avg('bright'), low = avg('low');
@@ -130,9 +134,15 @@ export function soundsOf(bars, preset = 'ours') {
   const kit = low > 0.55 ? 'RolandTR808' : bright > 0.45 ? 'RolandTR909' : bright > 0.3 ? KITS[2] : KITS[4];
   const bassWave = low > 0.5 ? 'sine' : bright > 0.4 ? 'sawtooth' : 'square';
   const bassCut = Math.round((300 + 900 * Math.min(1, bright * 1.6)) / 50) * 50;
+  // (decode-refine D3: a bass whose band brightness moves over a bar by SOUND_RULE.move or more, the median of the bars, an
+  // acid line, is a sawtooth with a resonant filter moving over that range)
+  const midOf = v => { const x = v.filter(y => y > 0).sort((a, b) => a - b); return x.length ? x[Math.floor(x.length / 2)] : 0; };
+  const lo = midOf(bars.map(b => b.bassLo)), hi = midOf(bars.map(b => b.bassHi)), moving = midOf(whole.filter(b => b.bassHi > 0).map(b => b.bassHi - b.bassLo)) >= SOUND_RULE.move;
+  const r50 = x => Math.round(x / 50) * 50;
+  const bassSound = moving ? `.s("sawtooth").lpf(sine.range(${r50(Math.max(200, lo))}, ${r50(Math.min(3000, hi))}).slow(4)).lpq(8).gain(.6)` : `.s("${bassWave}").lpf(${bassCut}).gain(.75)`;
   const chordWave = bright > 0.45 ? 'supersaw' : bright > 0.25 ? 'sawtooth' : 'triangle';
   const chordCut = Math.round((800 + 3200 * Math.min(1, bright * 1.5)) / 100) * 100;
-  return { kit, bass: `.s("${bassWave}").lpf(${bassCut}).gain(.75)`, chords: `.s("${chordWave}").lpf(${chordCut}).gain(.3)`, lead: '.s("square").lpf(2400).gain(.25)', why: `bright ${bright.toFixed(2)} low ${low.toFixed(2)}` };
+  return { kit, bass: bassSound, chords: `.s("${chordWave}").lpf(${chordCut}).gain(.3)`, lead: '.s("square").lpf(2400).gain(.25)', why: `bright ${bright.toFixed(2)} low ${low.toFixed(2)}` };
 }
 
 // the song of a decoded track. opts: { id, title, artist, attribution, sounds, upTo (bars written, default all) }
@@ -483,7 +493,9 @@ export function writeFull(model, opts = {}) {
       });
       clips.push(...runs(out.map(x => (x ? idOf(x, p.grid) : null)), s0));
     });
-    if (clips.length) tracks.push({ id: 'drums', name: 'Drums', type: 'drums', settings: { kit: all.kit }, patterns, clips });
+    // (decode-refine D3: level B's drum machine by measure, the nearest to the track's kicks and hats)
+    const kit = opts.sounds !== 'simple' && model.drumSound && model.drumSound.kit ? model.drumSound.kit : all.kit;
+    if (clips.length) tracks.push({ id: 'drums', name: 'Drums', type: 'drums', settings: { kit }, patterns, clips });
   }
   // bass and chords
   // keep(values): whether a section's values are a part at all (chords: most of them in the song's key)
@@ -495,7 +507,7 @@ export function writeFull(model, opts = {}) {
       const byBar = {}; idx.forEach((i, j) => { byBar[i] = on[j] && heardOf(bars[i]) ? valueOf(bars[i]) : null; });
       const loop = sectionLoop(byBar, idx, same ? { same } : {});
       if (!loop) return;
-      const snd = soundsOf(idx.map(i => bars[i]), opts.sounds), c = code(loop, id === 'bass' ? snd.bass : snd.chords);
+      const snd = soundsOf(idx.map(i => bars[i]), opts.sounds, bars.slice(0, end)), c = code(loop, id === 'bass' ? snd.bass : snd.chords);
       if (!ids.has(c)) { const p = pid(ids.size); ids.set(c, p); patterns[p] = { code: c }; }
       clips.push(...runs(on.map(x => (x ? ids.get(c) : null)), sec.start));
     });

@@ -308,6 +308,20 @@ The arc score moved between two runs of the check on the same code (decode-test-
 
 Proof: the snapshot was written from one run, then the check ran twice more, each time from an empty cache (every original and every level B song exported again): both runs pass, and the scores of the two runs are equal except on decode-test-acid (at most 0.005 apart). The snapshot also takes the drops groups 7 to 9 brought, for the reasons in their entries: the brightness of decode-test-acid (0.74 to 0.50) and luci-rosse (0.67 to 0.61), the right drums playing on the 808 until group 10 picks the kit; luci-rosse's high-band rhythm (0.41 to 0.35), measured with the old noisy exports. The 0.05 margin is unchanged.
 
+### Group 10: sounds by measure, in part (11 November)
+
+Done: the drum machines measured once from their first kick and closed hat samples (`tools/decode-kits.mjs`, `src/decode/kits.js`: kick decay, hat brightness above 2 kHz), the nearest machine in level B (`kit-measure.js`; a mix's hats read about 9 % darker than the sample, `MIX_HAT`; a kick decay under 20 ms, a loud bass stopping the measure, does not count); a bass whose band brightness moves by 350 Hz or more over a bar becomes a sawtooth with a moving resonant filter. Picked: the 909 on luci-rosse, the radio seed, decode-test-124 and long, the 808 on decode-test-90 (right); R8, 707 and 505 on decode-test-174, acid and arp (wrong: those machines' hats sit within 4 % of the 909's). Not done: distortion (neither the click above 1 kHz nor the 150-1000 Hz overtones of the first 50 ms separate driven kicks from clean ones on the bench), the chord and Lead sounds, and the part levels. The radio seed has no distortion (drive 0), so 10.3's "909 with distortion" holds for luci-rosse only.
+
+| Similarity (B) | Before | After | Target |
+| --- | --- | --- | --- |
+| luci-rosse brightness ratio | 0.61 | 1.05 | 0.75 to 1.33 |
+| acid brightness ratio | 0.50 | 1.04 | 0.75 to 1.33 |
+| radio seed brightness ratio | 0.63 | 0.59 | 0.75 to 1.33 |
+| decode-test-124, 90, 174, long brightness ratio | 1.35, 1.42, 1.38, 1.31 | 1.39, 1.42, 1.42, 1.46 | 0.75 to 1.33 |
+| luci-rosse band shares (original 0.76/0.20/0.04) | 0.83/0.13/0.04 | 0.71/0.18/0.12 | within 0.10 |
+| acid band shares (original 0.77/0.21/0.01) | 0.90/0.08/0.02 | 0.57/0.42/0.01 | within 0.10 |
+| decode-test-124 / long mid-band rhythm | 0.92 / 0.90 | 0.63 / 0.56 | |
+
 ## Risks / Trade-offs
 
 - [The edit rule makes level A slow to follow real changes] → Parts entering or stopping never wait; the waits are 2 and 4 bars; level B is the right level for a track the user wants close.

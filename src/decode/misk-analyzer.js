@@ -126,6 +126,8 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   const cent = new Float32Array(nf1);
   // the spectral flatness of the snare band per frame (a clap is noise; a lead's note in the same band is tonal)
   const flatS = new Float32Array(nf1);
+  // the centroid of the bass band (40 to 1500 Hz) per frame: an acid line's filter moves it over the bar (D3)
+  const bcent = new Float32Array(nf1);
   const chroma = new Float32Array(nf2 * 12), chromaE = new Float32Array(nf2);
   // the tonal peaks of each frame (frequency, magnitude), for a bar's chroma without the bass's upper harmonics
   const peaks = new Array(nf2);
@@ -152,7 +154,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       for (let i = 0; i < N1; i++) { re1[i] = pcm[o + i] * w1[i]; im1[i] = 0; }
       fft(re1, im1);
       const lg = new Float64Array(half + 1);
-      let tot = 0, cw = 0, fl = 0, fa = 0, fn = 0;
+      let tot = 0, cw = 0, fl = 0, fa = 0, fn = 0, bt = 0, bw = 0;
       const bandE = { kick: 0, hat: 0, snare: 0, low: 0, mid: 0, high: 0 }, bandF = { kick: 0, snare: 0, hat: 0, air: 0 };
       for (let k = 1; k <= half; k++) {
         const m = Math.hypot(re1[k], im1[k]), p = m * m;
@@ -161,12 +163,14 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
         const d = lg[k] - prevLog[k], up = d > 0 ? d : 0;
         for (const b of ['kick', 'hat', 'snare', 'low', 'mid', 'high']) { const [a, z] = B1[b]; if (k >= a && k <= z) bandE[b] += p; }
         if (k >= B1.snare[0] && k <= B1.snare[1]) { fl += Math.log(p + 1e-12); fa += p; fn++; }
+        if (k * hz1 >= 40 && k * hz1 <= 1500) { bt += p; bw += p * k * hz1; }
         for (const b of ['kick', 'snare', 'hat', 'air']) { const [a, z] = B1[b]; if (k >= a && k <= z) bandF[b] += up; }
       }
       for (const b of ['kick', 'snare', 'hat', 'air']) { const [a, z] = B1[b]; flux[b][done1] = bandF[b] / (z - a + 1); }
       for (const b of ['kick', 'hat', 'snare', 'low', 'mid', 'high']) energy[b][done1] = bandE[b];
       energy.total[done1] = tot; cent[done1] = tot ? cw / tot : 0;
       flatS[done1] = fn && fa > 0 ? Math.exp(fl / fn) / (fa / fn) : 0;
+      bcent[done1] = bt ? bw / bt : 0;
       prevLog = lg;
     }
   }
@@ -672,6 +676,9 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     let lowS = 0, lowN = 0; for (let f = fa; f < fz; f++) if (!kickNear.has(f)) { lowS += energy.low[f]; lowN++; }
     const raw = { drums: DRUM_ROWS.reduce((a, r) => a + Math.max(...strengths[r]) * (r === 'oh' ? 0.5 : 1), 0), bass: lowN ? lowS / lowN : 0, chords: mean(energy.mid, fa, fz), other: mean(energy.high, fa, fz) };
     const tot = mean(energy.total, fa, fz);
+    // the bass band's brightness over the bar, outside the kicks: its 10th and 90th percentile (D3: a moving filter)
+    const bc = []; for (let f = fa; f < fz; f++) if (!kickNear.has(f) && bcent[f] > 0) bc.push(bcent[f]);
+    const bassLo = Math.round(quantile(bc, 0.1)), bassHi = Math.round(quantile(bc, 0.9));
     const bright = Math.min(1, mean(cent, fa, fz) / 6000), low = tot ? Math.min(1, mean(energy.low, fa, fz) / tot) : 0;
     // chord: the bar's chroma against 24 templates, the bass note's pitch class as a small prior
     // the bar's chroma; a bass note's 5th, 7th, 9th, 10th, 11th and 13th harmonics are left out (a low bass's 5th
@@ -703,7 +710,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       else if (ex && best.T.quality === 'maj' && quiet) third = true;
       chord = chordName(best.T.root, best.T.quality); chordConf = Math.round(Math.min(1, best.s) * 100) / 100;
     }
-    return { start: Math.round(start * 1000) / 1000, chord, chordConf, ...(third ? { third: true } : {}), bass, drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, top: topOf(start, end, bass) };
+    return { start: Math.round(start * 1000) / 1000, chord, chordConf, ...(third ? { third: true } : {}), bass, drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, bassLo, bassHi, top: topOf(start, end, bass) };
   }
   // the top line of a bar (decode-refine D6): `up`, the median over its frames of the share of the tonal peaks'
   // energy between 400 and 2000 Hz (no harmonic of a bass note) in all of the frame's tonal energy (60 to 2100 Hz). A

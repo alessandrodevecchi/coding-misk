@@ -3234,3 +3234,25 @@ Una revisione indipendente del codice unito dei gruppi 7-9 ha trovato quattro er
 - **Basso sotto la cassa ai passi 0 e 1** (`misk-analyzer.js`): la regola guardava solo i passi della battuta in corso; ora conta anche gli ultimi due passi della battuta prima (`quietBefore`). Sul banco nessuna nota cambia (livello A: 263 note sul seme della radio, 135 sull'arp, prima e dopo): la regola era sbagliata ma qui non scattava.
 - **Tempo salvato prima del riaggancio** (`tab.js`, `worker.js`, `misk-analyzer.js`): un modello di livello A salvato prima che il riaggancio girasse tornava al worker come tempo fisso, e il riaggancio non girava più (il caso della revisione: la radio salvata dopo 10 s resterebbe a 117,46 invece di 176; qui provato su un brano generato). Il modello porta `relockChecked`; senza, il tempo salvato resta libero per il riaggancio. Un tempo battuto o scelto resta fisso.
 - Banco (livello B con Essentia.js, gli stessi WAV): brani uguali su 7 file su 8; su decode-test-124 cambia solo il pattern di rumore nella pausa senza batteria (battute 35-38): la cassa `..x...x.......x.` diventa `......x.......x.` (la griglia più frequente al posto di una mai sentita). `ANALYSIS_VERSION` 6.
+
+
+## 2026-11-11: Decodifica, parte 2, gruppo 10: suoni per misura, in parte (feat/91-decode-part-2, #91)
+
+- **10.1, le drum machine misurate:** `tools/decode-kits.mjs` scarica il primo campione di cassa e di charleston chiuso di ogni macchina dell'app (lo stesso archivio da cui li carica Strudel) e scrive `src/decode/kits.js` (23 macchine: decadimento della cassa a -20 dB, brillantezza del charleston sopra 2 kHz). `src/decode/kit-measure.js` misura le stesse due cose sui colpi del brano nel livello B e sceglie la macchina più vicina (`nearestKit`, `KIT_RULE`). Nel mix il charleston risulta circa il 9 % più scuro del campione (`MIX_HAT` 1,1, misurato sul banco); il decadimento della cassa sotto un basso forte si ferma a 5 ms e non conta sotto 20 ms. Scelte: luci-rosse 909, radio-bench-c 909, decode-test-124 e long 909, decode-test-90 808 (giusti); decode-test-174 R8, acid 707, arp 505 (la verità è 909: 909, 707 e 505 hanno charleston a 6400-6650 Hz, troppo vicini per questa misura).
+- **Distorsione non trovata:** né il click sopra 1 kHz né gli armonici 150-1000 Hz nei primi 50 ms separano le casse con `distort` (luci-rosse 0,85, acid 1,18) da quelle pulite (decode-test-124 1,05, radio-bench-c 1,60). Il codice non scrive `crunch` né `distort`. Nota: il seme della radio congelato non ha distorsione (`drive 0`); il compito 10.3 la chiede anche lì.
+- **10.2, in parte:** il basso la cui brillantezza nella banda 40-1500 Hz si muove di almeno 350 Hz in una battuta (mediana del brano; luci-rosse e acid circa 470, il supersaw risonante della radio 370, gli altri bassi 120-260) diventa `sawtooth` con `lpf(sine.range(…).slow(4)).lpq(8)` (`SOUND_RULE`, nuovi campi `bassLo` e `bassHi` per battuta). Non fatti: suono di accordi e Lead per brillantezza e decadimento, livelli delle parti sulle quote di banda.
+- `ANALYSIS_VERSION` 6. «Simple kit» invariato (controllato in `check:decode`).
+
+| Somiglianza (livello B) | Prima del gruppo 10 | Dopo | Obiettivo |
+| --- | --- | --- | --- |
+| luci-rosse brillantezza (rapporto codice/originale) | 0,61 | 1,05 | 0,75-1,33 |
+| acid brillantezza | 0,50 | 1,04 | 0,75-1,33 |
+| radio-bench-c brillantezza | 0,63 | 0,59 | 0,75-1,33 |
+| decode-test-124 / 90 / 174 / long brillantezza | 1,35 / 1,42 / 1,38 / 1,31 | 1,39 / 1,42 / 1,42 / 1,46 | 0,75-1,33 |
+| luci-rosse quote basso/medio/alto (orig 0,76/0,20/0,04) | 0,83/0,13/0,04 | 0,71/0,18/0,12 | entro 0,10 |
+| acid quote (orig 0,77/0,21/0,01) | 0,90/0,08/0,02 | 0,57/0,42/0,01 | entro 0,10 |
+| decode-test-124 ritmo medio | 0,92 | 0,63 | (snapshot 0,89) |
+| decode-test-long ritmo medio | 0,90 | 0,56 | (snapshot 0,90) |
+
+- Migliorano anche: acid ritmo medio 0,61 → 0,76, croma 0,97 → 0,98; luci-rosse arco 0,66 → 0,80; radio-bench-c croma 0,94 → 0,99 e croma del basso 0,90 → 0,99. Peggiorano il ritmo medio di decode-test-124 e long (la 909 al posto della 808 decisa prima dalla regola del peso basso) e le quote di acid. **Obiettivo 10.3 non raggiunto**; i compiti 10.1, 10.2 e 10.3 restano aperti. Snapshot non aggiornato: falliscono 8 punteggi (anche quelli già falliti prima, vedi gruppi 7 e 8).
+- **Prove nel browser:** luci-rosse in Completa con la 909 e il basso `sawtooth` con il filtro che si muove, nessun errore.
