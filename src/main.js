@@ -75,6 +75,7 @@ import { LESSONS, REFS, SONGS } from './content.js';
 import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createStageVideo } from './visuals/stage-video.js';
+import { createStageFolders } from './visuals/stage-video-folders.js';
 import { SV_KEY, sizeOf as svSizeOf, fallbackLookOf } from './visuals/stage-video-rules.js';
 import { createVideo } from './video/video.js';
 import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, codeColsOf, TIMELINE_LAYOUTS, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
@@ -4521,7 +4522,9 @@ const setLook = l => {
   // the look that keeps drawing while the first video picture loads (stage-video D9)
   if (l === 'video' && look !== 'video') lookBeforeVideo = look;
   look = l; soulBase = l; store.set('coding-misk-look', l); syncAll();
-  if (stageVideo) stageVideo.tick();
+  // the folders are read (and scanned once per session) only when the Video look needs them (D9)
+  if (l === 'video' && svFolders) svFolders.need();
+  if (stageVideo) { stageVideo.tick(); syncSvChip(); }
 };
 // a song's own visual, unless the listener is watching the soul; a song never sets Video, and while the user has chosen
 // Video a song's own look does not replace it (stage-video D1)
@@ -4708,7 +4711,7 @@ function showTab(name) {
   if (name === 'radio' && radio) radio.render();
   if (name === 'decode' && decodeTab) decodeTab.render();
   if (name === 'playlist' && playlistsTab) playlistsTab.render();
-  if (name === 'impostazioni' && settingsPage) settingsPage.render();
+  if (name === 'impostazioni' && settingsPage) { settingsPage.render(); if (svFolders) svFolders.rescan(); }
   if (name === 'generi' && genresTab) genresTab.render();
   if (name === 'voci' && voicesTab) voicesTab.render();
   $('#open-settings').setAttribute('aria-pressed', name === 'impostazioni');
@@ -5895,6 +5898,8 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => changeLang(b.da
 // settings page (#31): the gear opens it, a second press goes back to the tab before
 settingsPage = createSettings({ root: $('#tab-impostazioni'), t, tx, esc, store, looks: PICK_LOOKS, toast, confirmTwice,
   app: {
+    // the "Stage videos" card (stage-video D10)
+    get stageVideos() { return svFolders; },
     // decoded tracks (track-to-code D3): their records travel in the backup without the files' handles
     // (decode-library D14): the 100 used last by default, every record in batches with "Include all Decode analyses"; the
     // import compares with the light index; mixtapes and folder names without handles (D11)
@@ -6077,6 +6082,9 @@ const ownLook = () => {
   if (mode === 'radio' && radio && radio.on) { const rs = radio.state, it = rs && rs.stream[rs.onAir]; return it && it.song ? it.song.look : null; }
   return T.look;
 };
+// the "Stage videos" folders (D10): their list, access and scan; a change runs the layer's rules and redraws the card
+svFolders = createStageFolders({ onChange: () => { if (stageVideo) stageVideo.filesChanged(); syncSvChip(); if (settingsPage && !$('#tab-impostazioni').hidden) settingsPage.render(); } });
+if (look === 'video') svFolders.need();
 stageVideo = createStageVideo({
   look: () => look, soul: () => soulOverride, playing: () => isPlaying(), track: svTrack, files: svFiles, songKey: svSong, nextKey: svNext,
   keep: () => false,
@@ -6085,7 +6093,16 @@ stageVideo = createStageVideo({
 });
 let svBands = { ui: null, c: '#000' };
 const stageFallback = () => (stageVideo.loading && lookBeforeVideo && lookBeforeVideo !== 'video' ? lookBeforeVideo : fallbackLookOf(ownLook(), PICK_LOOKS.map(l => l[0])));
+// the stage's "Allow stage videos" chip (D2): Video chosen, nothing to show because the folders wait for access
+let svChip = null;
+function syncSvChip() {
+  const b = $('#sv-allow'); if (!b || !stageVideo) return;
+  const on = look === 'video' && !soulOverride && !svTrack() && !!svFolders && svFolders.waiting();
+  if (on !== svChip) { svChip = on; b.hidden = !on; }
+}
+$('#sv-allow').addEventListener('click', () => { svFolders.allow().then(() => { stageVideo.tick(); syncSvChip(); }); });
 globalThis.codingMiskStageVideo = {
+  folders: () => ({ list: svFolders.list(), playable: svFolders.playable().map(f => f.key), waiting: svFolders.waiting() }),
   layer: stageVideo, fallback: stageFallback, state: () => ({ ...stageVideo.state(), look, drawn: globalThis.codingMiskStageDrawn, fallbackLook: stageFallback(), song: svSong() }),
   testFiles: list => { svTestFiles = list; stageVideo.filesChanged(); },
 };
@@ -6119,7 +6136,7 @@ const visuals = startVisuals({
       const S = coSettings(); return S.stage ? (S.side === 'whole' ? 'none' : S.side === 'right' ? 'left' : 'right') : null;
     },
   },
-  afterFrame: (cyc, playing) => { stageVideo.tick(); video.frame(cyc, playing); drawStageOver(cyc); drawEditorWidgets(cyc); liveLink.tick(); },
+  afterFrame: (cyc, playing) => { stageVideo.tick(); syncSvChip(); video.frame(cyc, playing); drawStageOver(cyc); drawEditorWidgets(cyc); liveLink.tick(); },
   getInfo: stageInfo,
   getSteps: () => meterSteps(secFull().meter),
   // il sequencer mostra il playhead solo se la scena selezionata è quella che sta suonando

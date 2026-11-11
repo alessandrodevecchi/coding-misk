@@ -9,6 +9,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 - Stage: Video look in the look menu and the arrows, showing a muted video with every render style, Code over, the widgets and the captions over it.
 - Stage: with Video chosen and nothing to show, the stage shows the song's own look or Palco, and the menu keeps Video.
+- Settings: "Stage videos" card with the folders of the Video look (Chrome, Edge), their number of videos, Allow access, remove with confirmation, and the size mode Fill, Fit or Stretch.
+- Stage: "Allow stage videos" chip beside the render menu while the stage video folders wait for the browser's permission.
 - `tools/make-test-video.mjs`: numbered, coloured test videos drawn by the repository, with and without sound, 9:16, 4K and an unplayable file.
 - `npm run check:stage-video` and `tools/check-stage-video.cjs` for the Video look.
 

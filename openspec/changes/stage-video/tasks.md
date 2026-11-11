@@ -15,11 +15,11 @@ Estimate: about 25 agent hours (22 to 30), in the order below: the stage layer w
 
 ## 2. The "Stage videos" folders (about 4.5 h)
 
-- [ ] 2.1 `src/decode/folders.js`: `pickerId` option for `pickFolder`, `accept` option for `scanFolder`; Decode unchanged (`npm run check:decode-library` passes) (about 0.5 h).
-- [ ] 2.2 `src/visuals/stage-video-store.js`: IndexedDB `coding-misk-stage-videos` (`folders`, `files`), quiet failures, handles and names only (D10); Node check on a fake IndexedDB (about 1 h).
-- [ ] 2.3 `src/settings/settings.js`: the "Stage videos" card (list, Add folder, Allow access, remove with confirmation, counts, Fill, Fit or Stretch, the note without folder access); `coding-misk-stage-video` in the backup (size only), reset clears the folders (about 1.5 h).
-- [ ] 2.4 Wire the folders into the layer: scan rules (on add, on card open, once per session on first need), permission from the card and from the stage chip inside the click, skipped files with one note (about 1 h).
-- [ ] 2.5 Browser check with fake folders in the origin private file system (as `check-decode-library.cjs`): add two folders, duplicate, hidden subfolder, reload and one click, denied, no folder picker, 400 px and the three themes (about 0.5 h).
+- [x] 2.1 `src/decode/folders.js`: `pickerId` option for `pickFolder`, `accept` option for `scanFolder`; Decode unchanged (`npm run check:decode-library` passes) (about 0.5 h).
+- [x] 2.2 `src/visuals/stage-video-store.js`: IndexedDB `coding-misk-stage-videos` (`folders`, `files`), quiet failures, handles and names only (D10); Node check on a fake IndexedDB (about 1 h).
+- [x] 2.3 `src/settings/settings.js`: the "Stage videos" card (list, Add folder, Allow access, remove with confirmation, counts, Fill, Fit or Stretch, the note without folder access); `coding-misk-stage-video` in the backup (size only), reset clears the folders (about 1.5 h).
+- [x] 2.4 Wire the folders into the layer: scan rules (on add, on card open, once per session on first need), permission from the card and from the stage chip inside the click, skipped files with one note (about 1 h).
+- [x] 2.5 Browser check with fake folders in the origin private file system (as `check-decode-library.cjs`): add two folders, duplicate, hidden subfolder, reload and one click, denied, no folder picker, 400 px and the three themes (about 0.5 h).
 
 ## 3. The Decode track video (about 3 h)
 

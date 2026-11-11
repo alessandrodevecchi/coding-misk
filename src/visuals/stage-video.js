@@ -194,8 +194,8 @@ export function createStageVideo({ look, soul = () => false, playing, track = ()
     // nothing to show at all (no track video, no playable stage video): the fallback look, not a loading one
     get empty() { return !track() && !(files() || []).some(f => !failed.has(f.key)); },
     get loading() { return !!opening || !!(cur && !cur.ready); },
-    // the folders changed: a new bag, the failed files tried again
-    filesChanged() { bag.reset(); failed.clear(); pick = null; ahead = null; tick(); },
+    // the folders changed: the rules run again (the bag starts a new round when the list is another, D5)
+    filesChanged() { ahead = null; tick(); },
     // for the checks
     get element() { return el; },
     state() {

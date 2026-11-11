@@ -119,6 +119,75 @@ CHECKS['a song file naming Video as its look gets a warning (D1)'] = async () =>
   assert(!r0.warnings.some(w => /Video/.test(w.message || w.msg || String(w))), 'no warning for pixel');
 };
 
+// the stage videos' store and folders on a fake IndexedDB and fake directories (D10, spec stage/video-folders)
+const fileH = (name, size = 1000) => ({ kind: 'file', name, getFile: async () => ({ size, lastModified: 1, name }) });
+const dirH = (name, kids) => {
+  const by = new Map(kids.map(k => [k.name, k]));
+  return { kind: 'directory', name, async *values() { for (const k of kids) yield k; }, isSameEntry: async o => o === dirH.last[name] || o.name === name,
+    getDirectoryHandle: async n => { const d = by.get(n); if (!d || d.kind !== 'directory') throw Object.assign(new Error('nf'), { name: 'NotFoundError' }); return d; },
+    getFileHandle: async n => { const f = by.get(n); if (!f || f.kind !== 'file') throw Object.assign(new Error('nf'), { name: 'NotFoundError' }); return f; } };
+};
+dirH.last = {};
+CHECKS['the scan keeps videos only, subfolders, no dot names; Decode\'s scan unchanged (D10)'] = async () => {
+  const { scanFolder } = await import('../src/decode/folders.js');
+  const { isVideo } = await import('../src/decode/folders.js');
+  const d = dirH('Mixed', [fileH('a.mp4'), fileH('b.mov'), fileH('c.webm'), ...Array.from({ length: 10 }, (_, i) => fileH(`s${i}.wav`)), dirH('.cache', [fileH('h.mp4')]), dirH('sub', [fileH('d.mkv')]), fileH('notes.txt')]);
+  const v = await scanFolder(d, { accept: isVideo }), all = await scanFolder(d);
+  assert(v.files.map(f => f.path).join() === 'a.mp4,b.mov,c.webm,sub/d.mkv', v.files.map(f => f.path).join());
+  assert(all.files.length === 14, `Decode keeps audio and video: ${all.files.length}`);
+};
+CHECKS['the store: folders and names only, apart from the Decode library, quiet without IndexedDB (D10)'] = async () => {
+  const { createFakeIDB } = await import('./fake-idb.mjs');
+  const { createStageVideoStore, STAGE_VIDEO_DB } = await import('../src/visuals/stage-video-store.js');
+  const idb = createFakeIDB(), st = createStageVideoStore({ idb });
+  assert(await st.ready && STAGE_VIDEO_DB === 'coding-misk-stage-videos', 'ready');
+  await st.putFolder({ id: 'f1', name: 'Loops', handle: { name: 'Loops' }, added: 1, count: 2, extra: 'dropped' });
+  await st.setFiles('f1', [{ path: 'a.mp4', name: 'a.mp4', size: 5, modified: 2, bytes: new Uint8Array(9), video: true }, { path: 'b.mp4', name: 'b.mp4', size: 6, modified: 3 }]);
+  const fs = await st.files(), fo = await st.folders();
+  assert(fs.length === 2 && fs.every(x => Object.keys(x).sort().join() === 'folderId,modified,name,path,size'), JSON.stringify(fs[0]));
+  assert(fo.length === 1 && !('extra' in fo[0]), JSON.stringify(fo));
+  await st.setFiles('f1', [{ path: 'c.mp4', name: 'c.mp4' }]);
+  assert((await st.files()).map(x => x.path).join() === 'c.mp4', 'a rescan replaces the folder\'s files');
+  await st.removeFolder('f1');
+  assert(!(await st.folders()).length && !(await st.files()).length, 'removed with its files');
+  const none = createStageVideoStore({ idb: null });
+  assert(!(await none.ready) && (await none.folders()).length === 0 && (await none.putFolder({ id: 'x' })) === false, 'no IndexedDB: empty, no error');
+};
+CHECKS['the folders: add, duplicate, playable files with access only, waiting, remove, clear'] = async () => {
+  const { createFakeIDB } = await import('./fake-idb.mjs');
+  const { createStageVideoStore } = await import('../src/visuals/stage-video-store.js');
+  const { createStageFolders, STAGE_PICKER_ID } = await import('../src/visuals/stage-video-folders.js');
+  globalThis.requestIdleCallback = f => setTimeout(f, 0);
+  const loops = dirH('Loops', [fileH('a.mp4'), fileH('b.webm'), fileH('x.wav')]), clips = dirH('Clips', [dirH('sub', [fileH('c.mp4')])]);
+  let next = null, ids = [], perm = 'granted';
+  for (const h of [loops, clips]) { h.queryPermission = async () => perm; h.requestPermission = async () => 'granted'; }
+  globalThis.showDirectoryPicker = async o => { ids.push(o.id); return next; };
+  const store = createStageVideoStore({ idb: createFakeIDB() });
+  let changes = 0;
+  const F = createStageFolders({ store, onChange: () => changes++ });
+  next = loops; let r = await F.add();
+  next = clips; await F.add();
+  next = loops; const dup = await F.add();
+  assert(r.kind === 'added' && r.count === 2 && dup.kind === 'dup' && F.list().length === 2 && changes > 0, JSON.stringify({ r, dup, n: F.list().length }));
+  assert(ids.every(x => x === STAGE_PICKER_ID), `picker id ${ids}`);
+  assert(F.playable().map(f => f.key).join() === `${F.list()[0].id}/a.mp4,${F.list()[0].id}/b.webm,${F.list()[1].id}/sub/c.mp4`, F.playable().map(f => f.key).join());
+  assert(F.playable() === F.playable(), 'the list is kept until something changes');
+  const got = await F.playable()[2].open();
+  assert(got.name === 'c.mp4', 'a file opened by its path');
+  // a reload: the folders come back waiting; one click allows them
+  perm = 'prompt';
+  // (the fake IndexedDB clones values without their methods; the browser keeps a handle's: the same handles given back)
+  const G = createStageFolders({ store: { ...store, folders: async () => (await store.folders()).map(f => ({ ...f, handle: f.name === 'Loops' ? loops : clips })) } });
+  await G.load();
+  assert(G.list().length === 2 && G.list().every(f => f.state === 'prompt') && G.waiting() && !G.playable().length, JSON.stringify(G.list()));
+  await G.allow(G.list()[0].id);
+  assert(G.list()[0].state === 'granted' && G.list()[1].state === 'prompt' && !G.waiting() && G.playable().length === 2, JSON.stringify(G.list()));
+  await G.remove(G.list()[1].id);
+  assert(G.list().length === 1 && (await store.folders()).length === 1, 'removed');
+  await G.clear();
+  assert(!G.list().length && !(await store.folders()).length && !(await store.files()).length, 'cleared');
+};
+
 let failed = 0;
 for (const [name, fn] of Object.entries(CHECKS)) {
   try { await fn(); console.log(`ok   ${name}`); } catch (e) { failed++; console.log(`FAIL ${name}: ${e.message}`); }

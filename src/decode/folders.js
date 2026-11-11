@@ -26,9 +26,10 @@ export async function permission(handle, ask = false) {
 }
 
 // a new folder from the picker. → { folder } | { dup: folder } | { cancelled } | { error }
-export async function pickFolder(known = [], { now = Date.now(), id = null } = {}) {
+// pickerId: the picker's own start folder (Decode by default; the stage videos have theirs, stage-video D10)
+export async function pickFolder(known = [], { now = Date.now(), id = null, pickerId = 'coding-misk-decode' } = {}) {
   let handle;
-  try { handle = await globalThis.showDirectoryPicker({ mode: 'read', id: 'coding-misk-decode' }); }
+  try { handle = await globalThis.showDirectoryPicker({ mode: 'read', id: pickerId }); }
   catch (e) { return e && e.name === 'AbortError' ? { cancelled: true } : { error: e && e.name }; }
   for (const f of known) {
     try { if (f.handle && (await f.handle.isSameEntry(handle))) return { dup: f }; } catch (e) {}
@@ -44,8 +45,9 @@ async function entriesOf(dir) {
   return out.sort((a, b) => byName.compare(a.name, b.name) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 // the scan (D3). → { files: [{ path, name, size, modified, video }], capped, scanned }
-// onBatch(files so far) every `every` entries; stop() → true ends the scan early (a removed folder)
-export async function scanFolder(dir, { cap = FOLDER_CAP, every = 100, onBatch = null, stop = null, now = Date.now() } = {}) {
+// onBatch(files so far) every `every` entries; stop() → true ends the scan early (a removed folder); accept(name): the
+// files kept (Decode's audio and video by default; the stage videos keep videos only, stage-video D10)
+export async function scanFolder(dir, { cap = FOLDER_CAP, every = 100, onBatch = null, stop = null, now = Date.now(), accept = accepted } = {}) {
   const files = [];
   let seen = 0, capped = false;
   async function walk(d, prefix) {
@@ -54,7 +56,7 @@ export async function scanFolder(dir, { cap = FOLDER_CAP, every = 100, onBatch =
       if (++seen % every === 0) { if (onBatch) onBatch(files.slice()); await yieldNow(); }
       if (!e.name || e.name.startsWith('.')) continue;
       if (e.kind === 'directory') { await walk(e.handle, `${prefix}${e.name}/`); continue; }
-      if (e.kind !== 'file' || !accepted(e.name)) continue;
+      if (e.kind !== 'file' || !accept(e.name)) continue;
       if (files.length >= cap) { capped = true; return; }
       let size = 0, modified = 0;
       try { const f = await e.handle.getFile(); size = f.size; modified = f.lastModified; } catch (err) { continue; }

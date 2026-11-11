@@ -2083,3 +2083,17 @@ summary .vt-cs-dot { margin-left: 0; }
 :root[data-ui="hw"] .dcl-mark, :root[data-ui="hw"] .dcl-mark.live { color: var(--lcd-fg); }
 :root[data-ui="hw"] .dcl-list .dcl-vid .ico-no-sound { background: var(--lcd-bg); color: var(--lcd-fg); }
 .sp-row .sp-add { flex: none; font-weight: 700; }
+
+/* the "Stage videos" card (stage-video D10): the folders of the Video look */
+.sv-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.sv-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); }
+.sv-row.waiting { border-style: dashed; }
+.sv-ico { display: inline-flex; color: var(--a2); }
+.sv-ico svg, .sv-allow-one svg, #sv-add svg, .sv-remove svg { width: 14px; height: 14px; }
+.sv-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
+.sv-count { font-size: 12px; flex: 1 1 auto; }
+.sv-allow-one, #sv-add { display: inline-flex; align-items: center; gap: 6px; }
+.sv-note { flex-basis: 100%; color: var(--danger); font-size: 12px; }
+.sv-empty { padding: 4px 0; }
+.sv-msg:empty { display: none; }
+@media (max-width: 560px) { .sv-name { max-width: 100%; flex-basis: 60%; } }

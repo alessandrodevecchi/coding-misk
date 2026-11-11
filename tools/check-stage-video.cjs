@@ -82,7 +82,7 @@ const opfsWrite = (page, p, b64) => page.evaluate(async ([p, b]) => {
 const opfsClear = page => page.evaluate(async () => { const root = await navigator.storage.getDirectory(); for await (const k of root.keys()) await root.removeEntry(k, { recursive: true }); });
 const SVF = page => page.evaluate(() => globalThis.codingMiskStageVideo.folders());
 // the settings page, scrolled to the "Stage videos" card
-const openCard = async page => { await page.click('#open-settings'); await sleep(700); await page.locator('#set-stage-videos').scrollIntoViewIfNeeded(); await sleep(200); };
+const openCard = async page => { await page.evaluate(() => { if (document.querySelector('#tab-impostazioni').hidden) document.querySelector('#open-settings').click(); }); await sleep(700); await page.locator('#set-stage-videos').scrollIntoViewIfNeeded(); await sleep(200); };
 // the INIT patches in a page already open (a context made without them)
 const withFolders = async (ctx, page, LAYOUT) => {
   await page.evaluate(() => { localStorage.removeItem('coding-misk-stage-video'); indexedDB.deleteDatabase('coding-misk-stage-videos'); });
