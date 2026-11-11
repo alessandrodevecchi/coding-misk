@@ -181,6 +181,8 @@ export function createStageVideo({ look, soul = () => false, playing, track = ()
     if (w.kind === 'track') {
       const tr = w.track, at = tr.time(), dur = v.duration || 0, want = trackTime(at, dur), past = dur > 0 && at >= dur;
       const s = seekTo({ want, at: v.currentTime, seeking: v.seeking, lastSeek, now: performance.now(), playing: tr.playing && !past });
+      // a seek holds the last picture until the new one is decoded (owner, vp6: no flash of the fallback look)
+      if (s !== null && v.readyState >= 2 && v.videoWidth) snap = snapshot(v) || snap;
       if (s !== null) { try { v.currentTime = s; lastSeek = performance.now(); stats.seeks++; log('seek', { to: s }); } catch (e) {} }
       if (tr.playing && !past) { if (v.paused) v.play().catch(() => {}); } else if (!v.paused) v.pause();
     } else {
@@ -192,7 +194,7 @@ export function createStageVideo({ look, soul = () => false, playing, track = ()
     tick,
     // the picture to draw, or null (the fallback look draws)
     frame() {
-      if (!cur || !cur.ready || !el || el.readyState < 2 || !el.videoWidth) return snap ? snap.canvas : null;
+      if (!cur || !cur.ready || !el || el.readyState < 2 || !el.videoWidth || (el.seeking && cur.kind === 'track')) return snap ? snap.canvas : null;
       return el;
     },
     // nothing to show at all (no track video, no playable stage video): the fallback look, not a loading one

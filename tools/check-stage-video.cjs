@@ -624,7 +624,10 @@ const play = async page => { if (!(await page.evaluate(() => document.querySelec
       if (l === 'video') {
         let t = await T(page);
         check(t.playing && !t.paused && Math.abs(t.el - t.file) < 0.25, 'playing: the picture follows the file time heard', `video ${t.el.toFixed(2)} s, file ${t.file.toFixed(2)} s`);
-        await page.evaluate(() => globalThis.codingMiskDecode.seek(20)); await sleep(1200);
+        // a seek holds the last picture: every frame during the seek has a picture, never the fallback look (owner, vp6)
+        const gaps = await page.evaluate(() => new Promise(res => { const L = globalThis.codingMiskStageVideo.layer; let n = 0, miss = 0; globalThis.codingMiskDecode.seek(20); const f = () => { L.tick(); if (!L.frame()) miss++; if (++n < 45) requestAnimationFrame(f); else res({ n, miss }); }; requestAnimationFrame(f); }));
+        check(gaps.miss === 0, 'a seek: the last picture holds until the new one, no fallback frame', JSON.stringify(gaps));
+        await sleep(1200);
         t = await T(page);
         check(Math.abs(t.el - t.file) < 0.25 && t.file > 20, 'a seek: the picture at the same time within 0.25 s', `video ${t.el.toFixed(2)} s, file ${t.file.toFixed(2)} s`);
         await page.evaluate(() => globalThis.codingMiskDecode.pause()); await sleep(800);
