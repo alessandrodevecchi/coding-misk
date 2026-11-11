@@ -37,16 +37,19 @@
 //   names the bar it enters on (within one phrase), every move says why, the batches' own work stays under the
 //   budget, and the new tracks' sounds are loaded before their entry (no "took too long"); a burst with the CPU slowed
 //   4 times keeps its own work under the budget.
-// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-add-lag.cjs [--budget 100] [--profiles classic,crescendo,switch] [--rate 4] [--style berlin-techno] [--standing n] [--quick] [--owner]
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-add-lag.cjs [--budget 100] [--profiles classic,crescendo,switch] [--rate 4] [--style berlin-techno] [--standing n] [--quick] [--owner] [--convolvers]
 // --owner: only the owner's session (it also runs after the Live coder cases without --quick); --curve: only the curve case
 // --standing n: the commands standing before the late cases (default 8 in Classic, 3 on a grown song)
 // --quick: only the late "+", the burst, the net counts and the locks, at normal CPU speed
+// --convolvers: prints, per case, every reverb response put on a convolver from the press on (its time, cost, orbit, and
+// whether it replaced the buffer of a convolver that had one)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
 const BUDGET = +arg('--budget', 100), RATE = +arg('--rate', 4), PROFILES = arg('--profiles', 'classic,crescendo,switch').split(','), STYLE = arg('--style', 'berlin-techno');
 const QUICK = process.argv.includes('--quick'), OWNER = process.argv.includes('--owner'), CURVE = process.argv.includes('--curve'), STANDING = arg('--standing', null) === null ? null : +arg('--standing', 0);
 const OWNER_SEED = arg('--owner-seed', '69qgtn');
+const CONV = process.argv.includes('--convolvers');
 const NAMES = { switch: 'Live coder', classic: 'Classic', crescendo: 'Crescendo' };
 // (src/radio/radio.js: ADD_LEAD seconds at least before the boundary, the click's own budget)
 const ADD_LEAD = 2, CLICK_BUDGET = 20;
@@ -65,6 +68,16 @@ const table = [];
     addEventListener('click', e => { if (e.target.closest && e.target.closest('.arr-pm, .arr-lock, [data-mix-lock], [data-sp-new]') && window.__badge.click === null) window.__badge.click = performance.now(); }, true);
     new MutationObserver(() => { const b = window.__badge; if (b.click !== null && b.shown === null && document.querySelector('#radio-steer .arr-pend, #radio-steer [data-pend-s]')) b.shown = performance.now(); }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-pend-s'] });
     try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push({ s: e.startTime, d: e.duration }); }).observe({ type: 'longtask', buffered: true }); } catch (e) {}
+    // (--convolvers: every reverb response put on a convolver, its cost on the main thread and the orbit it serves)
+    window.__conv = [];
+    const d = typeof ConvolverNode !== 'undefined' && Object.getOwnPropertyDescriptor(ConvolverNode.prototype, 'buffer');
+    if (d && d.set) Object.defineProperty(ConvolverNode.prototype, 'buffer', { configurable: true, get: d.get, set(b) {
+      const had = !!d.get.call(this), t = performance.now();
+      d.set.call(this, b);
+      let orbit = null;
+      try { const N = globalThis.getSuperdoughAudioController().nodes; for (const k of Object.keys(N)) if (N[k] && N[k].reverbNode === this) orbit = +k; } catch (e) {}
+      if (window.__conv.length < 2000) window.__conv.push({ s: t, ms: performance.now() - t, orbit, had, len: b ? +(b.length / b.sampleRate).toFixed(2) : 0 });
+    } });
   });
   const page = await ctx.newPage();
   const errors = [], logs = [];
@@ -126,13 +139,13 @@ const table = [];
     const own = await R(() => globalThis.codingMiskRadio.addCost);
     const done = (await R(() => globalThis.codingMiskRadio.addsDone)).find(x => first[0] && x.id === first[0].id);
     if (done) { at = done.at; pushes = done.pushes; }
-    if (cpu !== 1) { const ltR = await R(() => window.__lt); await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }); return { r0, t0, lt: ltR, badgeMs, first, b0, q0, readyT, at, pushes, steer, own, late: late.length }; }
+    if (cpu !== 1) { const ltR = await R(() => window.__lt), conv = await R(t => window.__conv.filter(x => x.s >= t), t0); await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 }); return { r0, t0, lt: ltR, badgeMs, first, b0, q0, readyT, at, pushes, steer, own, late: late.length, conv }; }
     // two bars after the entry
     const bs = await barSec();
     if (at !== null) { for (let k = 0; k < 200 && (await rel()) < at + after; k++) await sleep(150); }
     else await sleep(after * bs * 1000);
-    const lt = await R(() => window.__lt), own2 = await R(() => globalThis.codingMiskRadio.addCost);
-    return { r0, t0, lt, badgeMs, first, b0, q0, readyT, at, pushes, steer, own: own2, late: late.length };
+    const lt = await R(() => window.__lt), own2 = await R(() => globalThis.codingMiskRadio.addCost), conv = await R(t => window.__conv.filter(x => x.s >= t), t0);
+    return { r0, t0, lt, badgeMs, first, b0, q0, readyT, at, pushes, steer, own: own2, late: late.length, conv };
   };
   const ownMax = m => Math.max(0, ...Object.values(m.own || {}));
   const ownText = m => Object.entries(m.own || {}).map(([k, v]) => `${k} ${v}`).join(', ') || 'none';
@@ -141,6 +154,7 @@ const table = [];
   const tasks = m => m.lt.map(x => `${Math.round(x.s - m.t0)}:${Math.round(x.d)}`).join(' ') || 'none';
   const report = (name, m) => {
     table.push(`${name}: longest ${longest(m)} ms, own work ${ownMax(m)} ms, "too late" ${m.late}, steering ${m.steer === undefined ? '—' : `${(m.steer / 1000).toFixed(1)} s`}, ready after ${m.readyT === null ? '—' : `${(m.readyT / 1000).toFixed(1)} s`}, entry bar ${m.at === null ? '—' : m.at + 1}, pushes ${m.pushes}`);
+    if (CONV && m.conv) console.log(`info  ${name}: reverb responses put on convolvers: ${m.conv.map(x => `${Math.round(x.s - m.t0)}:${x.ms.toFixed(1)} ms orbit ${x.orbit ?? 'new'}${x.had ? ' replaced' : ''} ${x.len} s`).join(', ') || 'none'}`);
     check(m.badgeMs !== null && m.badgeMs <= 100, `${name}: the badge shows within 100 ms`, `${m.badgeMs} ms`);
     check(longest(m) <= BUDGET, `${name}: no main-thread task over ${BUDGET} ms from the press until two bars after the entry`, `longest ${longest(m)} ms; tasks ${tasks(m)}`);
     check(m.late === 0, `${name}: no "skip query: too late"`, `${m.late}`);

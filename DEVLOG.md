@@ -2994,3 +2994,22 @@ Ramo `fix/82-widget-placement-check` da `feat/44-themed-checks` (ddf91af).
 - **Stessa causa in `check-code-over.cjs`:** «the app widgets are drawn in the editor and over the stage» falliva anche su ddf91af: kellerlicht in Live coder ora apre con i soli charleston (pianoroll) per più di 40 battute. Il caso tiene l'apertura `broken` che aveva (come `check-live-code.mjs`) con una prova del brano, senza cliccare il profilo: un clic sul profilo avvia una prova nuova senza opzioni (comportamento voluto dell'app) e toglieva l'apertura.
 - **Prove:** `check-widget-placement.cjs` 51 ok su 51, `check-code-over.cjs` tutto ok, `check-code-widgets.cjs` tutto ok (porta 5309); `check:steer-memo`, `check:endless` (97), `check:radio-profiles` (31), `check:live-code` (25), `check:sound-guard` (14), `check:knowledge` (solo l'avviso già noto del catalogo Strudel), `check:guide`, `npm run build`.
 - **Decisione aperta:** con un'apertura `typed` o senza batteria la griglia compare solo quando suona la prima riga di batteria. Consigliato lasciarla così (una griglia vuota sopra `$: silence` non ha una riga a cui stare).
+
+## 2026-11-11 riverbero nuovo per le tracce della console: misurato e non fatto (#82)
+
+Ramo `fix/82-reverb-new-orbit` da `feat/44-themed-checks` (ddf91af). Limite noto dell'8 novembre (note, «riverbero in Classic con molte tracce»): un `convolver.buffer =` su un riverbero che suona bloccava la pagina 260-420 ms. Idea da provare: le tracce aggiunte dalla console prendono un orbit nuovo, quindi un ConvolverNode nuovo (6-10 ms) invece di cambiare il buffer di uno che suona.
+
+- **Orbit liberi:** il brano in onda usa 1-8 (uno per tipo), 9-12 per le tracce in più (fino a 12 tracce), 13-14 per la voce strumento, 15 e su per il narratore (una traccia voce per brano in 139 brani generati, 20 stili, complessità 1: orbit più alto 13 nel codice del brano, 15 con il narratore; anche «Say now» suona su 15). Il brano nascosto della finestra prende gli stessi più 20 (21-39); 20 è l'anteprima dei pattern, 30 il laboratorio FM, 40 l'anteprima della radio. Liberi per il brano in onda: 16-19, e da 41 in su (con il brano nascosto da 61).
+- **Il caso del limite non si ripete:** `check-add-lag.cjs --profiles classic` tre volte (nuova opzione `--convolvers`, che stampa ogni risposta messa su un riverbero, con costo, orbit e se ne sostituisce una). Il caso delle tracce ora arriva a 11 tracce, non più a 5 (le correzioni del 7-8 novembre), e «+ arp» e «− bass» non mettono nessuna risposta di riverbero: 3 su 3 ok, compito più lungo 0 ms. Nell'intero gruppo Classic una sola sostituzione (sblocco del basso, orbit 4, 0,9 s): 7,6 e 12,8 ms. Un fallimento in una corsa su tre: «lock-part bass» con un compito di 106 ms, senza riverbero.
+- **I «+» finiscono già su un riverbero nuovo:** 62 «+» su brani Classic di berlin-techno, lo-fi, darksynth e ambient (due semi ciascuno, al primo brano e dopo due salti): 0 sostituzioni, 22 risposte messe su un ConvolverNode nuovo (il primo riverbero del suo orbit) in 5-35 ms. Il carico della macchina era 10-20 (altre sessioni): ci sono stati compiti fino a 292 ms e qualche «too late», anche subito dopo un riverbero nuovo e anche senza riverbero.
+- **Sostituire contro nuovo, da solo** (nuovo `tools/convolver-bench.cjs`: rumore in un convolver che suona mentre suona un brano Classic della radio, risposta di 3 s, 10 prove alternate per tipo, carico 9-11):
+
+| CPU | Altri convolver che suonano | Sostituire: costo (mediana, massimo) | Nuovo: costo (mediana, massimo) | Compiti > 100 ms dopo: sostituire / nuovo |
+| --- | --- | --- | --- | --- |
+| 1× | 0 | 10,1 ms, 16,4 ms | 8,7 ms, 23 ms | 0/10 / 0/10 |
+| 4× | 0 | 48,3 ms, 70,1 ms | 38 ms, 71,9 ms | 0/10 / 0/10 |
+| 1× | 12 | 15,9 ms, 20,5 ms | 8,6 ms, 15,3 ms | 0/10 / 0/10 |
+| 4× | 12 | 39,2 ms, 55,2 ms | 31,2 ms, 60,5 ms | 1/10 / 2/10 |
+
+- **Conclusione:** la sostituzione costa qualche ms in più (circa 7 ms a 1× con 12 riverberi), ma non blocca la pagina per centinaia di ms, e i «+» della console non sostituiscono mai un buffer nei casi misurati. Un orbit nuovo per le tracce della console non cambierebbe niente in questi casi e toccherebbe compilatore, mixer nascosto e fixture: non fatto, come da regola. Il blocco dell'8 novembre resta senza una causa ripetibile; i compiti lunghi visti oggi vengono con il carico della macchina. Il cambio di brano in Classic non è stato rimisurato perché il codice dell'app non cambia.
+- **Prove:** quelle elencate sopra; `check:knowledge`, `check:guide`, `npm run build` sul ramo.
