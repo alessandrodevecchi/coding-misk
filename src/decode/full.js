@@ -11,13 +11,18 @@ import { variationsOf } from './writer.js';
 export const MISK = 'misk-analyzer';
 // Essentia.js's tempo is taken when its confidence (RhythmExtractor2013 multifeature, 0 to about 5.3) is at least this
 export const ESSENTIA_CONFIDENT = 2.5;
+// … and from this confidence when misk-analyzer's tempo agrees with it (the two analyses confirm each other): on the test
+// track the confidence is 2.503 to 2.509 and changes between identical calls, so the threshold alone flipped the engine
+export const ESSENTIA_CONFIRMED = 2.0;
+const RATIOS = [1, 2, 0.5, 1.5, 2 / 3];
+const agrees = (a, b) => a > 0 && b > 0 && RATIOS.some(r => Math.abs((a * r) / b - 1) < 0.03);
 
 // the tempo of level B (D7): a tempo the user tapped or picked (½×, 2×) wins; else Essentia.js's whole-track tempo
 // when it is confident, in misk-analyzer's octave when the two are half or double of each other (the backbeat rule of
 // D7 settles the octave); else misk-analyzer's own. → { bpm, from }
 export function pickTempo(misk, ess, user = null) {
   if (user && user.bpm > 0) return { bpm: user.bpm, from: user.tapped ? 'tapped' : 'picked' };
-  if (ess && ess.bpm > 0 && ess.confidence >= ESSENTIA_CONFIDENT) {
+  if (ess && ess.bpm > 0 && (ess.confidence >= ESSENTIA_CONFIDENT || (ess.confidence >= ESSENTIA_CONFIRMED && misk && agrees(ess.bpm, misk.bpm)))) {
     let bpm = ess.bpm;
     if (misk && misk.bpm > 0) for (const r of [2, 0.5, 1.5, 2 / 3]) if (Math.abs((bpm * r) / misk.bpm - 1) < 0.03) bpm *= r;
     return { bpm, from: 'essentia.js' };
@@ -109,6 +114,8 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   m.sections = sections;
   m.ending = ending;
   m.variations = variationsOf(m);
+  // (Essentia.js's own tempo and confidence, to read why the engine was or was not taken)
+  if (ess) m.essentiaTempo = { bpm: Math.round(ess.bpm * 1000) / 1000, confidence: Math.round(ess.confidence * 1000) / 1000 };
   Object.assign(m, { level: 'B', engines, ms: Date.now() - t0, ...(notes.length ? { notes } : {}), ...(E ? { essentia: E.version } : {}) });
   onProgress(1, 'done');
   return m;

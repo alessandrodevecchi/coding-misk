@@ -239,7 +239,9 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
     check(m.bpm === 124 && Math.abs(m.downbeat - 0.3) < 0.01 && ok >= 0.9 && m.key && m.key.root === 9 && m.key.mode === 'minor', `level B (${name}): tempo, downbeat within 10 ms, chords at least 90 %, key A minor`, `${m.bpm} BPM, ${m.downbeat} s, chords ${ok.toFixed(2)}`);
     check(m.level === 'B' && m.version === ANALYSIS_VERSION && m.variations && m.engines, `level B (${name}): the model shape, level B and its engines`, JSON.stringify(m.engines));
   }
-  check(Object.values(runs['Essentia.js'].engines).every(x => x === 'essentia.js'), 'with Essentia.js: tempo, key and chords from it', JSON.stringify(runs['Essentia.js'].engines));
+  check(Object.values(runs['Essentia.js'].engines).every(x => x === 'essentia.js'), 'with Essentia.js: tempo, key and chords from it', `${JSON.stringify(runs['Essentia.js'].engines)} · Essentia.js tempo ${JSON.stringify(runs['Essentia.js'].essentiaTempo)}`);
+  // the tempo's engine (D7): confident alone, or confirmed by misk-analyzer from 2.0; never a disagreeing weak tempo
+  check(pickTempo({ bpm: 124 }, { bpm: 123.8, confidence: 2.49 }).from === 'essentia.js' && pickTempo({ bpm: 124 }, { bpm: 61.9, confidence: 2.2 }).bpm === 123.8 && pickTempo({ bpm: 124 }, { bpm: 97, confidence: 2.49 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, { bpm: 123.8, confidence: 1.9 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, { bpm: 97, confidence: 2.6 }).from === 'essentia.js', 'level B tempo: Essentia.js confident (2.5), or from 2.0 when misk-analyzer agrees (any octave); a weak disagreeing tempo stays misk-analyzer\'s');
   check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
   // the same model shape as level A for the same bars (analysis spec: One song model)
   const A = createAnalyzer(pcm).model(30), B = runs['Essentia.js'];
