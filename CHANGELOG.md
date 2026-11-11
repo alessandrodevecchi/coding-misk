@@ -64,6 +64,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - One-row pianoroll looks: a pianoroll widget whose hits fall on one row draws thin ticks in a low strip when every hit is as loud, and shows accents by bar height, transparency or both, in the editor, on the stage panels and in videos.
 - Settings "One-row pianoroll, equal volume" (Thin, Full) and "One-row pianoroll, varying volume" (Height, Transparency, Both, Random) in the Code widgets card.
 - `npm run check:one-row-roll`.
+- `tools/convolver-bench.cjs`: the cost of replacing a playing reverb's response against a fresh reverb, while a radio song plays.
+- `tools/check-add-lag.cjs --convolvers`: every reverb response a case puts on a convolver, with its cost and orbit.
 
 ### Changed
 
