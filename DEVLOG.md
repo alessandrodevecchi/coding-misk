@@ -3206,3 +3206,13 @@ Gruppi 7-10 di `decode-refine` approvati dal proprietario oggi. Gruppo 7 (D4), m
 - `ANALYSIS_VERSION` 5.
 - **Somiglianza:** i brani del banco non ricevono un Lead (sonorità sotto il 30 % o `top.up` basso), quindi i punteggi restano quelli del gruppo 8; l'arp: quota media del codice 0,53 → 0,56.
 - **Prove nel browser:** l'hook generato aperto in Completa mostra la traccia Lead (`n("2 1!2 ~ 0!2 ~ 4 3!2 2!2 1 0!2 ~").scale("C5:major")`), nessun errore.
+
+## 2026-11-12 riser nei brani che crescono: spec e controllo Crescendo (#82)
+
+Ramo `fix/82-riser-grown-songs` da `ef85658`.
+
+- **Stato:** la nota del proprietario del 7 novembre (riser che in un brano lungo entra quasi alla fine) era già corretta in `15511b9` (7 novembre, in `develop`): dentro la crescita il riser va sul brano cresciuto, entro due frasi dalla pressione (`riserAirTarget`, `riserAir`, `airRiser`). Mancavano la spec e un controllo sui brani Crescendo (quello esistente prova solo Live coder).
+- **Spec:** change OpenSpec `riser-grown-songs` (proposta, delta di `endless/steering` sul requisito «Riser row», task).
+- **Controllo:** nuovo caso in `check:radio-profiles`: riser premuti alla battuta 30,4 e a metà di crescite Crescendo di almeno 8 frasi finiscono entro due frasi sul brano cresciuto e si sentono (es. 30,4 → 32-40, 56,4 → 64-72). Con il posizionamento sul brano cresciuto spento il caso fallisce (il riser va per la strada della forma scritta, confine 40 e oltre).
+- **Tooltip:** il riser dice in inglese e italiano che, in un brano che cresce, mentre cresce arriva entro due frasi.
+- **Resta aperto (piccolo, non corretto):** il motivo «late» del pulsante su un brano cresciuto si calcola sulla forma scritta (`riserTarget`); verso la fine della crescita potrebbe disabilitare il pulsante anche se sul brano cresciuto il riser ci starebbe, e un riser che non trova posto entro due frasi viene lasciato cadere senza avviso.
