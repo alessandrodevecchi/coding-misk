@@ -1,0 +1,42 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>CAP-TAB</title></head>
+<body>
+<button id="go">capture</button>
+<script>
+window.res = { err: null }; const SUPPRESS = location.hash !== '#hear';
+document.getElementById('go').onclick = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: { suppressLocalAudioPlayback: SUPPRESS, echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2 }, selfBrowserSurface: 'exclude', preferCurrentTab: false });
+    const at = stream.getAudioTracks(), vt = stream.getVideoTracks();
+    window.res.audioTracks = at.length; window.res.videoTracks = vt.length;
+    window.res.surface = vt[0] && vt[0].getSettings().displaySurface;
+    window.res.label = vt[0] && vt[0].label;
+    window.res.audioSettings = at[0] ? at[0].getSettings() : null;
+    if (location.hash.includes('stopvideo')) vt.forEach(t => t.stop());
+    at[0].addEventListener('ended', () => { window.res.ended = performance.timeOrigin + performance.now(); });
+    if (!at.length) return;
+    const ctx = new AudioContext(); await ctx.resume();
+    const src = ctx.createMediaStreamSource(new MediaStream(at)), an = ctx.createAnalyser();
+    an.fftSize = 2048; src.connect(an);
+    const td = new Float32Array(an.fftSize), fd = new Float32Array(an.frequencyBinCount);
+    window.res.onsets = []; window.res.rms = []; window.res.peaks = [];
+    let above = false;
+    setInterval(() => {
+      an.getFloatTimeDomainData(td);
+      // the newest 256 samples (~6 ms) for onsets
+      let s = 0; for (let i = td.length - 256; i < td.length; i++) s += td[i] * td[i];
+      const rms = Math.sqrt(s / 256);
+      if (rms > 0.05 && !above) { above = true; window.res.onsets.push(performance.timeOrigin + performance.now()); }
+      if (rms < 0.01) above = false;
+    }, 2);
+    setInterval(() => {
+      an.getFloatTimeDomainData(td); let s = 0; for (const v of td) s += v * v; window.res.rms.push(+Math.sqrt(s / td.length).toFixed(4));
+      an.getFloatFrequencyData(fd);
+      const top = [...fd].map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]).slice(0, 2).map(([, i]) => Math.round(i * ctx.sampleRate / an.fftSize));
+      window.res.peaks.push(top.join('/'));
+    }, 250);
+    window.res.ok = true;
+  } catch (e) { window.res.err = `${e.name}: ${e.message}`; }
+};
+</script>
+</body></html>
