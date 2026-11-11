@@ -7,6 +7,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Decode: a music note or video icon on every row of the library list and of mixtapes, and a "no sound" mark on videos without sound.
 - Decode: "Another file" opens a panel with "Choose a file…", the recent tracks and the files of the user's folders in one list; the empty tab shows the same list.
 - Decode: Add folder (Chrome, Edge), with subfolders, up to 2000 files per folder, the browser's permission asked once per visit, and a video icon for video files.
 - Decode: search, a chip per folder, order by name or by recent, and the marks ◆ Full and ◇ Live in the list.
@@ -119,6 +120,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Decode: a video without sound plays in silence for its length, with a placeholder in the code column, instead of doing nothing.
+- Decode: a file of the library that cannot open gives a note in the panel and no longer stops the open track.
+- Decode: a mixtape's Play, Autoplay, Previous and Next skip rows that fail to open with a note naming them, and stop with a note when nothing can play.
 - Decode library: ticking a row's checkbox in Select mode now selects the row.
 - Decode: the name of a track not heard keeps its contrast in the light theme.
 - Decode: in Full, a part heard every other bar no longer mutes and unmutes on every bar.

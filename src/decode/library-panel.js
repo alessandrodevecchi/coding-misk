@@ -9,6 +9,7 @@ import { createLibraryStore } from './library-store.js';
 import { buildRows, filterRows, sortRows, listPrefs, windowOf, fileKey, usedSnapshot, LIST_KEY, AUTOPLAY_KEY } from './library.js';
 import { createMixtape, addRows, moveRow, removeRow, renameMixtape, setRepeat, relinkSingle, rowStatus, relinkFolder, exportMixtapes, mergeMixtapes } from './mixtapes.js';
 import { AUDIO_EXT, VIDEO_EXT } from './folders.js';
+import { AUDIO_FILE, VIDEO_FILE, NO_SOUND } from '../icons.js';
 
 const ls = {
   get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch (e) { return d; } },
@@ -17,7 +18,6 @@ const ls = {
 const svg = body => `<svg class="dc-ico" viewBox="0 0 16 16" aria-hidden="true">${body}</svg>`;
 export const LIB_ICON = {
   folder: svg('<path d="M1.8 4.2a1 1 0 0 1 1-1h3.4l1.4 1.6h5.6a1 1 0 0 1 1 1v6.9a1 1 0 0 1-1 1H2.8a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>'),
-  video: svg('<rect x="1.8" y="4" width="8.6" height="8" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.4 7l3.8-2.2v6.4L10.4 9z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>'),
   lock: svg('<path d="M5 7V5.2a3 3 0 0 1 6 0V7" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="3.5" y="7" width="9" height="6.5" rx="1.3" fill="currentColor"/>'),
   x: svg('<path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'),
   file: svg('<g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3"/></g>'),
@@ -103,8 +103,21 @@ export function createLibraryPanel({ app, store, hooks }) {
     const m = mixOf(id);
     if (!m) return { rows: [], repeat: false };
     const fset = new Set(files.map(f => fileKey(f.folderId, f.path)));
-    const ctx = { folders: new Map(folders.map(f => [f.id, f])), files: fset, singles: new Map(singles.map(s => [s.id, s])), gone };
-    return { rows: m.rows.map(r => { const st = rowStatus(r, ctx); return { ...r, kind: 'mix', mixId: id, status: st, missing: st === 'missing', waiting: st === 'waiting', key: r.ref.singleId ? `s:${r.ref.singleId}` : fileKey(r.ref.folderId, r.ref.path) }; }), repeat: !!m.repeat };
+    const silent = new Set([...silentKeys, ...files.filter(f => f.audio === false).map(f => fileKey(f.folderId, f.path))]);
+    const ctx = { folders: new Map(folders.map(f => [f.id, f])), files: fset, singles: new Map(singles.map(s => [s.id, s])), gone, silent };
+    return { rows: m.rows.map(r => { const st = rowStatus(r, ctx); return { ...r, kind: 'mix', mixId: id, status: st, missing: st === 'missing', waiting: st === 'waiting', silent: st === 'nosound', key: r.ref.singleId ? `s:${r.ref.singleId}` : fileKey(r.ref.folderId, r.ref.path) }; }), repeat: !!m.repeat };
+  }
+  // a file found to hold no sound when it failed to open (decode-library: rows that cannot play): a folder file is
+  // stored with `audio: false` in its index entry, a single file is remembered for the visit
+  const silentKeys = new Set();
+  async function markSilent(row) {
+    const k = row.kind === 'mix' ? row.key : row.kind === 'file' ? row.key : null;
+    if (!k) return;
+    silentKeys.add(k);
+    const x = files.find(f => fileKey(f.folderId, f.path) === k);
+    if (x && x.audio !== false) { x.audio = false; await lstore.putFiles([x]); }
+    rowsDirty = true;
+    render();
   }
 
   // ---------- files ----------
@@ -170,13 +183,14 @@ export function createLibraryPanel({ app, store, hooks }) {
   function tagOf(folderId, x) {
     if (!tagMap || tagMap.n !== files.length) { tagMap = fileByKey(); tagMap.n = files.length; }
     const o = tagMap.get(fileKey(folderId, x.path));
-    return o && o.tagged && o.size === x.size && o.modified === x.modified ? { title: o.title, artist: o.artist, tagged: true } : null;
+    return o && o.tagged && o.size === x.size && o.modified === x.modified ? { title: o.title, artist: o.artist, tagged: true, ...(o.audio !== undefined ? { audio: o.audio } : {}) } : null;
   }
 
   // ---------- tags (D4, task 2.4) ----------
   let tagT = 0, tagging = false;
   const tagStats = { files: 0, times: [], longest: 0 };
-  function readTagsSoon() { if (!TAGS_IN_LIST || tagT || tagging) return; tagT = setTimeout(() => { tagT = 0; readTags(); }, 400); }
+  // (codingMiskNoTags: a check holds the idle read back, to find a video without sound when it fails to open)
+  function readTagsSoon() { if (!TAGS_IN_LIST || tagT || tagging || globalThis.codingMiskNoTags) return; tagT = setTimeout(() => { tagT = 0; readTags(); }, 400); }
   const idle = () => new Promise(r => (globalThis.requestIdleCallback ? requestIdleCallback(d => r(d), { timeout: 1000 }) : setTimeout(() => r({ timeRemaining: () => 8 }), 30)));
   async function readTags() {
     if (tagging) return;
@@ -185,7 +199,8 @@ export function createLibraryPanel({ app, store, hooks }) {
       // 25 rows at a time from the list shown now, so a new chip or search is followed at the next batch
       for (let round = 0; round < 400; round++) {
         const fk = fileByKey();
-        const want = listFor({ ...prefs, search }).filter(r => r.kind === 'file' && !r.waiting && !r.fp && !(fk.get(r.key) || {}).tagged).slice(0, 25);
+        // (a video read before this check has its tags but not its sound: it is read once more)
+        const want = listFor({ ...prefs, search }).filter(r => { const x = fk.get(r.key) || {}; return r.kind === 'file' && !r.waiting && !r.fp && (!x.tagged || (x.video && x.audio === undefined)); }).slice(0, 25);
         if (!want.length) break;
         const done = [];
         for (const r of want) {
@@ -194,13 +209,16 @@ export function createLibraryPanel({ app, store, hooks }) {
           const f = folderOf(r.folderId), x = fk.get(r.key);
           if (!f || !f.granted || !x) continue;
           const t0 = performance.now();
-          let tags = {};
+          let tags = {}, audio;
           try {
             const file = await (await fileAt(f.handle, r.path)).getFile();
             const mb = await import('mediabunny');
             const input = new mb.Input({ source: new mb.BlobSource(file), formats: mb.ALL_FORMATS });
             tags = (await input.getMetadataTags()) || {};
+            // the same read of the header tells whether the file has a sound at all (a screen recording may not)
+            audio = !!(await input.getPrimaryAudioTrack().catch(() => true));
           } catch (e) { tags = {}; }
+          if (audio !== undefined) x.audio = audio;
           const dt = performance.now() - t0;
           tagStats.files++; tagStats.times.push(dt); tagStats.longest = Math.max(tagStats.longest, dt);
           // a file without readable tags is not tried again
@@ -286,13 +304,8 @@ export function createLibraryPanel({ app, store, hooks }) {
     if (srcs.length) m = addRows(m, srcs);
     await saveMix(m); render();
   }
-  function playMix(id, from = 0) {
-    const src = mixRows(id), list = src.rows;
-    const i = list.findIndex((r, j) => j >= from && !r.missing);
-    if (i < 0) { app.toast(t('dclAllMissing')); return; }
-    const r = list[i];
-    hooks.openRow(r, { kind: 'mixtape', id, rowId: r.id, pos: i }, true);
-  }
+  // the kind of a row's file (decode-library: a kind icon on every row): a music note, a video, a video without sound
+  const kindHtml = (video, silent) => `<span class="dcl-vid${silent ? ' vonly' : ''}" title="${esc(t(silent ? 'dclNoSoundTip' : video ? 'dclVideo' : 'dclAudio'))}" aria-label="${esc(t(silent ? 'dclNoSoundTip' : video ? 'dclVideo' : 'dclAudio'))}">${video ? VIDEO_FILE : AUDIO_FILE}${silent ? NO_SOUND : ''}</span>`;
 
   // ---------- rendering ----------
   const rowH = () => (globalThis.matchMedia && matchMedia('(max-width: 600px)').matches ? 40 : 32);
@@ -308,10 +321,10 @@ export function createLibraryPanel({ app, store, hooks }) {
   }
   function rowHtml(r, i, top) {
     const p = playingNow(), on = p.key && p.key === r.key && !p.mixId;
-    const cls = `dcl-row${on ? ' on' : ''}${r.waiting ? ' wait' : ''}${r.missing ? ' miss' : ''}${selected.has(r.key) ? ' sel' : ''}`;
+    const cls = `dcl-row${on ? ' on' : ''}${r.waiting ? ' wait' : ''}${r.missing ? ' miss' : ''}${r.silent ? ' vonly' : ''}${selected.has(r.key) ? ' sel' : ''}`;
     const mark = r.mark ? `<span class="dcl-mark ${r.mark}" title="${esc(t(r.mark === 'full' ? 'dclMarkFull' : 'dclMarkLive'))}" aria-label="${esc(t(r.mark === 'full' ? 'dclMarkFull' : 'dclMarkLive'))}">${MARK[r.mark]}</span>` : '<span class="dcl-mark"></span>';
     const state = r.missing ? `<span class="dcl-state miss">${esc(t('dclNotFound'))}</span>` : r.waiting ? `<span class="dcl-state wait" title="${esc(t('dclWaitingTip'))}">${LIB_ICON.lock}</span>` : '';
-    return `<div class="${cls}" role="option" aria-selected="${!!on}" data-dcl-row="${esc(r.key)}" data-i="${i}" style="top:${top}px" title="${esc(r.fileName || r.name)}"><span class="dcl-selc">${selecting ? `<input type="checkbox" class="dcl-sel" tabindex="-1" aria-label="${esc(r.name)}"${selected.has(r.key) ? ' checked' : ''}>` : ''}</span><span class="dcl-vid">${r.video ? `<span title="${esc(t('dclVideo'))}">${LIB_ICON.video}</span>` : ''}</span><span class="dcl-name">${esc(r.name)}${r.artist ? ` <small>${esc(r.artist)}</small>` : ''}</span><span class="dcl-folder">${esc(r.folderName || t('dclRecent'))}</span>${state}${mark}${r.fp ? `<button class="btn icon mini-btn dcl-rm" data-dcl-remove="${esc(r.fp)}" title="${esc(t('dcRemove'))}" aria-label="${esc(`${t('dcRemove')} · ${r.name}`)}">${LIB_ICON.x}</button>` : '<span class="dcl-rm"></span>'}</div>`;
+    return `<div class="${cls}" role="option" aria-selected="${!!on}" data-dcl-row="${esc(r.key)}" data-i="${i}" style="top:${top}px" title="${esc(r.fileName || r.name)}"><span class="dcl-selc">${selecting ? `<input type="checkbox" class="dcl-sel" tabindex="-1" aria-label="${esc(r.name)}"${selected.has(r.key) ? ' checked' : ''}>` : ''}</span>${kindHtml(r.video, r.silent)}<span class="dcl-name">${esc(r.name)}${r.artist ? ` <small>${esc(r.artist)}</small>` : ''}</span><span class="dcl-folder">${esc(r.folderName || t('dclRecent'))}</span>${state}${mark}${r.fp ? `<button class="btn icon mini-btn dcl-rm" data-dcl-remove="${esc(r.fp)}" title="${esc(t('dcRemove'))}" aria-label="${esc(`${t('dcRemove')} · ${r.name}`)}">${LIB_ICON.x}</button>` : '<span class="dcl-rm"></span>'}</div>`;
   }
   let lastWin = '';
   // the rows in view only (D6)
@@ -321,7 +334,7 @@ export function createLibraryPanel({ app, store, hooks }) {
     shown = listFor({ ...prefs, search });
     const h = rowH(), sp = box.querySelector('.dcl-spacer');
     const { first, last } = windowOf(box.scrollTop, box.clientHeight || 400, h, shown.length);
-    const key = `${first}|${last}|${shown.length}|${shown.slice(first, last).map(r => `${r.key}${r.mark}${r.waiting}${r.missing}${r.name}`).join(',')}|${selecting}|${selected.size}|${JSON.stringify(playingNow())}|${h}`;
+    const key = `${first}|${last}|${shown.length}|${shown.slice(first, last).map(r => `${r.key}${r.mark}${r.waiting}${r.missing}${r.silent}${r.name}`).join(',')}|${selecting}|${selected.size}|${JSON.stringify(playingNow())}|${h}`;
     sp.style.height = `${shown.length * h}px`;
     box.dataset.q = search;
     if (!force && key === lastWin) return;
@@ -347,8 +360,8 @@ export function createLibraryPanel({ app, store, hooks }) {
     const src = mixRows(m.id), p = playingNow();
     const rowsH = src.rows.map((r, i) => {
       const on = p.mixId === m.id && p.mixRowId === r.id;
-      const state = r.status === 'missing' ? `<span class="dcl-state miss">${esc(t('dclNotFound'))}</span>${r.ref.singleId ? `<button class="btn mini-btn" data-dcl-repick="${esc(r.id)}">${esc(t('dclFile'))}</button>` : ''}` : r.status === 'waiting' ? `<span class="dcl-state wait" title="${esc(t('dclWaitingTip'))}">${LIB_ICON.lock}</span>` : '';
-      return `<li class="dcl-mrow${on ? ' on' : ''}${r.status === 'missing' ? ' miss' : ''}${r.status === 'waiting' ? ' wait' : ''}" draggable="true" data-i="${i}" data-dcl-mrow="${esc(r.id)}" title="${esc(t('plDrag'))}"><span class="dcl-grip">${LIB_ICON.grip}</span><span class="dcl-n">${i + 1}</span><span class="dcl-vid">${r.video ? LIB_ICON.video : ''}</span><span class="dcl-name">${esc(r.name)}</span><span class="dcl-folder">${esc(r.ref.folderName || r.ref.fileName || '')}</span>${state}<span class="dcl-macts"><button class="btn icon mini-btn" data-dcl-up="${i}" aria-label="${esc(t('dclUp'))}" title="${esc(t('dclUp'))}"${i ? '' : ' disabled'}>${LIB_ICON.up}</button><button class="btn icon mini-btn" data-dcl-down="${i}" aria-label="${esc(t('dclDown'))}" title="${esc(t('dclDown'))}"${i < src.rows.length - 1 ? '' : ' disabled'}>${LIB_ICON.down}</button><button class="btn icon mini-btn" data-dcl-rmrow="${esc(r.id)}" aria-label="${esc(t('dclRemoveRow'))}" title="${esc(t('dclRemoveRow'))}">${LIB_ICON.x}</button></span></li>`;
+      const state = r.status === 'nosound' ? '' : r.status === 'missing' ? `<span class="dcl-state miss">${esc(t('dclNotFound'))}</span>${r.ref.singleId ? `<button class="btn mini-btn" data-dcl-repick="${esc(r.id)}">${esc(t('dclFile'))}</button>` : ''}` : r.status === 'waiting' ? `<span class="dcl-state wait" title="${esc(t('dclWaitingTip'))}">${LIB_ICON.lock}</span>` : '';
+      return `<li class="dcl-mrow${on ? ' on' : ''}${r.status === 'missing' ? ' miss' : ''}${r.status === 'waiting' ? ' wait' : ''}${r.silent ? ' vonly' : ''}" draggable="true" data-i="${i}" data-dcl-mrow="${esc(r.id)}" title="${esc(t('plDrag'))}"><span class="dcl-grip">${LIB_ICON.grip}</span><span class="dcl-n">${i + 1}</span>${kindHtml(r.video, r.silent)}<span class="dcl-name">${esc(r.name)}</span><span class="dcl-folder">${esc(r.ref.folderName || r.ref.fileName || '')}</span>${state}<span class="dcl-macts"><button class="btn icon mini-btn" data-dcl-up="${i}" aria-label="${esc(t('dclUp'))}" title="${esc(t('dclUp'))}"${i ? '' : ' disabled'}>${LIB_ICON.up}</button><button class="btn icon mini-btn" data-dcl-down="${i}" aria-label="${esc(t('dclDown'))}" title="${esc(t('dclDown'))}"${i < src.rows.length - 1 ? '' : ' disabled'}>${LIB_ICON.down}</button><button class="btn icon mini-btn" data-dcl-rmrow="${esc(r.id)}" aria-label="${esc(t('dclRemoveRow'))}" title="${esc(t('dclRemoveRow'))}">${LIB_ICON.x}</button></span></li>`;
     }).join('');
     return `<div class="dcl-mixhead"><button class="btn icon" id="dcl-back" aria-label="${esc(t('dclBack'))}" title="${esc(t('dclBack'))}">${LIB_ICON.back}</button><input type="text" id="dcl-mix-name" maxlength="80" value="${esc(m.name)}" aria-label="${esc(t('dclMixName'))}" data-no-knob>
         <button class="btn primary" data-dcl-play="${esc(m.id)}">${esc(t('dcPlay'))}</button><button class="vswitch" id="dcl-repeat" aria-pressed="${!!m.repeat}" title="${esc(t('dclRepeatTip'))}"><span class="vs-lamp" aria-hidden="true"></span><span class="vs-txt">${esc(t('dclRepeat'))}</span></button>
@@ -416,7 +429,7 @@ export function createLibraryPanel({ app, store, hooks }) {
     if (b.id === 'dcl-newmix') { const m = createMixtape(t('dclNewMixName', { n: mixtapes.length + 1 })); await saveMix(m); openMix = m.id; render(); const inp = el.querySelector('#dcl-mix-name'); if (inp) { inp.focus(); inp.select(); } return; }
     if (b.dataset.dclOpen) { openMix = b.dataset.dclOpen; render(); return; }
     if (b.id === 'dcl-back') { openMix = null; render(); return; }
-    if (b.dataset.dclPlay) { playMix(b.dataset.dclPlay); return; }
+    if (b.dataset.dclPlay) { hooks.playMix(b.dataset.dclPlay); return; }
     const m = mixOf(openMix);
     if (!m) return;
     if (b.id === 'dcl-repeat') { await saveMix(setRepeat(m, !m.repeat)); render(); return; }
@@ -470,6 +483,7 @@ export function createLibraryPanel({ app, store, hooks }) {
     // inline under the empty tab's drop area, or over the tab's panel
     mount(slot, asOverlay) { overlay = !!asOverlay; if (!asOverlay) isOpen = false; if (el.parentNode !== slot) slot.appendChild(el); render(); },
     rows: getRows,
+    markSilent,
     usedSnapshot: () => usedSnapshot(getRows()),
     // the list of a context (chip, search, order), sorted and filtered once (Autoplay, Previous and Next)
     listFor,

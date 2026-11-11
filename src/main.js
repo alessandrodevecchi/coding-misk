@@ -4978,6 +4978,13 @@ decodeTab = createDecodeTab({ root: $('#tab-decode'), app: {
   },
   outCombo, exportJob: decodeExportJob, exportDecode, openFragments: (source, anchor) => { if (!fragMenu || fragMenu.source !== source) openFragMenu(source, anchor); },
   stopCode: () => { decodeNext = null; decodeSwap = null; typing = null; if (ed && mode === 'decode') ed.stop(); },
+  // a video without sound (decode-library): a placeholder in the code column, nothing evaluated, other players stopped
+  showCode: (code, name, level) => {
+    if (mode !== 'decode') { if (radio && radio.on) radio.stopped(); if (preview) preview.stop(); setHand(false); resumeTo = null; paused = null; if (ed) ed.stop(); }
+    decodeNext = null; decodeSwap = null; typing = null; mode = 'decode';
+    source = { kind: 'decode', name, level: level || '' }; renderSource();
+    if (ed) ed.setCode(code);
+  },
   source: (name, level) => { source = { kind: 'decode', name, level }; renderSource(); },
   ended: () => { decodeNext = null; decodeSwap = null; typing = null; if (ed && mode === 'decode') ed.stop(); if (decodeRec) { decodeRec.ending = true; setTimeout(() => decodeRec && decodeRec.finish(false), 2500); } },
 } });

@@ -2035,7 +2035,11 @@ summary .vt-cs-dot { margin-left: 0; }
 .dcl-row.sel { background: color-mix(in srgb, var(--a2) 14%, transparent); }
 .dcl-row.wait .dcl-name, .dcl-row.miss .dcl-name { color: var(--muted); }
 .dcl-sel { margin: 0; accent-color: var(--a1); }
-.dcl-vid { display: inline-grid; place-items: center; color: var(--muted); }
+.dcl-vid { position: relative; display: inline-grid; place-items: center; color: var(--muted); }
+.dcl-vid svg { width: 15px; height: 15px; }
+/* a video without sound (decode-library: videos without sound): a "video only" row in the normal style, the video icon
+   with a small crossed speaker; not broken, so not dimmed */
+.dcl-vid .ico-no-sound { position: absolute; right: -6px; bottom: -5px; width: 11px; height: 11px; color: var(--muted); background: var(--panel2); border-radius: 50%; }
 .dcl-name, .dcl-folder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .dcl-name small { color: var(--muted); }
 .dcl-folder { color: var(--muted); font-size: 12px; }
@@ -2073,4 +2077,5 @@ summary .vt-cs-dot { margin-left: 0; }
 :root[data-ui="hw"] .dcl-list { background: var(--lcd-bg); border-color: #0c0c0e; }
 :root[data-ui="hw"] .dcl-row { color: var(--ink); border-bottom-color: rgba(255,255,255,.05); }
 :root[data-ui="hw"] .dcl-mark, :root[data-ui="hw"] .dcl-mark.live { color: var(--lcd-fg); }
+:root[data-ui="hw"] .dcl-list .dcl-vid .ico-no-sound { background: var(--lcd-bg); color: var(--lcd-fg); }
 .sp-row .sp-add { flex: none; font-weight: 700; }

@@ -45,6 +45,8 @@ export function prepareTrack(row, deps) {
       const info = await probe(p.file).catch(() => ({ duration: null, audio: true, video: false }));
       p.info = info; p.times.read = now() - p.t0;
       if (!alive()) return p;
+      // a video without sound plays in silence: nothing to decode or analyse
+      if (info.video && !info.audio && info.duration > 0) { p.videoOnly = true; p.state = 'ready'; return p; }
       if (info.duration && info.duration > MAX_SECONDS + 1) { p.state = 'failed'; p.error = 'long'; return p; }
       if (info.video && !info.audio) { p.state = 'failed'; p.error = 'nosound'; return p; }
       const ctx = deps.ctx();

@@ -80,6 +80,42 @@ Video files that Decode accepts SHALL be listed with a small video icon next to 
 - **WHEN** a folder holds `clip.mp4`
 - **THEN** its row shows the video icon, and a click opens its sound in Decode
 
+### Requirement: Videos without sound
+
+A video without an audio track is not a broken file: it SHALL be shown as a "video only" row in the normal style, with the video icon and a small "no sound" mark ("Video without sound: nothing for Decode to analyse"). It SHALL stay selectable, SHALL be allowed in mixtapes, and SHALL open and play like any track, as the playback requirement "A video without sound" says.
+
+#### Scenario: In a mixtape
+
+- **WHEN** the user selects a video without sound and adds it to a mixtape
+- **THEN** it is added like any other row
+
+### Requirement: Finding videos without sound
+
+The app SHALL find a video without sound while it reads the tags in idle time, or when it opens the file, and SHALL remember it in the folder's index with generic fields (`video: true`, `audio: false`), so a later feature can list such videos.
+
+#### Scenario: Found while reading tags
+
+- **WHEN** the tags of the folder's files have been read
+- **THEN** the MP4 without sound shows the "no sound" mark before anyone clicks it
+
+### Requirement: A row that fails to open
+
+A click on a file that fails to open SHALL show a short note in the panel naming the file and the reason. The panel SHALL stay open and the open track SHALL NOT stop or change.
+
+#### Scenario: An unreadable file
+
+- **WHEN** the user clicks the row of a file the browser cannot decode while another track plays
+- **THEN** the panel names the file and says why it cannot open, the panel stays open and the other track keeps playing
+
+### Requirement: A kind icon on every row
+
+Every row of the track list and of a mixtape SHALL show a small drawn icon of its kind: a music note for an audio file, a video icon for a video file. A video without sound SHALL also show the "no sound" mark. The icons SHALL take their colour from the theme's tokens.
+
+#### Scenario: Icons
+
+- **WHEN** the list holds an MP3, an MP4 with sound and an MP4 without sound
+- **THEN** their rows show a music note, a video icon, and a video icon with the "no sound" mark
+
 ### Requirement: The rows of the list
 
 The list SHALL show one compact row per track: its name, its folder and, when an analysis of the track is stored, a mark: ◆ Full when a full analysis is stored, ◇ Live when only a Live analysis is stored. The row SHALL NOT show the track's length; the length SHALL show when the track is open. The track that is open SHALL be highlighted.

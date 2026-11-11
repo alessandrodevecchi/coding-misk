@@ -53,6 +53,20 @@ Rows marked "not found" or waiting for access SHALL be skipped. At the end of th
 - **WHEN** the next row of the mixtape is marked "not found"
 - **THEN** it is skipped and the row after it plays
 
+### Requirement: One rule for the rows that cannot play
+
+Autoplay, Previous, Next and a mixtape's Play SHALL use the same rule: a row "not found" or waiting for access SHALL be skipped without trying to open it, and a row that fails when it is opened SHALL be skipped too (a video without sound is not skipped: it plays in silence); the first playable row after it SHALL open, with a short note naming the rows skipped. When no playable row is left, the tab SHALL stop with a note, and SHALL NOT try the same rows again.
+
+#### Scenario: A mixtape that starts with an unreadable file
+
+- **WHEN** the first row of a mixtape is a file the browser cannot decode and the user presses Play
+- **THEN** that row is skipped with a note naming it and the next playable row plays
+
+#### Scenario: Nothing playable
+
+- **WHEN** every row of a mixtape with repeat on is unreadable or "not found" and the user presses Play
+- **THEN** a note says that no track of the mixtape can play, nothing plays, and the tab does not loop
+
 ### Requirement: The next track is prepared ahead
 
 With Autoplay on, the tab SHALL prepare the next track about 30 seconds before the playing track ends (at once when less than that remains): it SHALL read the file, decode its sound, look up its stored analysis and start its Live analysis of the first bars. Preparing SHALL NOT cause a main-thread task over 100 ms or an audible glitch in the playing track.

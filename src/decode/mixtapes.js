@@ -30,16 +30,18 @@ export const setRepeat = (m, on, now = Date.now()) => touched({ ...m, repeat: !!
 export const relinkSingle = (m, rowId, single, now = Date.now()) => touched({ ...m, rows: m.rows.map(r => (r.id === rowId ? { ...r, ref: { singleId: single.id, fileName: single.name, size: single.size || 0 } } : r)) }, now);
 
 // a row's status: 'ok' | 'waiting' (folder or file not allowed yet in this session) | 'missing' (folder unknown, path not
-// in its index, file gone). folders: Map id → { granted }; files: Set of `folderId/path`; singles: Map id → { granted };
-// gone: Set of row refs that failed to open (`folderId/path` or `s:singleId`)
-export function rowStatus(row, { folders = new Map(), files = new Set(), singles = new Map(), gone = new Set() } = {}) {
+// in its index, file gone) | 'nosound' (a file known to hold no sound). folders: Map id → { granted }; files: Set of
+// `folderId/path`; singles: Map id → { granted }; gone: Set of row refs that failed to open (`folderId/path` or
+// `s:singleId`); silent: Set of the same refs known to hold no sound
+export function rowStatus(row, { folders = new Map(), files = new Set(), singles = new Map(), gone = new Set(), silent = new Set() } = {}) {
   const r = row && row.ref;
   if (!r) return 'missing';
-  if (r.singleId) { const s = singles.get(r.singleId); return !s || gone.has(`s:${r.singleId}`) ? 'missing' : s.granted ? 'ok' : 'waiting'; }
+  if (r.singleId) { const s = singles.get(r.singleId), k = `s:${r.singleId}`; return !s || gone.has(k) ? 'missing' : silent.has(k) ? 'nosound' : s.granted ? 'ok' : 'waiting'; }
   const f = folders.get(r.folderId), k = `${r.folderId}/${r.path}`;
   if (!f) return 'missing';
-  if (!f.granted) return 'waiting';
-  return files.has(k) && !gone.has(k) ? 'ok' : 'missing';
+  if (!(files.has(k) && !gone.has(k))) return f.granted ? 'missing' : 'waiting';
+  if (silent.has(k)) return 'nosound';
+  return f.granted ? 'ok' : 'waiting';
 }
 // rows whose folder is unknown here and whose folder name matches a folder just added point to it. → changed mixtapes
 export function relinkFolder(mixtapes, folder, knownIds, now = Date.now()) {
