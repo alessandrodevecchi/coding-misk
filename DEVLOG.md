@@ -3037,3 +3037,11 @@ Ramo `fix/91-essentia-tempo-check` da `feat/44-themed-checks` (10d3322). Nella c
 - **Il controllo non nasconde una regressione:** se Essentia.js non calcola il tempo o la sua confidenza scende sotto 2,0, il caso fallisce come prima; nuovo controllo puro su `pickTempo` (2,49 d'accordo, metà d'accordo, 2,49 in disaccordo, 1,9 d'accordo, 2,6 in disaccordo).
 - **Prove:** `check:decode` (153), `check:decode-library`, `check:guide`, `check:knowledge`, `npm run build`; la catena intera prima della correzione (passata qui). Non rifatto il controllo nel browser di Completa.
 
+## 2026-11-11: Decodifica, filtro per tipo nella libreria (fix/91-library-kind-filter, #91)
+
+Ramo `fix/91-library-kind-filter` da `feat/44-themed-checks` (2b7c415). Richiesta del proprietario; delta della spec (`decode/library` «Kind filter», scenario in `decode/autoplay`) e nota nel design in un commit a sé.
+
+- **Cosa:** accanto all'ordine, «Tutti / Audio / Video» con il numero di brani di ognuno dentro il chip e la ricerca; un video senza suono conta come Video, un brano recente secondo il segno video del suo record. Ricordato con chip e ordine in `coding-misk-decode-list` (campo `media`, perché nel contesto `kind` è già «list» o «mixtape»).
+- **Contesto:** fa parte del contesto come il chip: riproduzione automatica, Precedente e Successivo restano nel tipo scelto; un tipo scelto mentre suona un brano dell'elenco diventa il contesto (la stessa regola dell'ordine). I conteggi vengono dalle righe già in memoria, un passaggio per chip e ricerca, nessuna lettura di file.
+- **Prove:** `check:decode-library` (74, quattro nuovi), gruppo `silent` di `check-decode-library.cjs` (18, cinque nuovi: Video con tre video e i conteggi 5/2/3, Audio, ricordato dopo il ricaricamento, Successivo e Precedente tra i video, il tipo cambiato mentre è aperto un brano), più le prove elencate nel rapporto.
+

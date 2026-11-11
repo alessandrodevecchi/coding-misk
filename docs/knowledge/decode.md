@@ -32,6 +32,7 @@ The library around it (decode-library) is the "Another file" panel: "Choose a fi
 | Autoplay | off (default), on; remembered in `coding-misk-decode-autoplay` | the panel, browsers with folders |
 | Folder chip | All or one folder; remembered with the order in `coding-misk-decode-list` | the panel |
 | Order | Name, Recent | the panel |
+| Kind | All, Audio, Video (a video without sound is a video), with counts from the rows in memory; remembered with the chip and the order (`media` in `coding-misk-decode-list`), part of the context of Autoplay, Previous and Next | the panel |
 | Search | name, artist or file name, case and accents ignored; not remembered | the panel |
 | Mixtape repeat | off (default), on; kept with the mixtape | an open mixtape |
 | Include all Decode analyses | off by default and on every visit of the settings page | Settings, backup card |

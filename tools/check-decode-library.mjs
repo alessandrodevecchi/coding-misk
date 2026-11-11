@@ -8,7 +8,7 @@
 // record in batches, the import through the index keeping a newer record and its handle), the preparation's timing and
 // memory budget and the end-of-track rule. Usage: npm run check:decode-library
 import { scanFolder, accepted, isVideo, FOLDER_CAP, fileAt, permission } from '../src/decode/folders.js';
-import { buildRows, filterRows, sortRows, listOf, nextOf, prevOf, norm, listPrefs, windowOf, listContext, usedSnapshot } from '../src/decode/library.js';
+import { buildRows, filterRows, sortRows, listOf, nextOf, prevOf, norm, listPrefs, windowOf, listContext, usedSnapshot, mediaCounts } from '../src/decode/library.js';
 import { createMixtape, addRows, moveRow, removeRow, renameMixtape, setRepeat, rowStatus, relinkFolder, exportMixtapes, mergeMixtapes, MIXTAPES_KEY } from '../src/decode/mixtapes.js';
 import { createDecodeStore, overCap, entryOf, markOf, DECODE_CAP, importWins } from '../src/decode/store.js';
 import { prepareAt, fitsBudget, decodedBytes, endStep, BUDGET_BYTES } from '../src/decode/autoplay.js';
@@ -147,6 +147,20 @@ const rows = buildRows({ folders, files, entries });
   clk.start(10, 5); fake.currentTime = 12;
   const at = clk.now(); fake.currentTime = 100;
   check(Math.abs(at - 7) < 1e-9 && clk.now() === 30 && clk.playing && (clk.stop(), !clk.playing && clk.now() === null), 'the silent clock of a video without sound: position, the end, stop');
+}
+
+// ---------- the kind filter (owner, 11 November) ----------
+{
+  const L = [{ id: 'K', name: 'Mixed', granted: true }];
+  const F = [{ folderId: 'K', path: 'a.mp3', name: 'a.mp3', size: 1, modified: 1 }, { folderId: 'K', path: 'b.mp4', name: 'b.mp4', size: 2, modified: 2, video: true }, { folderId: 'K', path: 'c.wav', name: 'c.wav', size: 3, modified: 3 }, { folderId: 'K', path: 'd.mp4', name: 'd.mp4', size: 4, modified: 4, video: true, audio: false }];
+  const ent = [entryOf({ fp: 'rv', title: 'Recent clip', fileName: 'r.mp4', used: 5, video: true, modelA: { version: V } })];
+  const R = buildRows({ folders: L, files: F, entries: ent });
+  check(listPrefs({}).media === 'all' && listPrefs({ media: 'video' }).media === 'video' && listPrefs({ media: 'x' }).media === 'all', 'the kind filter is remembered with the chip and the order, All by default');
+  check(filterRows(R, { media: 'video' }).map(r => r.name).sort().join() === 'Recent clip,b,d' && filterRows(R, { media: 'audio', chip: 'K' }).map(r => r.name).join() === 'a,c', 'Video keeps the videos (one without sound and a recent one included), Audio the audio files, with the chip');
+  const n = mediaCounts(R, { chip: 'K' });
+  check(n.all === 4 && n.audio === 2 && n.video === 2 && mediaCounts(R, { search: 'b' }).video === 1, 'the counts per kind within the chip and the search', JSON.stringify(n));
+  const ctx = listContext({ chip: 'K', order: 'name', media: 'video' }, '', 'K/b.mp4', R);
+  check(ctx.media === 'video' && nextOf(ctx, R).row.name === 'd' && prevOf(ctx, R) === null, 'the kind is part of the context: Next goes to the next video, past the audio file between them');
 }
 
 // ---------- 4.1 mixtapes ----------

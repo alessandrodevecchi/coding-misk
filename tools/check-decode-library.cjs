@@ -477,7 +477,31 @@ const INIT = () => {
     await page.evaluate(id => globalThis.codingMiskDecode.panel.rescan(id), await folderId('Screens'));
     const found = await waitFor(async () => { const k = await rowKey('rec 3'); return k && (await page.$(`#dcl [data-dcl-row="${k}"] .ico-no-sound`)); }, 20000, 400);
     check(!!found, 'the idle tag read finds a video without sound before any click');
-    await shot('lib-silent');
+    // the kind filter (owner, 11 November): Video keeps the videos, one without sound included, with counts; remembered;
+    // part of the context of Next like the chip
+    await page.click('#dc-stop').catch(() => {});
+    if (!(await page.$('#dcl.over'))) { await page.click('#dc-another'); await sleep(300); }
+    await page.click('#dcl [data-dcl-view="tracks"]').catch(() => {}); await sleep(200);
+    await chip(await folderId('Screens')); await page.click('#dcl [data-dcl-order="name"]'); await sleep(200);
+    const counts = await page.$$eval('#dcl-media [data-dcl-media]', xs => Object.fromEntries(xs.map(x => [x.dataset.dclMedia, +x.querySelector('small').textContent])));
+    await page.click('#dcl [data-dcl-media="video"]'); await sleep(300);
+    const vids = (await rowsNow()).map(r => r.name);
+    check(vids.join() === 'rec 1,rec 2,rec 3' && counts.all === 5 && counts.video === 3 && counts.audio === 2, 'kind filter Video: the three videos (without sound too), counts All 5, Audio 2, Video 3', `${vids.join()} · ${JSON.stringify(counts)}`);
+    await page.click('#dcl [data-dcl-media="audio"]'); await sleep(300);
+    check((await rowsNow()).map(r => r.name).join() === 'song,zz broken', 'kind filter Audio: the audio files', (await rowsNow()).map(r => r.name).join());
+    await page.click('#dcl [data-dcl-media="video"]'); await sleep(200);
+    await reload();
+    if (!(await page.$('#dcl'))) { await page.click('#dc-another'); await sleep(300); }
+    const kept = await page.getAttribute('#dcl [data-dcl-media="video"]', 'aria-pressed');
+    check(kept === 'true' && (await pst()).prefs.media === 'video', 'the kind filter is remembered after a reload');
+    await clickRow('rec 2'); await waitFor(async () => (await dec()).track && (await dec()).track.name === 'rec 2.mp4', 8000);
+    let ks = await dec();
+    check(ks.nav && ks.nav.media === 'video' && ks.next === 'rec 3' && ks.prev === 'rec 1', 'the kind is part of the context: Next and Previous stay among the videos', `${ks.prev} · ${ks.next}`);
+    if (!(await page.$('#dcl.over'))) { await page.click('#dc-another'); await sleep(300); }
+    await page.click('#dcl [data-dcl-media="all"]'); await sleep(400);
+    ks = await dec();
+    check(ks.nav.media === 'all' && ks.next === 'rec 3', 'a kind picked while the track is open becomes the context\'s kind', `${ks.nav.media} · ${ks.next}`);
+    await shot('lib-kind');
     await page.keyboard.press('Escape');
   }
 

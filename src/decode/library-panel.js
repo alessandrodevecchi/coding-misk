@@ -6,7 +6,7 @@
 // stored analysis. The tab opens tracks; the panel finds their files.
 import { foldersSupported, pickFolder, permission, scanFolder, fileAt } from './folders.js';
 import { createLibraryStore } from './library-store.js';
-import { buildRows, filterRows, sortRows, listPrefs, windowOf, fileKey, usedSnapshot, LIST_KEY, AUTOPLAY_KEY } from './library.js';
+import { buildRows, filterRows, sortRows, listPrefs, windowOf, fileKey, usedSnapshot, mediaCounts, MEDIA, LIST_KEY, AUTOPLAY_KEY } from './library.js';
 import { createMixtape, addRows, moveRow, removeRow, renameMixtape, setRepeat, relinkSingle, rowStatus, relinkFolder, exportMixtapes, mergeMixtapes } from './mixtapes.js';
 import { AUDIO_EXT, VIDEO_EXT } from './folders.js';
 import { AUDIO_FILE, VIDEO_FILE, NO_SOUND } from '../icons.js';
@@ -82,17 +82,17 @@ export function createLibraryPanel({ app, store, hooks }) {
   });
   const getRows = () => { if (rowsDirty) { rows = buildRows({ folders, files: files.map(f => (gone.has(fileKey(f.folderId, f.path)) ? { ...f, missing: true } : f)), entries }); rowsDirty = false; } return rows; };
   // the rows sorted once per order and the filtered list once per chip and search: scrolling and stepping read them
-  const sorted = { rows: null, order: null, list: [] }, filtered = { base: null, chip: null, search: null, list: [] };
-  const frozen = { rows: null, used: null, chip: null, search: null, list: [] };
-  function listFor({ chip = 'all', search: q = '', order = 'name', used = null } = {}) {
+  const sorted = { rows: null, order: null, list: [] }, filtered = { base: null, chip: null, search: null, media: null, list: [] };
+  const frozen = { rows: null, used: null, chip: null, search: null, media: null, list: [] };
+  function listFor({ chip = 'all', search: q = '', order = 'name', used = null, media = 'all' } = {}) {
     const r = getRows();
     // a context's frozen order by recent: sorted by its own last uses, once per context and rows
     if (order === 'recent' && used) {
-      if (frozen.rows !== r || frozen.used !== used || frozen.chip !== chip || frozen.search !== q) Object.assign(frozen, { rows: r, used, chip, search: q, list: sortRows(filterRows(r, { chip, search: q }), 'recent', used) });
+      if (frozen.rows !== r || frozen.used !== used || frozen.chip !== chip || frozen.search !== q || frozen.media !== media) Object.assign(frozen, { rows: r, used, chip, search: q, media, list: sortRows(filterRows(r, { chip, search: q, media }), 'recent', used) });
       return frozen.list;
     }
     if (sorted.rows !== r || sorted.order !== order) { sorted.rows = r; sorted.order = order; sorted.list = sortRows(r, order); }
-    if (filtered.base !== sorted.list || filtered.chip !== chip || filtered.search !== q) { filtered.base = sorted.list; filtered.chip = chip; filtered.search = q; filtered.list = filterRows(sorted.list, { chip, search: q }); }
+    if (filtered.base !== sorted.list || filtered.chip !== chip || filtered.search !== q || filtered.media !== media) { filtered.base = sorted.list; filtered.chip = chip; filtered.search = q; filtered.media = media; filtered.list = filterRows(sorted.list, { chip, search: q, media }); }
     return filtered.list;
   }
   const fileByKey = () => new Map(files.map(f => [fileKey(f.folderId, f.path), f]));
@@ -332,6 +332,7 @@ export function createLibraryPanel({ app, store, hooks }) {
     const box = el.querySelector('#dcl-list');
     if (!box || view !== 'tracks') return;
     shown = listFor({ ...prefs, search });
+    const mb = el.querySelector('#dcl-media'); if (mb) { const h = mediaChips(); if (mb.dataset.h !== h) { mb.innerHTML = h; mb.dataset.h = h; } }
     const h = rowH(), sp = box.querySelector('.dcl-spacer');
     const { first, last } = windowOf(box.scrollTop, box.clientHeight || 400, h, shown.length);
     const key = `${first}|${last}|${shown.length}|${shown.slice(first, last).map(r => `${r.key}${r.mark}${r.waiting}${r.missing}${r.silent}${r.name}`).join(',')}|${selecting}|${selected.size}|${JSON.stringify(playingNow())}|${h}`;
@@ -344,10 +345,18 @@ export function createLibraryPanel({ app, store, hooks }) {
     if (em) { em.hidden = shown.length > 0; em.textContent = search ? t('dclNoMatch') : t(supported ? 'dclEmpty' : 'dcNoRecent'); }
     const sel = el.querySelector('#dcl-selbar-n'); if (sel) sel.textContent = t('dclSelected', { n: selected.size });
   }
+  // the kind filter's chips with their counts within the chip and the search (decode-library: Kind filter)
+  const counted = { rows: null, chip: null, search: null, n: null };
+  function mediaChips() {
+    const r = getRows();
+    if (counted.rows !== r || counted.chip !== prefs.chip || counted.search !== search) Object.assign(counted, { rows: r, chip: prefs.chip, search, n: mediaCounts(r, { chip: prefs.chip, search }) });
+    return MEDIA.map(m => `<button class="chip" role="radio" data-dcl-media="${m}" aria-pressed="${prefs.media === m}" aria-checked="${prefs.media === m}">${esc(t(m === 'all' ? 'dclAll' : m === 'audio' ? 'dclAudioKind' : 'dclVideoKind'))} <small>${counted.n[m]}</small></button>`).join('');
+  }
   function tracksHtml() {
+    const media = `<span class="chips dc-seg dcl-media" id="dcl-media" role="radiogroup" aria-label="${esc(t('dclKind'))}">${mediaChips()}</span>`;
     const order = `<span class="chips dc-seg" role="radiogroup" aria-label="${esc(t('dclOrder'))}">${['name', 'recent'].map(o => `<button class="chip" role="radio" data-dcl-order="${o}" aria-pressed="${prefs.order === o}" aria-checked="${prefs.order === o}">${esc(t(o === 'name' ? 'dclByName' : 'dclByRecent'))}</button>`).join('')}</span>`;
     const selBar = selecting ? `<div class="dcl-selbar"><span id="dcl-selbar-n">${esc(t('dclSelected', { n: selected.size }))}</span><span class="dcl-menu-wrap"><button class="btn" id="dcl-addto" aria-expanded="${menuOpen}"${selected.size ? '' : ' disabled'}>${LIB_ICON.tape} ${esc(t('dclAddTo'))} ▾</button>${menuOpen ? `<div class="dcl-menu" role="menu">${mixtapes.map(m => `<button class="dcl-mi" role="menuitem" data-dcl-addto="${esc(m.id)}">${esc(m.name)}</button>`).join('')}<button class="dcl-mi" role="menuitem" data-dcl-addto="">${LIB_ICON.plus} ${esc(t('dclNewMix'))}</button></div>` : ''}</span><button class="btn" id="dcl-selcancel">${esc(t('trashCancel'))}</button></div>` : '';
-    return `<div class="dcl-tools"><input type="search" id="dcl-search" placeholder="${esc(t('dclSearch'))}" aria-label="${esc(t('dclSearch'))}" value="${esc(search)}" autocomplete="off" data-no-knob>${order}${supported ? `<button class="chip" id="dcl-select" aria-pressed="${selecting}">${esc(t('dclSelect'))}</button>` : ''}</div>
+    return `<div class="dcl-tools"><input type="search" id="dcl-search" placeholder="${esc(t('dclSearch'))}" aria-label="${esc(t('dclSearch'))}" value="${esc(search)}" autocomplete="off" data-no-knob>${order}${media}${supported ? `<button class="chip" id="dcl-select" aria-pressed="${selecting}">${esc(t('dclSelect'))}</button>` : ''}</div>
       ${selBar}${chipsHtml()}
       <div class="dcl-list" id="dcl-list" role="listbox" aria-label="${esc(t('dclTracks'))}" tabindex="0"><div class="dcl-spacer"></div></div><p class="note dcl-empty" id="dcl-empty" hidden></p>`;
   }
@@ -405,6 +414,7 @@ export function createLibraryPanel({ app, store, hooks }) {
     if (b.id === 'dcl-add') { addFolder(); return; }
     if (b.id === 'dcl-autoplay') { autoplay = !autoplay; ls.set(AUTOPLAY_KEY, autoplay); b.setAttribute('aria-pressed', autoplay); hooks.changed(); return; }
     if (b.dataset.dclView) { view = b.dataset.dclView; selecting = false; menuOpen = false; render(); return; }
+    if (b.dataset.dclMedia) { setPrefs({ media: b.dataset.dclMedia }); const bx = el.querySelector('#dcl-list'); if (bx) bx.scrollTop = 0; render(); hooks.changed('list'); readTagsSoon(); return; }
     if (b.dataset.dclOrder) { setPrefs({ order: b.dataset.dclOrder }); render(); hooks.changed('list'); readTagsSoon(); return; }
     if (b.dataset.dclChip) { setPrefs({ chip: b.dataset.dclChip }); const bx = el.querySelector('#dcl-list'); if (bx) bx.scrollTop = 0; render(); hooks.changed('list'); readTagsSoon(); return; }
     if (b.dataset.dclAllow) { const f = folderOf(b.dataset.dclAllow); if (f) allow(f); return; }
@@ -455,7 +465,7 @@ export function createLibraryPanel({ app, store, hooks }) {
 
   // a row of the list: the context is the list as it is now (D8)
   function openFromList(r) {
-    const ctx = { kind: 'list', chip: prefs.chip, search, order: prefs.order, key: r.key, pos: Math.max(0, shown.findIndex(x => x.key === r.key)), ...(prefs.order === 'recent' ? { used: usedSnapshot(getRows()) } : {}) };
+    const ctx = { kind: 'list', chip: prefs.chip, media: prefs.media, search, order: prefs.order, key: r.key, pos: Math.max(0, shown.findIndex(x => x.key === r.key)), ...(prefs.order === 'recent' ? { used: usedSnapshot(getRows()) } : {}) };
     if (r.kind === 'recent') { hooks.openRecent(r.fp, ctx); return; }
     hooks.openRow(r, ctx, true);
   }

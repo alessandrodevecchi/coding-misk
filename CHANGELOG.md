@@ -7,6 +7,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Decode: All, Audio and Video filters in the library list, with the count of each, remembered and followed by Autoplay, Previous and Next.
 - Decode: a music note or video icon on every row of the library list and of mixtapes, and a "no sound" mark on videos without sound.
 - Decode: "Another file" opens a panel with "Choose a file…", the recent tracks and the files of the user's folders in one list; the empty tab shows the same list.
 - Decode: Add folder (Chrome, Edge), with subfolders, up to 2000 files per folder, the browser's permission asked once per visit, and a video icon for video files.

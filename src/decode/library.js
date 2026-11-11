@@ -9,6 +9,9 @@ import { markOf } from './store.js';
 export const LIST_KEY = 'coding-misk-decode-list';
 export const AUTOPLAY_KEY = 'coding-misk-decode-autoplay';
 export const ORDERS = ['name', 'recent'];
+// the kind filter (decode-library, owner 11 November): every track, audio files, video files (a video without sound is a
+// video). Called `media` in the prefs and the context, since a context's `kind` is already 'list' or 'mixtape'
+export const MEDIA = ['all', 'audio', 'video'];
 // lower case without accents, for the search
 export const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -16,7 +19,7 @@ export const fileKey = (folderId, path) => `${folderId}/${path}`;
 // the remembered chip and order (the search text is not remembered)
 export function listPrefs(v) {
   const o = v && typeof v === 'object' ? v : {};
-  return { chip: typeof o.chip === 'string' && o.chip ? o.chip : 'all', order: ORDERS.includes(o.order) ? o.order : 'name' };
+  return { chip: typeof o.chip === 'string' && o.chip ? o.chip : 'all', order: ORDERS.includes(o.order) ? o.order : 'name', media: MEDIA.includes(o.media) ? o.media : 'all' };
 }
 
 // the rows (D4, D5). folders: [{ id, name, granted, capped }], files: the folders' index, entries: the decode store's
@@ -50,9 +53,16 @@ export function buildRows({ folders = [], files = [], entries = [] } = {}) {
   return rows;
 }
 // the rows of a chip and a search: 'all' holds every row, recent ones included
-export function filterRows(rows, { chip = 'all', search = '' } = {}) {
+export const mediaOf = r => (r.video ? 'video' : 'audio');
+export function filterRows(rows, { chip = 'all', search = '', media = 'all' } = {}) {
   const q = norm(search).trim();
-  return rows.filter(r => (chip === 'all' || r.folderId === chip) && (!q || r.norm.includes(q)));
+  return rows.filter(r => (chip === 'all' || r.folderId === chip) && (media === 'all' || mediaOf(r) === media) && (!q || r.norm.includes(q)));
+}
+// the counts on the kind filter: the rows of a chip and a search, by kind (the rows in memory, no file read)
+export function mediaCounts(rows, { chip = 'all', search = '' } = {}) {
+  const out = { all: 0, audio: 0, video: 0 };
+  for (const r of filterRows(rows, { chip, search })) { out.all++; out[mediaOf(r)]++; }
+  return out;
 }
 // by name; by recent: the tracks opened last first, then the others by name
 // used: the last uses frozen in a context ({ key: time }, decode-library D8), in place of the rows' own
@@ -61,7 +71,7 @@ export function sortRows(rows, order = 'name', used = null) {
   const u = used ? r => used[r.key] || 0 : r => r.used || 0;
   return [...rows].sort(order === 'recent' ? (a, b) => (u(b) - u(a)) || byN(a, b) : byN);
 }
-export const listOf = (rows, { chip, search, order, used } = {}) => sortRows(filterRows(rows, { chip, search }), order, used);
+export const listOf = (rows, { chip, search, order, used, media } = {}) => sortRows(filterRows(rows, { chip, search, media }), order, used);
 // the last uses of the rows now, kept by a context with the order by recent (decode-library D8, owner 2026-11-11): the
 // tracks that play meanwhile do not move to the top of its list
 export function usedSnapshot(rows) {
@@ -76,7 +86,7 @@ export const playable = r => !!r && !r.missing && !r.waiting;
 // the context of the open track (D8): { kind: 'list', chip, search, order, key, pos } | { kind: 'mixtape', id, rowId,
 // pos } | null (a picked or dropped file)
 export function listContext(prefs, search, key, rows) {
-  const ctx = { kind: 'list', chip: prefs.chip, search: search || '', order: prefs.order, key, ...(prefs.order === 'recent' ? { used: usedSnapshot(rows) } : {}) };
+  const ctx = { kind: 'list', chip: prefs.chip, media: prefs.media || 'all', search: search || '', order: prefs.order, key, ...(prefs.order === 'recent' ? { used: usedSnapshot(rows) } : {}) };
   ctx.pos = Math.max(0, listOf(rows, ctx).findIndex(r => r.key === key));
   return ctx;
 }

@@ -153,7 +153,7 @@ export function createDecodeTab({ root, app }) {
       file, name: file.name, fp: null, info, buffer: null, duration: info.duration, handle: handle || null, where: where || null, created: null,
       title: info.title, artist: info.artist, attribution: true, settings: DEFAULT_SETTINGS(), tempo: null, video: true, trim: 1, videoOnly: true,
     };
-    if (!quick && !(ctx && nav && ctx.kind === nav.kind && (ctx.kind === 'mixtape' ? ctx.id === nav.id : ctx.chip === nav.chip && ctx.order === nav.order && ctx.search === nav.search))) skipped.clear();
+    if (!quick && !(ctx && nav && ctx.kind === nav.kind && (ctx.kind === 'mixtape' ? ctx.id === nav.id : ctx.chip === nav.chip && ctx.media === nav.media && ctx.order === nav.order && ctx.search === nav.search))) skipped.clear();
     nav = ctx || null; navVer++; prepNone = false; vcIdx = -1;
     status = { kind: 'note', text: t('dclVideoOnlyNote') };
     render();
@@ -208,7 +208,7 @@ export function createDecodeTab({ root, app }) {
       trim: p.trim || loudnessTrim(buffer.getChannelData(0), buffer.sampleRate),
     };
     // the rows that failed to open stay skipped while Autoplay or Previous and Next go through the same list
-    if (!quick && !(ctx && nav && ctx.kind === nav.kind && (ctx.kind === 'mixtape' ? ctx.id === nav.id : ctx.chip === nav.chip && ctx.order === nav.order && ctx.search === nav.search))) skipped.clear();
+    if (!quick && !(ctx && nav && ctx.kind === nav.kind && (ctx.kind === 'mixtape' ? ctx.id === nav.id : ctx.chip === nav.chip && ctx.media === nav.media && ctx.order === nav.order && ctx.search === nav.search))) skipped.clear();
     nav = ctx || null; navVer++; prepNone = false;
     if (match && freshModel(rec.modelA)) model = rec.modelA;
     // a stored analysis of an older analyser is made again, and the tab says so (decode-refine: Stored analysis)
@@ -327,7 +327,7 @@ export function createDecodeTab({ root, app }) {
     if ((kind === 'list' || kind === 'opened') && nav && nav.kind === 'list') {
       const p = kind === 'list' ? panel.prefs() : nav;
       const { used, ...rest } = nav;
-      nav = { ...rest, chip: p.chip, order: p.order, ...(p.order === 'recent' ? { used: panel.usedSnapshot() } : {}) };
+      nav = { ...rest, chip: p.chip, media: p.media || 'all', order: p.order, ...(p.order === 'recent' ? { used: panel.usedSnapshot() } : {}) };
     }
     navVer++; prepNone = false;
     if (!autoplayOn()) { dropPrep(); return; }
