@@ -76,6 +76,7 @@ import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createStageVideo } from './visuals/stage-video.js';
 import { createStageFolders } from './visuals/stage-video-folders.js';
+import { OSC_KEY } from './visuals/oscilloscope-rules.js';
 import { SV_KEY, sizeOf as svSizeOf, fallbackLookOf, folderSignature, seededPick, trackTime, loopTime, decodeSize } from './visuals/stage-video-rules.js';
 import { createVideoFrames } from './video/stage-video-frames.js';
 import { passSizes } from './visuals/render-styles.js';
@@ -6176,6 +6177,8 @@ const visuals = startVisuals({
     // the Video look (stage-video D2, D7): the live picture, the size mode, Fit's bands, the look without Video
     video: () => { const f = stageVideo.frame(); if (f) lookBeforeVideo = null; return f; },
     videoSize: () => svSizeOf(store.get(SV_KEY, null)),
+    // the Oscilloscope look's stored settings (oscilloscope-visual D7), read each frame so a change shows at once
+    oscilloscope: () => store.get(OSC_KEY, null),
     videoBands: () => { if (svBands.ui !== ui) svBands = { ui, c: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#000' }; return svBands.c; },
     fallbackLook: stageFallback,
     word: (k, vars) => { const key = `term:${k}`, v = t(key, vars); return v === key ? null : v; },
