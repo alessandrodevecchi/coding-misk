@@ -68,10 +68,10 @@ A first round is on `feat/91-decode-part-2` (commit 86fcef0), not merged (owner,
 
 - [ ] 10.1 Measure the app's drum machines once from their samples (kick decay and centroid, hat brightness) into a small table in `src/decode/`; the nearest machine wins, with `crunch` or `distort` when the original's kick is distorted.
 - [ ] 10.2 Bass wave, cutoff and moving resonance; chord and Lead sound by brightness and decay; part levels to match band shares.
-- [ ] 10.3 Verify with the similarity check: the 909 with distortion on `luci-rosse` and the radio seed, brightness ratio and band shares inside the targets on the app songs and test songs; "Simple kit" unchanged.
+- [ ] 10.3 Verify with the similarity check: the 909 with distortion on `luci-rosse`, the 909 without distortion on the radio seed (its source drives no drums: `drive 0`, so "with distortion" holds for `luci-rosse` only), brightness ratio and band shares inside the targets on the app songs and test songs; "Simple kit" unchanged.
 
 ### 11. Guide, knowledge and docs for part 2 (about 3 h)
 
 - [ ] 11.1 Guide card (the Lead), `docs/knowledge/` (the similarity check and its targets), `AGENTS.md` tooling line for `decode-similarity.cjs`, `DEVLOG.md` with the scores before and after; retune `EDIT_RULE` against the new parts.
-- [ ] 11.3 Similarity check noise: the arc score changes between exports of flat songs (it fails on the base commit too); make it stable before the snapshot is updated.
+- [x] 11.3 Similarity check noise: the arc score changes between exports of flat songs (it fails on the base commit too); make it stable before the snapshot is updated. Done (12 November): two causes, the fast export of a song with a supersaw was not repeatable (the render page now seeds each worklet voice by its start and pitch) and the arc of a flat song was a correlation of noise (each curve's variance now has a 1 dB floor); two runs from an empty cache match the snapshot.
 - [ ] 11.2 Essentia.js again: the A/B listening round of 6.4 repeated after groups 7 to 10 (same files, new random labels); keep, drop or limit it, recorded in `docs/knowledge/decisions.md`.

@@ -292,6 +292,22 @@ What changed against D5: the chroma that leaves out the bass's harmonics shows l
 
 Not met on the bench: MELODIA follows the arp and the pad, louder than the lead in the arp-and-lead song (notes 52 to 60 against a lead at 72 to 81), and YIN finds no single pitch in a polyphonic mix. A tonal-peak tracker (the highest salient peak that is no harmonic) reached 0.47 on the arp song but gives no voicing, so it is not kept. MELODIA reports a pitch about 60 ms late (`MELODY_LAG`). Its voicing replaces `top.up` only in bars where `top.up` hears a top line at all (0.18), because MELODIA also voices a pad or a bass. The Lead is written as `n(…).scale(…)` degrees; a sung melody's Lead has `hush` in the song (muted in Compose) and starts muted in Decode's mix.
 
+### Task 11.3: a stable similarity check (12 November)
+
+The arc score moved between two runs of the check on the same code (decode-test-124, 90 and 174 failed on the base commit; the radio seed's arc went from 0.48 to -0.03). Two causes:
+
+- **Exports were not repeatable.** Two fast exports of the same test song differed by -2 to -10 dB of residual energy (luci-rosse by -60 dB). The pad's supersaw draws its voices' phases with `Math.random` in the audio worklet; the render page seeded one sequence there, but the order in which voices draw from it depends on when pooled nodes and port messages reach the audio thread, so every voice after the first difference got other phases. Level B then wrote a different song from two exports of one original on 6 of 8 bench files (a section bound one bar off, other bass notes, the arp song's key). Fix in `src/render/page.js`: each worklet processor call seeds the sequence from its voice's `begin` and `frequency`, so a voice draws the same phases whatever the order. Two exports of decode-test-90 now differ by -62 dB (before: -2 dB), and level B writes the same song from both.
+- **A flat song has no arc.** The arc was the correlation of the loudness per bar; on a song whose bars differ by 0.16 dB (decode-test-174) it is the correlation of noise (0.26 between two exports of the original alone). The arc is now the correlation with each curve's variance floored at 1 dB² (`ARC_DB`, about the smallest step of loudness a listener hears): a flat song scores near 0 every run, a song with a real arc keeps its correlation. A dB distance was tried first and rejected: it gave the floor pairs (unrelated songs) 0.87, as much as the real pairs.
+
+| Arc (B) | Before (snapshot) | After (new measure) |
+| --- | --- | --- |
+| decode-test-124 / 90 / 174 / long | 0.56 / 0.99 / 0.10 / 0.68 | 0.41 / 0.91 / -0.01 / 0.60 |
+| decode-test-acid / arp | 0.38 / 0.15 | 0.08 / 0.07 |
+| luci-rosse / radio seed | 0.49 / 0.48 | 0.45 / 0.01 |
+| floor pairs | -0.02 / -0.16 | -0.03 / -0.02 |
+
+Proof: the snapshot was written from one run, then the check ran twice more, each time from an empty cache (every original and every level B song exported again): both runs pass, and the scores of the two runs are equal except on decode-test-acid (at most 0.005 apart). The snapshot also takes the drops groups 7 to 9 brought, for the reasons in their entries: the brightness of decode-test-acid (0.74 to 0.50) and luci-rosse (0.67 to 0.61), the right drums playing on the 808 until group 10 picks the kit; luci-rosse's high-band rhythm (0.41 to 0.35), measured with the old noisy exports. The 0.05 margin is unchanged.
+
 ## Risks / Trade-offs
 
 - [The edit rule makes level A slow to follow real changes] → Parts entering or stopping never wait; the waits are 2 and 4 bars; level B is the right level for a track the user wants close.

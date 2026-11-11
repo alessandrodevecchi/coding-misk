@@ -42,10 +42,23 @@ installHelpers({ register: strudelRegister, Pattern });
 
 // repeatable renders: superdough draws random numbers (the phases of the supersaw voices, noise, the reverb's impulse),
 // so the same song rendered twice would differ a little. Every render draws from the same seeded sequence, here and in
-// the audio worklets (their own global scope)
+// the audio worklets (their own global scope).
+// In the worklets one sequence is not enough (decode-refine 11.3): the order in which the supersaw voices draw their
+// phases depends on when the main thread's messages and pooled nodes reach the audio thread, so two renders of a song
+// with a supersaw differed by -2 to -10 dB. Each processor call starts the sequence again from its voice's start time
+// and pitch (the `begin` and `frequency` parameters), so a voice draws the same phases whatever the order.
 const SEED = 0x6d69736b;
 const seeded = seed => { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
-const WORKLET_SEED = `{ let a = ${SEED} >>> 0; Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }`;
+const WORKLET_SEED = `{ let a = ${SEED} >>> 0; Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const reg = globalThis.registerProcessor;
+  globalThis.registerProcessor = (name, C) => reg(name, class extends C {
+    process(i, o, p) {
+      const b = p && p.begin ? p.begin[0] : 0, f = p && p.frequency ? p.frequency[0] : 0;
+      a = (${SEED} ^ Math.imul(Math.round(b * 48000) | 0, 0x9e3779b1) ^ Math.imul(Math.round(f * 1000) | 0, 0x85ebca6b)) >>> 0;
+      return super.process(i, o, p);
+    }
+  });
+}`;
 
 // seconds to wait for one sound to load before skipping it
 const SOUND_WAIT = 8000;

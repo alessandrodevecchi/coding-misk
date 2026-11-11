@@ -3206,3 +3206,21 @@ Gruppi 7-10 di `decode-refine` approvati dal proprietario oggi. Gruppo 7 (D4), m
 - `ANALYSIS_VERSION` 5.
 - **Somiglianza:** i brani del banco non ricevono un Lead (sonorità sotto il 30 % o `top.up` basso), quindi i punteggi restano quelli del gruppo 8; l'arp: quota media del codice 0,53 → 0,56.
 - **Prove nel browser:** l'hook generato aperto in Completa mostra la traccia Lead (`n("2 1!2 ~ 0!2 ~ 4 3!2 2!2 1 0!2 ~").scale("C5:major")`), nessun errore.
+
+## 2026-11-12: Decodifica, controllo di somiglianza stabile (feat/91-decode-group-10, #91, compito 11.3)
+
+Ramo `feat/91-decode-group-10` da `feat/44-themed-checks` (ef85658).
+
+- **Causa 1, export non ripetibili:** due export veloci dello stesso brano di prova differivano di -2 / -10 dB di energia residua (luci-rosse di -60 dB). Il supersaw del pad sceglie le fasi delle voci con `Math.random` nel worklet audio; la pagina di render seminava già una sequenza, ma l'ordine in cui le voci la leggono dipende da quando i nodi riusati dal pool e i messaggi arrivano al thread audio. Il livello B scriveva un brano diverso da due export dello stesso originale su 6 file del banco su 8 (un confine di sezione spostato di una battuta, altre note di basso, la tonalità del brano arp). **Correzione** in `src/render/page.js`: ogni chiamata di un processore del worklet riparte dalla semina della sua voce (inizio e frequenza), quindi una voce ha sempre le stesse fasi. Due export di decode-test-90: -62 dB (prima -2 dB); il livello B scrive lo stesso brano da entrambi.
+- **Causa 2, l'arco dei brani piatti:** l'arco era la correlazione del volume per battuta; un brano con le battute a 0,16 dB l'una dall'altra (decode-test-174) dà la correlazione del rumore (0,26 fra due export dello stesso originale). Ora è la correlazione con la varianza di ogni curva portata almeno a 1 dB² (`ARC_DB`, circa il più piccolo cambio di volume che si sente): un brano piatto vale circa 0 a ogni giro, un brano con un arco vero tiene la sua correlazione. Provata prima una distanza in dB: dava 0,87 alle coppie pavimento (brani che non c'entrano), quanto alle coppie vere. Scartata.
+
+| Arco (B) | Prima (snapshot) | Dopo (misura nuova) |
+| --- | --- | --- |
+| decode-test-124 / 90 / 174 / long | 0,56 / 0,99 / 0,10 / 0,68 | 0,41 / 0,91 / -0,01 / 0,60 |
+| decode-test-acid / arp | 0,38 / 0,15 | 0,08 / 0,07 |
+| luci-rosse / radio-bench-c | 0,49 / 0,48 | 0,45 / 0,01 |
+| coppie pavimento | -0,02 / -0,16 | -0,03 / -0,02 |
+
+- **Prova:** snapshot scritto da un giro, poi due giri del controllo, ognuno con la cache vuota (originali e brani del livello B riesportati): passano entrambi e i punteggi dei due giri sono uguali tranne decode-test-acid (al massimo 0,005). Margine 0,05 invariato.
+- **Snapshot aggiornato:** tutti gli archi (misura nuova) e i cali dei gruppi 7-9 con il loro motivo: brillantezza di acid 0,74 → 0,50 e di luci-rosse 0,67 → 0,61 (la batteria giusta suona sull'808 finché il gruppo 10 non sceglie il kit), ritmo alto di luci-rosse 0,41 → 0,35 (misurato prima con gli export rumorosi).
+- Il testo del compito 10.3 ora dice che il seme della radio non ha distorsione (`drive 0`): la 909 con distorsione vale solo per luci-rosse.

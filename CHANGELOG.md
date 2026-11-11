@@ -145,6 +145,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Fast export: two exports of a song with a supersaw give the same sound.
+- Decode: the similarity check gives the same scores on two runs.
 - Stage widgets: after a song change, Monitor and the side panels show the new song's panels; no hit grid space is kept from the song before, and the hit grid keeps no rows of earlier songs.
 - Video on the stage: a seek in Decode keeps the last picture until the new one shows, instead of the normal look for a moment.
 - Backup: the default backup file is written compact like the one with all Decode analyses, so the two differ only by the analyses.

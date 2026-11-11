@@ -3,106 +3,106 @@
   "margin": 0.05,
   "files": {
     "decode-test-124": {
-      "rhythmLow": 0.263,
-      "rhythmMid": 0.894,
-      "rhythmHigh": 0.874,
+      "rhythmLow": 0.267,
+      "rhythmMid": 0.923,
+      "rhythmHigh": 0.878,
       "chroma": 0.913,
-      "bassChroma": 0.859,
-      "brightness": 0.735,
-      "shares": 0.958,
-      "arc": 0.564
+      "bassChroma": 0.861,
+      "brightness": 0.758,
+      "shares": 0.961,
+      "arc": 0.413
     },
     "decode-test-90": {
-      "rhythmLow": 0.108,
-      "rhythmMid": 0.333,
+      "rhythmLow": 0.082,
+      "rhythmMid": 0.322,
       "rhythmHigh": 0.98,
-      "chroma": 0.883,
-      "bassChroma": 0.827,
-      "brightness": 0.69,
-      "shares": 0.641,
-      "arc": 0.99
+      "chroma": 0.903,
+      "bassChroma": 0.876,
+      "brightness": 0.689,
+      "shares": 0.81,
+      "arc": 0.908
     },
     "decode-test-174": {
-      "rhythmLow": 0.69,
-      "rhythmMid": 0.626,
-      "rhythmHigh": 0.966,
+      "rhythmLow": 0.653,
+      "rhythmMid": 0.633,
+      "rhythmHigh": 0.965,
       "chroma": 0.937,
-      "bassChroma": 0.847,
-      "brightness": 0.724,
-      "shares": 0.678,
-      "arc": 0.103
+      "bassChroma": 0.843,
+      "brightness": 0.71,
+      "shares": 0.686,
+      "arc": -0.009
     },
     "decode-test-long": {
-      "rhythmLow": 0.574,
-      "rhythmMid": 0.904,
+      "rhythmLow": 0.598,
+      "rhythmMid": 0.903,
       "rhythmHigh": 0.89,
-      "chroma": 0.902,
-      "bassChroma": 0.83,
-      "brightness": 0.765,
-      "shares": 0.872,
-      "arc": 0.681
+      "chroma": 0.903,
+      "bassChroma": 0.828,
+      "brightness": 0.767,
+      "shares": 0.861,
+      "arc": 0.596
     },
     "decode-test-acid": {
-      "rhythmLow": 0.619,
-      "rhythmMid": 0.276,
-      "rhythmHigh": 0.639,
-      "chroma": 0.954,
-      "bassChroma": 0.981,
-      "brightness": 0.735,
-      "shares": 0.885,
-      "arc": 0.375
+      "rhythmLow": 0.875,
+      "rhythmMid": 0.61,
+      "rhythmHigh": 0.666,
+      "chroma": 0.97,
+      "bassChroma": 0.989,
+      "brightness": 0.499,
+      "shares": 0.863,
+      "arc": 0.079
     },
     "decode-test-arp": {
-      "rhythmLow": 0.495,
-      "rhythmMid": 0.116,
-      "rhythmHigh": 0.937,
-      "chroma": 0.94,
-      "bassChroma": 0.892,
-      "brightness": 0.942,
-      "shares": 0.874,
-      "arc": 0.154
+      "rhythmLow": 0.516,
+      "rhythmMid": 0.146,
+      "rhythmHigh": 0.936,
+      "chroma": 0.946,
+      "bassChroma": 0.902,
+      "brightness": 0.934,
+      "shares": 0.852,
+      "arc": 0.066
     },
     "luci-rosse": {
-      "rhythmLow": 0.537,
-      "rhythmMid": 0.39,
-      "rhythmHigh": 0.414,
-      "chroma": 0.951,
-      "bassChroma": 0.964,
-      "brightness": 0.668,
-      "shares": 0.972,
-      "arc": 0.488
+      "rhythmLow": 0.757,
+      "rhythmMid": 0.475,
+      "rhythmHigh": 0.349,
+      "chroma": 0.961,
+      "bassChroma": 0.973,
+      "brightness": 0.611,
+      "shares": 0.932,
+      "arc": 0.449
     },
     "radio-bench-c": {
-      "rhythmLow": 0.68,
+      "rhythmLow": 0.682,
       "rhythmMid": 0.948,
-      "rhythmHigh": 0.809,
+      "rhythmHigh": 0.81,
       "chroma": 0.936,
-      "bassChroma": 0.895,
+      "bassChroma": 0.9,
       "brightness": 0.629,
-      "shares": 0.799,
-      "arc": 0.483
+      "shares": 0.838,
+      "arc": 0.01
     }
   },
   "floor": {
     "luci-rosse × radio-bench-c": {
-      "rhythmLow": 0.017,
-      "rhythmMid": -0.008,
-      "rhythmHigh": -0.016,
-      "chroma": 0.824,
-      "bassChroma": 0.793,
-      "brightness": 0.668,
-      "shares": 0.56,
-      "arc": -0.017
+      "rhythmLow": 0.025,
+      "rhythmMid": -0.005,
+      "rhythmHigh": -0.01,
+      "chroma": 0.828,
+      "bassChroma": 0.803,
+      "brightness": 0.673,
+      "shares": 0.599,
+      "arc": -0.032
     },
     "decode-test-acid × decode-test-arp": {
-      "rhythmLow": -0.013,
-      "rhythmMid": 0.05,
-      "rhythmHigh": -0.003,
-      "chroma": 0.902,
-      "bassChroma": 0.869,
-      "brightness": 0.432,
-      "shares": 0.651,
-      "arc": -0.163
+      "rhythmLow": -0.005,
+      "rhythmMid": 0.048,
+      "rhythmHigh": 0,
+      "chroma": 0.903,
+      "bassChroma": 0.873,
+      "brightness": 0.436,
+      "shares": 0.628,
+      "arc": -0.028
     }
   }
 }
