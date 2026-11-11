@@ -283,7 +283,13 @@ export function createDecodeTab({ root, app }) {
   // the list, a mixtape or the Autoplay switch changed (the panel): the context follows a new chip or order, a prepared
   // track that is no longer the next one goes (D9: one at a time)
   function libraryChanged(kind) {
-    if (kind === 'list' && nav && nav.kind === 'list') { const p = panel.prefs(); nav = { ...nav, chip: p.chip, order: p.order }; }
+    // a chip or an order picked, or the panel opened again: the context takes the list as it is now (with the order by
+    // recent, its last uses too, D8)
+    if ((kind === 'list' || kind === 'opened') && nav && nav.kind === 'list') {
+      const p = kind === 'list' ? panel.prefs() : nav;
+      const { used, ...rest } = nav;
+      nav = { ...rest, chip: p.chip, order: p.order, ...(p.order === 'recent' ? { used: panel.usedSnapshot() } : {}) };
+    }
     navVer++; prepNone = false;
     if (!autoplayOn()) { dropPrep(); return; }
     if (prep) { const n = navInfo(); if (!n || !n.next || rowId(n.next.row) !== rowId(prep.row)) dropPrep(); }
@@ -414,6 +420,7 @@ export function createDecodeTab({ root, app }) {
       removeRecent: fp => store.remove(fp).then(() => { app.toast(t('dcRemoved')); panel.entriesChanged(); navVer++; }),
       playing: () => (!cur ? null : nav && nav.kind === 'mixtape' ? { mixId: nav.id, mixRowId: nav.rowId } : { key: nav && nav.kind === 'list' ? nav.key : cur.where ? `${cur.where.folderId}/${cur.where.path}` : cur.fp ? `fp:${cur.fp.key}` : null }),
       changed: kind => libraryChanged(kind),
+      opened: () => libraryChanged('opened'),
       closed: () => { panelOpen = false; },
     },
   });

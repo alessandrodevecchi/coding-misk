@@ -245,6 +245,22 @@ const INIT = () => {
     await page.setInputFiles('#dc-file', Z); await opened('zeta.wav');
     s = await dec();
     check(!s.canNext && !s.canPrev && !s.nav && await page.$eval('#pb-next', b => b.disabled), 'a picked file: Previous and Next disabled, no next track');
+    // the order by recent frozen in the context (owner 2026-11-11): the open track becomes the last used, but Next keeps
+    // the order the list had when it opened, until the panel opens again
+    if (!(await page.$('#dcl.over'))) { await page.click('#dc-another'); await sleep(300); }
+    await chip(await folderId('Live sets')); await page.click('#dcl [data-dcl-order="recent"]'); await sleep(300);
+    const before = (await rowsNow()).map(r => r.name);
+    await clickRow(before[2]); await waitFor(async () => { const x = await dec(); return x.track && x.track.name.startsWith(before[2]) && !(x.status && x.status.kind === 'busy'); }, 8000);
+    await sleep(3500);
+    s = await dec();
+    check(s.nav && s.nav.order === 'recent' && s.next === before[3] && s.prev === before[1], 'order by recent: Next and Previous keep the order the list had when the track opened, though it is now the track used last', `${before.join()} → next ${s.next}, prev ${s.prev}`);
+    await page.click('#dc-another'); await sleep(1500);
+    const after = (await rowsNow()).map(r => r.name);
+    s = await dec();
+    check(after[0] === before[2] && s.prev === null && s.next === after[1], 'the panel opened again: the context takes the order as it is now', `${after.join()} → next ${s.next}`);
+    await page.keyboard.press('Escape');
+    if (!(await page.$('#dcl.over'))) { await page.click('#dc-another'); await sleep(300); }
+    await page.click('#dcl [data-dcl-order="name"]'); await sleep(200); await page.keyboard.press('Escape');
     if ((await page.getAttribute('#dcl-autoplay', 'aria-pressed').catch(() => null)) === 'true') await page.click('#dcl-autoplay').catch(() => {});
   }
 

@@ -8,7 +8,7 @@
 // record in batches, the import through the index keeping a newer record and its handle), the preparation's timing and
 // memory budget and the end-of-track rule. Usage: npm run check:decode-library
 import { scanFolder, accepted, isVideo, FOLDER_CAP, fileAt, permission } from '../src/decode/folders.js';
-import { buildRows, filterRows, sortRows, listOf, nextOf, prevOf, norm, listPrefs, windowOf, listContext } from '../src/decode/library.js';
+import { buildRows, filterRows, sortRows, listOf, nextOf, prevOf, norm, listPrefs, windowOf, listContext, usedSnapshot } from '../src/decode/library.js';
 import { createMixtape, addRows, moveRow, removeRow, renameMixtape, setRepeat, rowStatus, relinkFolder, exportMixtapes, mergeMixtapes, MIXTAPES_KEY } from '../src/decode/mixtapes.js';
 import { createDecodeStore, overCap, entryOf, markOf, DECODE_CAP, importWins } from '../src/decode/store.js';
 import { prepareAt, fitsBudget, decodedBytes, endStep, BUDGET_BYTES } from '../src/decode/autoplay.js';
@@ -107,6 +107,16 @@ const rows = buildRows({ folders, files, entries });
   const added = buildRows({ folders: L, files: [...F, { folderId: 'D', path: 'bb.wav', name: 'bb.wav', size: 5, modified: 5 }], entries: [] });
   check(nextOf(ctx, added).row.name === 'bb', 'a file added meanwhile counts (the list is read when the next track is prepared)');
   check(nextOf(null, R) === null && prevOf(null, R) === null, 'a picked or dropped file: no next or previous track');
+  // the order by recent frozen in the context (owner 2026-11-11): the open track that becomes the last used does not
+  // move to the top of the context's list
+  const RU = R.map((r, i) => ({ ...r, used: 100 - i * 10 }));
+  const recent = listOf(RU, { chip: 'all', order: 'recent' }).map(r => r.name);
+  const rc = listContext({ chip: 'all', order: 'recent' }, '', RU.find(r => r.name === recent[2]).key, RU);
+  const played = RU.map(r => (r.name === recent[2] ? { ...r, used: 999 } : r));
+  check(rc.used && nextOf(rc, played).row.name === recent[3] && prevOf(rc, played).row.name === recent[1], 'order by recent: the next and previous tracks of the order as it was when the track opened', `${recent.join()} → ${nextOf(rc, played).row.name}`);
+  const { used, ...loose } = rc;
+  check(nextOf(loose, played).row.name === recent[0], 'without the frozen order the open track would jump to the top and the next one would be the first', nextOf(loose, played).row.name);
+  check(!listContext({ chip: 'all', order: 'name' }, '', RU[0].key, RU).used && usedSnapshot(RU)[RU[0].key] === 100, 'the order by name keeps no last uses; the snapshot holds every used row');
   const mrows = ['r1', 'r2', 'r3', 'r4'].map(id => ({ id, name: id }));
   const mctx = { kind: 'mixtape', id: 'm', rowId: 'r4', pos: 3 };
   check(nextOf(mctx, { rows: mrows, repeat: false }) === null && nextOf(mctx, { rows: mrows, repeat: true }).row.id === 'r1', 'a mixtape: the end stops, repeat starts again from the first row');

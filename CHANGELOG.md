@@ -11,7 +11,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Decode: Add folder (Chrome, Edge), with subfolders, up to 2000 files per folder, the browser's permission asked once per visit, and a video icon for video files.
 - Decode: search, a chip per folder, order by name or by recent, and the marks ◆ Full and ◇ Live in the list.
 - Decode: Autoplay, off by default, that prepares the next track of the list or mixtape before the end and hands over without a gap.
-- Decode: Previous and Next on the player bar for a track opened from the list or a mixtape.
+- Decode: Previous and Next on the player bar for a track opened from the list or a mixtape; with the order by recent they keep the order the list had when the track opened.
 - Decode: mixtapes, ordered references to the user's files, with drag, File…, repeat, rename and delete, in the settings backup without file handles.
 - Settings: "Include all Decode analyses" checkbox in the backup card.
 - `npm run check:decode-library` and `tools/check-decode-library.cjs` (fake folders in the origin private file system); `tools/check-decode.cjs --library`.

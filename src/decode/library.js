@@ -55,18 +55,27 @@ export function filterRows(rows, { chip = 'all', search = '' } = {}) {
   return rows.filter(r => (chip === 'all' || r.folderId === chip) && (!q || r.norm.includes(q)));
 }
 // by name; by recent: the tracks opened last first, then the others by name
-export function sortRows(rows, order = 'name') {
+// used: the last uses frozen in a context ({ key: time }, decode-library D8), in place of the rows' own
+export function sortRows(rows, order = 'name', used = null) {
   const byN = (a, b) => collator.compare(a.name, b.name) || collator.compare(a.folderName || '', b.folderName || '') || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
-  return [...rows].sort(order === 'recent' ? (a, b) => ((b.used || 0) - (a.used || 0)) || byN(a, b) : byN);
+  const u = used ? r => used[r.key] || 0 : r => r.used || 0;
+  return [...rows].sort(order === 'recent' ? (a, b) => (u(b) - u(a)) || byN(a, b) : byN);
 }
-export const listOf = (rows, { chip, search, order } = {}) => sortRows(filterRows(rows, { chip, search }), order);
+export const listOf = (rows, { chip, search, order, used } = {}) => sortRows(filterRows(rows, { chip, search }), order, used);
+// the last uses of the rows now, kept by a context with the order by recent (decode-library D8, owner 2026-11-11): the
+// tracks that play meanwhile do not move to the top of its list
+export function usedSnapshot(rows) {
+  const out = {};
+  for (const r of rows) if (r.used) out[r.key] = r.used;
+  return out;
+}
 // a row Autoplay and Previous and Next can open: not "not found", not waiting for access
 export const playable = r => !!r && !r.missing && !r.waiting;
 
 // the context of the open track (D8): { kind: 'list', chip, search, order, key, pos } | { kind: 'mixtape', id, rowId,
 // pos } | null (a picked or dropped file)
 export function listContext(prefs, search, key, rows) {
-  const ctx = { kind: 'list', chip: prefs.chip, search: search || '', order: prefs.order, key };
+  const ctx = { kind: 'list', chip: prefs.chip, search: search || '', order: prefs.order, key, ...(prefs.order === 'recent' ? { used: usedSnapshot(rows) } : {}) };
   ctx.pos = Math.max(0, listOf(rows, ctx).findIndex(r => r.key === key));
   return ctx;
 }

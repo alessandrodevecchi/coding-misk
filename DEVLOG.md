@@ -2974,3 +2974,12 @@ Ramo `feat/91-decode-library` da `feat/44-themed-checks` (ddf91af, con la parte 
 - **Secondo bug trovato e corretto:** nella scena nuova di `check-light-theme` (Decode con un brano aperto) il nome di una traccia non sentita, attenuato con `opacity: .5`, scendeva a 2,25:1 nel tema chiaro; ora è attenuato con il colore `--muted` e il corsivo.
 - **Prove:** `check:steer-memo`, `check:endless` (97), `check:radio-profiles` (31), `check:live-code` (25), `check:sound-guard` (14), `check:knowledge`, `check:guide`, `check:decode` (152), `check:decode-library` (61), `check-backup.mjs` (19), `check:light-theme`, `check:strudel`, `npm run catalog:strudel`, `npm run build`, `openspec validate decode-library --strict`; nel browser (porta 5308) `check-decode.cjs` completo (201 ok, con il gruppo della libreria: 68 ok), `check-player.cjs`, `check-settings.cjs`, `check-light-theme.cjs --only decodifica,decodifica-pannello` a 1300 e 400 px.
 - **Non provato in automatico:** il vero selettore delle cartelle e il vero prompt del permesso del browser (simulati), cartelle su un disco vero, Edge.
+
+## 2026-11-11: Decodifica, ordine «Recenti» fermo per la riproduzione automatica (decode-library, #91)
+
+Decisione del proprietario sulla domanda aperta 1. Nota nel design (D8) e scenario nella spec `decode/autoplay` in un commit a sé, poi il codice, sopra 6a4c3d4 (già unito in `feat/44-themed-checks`, nessun rebase).
+
+- **Prima:** con l'ordine per recenti il brano che suona diventava il più recente a ogni salvataggio e saliva in cima all'elenco, così il brano dopo e quello prima cambiavano mentre suonava.
+- **Ora:** il contesto di un brano aperto dall'elenco con l'ordine «Recenti» tiene gli ultimi usi delle righe com'erano all'apertura (`used`, chiave → ora); riproduzione automatica, Precedente e Successivo ordinano con quelli. Si riprendono quando l'utente sceglie un chip o un ordine, o riapre il pannello: sono i momenti in cui l'utente guarda di nuovo l'elenco. Il brano preparato che non è più il prossimo si scarta come prima.
+- **Prove:** `check:decode` (152), `check:decode-library` (64, tre nuovi), `check:guide`, `check:knowledge`, `npm run build`; nel browser (porta 5308) `check-decode.cjs --library`, con due controlli nuovi (Successivo e Precedente con l'ordine dell'apertura; l'ordine nuovo dopo aver riaperto il pannello).
+

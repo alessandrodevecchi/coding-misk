@@ -29,6 +29,11 @@ When a track opens from the list, the tab SHALL remember the list as it was then
 - **WHEN** the "Demos" chip is active, the order is by name, Autoplay is on and the track "B" of Demos ends
 - **THEN** the next track of Demos by name after "B" opens, even if a track of another folder would come first by name
 
+#### Scenario: Order by recent
+
+- **WHEN** the order is "Recent", the user opens the third track of the list and Autoplay is on
+- **THEN** the next track is the fourth of the list as it was ordered when the third opened, even though the third has become the track opened last; the order by recent is taken again only when the user picks a chip or an order, or opens the panel again
+
 #### Scenario: A dropped file
 
 - **WHEN** Autoplay is on and a dropped file ends
