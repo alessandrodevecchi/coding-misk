@@ -3206,3 +3206,17 @@ Gruppi 7-10 di `decode-refine` approvati dal proprietario oggi. Gruppo 7 (D4), m
 - `ANALYSIS_VERSION` 5.
 - **Somiglianza:** i brani del banco non ricevono un Lead (sonorità sotto il 30 % o `top.up` basso), quindi i punteggi restano quelli del gruppo 8; l'arp: quota media del codice 0,53 → 0,56.
 - **Prove nel browser:** l'hook generato aperto in Completa mostra la traccia Lead (`n("2 1!2 ~ 0!2 ~ 4 3!2 2!2 1 0!2 ~").scale("C5:major")`), nessun errore.
+
+## 2026-11-12 visual Oscilloscopio: spec e primo prototipo (#58)
+
+Ramo `feat/58-oscilloscope-visual` da `ef85658`. Prototipo da far vedere al proprietario, non ancora una funzione finita (niente CHANGELOG).
+
+- **Spec:** change OpenSpec `oscilloscope-visual` (proposta, design D1-D8, delta della nuova capacità `stage/oscilloscope`, task). Sei domande aperte per il proprietario, ognuna con una risposta consigliata (sinistra e destra vere per XY, dove stanno i parametri, qualità del video veloce, valori di partenza, fosforo come Render, altri collegamenti).
+- **Look nuovo «Oscilloscopio»** in `LOOKS` (`RENDER_GAIN` 2,4). Il disegno sta in `src/visuals/oscilloscope.js`, importato solo la prima volta che il look viene disegnato (verificato: con Palco all'avvio il modulo non viene caricato). Un passaggio su canvas 2D: il buffer del fosforo sbiadisce con la Persistenza (uguale a ogni frame rate), il raggio è più luminoso dove si muove piano (6 livelli, quindi 6 tracciati), il bagliore è il buffer sfocato, poi il vetro.
+- **Segnale:** solo mentre il look è a schermo, `readAudio` tiene i dati completi degli analizzatori (8192 campioni) sommati in mix, gruppo basso (cassa, basso) e gli altri. Sweep: il mix nel tempo dal primo passaggio in salita del trigger. XY: basso in orizzontale, gli altri in verticale più il basso 1,5 ms dopo (con solo cassa e basso la prima prova dava una riga piatta).
+- **Sei schermi** disegnati dall'app (Vuoto, Reticolo, Sbavato, Reticolo sbavato, Oscilloscopio vero, Display vettoriale), in cache finché non cambiano misura, tinta, luce ambiente o saturazione. Rumore e macchie seminati sul tempo del brano, non sull'orologio.
+- **Collegamenti al brano:** ogni parametro è Fisso o segue Battuta, Sezione, Cassa, Basso, Pad, Melodia o Mix (fino al 60 % verso il massimo; la tinta gira al massimo di mezzo cerchio). Di partenza il bagliore segue la cassa e la tinta la sezione.
+- **Impostazioni:** scheda «Oscilloscopio» con schermo, modo, sovracampionamento e otto parametri con il loro collegamento; salvata in `coding-misk-oscilloscope` (va nel backup).
+- **Controllo:** `npm run check:oscilloscope` (senza browser: valori di partenza, limiti, collegamenti, trigger, ricampionamento, luminosità).
+- **Prova nel browser:** luci-rosse in Componi, nessun errore; frame mediano 16,7 ms (a 60 Hz, nessun calo) con lo schermo vero. Screenshot in `notes/oscilloscope-2026-11-12/` (oscilloscopio vero in sweep, reticolo sbavato ambra, display vettoriale in XY, reticolo con rumore, la scheda delle impostazioni).
+- **Mancano (task 2):** tutti i parametri nella scheda, la scheda della Guida e la nota della base di conoscenza, il video veloce (modulo caricato prima del primo frame; il feed ha solo 256 campioni del mix, e in XY disegna lo sweep), misure a 1080p e 4K, un controllo nel browser.

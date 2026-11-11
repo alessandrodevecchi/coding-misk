@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 118. With open tasks: 37. All tasks ticked, waiting to be archived: 81.
+OpenSpec changes not archived: 119. With open tasks: 38. All tasks ticked, waiting to be archived: 81.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -39,6 +39,7 @@ OpenSpec changes not archived: 118. With open tasks: 37. All tasks ticked, waiti
 | [narrator-caption-sync](../../openspec/changes/narrator-caption-sync/tasks.md) | 1 | 20 |
 | [natural-growth](../../openspec/changes/natural-growth/tasks.md) | 2 | 10 |
 | [new-song-panel](../../openspec/changes/new-song-panel/tasks.md) | 1 | 21 |
+| [oscilloscope-visual](../../openspec/changes/oscilloscope-visual/tasks.md) | 7 | 13 |
 | [pattern-library](../../openspec/changes/pattern-library/tasks.md) | 1 | 16 |
 | [performance-profiles](../../openspec/changes/performance-profiles/tasks.md) | 1 | 9 |
 | [player-bar](../../openspec/changes/player-bar/tasks.md) | 1 | 8 |

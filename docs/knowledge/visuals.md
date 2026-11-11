@@ -38,7 +38,7 @@ A frame must depend on the bar and the levels only, never on wall time. Then the
 ## Options
 
 <!-- generated:looks -->
-Stage visuals (`LOOKS` in `src/music.js`): `palco` Stage (it: Palco), `pixel` Pixel, `tramonto` Sunset (it: Tramonto), `montagne` Mountains (it: Montagne), `spazio` Space (it: Spazio), `sonar` Sonar, `edgerunners` Edgerunners, `studio` Studio (hidden), `monitor` Monitor, `rullo` Roll (it: Rullo), `claude` Claude, `video` Video.
+Stage visuals (`LOOKS` in `src/music.js`): `palco` Stage (it: Palco), `pixel` Pixel, `tramonto` Sunset (it: Tramonto), `montagne` Mountains (it: Montagne), `spazio` Space (it: Spazio), `sonar` Sonar, `edgerunners` Edgerunners, `studio` Studio (hidden), `monitor` Monitor, `rullo` Roll (it: Rullo), `claude` Claude, `video` Video, `oscilloscope` Oscilloscope (it: Oscilloscopio).
 
 Soul views (`VIEW_NAMES` in `src/soul/data.js`): `a` Tracker, `b` Terrain, `c` Sphere, `d` Lattice, `e` Strands, `f` Landscape, `g` Particles, `h` Halftone, `i` Aura, `j` Spectrum.
 

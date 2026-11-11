@@ -102,18 +102,33 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     if (streaks.length > 16) streaks.shift();
   }
 
+  // the Oscilloscope look's signal (oscilloscope-visual D4): the full time data of the analysers summed into the mix,
+  // the low instruments (kick, bass) and the others; kept only while the look shows (oscOn)
+  let oscOn = false;
+  const osc = { mix: new Float32Array(0), low: new Float32Array(0), high: new Float32Array(0), rate: 48000 };
+  const OSC_LOW = ['kick', 'bass'];
+  function oscAdd(id, d) {
+    if (osc.mix.length !== d.length) { osc.mix = new Float32Array(d.length); osc.low = new Float32Array(d.length); osc.high = new Float32Array(d.length); }
+    const side = OSC_LOW.includes(id) ? osc.low : osc.high;
+    for (let i = 0; i < d.length; i++) { osc.mix[i] += d[i]; side[i] += d[i]; }
+  }
+
   function readAudio(dt, now) {
     const A = window.analysers, fn = window.getAnalyzerData;
     const raw = {};
     wave.fill(0);
     lastLevels = raw;
-    if (feed) { Object.assign(raw, feed.raw); wave.set(feed.wave); hookWave.set(feed.hook); }
+    if (oscOn && osc.low) { osc.mix.fill(0); osc.low.fill(0); osc.high.fill(0); }
+    // (the fast video's feed has 256 samples of the mix: the beam is coarser there, and XY draws the sweep, design Risks)
+    if (feed) { Object.assign(raw, feed.raw); wave.set(feed.wave); hookWave.set(feed.hook); if (oscOn) { osc.mix = Float32Array.from(feed.wave); osc.low = null; osc.high = null; osc.rate = 6400; } }
     else if (isPlaying() && A && typeof fn === 'function') {
+      if (oscOn) { try { osc.rate = globalThis.getAudioContext ? globalThis.getAudioContext().sampleRate : 48000; } catch (e) {} }
       for (const id of Object.keys(A)) {
         // (the FM lab's scope has its own analyser: a card heard over the song does not move the stage, fm-groove-lab D6)
         if (String(id).startsWith('fmlab')) continue;
         let d; try { d = fn('time', id); } catch (e) { continue; }
         if (!d || !d.length) continue;
+        if (oscOn) { if (!osc.low) { osc.mix = new Float32Array(0); osc.low = new Float32Array(0); osc.high = new Float32Array(0); } oscAdd(id, d); }
         const step = Math.floor(d.length / N); let sum = 0;
         const own = instWave[id] || (instWave[id] = new Float32Array(N));
         for (let i = 0; i < N; i++) { const v = d[i * step] || 0; wave[i] += v; own[i] = v; sum += v * v; }
@@ -421,6 +436,27 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     globalThis.codingMiskLayerPanels = { kind, panels: drawn.map(p => `${p.inst}:${p.widget}${p.quiet ? ':quiet' : ''}`), apps: F.drawnApps, sec: F.sec };
     layerTimes.push(performance.now() - t0); if (layerTimes.length > 600) layerTimes.shift();
   }
+
+  // the Oscilloscope look (oscilloscope-visual D2): its module is imported the first time a frame asks for it; until it
+  // arrives the screen is black
+  let oscMod = null, oscLoading = null;
+  function drawOscilloscope(cyc, dt, playing) {
+    if (!oscMod) {
+      cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H);
+      if (!oscLoading) oscLoading = import('./visuals/oscilloscope.js').then(m => { oscMod = m.createOscilloscope(); }, e => { oscLoading = null; console.warn('[oscilloscope] not loaded', e); });
+      return;
+    }
+    const info = stage && stage.sectionInfo ? stage.sectionInfo(cyc) : null;
+    const mix = osc.mix && osc.mix.length ? osc.mix : wave;
+    oscMod.draw(cx, W, H, dpr, {
+      mix, low: playing && osc.low && osc.low.length ? osc.low : null, high: playing && osc.high && osc.high.length ? osc.high : null,
+      rate: osc.mix && osc.mix.length ? osc.rate : 6400, lv, level: Math.min(1, level), bar: cyc, cyc,
+      section: info && Number.isFinite(info.i) ? { i: info.i, n: info.n } : null, dt, playing,
+      raw: stage && stage.oscilloscope ? stage.oscilloscope() : null,
+    });
+  }
+  // (the stage checks wait for the module before a picture: codingMiskOscReady)
+  globalThis.codingMiskOscReady = () => !!oscMod;
 
   const SCENE_DRAW = {
     tramonto(pal, cyc, dt) {
@@ -1098,6 +1134,7 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       if (!vsrc) look = r.fallback || (stage && stage.fallbackLook ? stage.fallbackLook() : 'palco');
     }
     globalThis.codingMiskStageDrawn = look;
+    oscOn = look === 'oscilloscope';
     curDensity = r.density || 'normal';
     if (!playing) echoes.length = 0;
     kick *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 10); glitch *= Math.exp(-dt * 9); shake *= Math.exp(-dt * 12);
@@ -1108,12 +1145,13 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     let native = false;
     if (look === 'soul' && soul) soul.draw(cx, W, H, dpr, cyc, playing);
     else if (WIDGET_LOOKS.includes(look)) { if (soul) soul.hide(); native = widgetLook(look, cyc, playing, render); }
+    else if (look === 'oscilloscope') { if (soul) soul.hide(); drawOscilloscope(cyc, dt, playing); if (!NATIVE_RENDERS.includes(render)) widgetLayer(look, cyc, playing); }
     else if (look === 'video') { if (soul) soul.hide(); drawVideo(vsrc, r.size || (stage && stage.videoSize ? stage.videoSize() : 'fill')); if (!NATIVE_RENDERS.includes(render)) widgetLayer(look, cyc, playing); }
     // the layer over the scene: before the pass, or drawn natively after it in ASCII and Terminal (D2)
     else { if (soul) soul.hide(); (SCENE_DRAW[look] || SCENE_DRAW.palco)(pal, cyc, dt, playing); if (!NATIVE_RENDERS.includes(render)) widgetLayer(look, cyc, playing); }
     // (the widget looks have no flash: their panels flash on their own onsets; nor the Video look: a flash over footage
     // reads as a glitch)
-    if (flash > .02 && !reduce && look !== 'soul' && look !== 'video' && !WIDGET_LOOKS.includes(look)) { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
+    if (flash > .02 && !reduce && look !== 'soul' && look !== 'video' && look !== 'oscilloscope' && !WIDGET_LOOKS.includes(look)) { cx.fillStyle = pal.echo; cx.globalAlpha = flash * .08; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1; }
     // D2: the pass over the finished frame, unless the look drew the render natively
     if (render !== 'normal' && !native) {
       const ms = renderer.apply(cx, cc, render, { look, theme: stage && stage.theme ? stage.theme() : 'neon', W, H, dpr, density: curDensity, light: r.light || 'auto', fixed: !!r.fixed, info: () => termInfo(cyc, playing, look, render) });
