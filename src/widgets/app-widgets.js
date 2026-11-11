@@ -110,7 +110,9 @@ export function installAppWidgets(Pattern, { registerWidget = globalThis.registe
     registerWidget(key, (id, options, pat) => {
       const reg = (globalThis.miskAppWidgets ||= new Map());
       let canvas = (reg.get(id) || {}).canvas || document.getElementById(id);
-      if (!canvas || canvas.tagName !== 'CANVAS') { canvas = document.createElement('canvas'); canvas.className = 'app-widget'; }
+      // (a new canvas is empty until its first draw: at the browser's default 300 × 150 it would show for a frame at
+      // another size than the widget's, and the hit grid must keep its size)
+      if (!canvas || canvas.tagName !== 'CANVAS') { canvas = document.createElement('canvas'); canvas.className = 'app-widget'; canvas.width = 0; canvas.height = 0; }
       setWidget(id, canvas);
       reg.set(id, { kind, options: options && typeof options === 'object' && !Array.isArray(options) ? options : {}, canvas });
       (globalThis.miskWidgetCanvases ||= new Map()).set(id, canvas);
