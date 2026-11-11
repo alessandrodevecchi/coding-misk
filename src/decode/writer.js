@@ -11,11 +11,15 @@
 // `melody(…)` lines that evaluate to silence, `$:` where the model hears a top line.
 import { STEPS, DRUM_ROWS, noteName, NOTE_NAMES, parseChord } from './model.js';
 import { KITS } from '../music.js';
+import { PART_LEVELS } from './part-levels.js';
 
 export const SOUND_PRESETS = ['ours', 'simple'];
 // sounds by measure (decode-refine D3): the bass band's brightness range over a bar that makes a moving filter (Hz;
 // measured: luci-rosse and the acid song about 470, the radio seed's resonant supersaw 370, plain basses 120 to 260)
-export const SOUND_RULE = { move: 350 };
+// sustain: the chords' mean energy left in the last eighth of their bar (amplitude ratio, 0.6 is about -4 dB) from which
+// they get a room of `room`; levels: the gain steps the balance tries for each part (multipliers, 1.5 dB apart) and the
+// highest gain it writes
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -142,7 +146,57 @@ export function soundsOf(bars, preset = 'ours', whole = bars) {
   const bassSound = moving ? `.s("sawtooth").lpf(sine.range(${r50(Math.max(200, lo))}, ${r50(Math.min(3000, hi))}).slow(4)).lpq(8).gain(.6)` : `.s("${bassWave}").lpf(${bassCut}).gain(.75)`;
   const chordWave = bright > 0.45 ? 'supersaw' : bright > 0.25 ? 'sawtooth' : 'triangle';
   const chordCut = Math.round((800 + 3200 * Math.min(1, bright * 1.5)) / 100) * 100;
-  return { kit, bass: bassSound, chords: `.s("${chordWave}").lpf(${chordCut}).gain(.3)`, lead: '.s("square").lpf(2400).gain(.25)', why: `bright ${bright.toFixed(2)} low ${low.toFixed(2)}` };
+  // (decode-refine D3: chords that are still sounding at the end of their bar, a held or reverberant pad, get a room;
+  // the Lead's wave and filter follow the brightness as the chords' do, one step brighter)
+  const held = bars.filter(b => b.sustain !== undefined), sustain = held.length ? held.reduce((a, b) => a + b.sustain, 0) / held.length : 0;
+  const room = sustain >= SOUND_RULE.sustain ? `.room(${SOUND_RULE.room})` : '';
+  const leadWave = bright > 0.45 ? 'sawtooth' : bright > 0.25 ? 'square' : 'triangle', leadCut = Math.round((1200 + 3600 * Math.min(1, bright * 1.5)) / 100) * 100;
+  return { kit, bass: bassSound, chords: `.s("${chordWave}").lpf(${chordCut})${room}.gain(.3)`, lead: `.s("${leadWave}").lpf(${leadCut}).gain(.25)`, why: `bright ${bright.toFixed(2)} low ${low.toFixed(2)} sustain ${sustain.toFixed(2)}` };
+}
+
+// the drum track's default gain (src/music.js DEFAULT.drums.gain), the level the part table measured the drums at
+const DRUMS_GAIN = 0.9;
+// the part levels (decode-refine D3): level B's drums, bass, chords and Lead gains scaled so the code's band shares (low, mid,
+// high) come nearest the original's (`shares`, full.js), the largest difference the smallest. The code's energy per
+// band is predicted from each sound alone at gain 1 (src/decode/part-levels.js, measured through the app), its gain
+// and the share of the song's bars it plays; the drums' level is their track's gain. When even the best gains leave a band further
+// than SOUND_RULE.shares (the spec's target) from the original, the prediction does not explain the original (a part
+// the code does not write, a sound the table does not hold) and the gains stay as written. Changes the tracks' code in place
+// → { before, after, gains } (the predicted largest share difference, the multipliers) or null
+const levelKey = (id, code) => {
+  const wave = (/\.s\("([a-z]+)"\)/.exec(code) || [])[1], cut = +((/\.lpf\((\d+)\)/.exec(code) || [])[1] || 0);
+  const near = list => list.reduce((a, b) => (Math.abs(Math.log(b / (cut || b))) < Math.abs(Math.log(a / (cut || a))) ? b : a));
+  if (id === 'bass') return /lpq\(/.test(code) ? 'bass:acid' : `bass:${wave}:${near([300, 600, 900, 1200])}`;
+  if (id === 'chords') return `chords:${wave}:${near([800, 1600, 2400, 4000])}`;
+  if (id === 'lead') return `lead:${wave}`;
+  return null;
+};
+export function balanceLevels(tracks, shares, bars) {
+  if (!shares || !bars) return null;
+  const parts = [];
+  for (const t of tracks) {
+    if (t.hush) continue;
+    const on = t.clips.reduce((a, c) => a + (c.bars || 1), 0) / bars;
+    // (the drums: measured at the drum track's default gain, DRUMS_GAIN; their level is the track's `gain` setting)
+    if (t.type === 'drums') { const T0 = PART_LEVELS[`drums:${t.settings.kit}`] || PART_LEVELS['drums:RolandTR909'], g = t.settings.gain ?? DRUMS_GAIN; parts.push({ t, T: T0.map(v => v / DRUMS_GAIN ** 2), g, on, drums: true }); continue; }
+    const codes = Object.values(t.patterns).map(p => p.code), key = codes.length && levelKey(t.id, codes[0]), T = key && PART_LEVELS[key];
+    const g = codes.length ? +((/\.gain\(([\d.]+)\)(?!.*\.gain\()/.exec(codes[0]) || [])[1] || 0) : 0;
+    if (T && g > 0) parts.push({ t, T, g, on });
+  }
+  const free = parts;
+  if (!free.length) return null;
+  const worst = ks => { const e = [0, 0, 0]; parts.forEach(p => { const k = ks[free.indexOf(p)]; for (let j = 0; j < 3; j++) e[j] += p.T[j] * (p.g * k) ** 2 * p.on; }); const s = e[0] + e[1] + e[2]; return s ? Math.max(...e.map((v, j) => Math.abs(v / s - shares[j]))) : 1; };
+  const steps = SOUND_RULE.levels.map(k => k), allowed = p => steps.filter(k => p.g * k <= SOUND_RULE.maxGain + 1e-9);
+  let best = free.map(() => 1), bv = worst(best);
+  const before = bv;
+  const walk = (i, ks) => {
+    if (i === free.length) { const v = worst(ks), dist = ks.reduce((a, k) => a + Math.abs(Math.log2(k)), 0), bd = best.reduce((a, k) => a + Math.abs(Math.log2(k)), 0); if (v < bv - 1e-6 || (Math.abs(v - bv) <= 1e-6 && dist < bd)) { bv = v; best = ks.slice(); } return; }
+    for (const k of allowed(free[i])) { ks[i] = k; walk(i + 1, ks); }
+  };
+  walk(0, free.map(() => 1));
+  if (bv > SOUND_RULE.shares) return { before: Math.round(before * 1000) / 1000, after: Math.round(bv * 1000) / 1000, gains: null };
+  free.forEach((p, i) => { const k = best[i]; if (k === 1) return; if (p.drums) { p.t.settings.gain = Math.round(p.g * k * 100) / 100; return; } for (const pat of Object.values(p.t.patterns)) pat.code = pat.code.replace(/\.gain\(([\d.]+)\)(?!.*\.gain\()/, (_, x) => `.gain(${Math.round(+x * k * 100) / 100})`); });
+  return { before: Math.round(before * 1000) / 1000, after: Math.round(bv * 1000) / 1000, gains: Object.fromEntries(free.map((p, i) => [p.t.id, Math.round(best[i] * 100) / 100])) };
 }
 
 // the song of a decoded track. opts: { id, title, artist, attribution, sounds, upTo (bars written, default all) }
@@ -493,7 +547,7 @@ export function writeFull(model, opts = {}) {
       });
       clips.push(...runs(out.map(x => (x ? idOf(x, p.grid) : null)), s0));
     });
-    // (decode-refine D3: level B's drum machine by measure, the nearest to the track's kicks and hats)
+    // (decode-refine D3: level B's drum machine by measure, the nearest to the track's hats)
     const kit = opts.sounds !== 'simple' && model.drumSound && model.drumSound.kit ? model.drumSound.kit : all.kit;
     if (clips.length) tracks.push({ id: 'drums', name: 'Drums', type: 'drums', settings: { kit }, patterns, clips });
   }
@@ -531,6 +585,7 @@ export function writeFull(model, opts = {}) {
     });
     if (clips.length) tracks.push({ id: 'lead', name: 'Lead', type: 'code', settings: { visual: 'hook' }, patterns, clips, ...(kind === 'vox' ? { hush: true } : {}) });
   }
+  if (opts.sounds !== 'simple') balanceLevels(tracks, model.shares, end);
   const song = songShell(model, opts, end, tracks);
   const key = formatKey(model.key), bpm = song.sections[0].bpm;
   song.sections = secs.map((s, i) => ({ name: names[i], bars: s.bars, bpm, key }));

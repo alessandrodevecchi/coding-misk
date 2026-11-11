@@ -7,7 +7,7 @@ import { createAnalyzer, ANALYSIS_RATE } from './misk-analyzer.js';
 import { chordName, parseChord } from './model.js';
 import { sectionsOf } from './sections.js';
 import { variationsOf } from './writer.js';
-import { mixMeasures, nearestKit } from './kit-measure.js';
+import { mixHatShape, mixHatBright, rankKits, bandEnergy, sustainOf } from './kit-measure.js';
 import { KIT_MEASURES } from './kits.js';
 
 export const MISK = 'misk-analyzer';
@@ -212,13 +212,22 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   steadyQualities(m.bars, sections, HARMONY_RULE, m.key);
   bassRange(m.bars, sections);
   m.variations = variationsOf(m);
-  // 9. the drum machine by measure (decode-refine D3): the kicks' decay and the hats' brightness of the track against the
-  // app's machines measured from their samples; "Our sounds" writes the nearest
+  // 9. the drum machine by measure (decode-refine D3), on the hats that play alone (a hat with a kick or a clap carries
+  // their sound): the hats' spectral shape against the app's machines measured from
+  // their samples; "Our sounds" writes the nearest. (Distortion is not measured: neither the
+  // kicks' overtones nor the hats' decay told the driven drums of the bench from the clean ones, decode-refine 10.1)
   {
     const bs = m.barSeconds, st = bs / 16, kicks = [], hats = [];
-    m.bars.forEach((b, i) => { for (let j = 0; j < 16; j++) { const t = m.downbeat + i * bs + j * st; if ((b.drums.bd || '')[j] === 'x') kicks.push(t); if ((b.drums.hh || '')[j] === 'x') hats.push(t); } });
-    const meas = mixMeasures(pcm, sr, kicks, hats), kit = nearestKit(meas, KIT_MEASURES);
-    m.drumSound = { kickDecay: meas.kickDecay === null ? null : Math.round(meas.kickDecay * 1000) / 1000, hatBright: meas.hatBright === null ? null : Math.round(meas.hatBright), kit };
+    m.bars.forEach((b, i) => { for (let j = 0; j < 16; j++) { const t = m.downbeat + i * bs + j * st; if ((b.drums.bd || '')[j] === 'x') kicks.push(t); if ((b.drums.hh || '')[j] === 'x' && !['bd', 'cp', 'oh'].some(r => (b.drums[r] || '')[j] === 'x')) hats.push(t); } });
+    const ranks = rankKits(mixHatShape(pcm, sr, hats), KIT_MEASURES, mixHatBright(pcm, sr, hats)), kit = ranks.length ? ranks[0].kit : null;
+    m.drumSound = { kit, ranks: ranks.slice(0, 3) };
+  }
+  // 10. the levels and the chords' sustain (decode-refine D3): the band shares of the original over the bars (the
+  // writer sets each part's gain to come near them), and per bar with a chord how much of it is left at its end
+  {
+    const e = bandEnergy(pcm, sr, m.downbeat * sr, (m.downbeat + m.bars.length * m.barSeconds) * sr), tot = e[0] + e[1] + e[2];
+    if (tot > 0) m.shares = e.map(v => Math.round((v / tot) * 1000) / 1000);
+    m.bars.forEach((b, i) => { if (b.chord) { const a = (m.downbeat + i * m.barSeconds) * sr; b.sustain = sustainOf(pcm, sr, a, a + m.barSeconds * sr); } });
   }
   // (Essentia.js's own tempo and confidence, to read why the engine was or was not taken)
   if (ess) m.essentiaTempo = { bpm: Math.round(ess.bpm * 1000) / 1000, confidence: Math.round(ess.confidence * 1000) / 1000 };

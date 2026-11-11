@@ -292,6 +292,30 @@ What changed against D5: the chroma that leaves out the bass's harmonics shows l
 
 Not met on the bench: MELODIA follows the arp and the pad, louder than the lead in the arp-and-lead song (notes 52 to 60 against a lead at 72 to 81), and YIN finds no single pitch in a polyphonic mix. A tonal-peak tracker (the highest salient peak that is no harmonic) reached 0.47 on the arp song but gives no voicing, so it is not kept. MELODIA reports a pitch about 60 ms late (`MELODY_LAG`). Its voicing replaces `top.up` only in bars where `top.up` hears a top line at all (0.18), because MELODIA also voices a pad or a bass. The Lead is written as `n(…).scale(…)` degrees; a sung melody's Lead has `hush` in the song (muted in Compose) and starts muted in Decode's mix.
 
+### Group 10, second round (12 November)
+
+The first round's machine choice (hat brightness times 1.1, tuned on the bench) is replaced, and the measures are verified on held-out songs: eight short songs on other machines and drive settings (`HOLDOUT_SONGS` in `tools/decode-songs.mjs`, `tools/decode-kits.mjs --holdout`), never used to choose a rule. The bench chose the rules; the held-out songs only verify them.
+
+- **The machine by the hat's spectral shape** (`kit-measure.js`): the closed hats' summed spectrum in twelfth-octave bands from 2 to 16 kHz, in log energy, the tilt over the bands taken out, correlated with each machine's sample. Why not the brightness: the 909's, 707's and 505's hats have centroids within 3 %, and a mix reads hats 1 to 5 % darker than the sample (the other parts, the limiter, distortion tilt the spectrum); their partials sit at different places, which a twelfth of an octave resolves and a tilt does not move. Only hats on steps without a kick, a clap or an open hat count (a hat with a kick carries its sound). Machines within 0.02 of the best correlation are ordered by the hats' brightness. Kick measures are not used: under a bass they read the bass. Right on 7 of 8 bench files (decode-test-174 reads the MC303, 0.829 against the 909's 0.808) and 6 of 8 held-out songs (the 505 with drive read as the 909, a clean 909 under a distorted bass read as the CR-78); the first round's rule on the same held-out songs: 1 of 8.
+- **Distortion: not detected.** Tried: the kick's energy from 1.5 to 6 kHz over its 40-120 Hz energy, the sound before it subtracted, against the clean sample (driven 1.9 and 2.6, clean 0.6 to 2.7); the hats' decay against the sample's (driven 1.31 and 1.06, the clean radio seed 1.13). With the first round's two measures, none separates. The code writes no `distort`.
+- **Chords and Lead:** chords still sounding in the last eighth of their bar (amplitude at least 0.6 of the bar's mean, about -4 dB) get `.room(0.4)`; the Lead's wave and cutoff follow the bars' brightness as the chords' do, one step brighter.
+- **Part levels** (`balanceLevels` in `writer.js`): each sound the writer can write is measured once alone through the app (`tools/decode-levels.cjs` into `src/decode/part-levels.js`, 30 sounds, one 9-second export), and the code's band energy is predicted from it, the gain squared and the share of bars a part plays. Level B's original band shares come from `full.js`. The writer scales the drums', bass's, chords' and Lead's gains in 1.5 dB steps (gains up to 1) to make the largest share difference the smallest. When even the best gains leave a band more than 0.10 off, the prediction does not explain the original (a part the code does not write, a sound unlike the original's) and the gains stay as written: without that rule the balance raised luci-rosse's acid bass and moved its shares further off.
+- `ANALYSIS_VERSION` 8 (7 after the first round on this branch).
+
+| Similarity (B) | Before group 10 | After the second round | Target |
+| --- | --- | --- | --- |
+| Brightness ratio, luci-rosse / radio seed | 0.61 / 0.63 | 0.93 / 0.62 | 0.75 to 1.33 |
+| Brightness ratio, acid / arp | 0.50 / 0.93 | 1.03 / 0.74 | 0.75 to 1.33 |
+| Brightness ratio, decode-test-124 / 90 / 174 / long | 1.32 / 1.45 / 1.41 / 1.30 | 0.84 / 1.40 / 2.37 / 1.22 | 0.75 to 1.33 |
+| Band shares, largest difference: luci-rosse / radio seed | 0.07 / 0.16 | 0.20 / 0.03 | 0.10 |
+| Band shares: acid / arp | 0.14 / 0.15 | 0.20 / 0.02 | 0.10 |
+| Band shares: decode-test-124 / 90 / 174 / long | 0.04 / 0.19 / 0.31 / 0.14 | 0.02 / 0.12 / 0.02 / 0.02 | 0.10 |
+| Mid-band rhythm, decode-test-124 / long | 0.92 / 0.90 | 0.98 / 0.95 | (first round: 0.63 / 0.56) |
+| Low-band rhythm, decode-test-124 / 90 | 0.27 / 0.08 | 0.38 / 0.10 | 0.5 |
+| High-band rhythm, luci-rosse | 0.35 | 0.32 | 0.5 |
+
+Met: the brightness of luci-rosse, acid, decode-test-124 and long; the shares of six files. Not met: the radio seed's brightness (0.62: its supersaw bass, arp and hook are brighter than any sound the writer has), decode-test-90 (1.40) and 174 (2.37, the wrong machine), the arp song's (0.74: the balance lowered its chords and Lead to fit the shares); the shares of acid and luci-rosse (the acid bass); low-band rhythm on decode-test-124 and 90 and high-band rhythm on luci-rosse (not part of group 10's sounds). The first round's mid-band rhythm loss on decode-test-124 and long is gone (0.98 and 0.95): with the right machine, the hats now line up. The snapshot takes each score that improved; the scores that fell stay at their old values, so the check fails on decode-test-174's and the arp song's brightness and on acid's and luci-rosse's shares until they are fixed.
+
 ### Task 11.3: a stable similarity check (12 November)
 
 The arc score moved between two runs of the check on the same code (decode-test-124, 90 and 174 failed on the base commit; the radio seed's arc went from 0.48 to -0.03). Two causes:

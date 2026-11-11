@@ -70,6 +70,25 @@ export const TEST_SONGS = [
     lead('decode-test-arp', ['d5 _ _ ~ f5 _ a5 _ _ ~ g5 _ f5 _ e5 _', 'd5 _ _ ~ c5 _ _ ~ a4 _ c5 _ d5 _ _ ~'], '.s("sawtooth").lpf(3200).gain(.28).room(.2)', ['Lead']),
   ]),
 ];
+// decode-refine 10.1, held out: songs on other drum machines and drive settings, never used to choose a sound rule. They
+// verify the drum machine and the distortion "Our sounds" picks (tools/decode-kits.mjs --holdout); the similarity bench
+// does not use them. 16 bars each, a bass and a pad; the truth is each song's drums settings.
+const held = (id, bpm, key, chords, kit, drive, rows, bassSettings, preset) => song(id, id, [sec('Main', 16, bpm, key, chords)], [
+  { id: 'drums', name: 'Drums', type: 'drums', settings: { kit, drive }, patterns: { A: { rows } }, clips: [{ section: 'Main', pattern: 'A' }] },
+  { id: 'bass', name: 'Bass', type: 'bass', settings: bassSettings, patterns: { A: { preset } }, clips: [{ section: 'Main', pattern: 'A' }] },
+  pad(['Main']),
+]);
+const FOUR = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' }, EIGHTS = { bd: 'x.....x...x.....', cp: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.' };
+export const HOLDOUT_SONGS = [
+  held('held-707-clean', 120, 'G', 'epica', 'RolandTR707', 0, FOUR, {}, 'offbeat'),
+  held('held-505-drive', 132, 'C', 'notturna', 'RolandTR505', 1.6, EIGHTS, {}, 'rolling'),
+  held('held-808-clean', 100, 'F', 'malinconica', 'RolandTR808', 0, EIGHTS, {}, 'sub'),
+  held('held-909-drive', 138, 'E', 'drone', 'RolandTR909', 2, FOUR, { wave: 'sawtooth', cutoff: 300, cutoffEnd: 1000, move: 'fisso', reso: 8, drive: 4.5 }, 'spirale'),
+  held('held-r8-clean', 115, 'D', 'epica', 'RolandR8', 0, EIGHTS, {}, 'offbeat'),
+  held('held-909-clean-dist-bass', 126, 'B', 'drone', 'RolandTR909', 0, FOUR, { wave: 'sawtooth', cutoff: 300, cutoffEnd: 1000, move: 'fisso', reso: 8, drive: 4.5 }, 'spirale'),
+  held('held-606-drive', 128, 'A', 'malinconica', 'RolandTR606', 1, FOUR, {}, 'rolling'),
+  held('held-linn-clean', 110, 'E', 'notturna', 'LinnDrum', 0, EIGHTS, {}, 'sub'),
+];
 // the new test songs (decode-refine 6.1) carry the sound the analysis does not handle yet (groups 7 to 10): the checks
 // report their measures without the targets of the older songs
 export const HARD_SONGS = ['decode-test-acid', 'decode-test-arp'];

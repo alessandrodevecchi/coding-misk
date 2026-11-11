@@ -25,8 +25,8 @@ import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
 import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode } from '../src/decode/writer.js';
-import { nearestKit } from '../src/decode/kit-measure.js';
+import { writeFull, inKey, leadCode, balanceLevels } from '../src/decode/writer.js';
+import { nearestKit, rankKits, shapeOf as hatShapeOf } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
 import { followSong, crescendoSong } from '../src/song/crescendo.js';
@@ -247,7 +247,7 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
   // the same model shape as level A for the same bars (analysis spec: One song model)
   const A = createAnalyzer(pcm).model(30), B = runs['Essentia.js'];
-  check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !['lead', 'leadVoiced', 'third'].includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !['lead', 'leadVoiced', 'third'].includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line, decode-refine D2)');
+  check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !['lead', 'leadVoiced', 'third', 'sustain'].includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !['lead', 'leadVoiced', 'third', 'sustain'].includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line and the chords\' sustain, decode-refine D2 and D3)');
   // level A never calls Essentia.js: the worker loads it only for "analyse all"
   const wsrc = fs.readFileSync('src/decode/worker.js', 'utf8'), msrc = fs.readFileSync('src/decode/misk-analyzer.js', 'utf8');
   check(!/essentia/i.test(msrc.replace(/\/\/.*$/gm, '')) && /async function all[\s\S]*import\('\.\/engine-essentia\.js'\)/.test(wsrc) && !/^import .*(engine-essentia|full)/m.test(wsrc), 'level A uses misk-analyzer only: Essentia.js is imported only by level B, inside the worker');
@@ -437,12 +437,25 @@ if (process.argv.includes('--app')) {
 // decode-refine group 10 (D3): the drum machine by measure, the acid bass's moving filter, Simple kit unchanged
 {
   check(Object.keys(KIT_MEASURES).length >= 20 && KIT_MEASURES.RolandTR909 && KIT_MEASURES.RolandTR808.hatBright > KIT_MEASURES.RolandTR909.hatBright, 'the drum machines measured from their samples (src/decode/kits.js)', `${Object.keys(KIT_MEASURES).length} kits`);
-  check(nearestKit({ hatBright: KIT_MEASURES.RolandTR808.hatBright, kickDecay: KIT_MEASURES.RolandTR808.kickDecay }, KIT_MEASURES) === 'RolandTR808' && nearestKit({ hatBright: KIT_MEASURES.RolandTR909.hatBright * 1.01, kickDecay: 0.005 }, KIT_MEASURES) === 'RolandTR909' && nearestKit({ hatBright: null }, KIT_MEASURES) === null, 'the nearest drum machine wins; a kick decay blurred by the bass does not count');
+  const K = KIT_MEASURES, noisy = v => v.map((x, i) => Math.round((x + (i % 3 - 1) * 0.05) * 100) / 100);
+  check(nearestKit(noisy(K.RolandTR808.hatShape), K) === 'RolandTR808' && nearestKit(noisy(K.RolandTR707.hatShape), K) === 'RolandTR707' && nearestKit(null, K) === null, 'the drum machine whose hat shape is nearest wins');
+  const near = rankKits(K.RolandTR909.hatShape, { A: { hatShape: K.RolandTR909.hatShape, hatBright: 9000 }, B: { hatShape: K.RolandTR909.hatShape.map((x, i) => (i === 3 ? x + 0.05 : x)), hatBright: 6500 } }, 6400);
+  check(near[0].kit === 'B', 'two machines within the tie of the shape are told apart by the hats\' brightness', JSON.stringify(near));
+  const flat = Array.from({ length: 2048 }, (_, k) => (k + 1) ** -2);
+  check(hatShapeOf(flat, 44100).every(x => Math.abs(x) < 0.1), 'a hat shape leaves out the spectrum\'s tilt');
   const base = { bright: 0.2, low: 0.6, bassLo: 100, bassHi: 300 }, acid = { ...base, bassLo: 80, bassHi: 700 };
   check(/sawtooth.*sine\.range\(.*lpq\(8\)/.test(soundsOf([acid, acid], 'ours').bass) && !/lpq/.test(soundsOf([base, base], 'ours').bass), 'a bass whose brightness moves over the bar gets a sawtooth with a moving resonant filter', soundsOf([acid, acid], 'ours').bass);
   check(soundsOf([acid], 'simple').bass === soundsOf([base], 'simple').bass && soundsOf([acid], 'simple').kit === 'RolandTR909', 'Simple kit keeps one set of sounds');
   const Mk = { bpm: 124, barSeconds: 240 / 124, downbeat: 0, key: { root: 9, mode: 'minor' }, sections: [{ start: 0, bars: 4, kind: 'verse' }], ending: 4, drumSound: { kit: 'RolandTR808' }, bars: Array.from({ length: 4 }, () => ({ ...base, chord: 'Am', chordConf: 0.9, level: { drums: 1, bass: 1, chords: 1, other: 0 }, bass: Array(16).fill(null), drums: { bd: 'x...x...x...x...', cp: E, hh: '..x...x...x...x.', oh: E } })) };
   check(writeFull(Mk, { sounds: 'ours' }).tracks[0].settings.kit === 'RolandTR808' && writeFull(Mk, { sounds: 'simple' }).tracks[0].settings.kit === 'RolandTR909', 'level B writes the measured drum machine with Our sounds, the fixed one with Simple kit');
+  // chords that ring on get a room; the Lead's sound follows the brightness
+  check(/\.room\(/.test(soundsOf([{ ...base, sustain: 0.8 }], 'ours').chords) && !/\.room\(/.test(soundsOf([{ ...base, sustain: 0.2 }], 'ours').chords), 'chords still sounding at the end of their bar get a room, short ones none');
+  check(soundsOf([{ ...base, bright: 0.6 }], 'ours').lead !== soundsOf([{ ...base, bright: 0.1 }], 'ours').lead, 'the Lead\'s sound follows the brightness');
+  // the part levels: the balance moves the gains toward the original's band shares, and leaves them when it cannot
+  const tr = () => [{ id: 'drums', type: 'drums', settings: { kit: 'RolandTR909' }, patterns: { A: { rows: {} } }, clips: [{ start: 0, bars: 8 }] }, { id: 'bass', type: 'code', patterns: { A: { code: 'note("a1").s("sine").lpf(400).gain(.75)' } }, clips: [{ start: 0, bars: 8 }] }, { id: 'chords', type: 'code', patterns: { A: { code: 'chord("Am").voicing().s("triangle").lpf(1200).gain(.3)' } }, clips: [{ start: 0, bars: 8 }] }];
+  const t1 = tr(), r1 = balanceLevels(t1, [0.5, 0.48, 0.02], 8), t2 = tr(), r2 = balanceLevels(t2, [0.05, 0.05, 0.9], 8);
+  check(r1 && r1.after <= 0.1 && r1.after <= r1.before && JSON.stringify(t1) !== JSON.stringify(tr()) && r2 && r2.gains === null && JSON.stringify(t2) === JSON.stringify(tr()), 'the part levels come near the original\'s band shares, and stay as written when no gains can reach them', JSON.stringify({ r1, r2 }));
+  check(writeFull({ ...Mk, shares: [0.5, 0.48, 0.02] }, { sounds: 'simple' }).tracks.find(t => t.id === 'bass') === undefined || /gain\(\.75\)/.test(JSON.stringify(writeFull({ ...Mk, shares: [0.9, 0.05, 0.05] }, { sounds: 'simple' }))), 'Simple kit keeps its levels');
 }
 // a tapped or stored tempo is never moved by the relock (decode-refine D4)
 {

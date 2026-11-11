@@ -3,7 +3,8 @@
 // decode-refine 6.2: also the app's own songs of the bench (APP_SONGS: the built-in luci-rosse and one radio song frozen
 // in tests/snapshots/decode-radio-song.json), each with the timeline JSON the export saves next to it (<id>.timeline.json,
 // the truth of tools/decode-measure.mjs). exportSong is the one fast export the similarity check uses too.
-// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-export.cjs [--force]   (dev server on PORT)
+// --holdout: the held-out songs of decode-refine 10.1 instead (HOLDOUT_SONGS, into .cache/decode/holdout/).
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-export.cjs [--force] [--holdout]   (dev server on PORT)
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ROOT = path.join(__dirname, '..');
@@ -51,7 +52,21 @@ async function exportTestSongs(page, { force = false, log = () => {} } = {}) {
   }
   return out;
 }
-module.exports = { exportTestSongs, exportSong, appSong, APP_SONGS, DIR };
+// the held-out songs (decode-refine 10.1, tools/decode-songs.mjs HOLDOUT_SONGS) into .cache/decode/holdout/ → { id: file }
+const HOLDOUT_DIR = path.join(ROOT, '.cache', 'decode', 'holdout');
+async function exportHoldout(page, { force = false, log = () => {} } = {}) {
+  const { HOLDOUT_SONGS } = await import('./decode-songs.mjs');
+  fs.mkdirSync(HOLDOUT_DIR, { recursive: true });
+  const out = {};
+  for (const s of HOLDOUT_SONGS) {
+    const file = path.join(HOLDOUT_DIR, `${s.id}.wav`);
+    out[s.id] = file;
+    if (!force && fs.existsSync(file)) continue;
+    log(`exported ${s.id} (${await exportSong(page, s, file)} s)`);
+  }
+  return out;
+}
+module.exports = { exportTestSongs, exportHoldout, exportSong, appSong, APP_SONGS, DIR, HOLDOUT_DIR };
 
 if (require.main === module) {
   (async () => {
@@ -60,7 +75,8 @@ if (require.main === module) {
     const page = await (await browser.newContext({ viewport: { width: 1300, height: 900 }, acceptDownloads: true })).newPage();
     page.on('pageerror', e => console.error('pageerror', e.message));
     await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
-    const files = await exportTestSongs(page, { force: process.argv.includes('--force'), log: console.log });
+    const opts = { force: process.argv.includes('--force'), log: console.log };
+    const files = process.argv.includes('--holdout') ? await exportHoldout(page, opts) : await exportTestSongs(page, opts);
     for (const [id, f] of Object.entries(files)) console.log(`${id}: ${f} (${Math.round(fs.statSync(f).size / 1024)} KB)`);
     await browser.close();
   })().catch(e => { console.error(e); process.exit(1); });

@@ -7,7 +7,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
-- `tools/decode-kits.mjs`: the app's drum machines measured from their samples into `src/decode/kits.js`.
+- `tools/decode-kits.mjs`: the app's drum machines measured from their hat samples into `src/decode/kits.js`; `--holdout` checks the choice on held-out songs.
+- `tools/decode-levels.cjs`: the sounds Decode writes, measured through the app into `src/decode/part-levels.js`.
 - Decode: in Full, a Lead track writes the top line as a loop per section, with mute and solo; a sung melody starts muted.
 - Decode: All, Audio and Video filters in the library list, with the count of each, remembered and followed by Autoplay, Previous and Next.
 - Stage: Video look in the look menu and the arrows, showing a muted video with every render style, Code over, the widgets and the captions over it.
@@ -108,7 +109,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Decode: in Full, a chord keeps the quality most bars of its section give its root.
 - Decode: in Full, the bass stays in one octave range per section and plays nothing where the bass is quiet.
 - Decode: a detuned bass under a kick is heard.
-- Decode: in Full, "Our sounds" picks the drum machine nearest to the track's kicks and hats, measured against the app's machines.
+- Decode: in Full, "Our sounds" picks the drum machine whose hats sound nearest to the track's.
+- Decode: in Full, chords that ring on get a room, the Lead's sound follows the track's brightness, and each part's level follows the original's balance of low, mid and high.
 - Decode: a bass whose filter moves over the bar is written as a sawtooth with a moving resonant filter.
 - Decode: the code changes less often, in Live and in Full: a line waits a few bars between edits and changes only for a real musical difference.
 - Decode: the space bar only plays and pauses.
