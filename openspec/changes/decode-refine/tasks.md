@@ -73,5 +73,6 @@ A first round is on `feat/91-decode-part-2` (commit 86fcef0), not merged (owner,
 ### 11. Guide, knowledge and docs for part 2 (about 3 h)
 
 - [ ] 11.1 Guide card (the Lead), `docs/knowledge/` (the similarity check and its targets), `AGENTS.md` tooling line for `decode-similarity.cjs`, `DEVLOG.md` with the scores before and after; retune `EDIT_RULE` against the new parts.
+  Done for groups 6 to 9 (11 November, `docs/91-docs-refresh`): the Decode card's Lead (en, it), `docs/knowledge/decode.md` (the rules of groups 7 to 9, the similarity check and its targets, the edit targets) and six rows in `decisions.md`; the `AGENTS.md` tooling lines were already there for `decode-similarity.cjs`, `decode-measure.mjs` and `check-stage-switch.cjs`; `EDIT_RULE` measured after groups 7 to 9 and with six other rules (design D7): kept as it is. Open: group 10's part (sounds by measure, its docs and its similarity scores before and after in the DEVLOG).
 - [ ] 11.3 Similarity check noise: the arc score changes between exports of flat songs (it fails on the base commit too); make it stable before the snapshot is updated.
 - [ ] 11.2 Essentia.js again: the A/B listening round of 6.4 repeated after groups 7 to 10 (same files, new random labels); keep, drop or limit it, recorded in `docs/knowledge/decisions.md`.

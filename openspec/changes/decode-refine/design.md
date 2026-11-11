@@ -233,6 +233,32 @@ After part 1 (11 November):
 
 (The radio song's level A runs at 117.46 BPM: see D4. Vocal track 2 in level A: 18 of its 36 edits are the drums stopping and entering again for two bars or more.) Targets: 10-30 % of bars, 2-8 edits per minute at 120-130 BPM, an average of at least 20 characters, at most 15 % small edits, at least 90 % of the section changes in level B with an edit within one bar. The small edits target is the hardest: a chord loop edit is often a few characters (`G` for `Dm`), and it is a real edit. The numbers are a starting point, to tune after the owner listens to Luci Rosse and a song with a voice (open question 2).
 
+After groups 7 to 9 (11 November, task 11.1), the same files and tool with the current `EDIT_RULE`:
+
+| File          | Level | Bars edited | Edits per minute | Average size | Small edits | Section changes edited |
+| ------------- | ----- | ----------- | ---------------- | ------------ | ----------- | ---------------------- |
+| Luci Rosse    | A     | 22 %        | 6.7              | 15           | 60 %        | 75 %                   |
+| Radio song    | A     | 17 %        | 7.3              | 32           | 40 %        | 56 %                   |
+| Vocal track 1 | A     | 13 %        | 4.3              | 33           | 55 %        | 29 %                   |
+| Vocal track 2 | A     | 33 %        | 10.4             | 19           | 39 %        | 56 %                   |
+| Luci Rosse    | B     | 12 %        | 3.7              | 115          | 0 %         | 100 %                  |
+| Radio song    | B     | 11 %        | 4.7              | 46           | 44 %        | 100 %                  |
+| Vocal track 1 | B     | 14 %        | 4.8              | 169          | 7 %         | 100 %                  |
+| Vocal track 2 | B     | 20 %        | 6.4              | 167          | 23 %        | 100 %                  |
+
+The drums found by group 7 add edits where level A used to hear nothing (Luci Rosse 10 % to 22 % of bars, still inside the target); the radio song now runs at its real tempo. Retune tried with `--rule`, the same files:
+
+| Rule tried                      | What moved                                                                                                                          |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `lineBars` 6                    | Nothing on Luci Rosse; vocal track 1 in A 13 % to 12 %; the radio song and vocal track 2 in A slightly more edits                    |
+| `anyBars` 3                     | Vocal tracks 1 and 2 in A 0.3 edits fewer per minute; section changes edited in A drop (29 % to 14 %, 56 % to 44 %)                 |
+| `lineBars` 6, `anyBars` 3       | Close to `anyBars` 3 (vocal track 1 in A 11 %); the radio song in B 11 % to 10 %                                                    |
+| `runBars` 3                     | Only vocal track 2 in B: 20 % to 17 % of bars, small edits 23 % to 12 %; but a two-bar stop inside a section is filled (`check:decode` fails: the spec keeps it) |
+| `chordShare` 0.5                | Vocal track 2 in A 33 % to 29 %, small edits 39 % to 29 %; the radio song's small edits in A 40 % to 48 %, section changes edited in A drop |
+| `lineBars` 6, `chordShare` 0.5  | Vocal track 1 in A 13 % to 10 % (at the target's floor), 43 characters; vocal track 2 in A 31 %; section changes edited in A drop    |
+
+`EDIT_RULE` stays as it is: no variant improves the files without a cost elsewhere. What is still out of target is not in these numbers: vocal track 2 in level A has 18 mutes of 36 edits (its drums stop and enter again, the enter and stop rule of `planA`), and most small edits are chord changes of a few characters, which are real edits.
+
 ### D8. Tap tempo key and Auto (part 1)
 
 The **T** key taps the tempo while the Decode tab shows and a track plays, with no modifier and the focus outside text fields and the editor. A key press of T does not activate a focused button, so the conflict goes. A **Tap** button next to ½× and 2× counts on `pointerdown` (or a click from the keyboard) and shows the taps so far (1/4, 2/4…); it is disabled while the track does not play, and it also shows while the tempo is still being found. The space bar keeps play and pause only. Keys already used were checked: Space, Ctrl/Cmd+Enter, Ctrl/Cmd+., Escape everywhere; digits and P in the radio; pads in the sound browser; C and B in the live room window; Y, N and arrows in the soul display. T is free.
