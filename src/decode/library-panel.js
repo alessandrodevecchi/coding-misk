@@ -6,7 +6,7 @@
 // stored analysis. The tab opens tracks; the panel finds their files.
 import { foldersSupported, pickFolder, permission, scanFolder, fileAt } from './folders.js';
 import { createLibraryStore } from './library-store.js';
-import { buildRows, filterRows, sortRows, listPrefs, windowOf, fileKey, LIST_KEY, AUTOPLAY_KEY } from './library.js';
+import { buildRows, filterRows, sortRows, listPrefs, windowOf, fileKey, usedSnapshot, LIST_KEY, AUTOPLAY_KEY } from './library.js';
 import { createMixtape, addRows, moveRow, removeRow, renameMixtape, setRepeat, relinkSingle, rowStatus, relinkFolder, exportMixtapes, mergeMixtapes } from './mixtapes.js';
 import { AUDIO_EXT, VIDEO_EXT } from './folders.js';
 
@@ -83,8 +83,14 @@ export function createLibraryPanel({ app, store, hooks }) {
   const getRows = () => { if (rowsDirty) { rows = buildRows({ folders, files: files.map(f => (gone.has(fileKey(f.folderId, f.path)) ? { ...f, missing: true } : f)), entries }); rowsDirty = false; } return rows; };
   // the rows sorted once per order and the filtered list once per chip and search: scrolling and stepping read them
   const sorted = { rows: null, order: null, list: [] }, filtered = { base: null, chip: null, search: null, list: [] };
-  function listFor({ chip = 'all', search: q = '', order = 'name' } = {}) {
+  const frozen = { rows: null, used: null, chip: null, search: null, list: [] };
+  function listFor({ chip = 'all', search: q = '', order = 'name', used = null } = {}) {
     const r = getRows();
+    // a context's frozen order by recent: sorted by its own last uses, once per context and rows
+    if (order === 'recent' && used) {
+      if (frozen.rows !== r || frozen.used !== used || frozen.chip !== chip || frozen.search !== q) Object.assign(frozen, { rows: r, used, chip, search: q, list: sortRows(filterRows(r, { chip, search: q }), 'recent', used) });
+      return frozen.list;
+    }
     if (sorted.rows !== r || sorted.order !== order) { sorted.rows = r; sorted.order = order; sorted.list = sortRows(r, order); }
     if (filtered.base !== sorted.list || filtered.chip !== chip || filtered.search !== q) { filtered.base = sorted.list; filtered.chip = chip; filtered.search = q; filtered.list = filterRows(sorted.list, { chip, search: q }); }
     return filtered.list;
@@ -435,13 +441,15 @@ export function createLibraryPanel({ app, store, hooks }) {
 
   // a row of the list: the context is the list as it is now (D8)
   function openFromList(r) {
-    const ctx = { kind: 'list', chip: prefs.chip, search, order: prefs.order, key: r.key, pos: Math.max(0, shown.findIndex(x => x.key === r.key)) };
+    const ctx = { kind: 'list', chip: prefs.chip, search, order: prefs.order, key: r.key, pos: Math.max(0, shown.findIndex(x => x.key === r.key)), ...(prefs.order === 'recent' ? { used: usedSnapshot(getRows()) } : {}) };
     if (r.kind === 'recent') { hooks.openRecent(r.fp, ctx); return; }
     hooks.openRow(r, ctx, true);
   }
   function open() {
     overlay = true; isOpen = true; note = null;
     render();
+    // the user looks at the list again: a context with the order by recent takes it as it is now
+    if (hooks.opened) hooks.opened();
     // the list refreshes when the panel opens: folders allowed this session are read again (at most every 30 s)
     for (const f of folders) if (f.granted && !scanning.has(f.id) && Date.now() - (f.scanned || 0) > 30000) scan(f);
     readTagsSoon();
@@ -461,6 +469,7 @@ export function createLibraryPanel({ app, store, hooks }) {
     // inline under the empty tab's drop area, or over the tab's panel
     mount(slot, asOverlay) { overlay = !!asOverlay; if (!asOverlay) isOpen = false; if (el.parentNode !== slot) slot.appendChild(el); render(); },
     rows: getRows,
+    usedSnapshot: () => usedSnapshot(getRows()),
     // the list of a context (chip, search, order), sorted and filtered once (Autoplay, Previous and Next)
     listFor,
     prefs: () => ({ ...prefs, search }),
