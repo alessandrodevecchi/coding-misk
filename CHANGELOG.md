@@ -117,6 +117,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Decode library: ticking a row's checkbox in Select mode now selects the row.
 - Decode: the name of a track not heard keeps its contrast in the light theme.
 - Decode: in Full, a part heard every other bar no longer mutes and unmutes on every bar.
 - A curve or energy command on a grown radio song no longer builds the director's view on the page while it waits for its steering.

@@ -384,7 +384,8 @@ export function createLibraryPanel({ app, store, hooks }) {
     if (e.key === 'Enter' && e.target.closest('[data-dcl-row]') === null && e.target.id === 'dcl-list') { const r = shown[0]; if (r) openFromList(r); }
   });
   el.addEventListener('click', async e => {
-    const b = e.target.closest('button, [data-dcl-row], input.dcl-sel');
+    // a click on a row's checkbox counts for its row (the box alone would tick without selecting)
+    const b = e.target.closest('button, [data-dcl-row]');
     if (!b) return;
     if (b.id === 'dcl-close') { close(); return; }
     if (b.id === 'dcl-choose') { hooks.pick(); return; }

@@ -304,7 +304,11 @@ const INIT = () => {
     if (!(await page.$('#dcl'))) { await page.click('#dc-another'); await sleep(300); }
     await chip('all'); await page.click('#dcl [data-dcl-order="name"]'); await sleep(200);
     await page.click('#dcl-select'); await sleep(200);
-    for (const n of ['a', 'b', 'c', 'Night Run']) await clickRow(n);
+    // two rows by their checkbox, two by the row itself
+    for (const n of ['a', 'b']) { const k = await rowKey(n); if (k) await page.click(`#dcl [data-dcl-row="${k}"] input.dcl-sel`); await sleep(100); }
+    const selN = await page.innerText('#dcl-selbar-n'), addOn = await page.$eval('#dcl-addto', b => !b.disabled);
+    check(/2/.test(selN) && addOn, 'a click on a row\'s checkbox selects the row and enables Add to mixtape', `${selN}, enabled ${addOn}`);
+    for (const n of ['c', 'Night Run']) await clickRow(n);
     await page.click('#dcl-addto'); await sleep(200);
     await page.click('#dcl [data-dcl-addto=""]'); await sleep(600);
     let st = await pst();
