@@ -696,6 +696,97 @@ const play = async page => { if (!(await page.evaluate(() => document.querySelec
     await ctx.close();
   }
 
+  // ---------- fast: the fast video and the fragments draw the Video look from the files (D12, D13) ----------
+  if (ONLY.includes('fast')) {
+    const os = require('node:os');
+    const frameAt = (f, t, w = 36, h = 64) => execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', f, '-frames:v', '1', '-vf', `scale=${w}:${h}`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']);
+    const diff = (a, b) => { let n = 0; for (let i = 0; i < Math.min(a.length, b.length); i++) n += Math.abs(a[i] - b[i]); return n / Math.max(1, Math.min(a.length, b.length)); };
+    const pcmOf = f => { const b = execFileSync('ffmpeg', ['-v', 'error', '-i', f, '-ac', '1', '-ar', '12000', '-f', 's16le', '-'], { maxBuffer: 1 << 28 }); return new Int16Array(b.buffer, b.byteOffset, b.length >> 1); };
+    const rms = a => Math.sqrt(a.reduce((n, v) => n + v * v, 0) / Math.max(1, a.length));
+    const load = () => require('node:os').loadavg().map(x => x.toFixed(1)).join(' ');
+    const ctx = await browser.newContext({ viewport: { width: 1300, height: 950 }, acceptDownloads: true });
+    const page = await ctx.newPage(), errors = [], downloads = [], logs = [];
+    page.on('pageerror', e => errors.push(e.message)); page.on('download', d => downloads.push(d));
+    page.on('console', m => { if (/\[fast video\] Video/.test(m.text())) logs.push(m.text()); });
+    await page.goto(URL0); await sleep(1500);
+    await page.evaluate(() => { localStorage.clear(); for (const [k, v] of Object.entries({ 'coding-misk-look': 'video', 'coding-misk-export-speed': 'fast', 'coding-misk-export-format': 'wav' })) localStorage.setItem(k, JSON.stringify(v)); });
+    await page.reload(); await sleep(3000);
+    await useFiles(page, ['green.mp4', 'blue.mp4', 'red.webm']);
+    const save = async (re, name) => { for (let i = 0; i < 600; i++) { const d = downloads.find(x => re.test(x.suggestedFilename())); if (d) { downloads.splice(downloads.indexOf(d), 1); const f = path.join(os.tmpdir(), `svf-${Date.now()}-${name}`); await d.saveAs(f); return f; } await sleep(500); } return null; };
+    const frag = async (o, name) => { await page.evaluate(o => globalThis.codingMiskClips.fragments(o), { source: 'kellerlicht', quiet: true, render: 'normal', ...o }); return save(/fragment \d+\.mp4$/, name); };
+    // 1. two exports of the same stretch give the same frames; a longer fragment has the same frames at the same song times
+    const A = await frag({ from: 30, to: 38, look: 'video' }, 'a.mp4'), B = await frag({ from: 30, to: 38, look: 'video' }, 'b.mp4'), C = await frag({ from: 28, to: 40, look: 'video' }, 'c.mp4');
+    const P = await frag({ from: 30, to: 38, look: 'palco' }, 'p.mp4');
+    check(!!(A && B && C && P), 'four fragments saved (Video twice, a longer one, Palco)');
+    if (A && B && C && P) {
+      const d1 = Math.max(...[1, 3.5, 6].map(t => diff(frameAt(A, t), frameAt(B, t))));
+      check(d1 < 2, 'two exports with Video give the same frames', `largest mean difference ${d1.toFixed(2)}`);
+      // (the picture's band of the 9:16 frame: the label, the tagline and the typed code differ between two fragments)
+      const band = (f, t) => execFileSync('ffmpeg', ['-v', 'error', '-ss', String(t), '-i', f, '-frames:v', '1', '-vf', 'crop=iw:ih*0.34:0:ih*0.32,scale=36:24', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']);
+      const d2 = Math.max(...[1.5, 4, 6.5].map(t => diff(band(A, t), band(C, t + 2))));
+      check(d2 < 3, 'a fragment\'s video frames equal the longer export\'s at the same song times', `largest mean difference ${d2.toFixed(2)}`);
+      const dv = diff(frameAt(A, 2), frameAt(P, 2));
+      check(dv > 5, 'the Video fragment differs from the Palco one (the video is drawn)', `${dv.toFixed(1)}`);
+      const a = pcmOf(A), p = pcmOf(P), n = Math.min(a.length, p.length);
+      let e = 0; for (let i = 0; i < n; i++) e += (a[i] - p[i]) ** 2;
+      const rel = Math.sqrt(e / n) / Math.max(1, rms(p));
+      check(rel < 0.05, 'the sound of the Video export equals the Palco export', `difference ${(rel * 100).toFixed(2)} % of the level`);
+      if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '3', '-i', A, '-frames:v', '1', path.join(SHOTS, 'fragment-video.png')]); }
+    }
+    // 2. an undecodable file: the fallback look and the log line
+    await useFiles(page, ['broken.mkv']);
+    logs.length = 0;
+    const X = await frag({ from: 30, to: 33, look: 'video' }, 'x.mp4');
+    check(!!X && logs.some(l => /cannot be decoded|cannot be read|fallback/.test(l)), 'an undecodable file: the export completes with the fallback look and says so', logs.slice(-2).join(' | '));
+    // 3. the time against Palco at 1080p30, Normal and LED (a warning above 2×, above 1.5× in Normal; never a failure)
+    await useFiles(page, ['green.mp4', 'blue.mp4', 'red.webm']);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
+    await page.evaluate(() => localStorage.setItem('coding-misk-out-kind', JSON.stringify('video')));
+    await page.reload(); await sleep(3000); await useFiles(page, ['green.mp4', 'blue.mp4', 'red.webm']);
+    await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await sleep(500);
+    const card = '#songs [data-song-id="dci-carica"]';
+    const songExport = async (lk, render, quality = '1080p30') => {
+      await page.evaluate(([lk, render, quality]) => { localStorage.setItem('coding-misk-video', JSON.stringify({ layout: 'visual', quality, card: 'never', soulPanel: false, visual: `fixed:${lk}`, soul: 'off', render })); }, [lk, render, quality]);
+      logs.length = 0;
+      const t0 = Date.now(), prog = [];
+      await page.click(`${card} [data-act="export"]`); await sleep(800);
+      while (Date.now() - t0 < 600000) { const j = await page.evaluate(() => globalThis.codingMiskExport.job); if (!j) break; prog.push([Date.now() - t0, j.progress, j.phase]); await sleep(500); }
+      const ms = Date.now() - t0;
+      const f = await save(/\.(mp4|webm)$/, `${lk}-${render}-${quality}.mp4`);
+      await save(/timeline\.json$/, 'tl.json'); await page.evaluate(() => { const p = document.querySelector('.texts-panel'); if (p) p.remove(); });
+      const stats = await page.evaluate(() => globalThis.codingMiskFastVideoStats || null);
+      await page.evaluate(() => { globalThis.codingMiskFastVideoStats = null; });
+      return { ms, f, prog, stats, logs: logs.slice() };
+    };
+    const ratios = {};
+    for (const r of ['normal', 'led']) {
+      const pal = await songExport('palco', r), vid = await songExport('video', r);
+      ratios[r] = { palco: Math.round(pal.ms / 100) / 10, video: Math.round(vid.ms / 100) / 10, ratio: +(vid.ms / pal.ms).toFixed(2), load: load(), decode: vid.stats ? [...new Set(vid.stats.sizes)].join(',') : '—', reused: vid.stats ? vid.stats.reused : 0, cached: vid.stats ? vid.stats.cached : 0, decoded: vid.stats ? vid.stats.decoded : 0 };
+      const lim = r === 'normal' ? 1.5 : 2;
+      (ratios[r].ratio > lim ? note : (n, x) => check(true, n, x))(`${r}: the fast export with Video against Palco at 1080p30${ratios[r].ratio > lim ? ` above ${lim}× (a warning, not a failure)` : ''}`, `${ratios[r].video} s against ${ratios[r].palco} s, ${ratios[r].ratio}×, load ${ratios[r].load}, decoded at ${ratios[r].decode}, ${ratios[r].decoded} decoded, ${ratios[r].cached} cached, ${ratios[r].reused} reused`);
+      check(!!(pal.f && vid.f), `${r}: both exports saved`);
+    }
+    RESULTS.fastRatio = ratios;
+    // 4. 1080p60 from 30 fps files: frames reused; a 4K source at 1080p60 with the CPU slowed: it completes, the
+    // progress reaches the end and moves at the real rate
+    const r60 = await songExport('video', 'normal', '1080p60');
+    check(r60.stats && r60.stats.reused + r60.stats.cached > 0, '1080p60 from 30 fps videos: frames drawn again without decoding', r60.stats ? `${r60.stats.decoded} decoded, ${r60.stats.reused} reused, ${r60.stats.cached} cached` : 'no stats');
+    await useFiles(page, ['uhd.mp4']);
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 2 });
+    const slow = await songExport('video', 'normal', '1080p60');
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    const fr = slow.prog.filter(x => x[2] === 'frames' || x[2] === 'render');
+    const last = slow.prog[slow.prog.length - 1] || [0, 0];
+    // the time left from the measured rate at half way, against the real end
+    const half = fr.find(x => x[1] >= 0.5), eta = half ? half[0] / half[1] : null;
+    RESULTS.slow = { seconds: slow.ms / 1000, lastProgress: last[1], etaAtHalf: eta && eta / 1000, decode: slow.stats ? [...new Set(slow.stats.sizes)].join(',') : '—' };
+    check(!!slow.f && last[1] > 0.9, 'a 4K source at 1080p60 with the CPU slowed: the export completes, the progress reaches the end', `${(slow.ms / 1000).toFixed(1)} s, last progress ${last[1].toFixed(2)}, decoded at ${RESULTS.slow.decode}`);
+    if (eta) note('the time left at half way from the measured rate', `${(eta / 1000).toFixed(1)} s estimated, ${(slow.ms / 1000).toFixed(1)} s real`);
+    check(!errors.length, 'fast: no page errors', errors.join('; '));
+    await ctx.close();
+  }
+
   await browser.close();
   const jsonOut = opt('--json');
   if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify(RESULTS, null, 2));

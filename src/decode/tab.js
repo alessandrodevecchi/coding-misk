@@ -748,6 +748,9 @@ export function createDecodeTab({ root, app }) {
       sg, song: songB(), title: cur.title, artist: cur.artist, key: cur.fp ? cur.fp.key : 'decode', mix,
       cover: { title: cur.title, artist: cur.artist, attribution: cur.attribution, original: mix.hasOriginal },
       seconds: cur.duration, whole: () => wholeJob(parts), fragment: () => fragmentJob(parts),
+      // the file's picture for the Video look in the fast video (stage-video D12): the file time is the song's plus the
+      // downbeat
+      video: cur.video ? { file: cur.file, downbeat: modelB.downbeat } : null,
     };
   }
   // cancel (analysis spec: Cancel): the worker ends, nothing is stored for level B, level A stays

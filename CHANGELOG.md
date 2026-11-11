@@ -9,6 +9,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 - Stage: Video look in the look menu and the arrows, showing a muted video with every render style, Code over, the widgets and the captions over it.
 - Stage: with Video chosen and nothing to show, the stage shows the song's own look or Palco, and the menu keeps Video.
+- Fast video and fragments: the Video look decoded from the files frame by frame, the same frames in every export of the same song, and Video offered as a fixed visual and a fragment visual.
 - Session video: a recording with the Video look keeps the stage video playing while the stage is scrolled away or the tab is in the background.
 - Decode: with the Video look, the stage shows the picture of the video file Decode plays, in sync with the sound, also for a video without sound.
 - Settings: "Stage videos" card with the folders of the Video look (Chrome, Edge), their number of videos, Allow access, remove with confirmation, and the size mode Fill, Fit or Stretch.

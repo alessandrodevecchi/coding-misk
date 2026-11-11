@@ -76,7 +76,9 @@ import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createStageVideo } from './visuals/stage-video.js';
 import { createStageFolders } from './visuals/stage-video-folders.js';
-import { SV_KEY, sizeOf as svSizeOf, fallbackLookOf } from './visuals/stage-video-rules.js';
+import { SV_KEY, sizeOf as svSizeOf, fallbackLookOf, folderSignature, seededPick, trackTime, loopTime, decodeSize } from './visuals/stage-video-rules.js';
+import { createVideoFrames } from './video/stage-video-frames.js';
+import { passSizes } from './visuals/render-styles.js';
 import { createVideo } from './video/video.js';
 import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, codeColsOf, TIMELINE_LAYOUTS, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
 import { liveAreas } from './live/presets.js';
@@ -1668,7 +1670,7 @@ async function exportDecode(kind) {
   if (!d) return;
   if (fastJob || rec || capture || decodeRec) return toast(t('dcExportBusy'));
   const job = d.whole(), asVideo = outKind() === 'video';
-  const dec = { job, seconds: d.seconds, timeline: { cover: { title: d.cover.title, artist: d.cover.artist, attribution: d.cover.attribution }, start: job.start }, texts: { cover: d.cover, textsTitle: d.cover.attribution ? d.title : t('dcHeading'), seconds: d.seconds } };
+  const dec = { job, seconds: d.seconds, video: d.video, timeline: { cover: { title: d.cover.title, artist: d.cover.artist, attribution: d.cover.attribution }, start: job.start }, texts: { cover: d.cover, textsTitle: d.cover.attribution ? d.title : t('dcHeading'), seconds: d.seconds } };
   if (exportSpeed() === 'fast' && (!asVideo || video.opts().layout !== 'tab')) {
     if (await (asVideo ? exportVideoFast(d.sg, d.title, { seed: d.key, dec }) : exportFast(d.sg, d.title, null, null, { seed: d.key, dec }))) return;
     toast(t('exportFastFailed'));
@@ -1867,6 +1869,9 @@ async function exportVideoFast(...args) {
   try { return await exportVideoFastIn(...args); } finally { exportCols = null; }
 }
 async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = null, cut = null, frag = null, seed = null, dec = null } = {}) {
+  // the Video look may need stage video folders waiting for access: asked first, while the export's click still counts
+  // (stage-video D12); refused, those parts use the fallback look
+  { const v0 = video.opts().visual || 'stage'; if (svFolders && svFolders.waiting() && (look === 'video' || v0 === 'fixed:video' || (frag && frag.o.look === 'video'))) await svFolders.allow().catch(() => []); }
   // texts on stage off for this one export (spoken-text-on-stage D7): the fragment menu's choice, or Settings → Video
   const noCaptions = frag ? !!frag.noCaptions : capsSkipNext;
   if (!frag) capsSkipNext = false;
@@ -1962,11 +1967,52 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   const fragJ = frag ? { q, comp: fsz.comp, o: frag.o, label: frag.label, code: frag.code, tagline: frag.tagline, msgs: frag.msgs, length: frag.end - frag.start, ct } : null;
   // a fragment's visual and soul view: the song's own, one at random (from the fragment's code), or one chosen
   const pickOf = (choice, list) => (choice === 'random' ? list[hashString(`${frag.code}/${list.length}`) % list.length] : list.includes(choice) ? choice : null);
-  const fragLook = frag ? pickOf(frag.o.look, looks) : null;
+  // (a fragment's "random" never picks Video: it would need files the viewer did not choose)
+  const fragLook = frag ? pickOf(frag.o.look, frag.o.look === 'random' ? looks.filter(l => l !== 'video') : looks) : null;
   // the render of the file (widget-render-styles D7): the fragment's or the video's own, else the stage's
   const fRender = outRender(frag ? frag.o.render : o.render);
   if (frag) soul.force(pickOf(frag.o.soulView, SOUL_VIEWS));
   const EQ = ['kick', 'snare', 'hats', 'bass', 'arp', 'pad', 'hook'];
+  // the Video look (stage-video D12, D13): one file per part (the Decode file, the video the stage shows for the song
+  // open, else the seeded pick), its frames decoded offline before each frame; its time is the song's (the file time
+  // for a track video, the song's seconds modulo the video's length for a stage video), so two exports and a fragment
+  // give the same frames
+  const partOf = cyc => parts.find(x => cyc >= x.start && cyc < x.end) || parts[parts.length - 1];
+  const lookOfPart = p => fragLook || lookFor(o, looks, { n: p.n, section: p.first, own, stage: stageLook });
+  const vParts = parts.filter(p => lookOfPart(p) === 'video');
+  const vSize = svSizeOf(store.get(SV_KEY, null));
+  const vFallback = p => fallbackLookOf(songs ? ((songs[p.n - 1] || {}).song || {}).look : sg.look, looks);
+  let vf = null, vCanvas = null;
+  const vSrc = new Map(), vFailed = new Set(), VT = tempoClock(job.bpm.map ? job.bpm : sg.meta.bpm.map(Number)), vOff = job.start || 0;
+  const vTime = (p, t, dur) => (vSrc.get(p.n).kind === 'track' ? trackTime(vOff + t + dec.video.downbeat, dur) : loopTime(vOff + t - VT.seconds(p.start), dur));
+  if (vParts.length) {
+    const files = svFiles(), sig = folderSignature(files), live = stageVideo.state();
+    for (const p of vParts) {
+      if (dec && dec.video) { vSrc.set(p.n, { key: 'track', kind: 'track', file: dec.video.file, name: dec.video.file.name }); continue; }
+      const it = songs ? songs[p.n - 1] : null, songId = it && it.song && it.song.id ? it.song.id : `${sg.id || title}${songs ? `/${p.n}` : ''}`;
+      // WYSIWYG (D5): the song open on the stage keeps the stage video the stage shows
+      let f = !songs && !dec && live.pick && live.cur && live.cur.kind === 'stage' && live.pick.song === svSong() && svSong() === `compose:${sg.id}` ? files.find(x => x.key === live.pick.key) : null;
+      if (!f) f = seededPick(files, songId, p.n, sig);
+      if (f) vSrc.set(p.n, { key: f.key, kind: 'stage', open: f.open, name: f.name });
+    }
+    const P = passSizes(fRender, stageA.w, stageA.h, { density: renderDensity() }), work = P && P.w && P.h ? { w: P.w, h: P.h } : null;
+    vf = createVideoFrames({ fps: q.fps, need: decodeSize(fRender, stageA, work), size: vSize, log: line => console.info(line) });
+    const total = (job.cut || VT.seconds(job.bpm.length) + (job.tail || 0)) - vOff, nFrames = Math.ceil(total * q.fps);
+    // the video times of a part's frames, in order (the frames of that part only)
+    vf.timesFor = (p, dur) => { const out = []; for (let fi = 0; fi < nFrames; fi++) { const t = fi / q.fps; if (partOf(Math.max(0, VT.cycleAt(vOff + t))) === p) out.push(vTime(p, t, dur)); } return out; };
+    if (!vSrc.size) console.info('[fast video] Video: no stage video and no Decode file; the frames use the fallback look');
+  }
+  const prepareFrame = vf ? async (t, cyc) => {
+    vCanvas = null;
+    const p = partOf(cyc), src = vSrc.get(p.n);
+    if (!src || vFailed.has(p.n) || lookOfPart(p) !== 'video') return;
+    const key = `${p.n}:${src.key}`;
+    if (vf.key !== key) {
+      const file = src.file || await src.open().catch(() => null);
+      if (!file || !(await vf.open({ key, kind: src.kind, file }, d => vf.timesFor(p, d)))) { vFailed.add(p.n); if (!file) console.info(`[fast video] Video: "${src.name}" cannot be read; its frames use the fallback look`); return; }
+    }
+    vCanvas = await vf.frame(vTime(p, t, vf.duration));
+  } : null;
   visuals.hold(true);
   let clockT = 0;
   soul.setClock(() => clockT);
@@ -1990,13 +2036,14 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
       const fLook = fragLook || lookFor(o, looks, { n: p.n, section, own, stage: stageLook });
       fv.look = fLook; exportLooks.add(fLook);
       if (!stageLogged && (WIDGET_LOOKS.includes(fLook) || layerOn(SWS.sw, fLook))) { stageLogged = true; console.info(`[fast video] ${WIDGET_LOOKS.includes(fLook) ? fLook : `layer over ${fLook}`}: notes from the render page; stage scopes use ${instWave ? `their instrument rendered alone (${Object.keys(waves).sort().join(', ')}), else ` : ''}the song's wave scaled by each instrument's level`); }
-      visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0, render: fRender, light: renderLight() === 'on' ? 'on' : 'off', density: renderDensity() });
+      visuals.drawAt({ now: t * 1000, cyc, look: fLook, feed: { ...feed, store: stageNotes, instWave }, dt: 1 / q.fps, show: fi % 6 === 0, render: fRender, light: renderLight() === 'on' ? 'on' : 'off', density: renderDensity(), video: vCanvas, fallback: vFallback(p), size: vSize });
       if (fragJ) video.composeVertical(fragJ, cyc, t, t, EQ.map(k => Math.min(1, ((feed.raw || {})[k] || 0) * 3)), section);
       else video.composeAt({ layout, q, ct }, cyc, t);
     },
     onProgress: (p, phase) => { if (fastJob) { fastJob.progress = p; fastJob.phase = phase; } },
     onNotes: cw ? (block, more) => cw.addNotes(block, more) : null,
     onStageNotes: block => { for (const [k, list] of Object.entries(block)) for (const n of list) stageNotes.add(k, n); },
+    prepareFrame,
     onLit: overOn ? L => { for (const x of L.haps) { const src = L.codes[x[2]]; let k = litCodes.lastIndexOf(src); if (k < 0) k = litCodes.push(src) - 1; lits.push([x[0], x[1], k, x[3]]); } lits.sort((a, b) => a[0] - b[0]); } : null,
   });
   if (preview) preview.stop();
@@ -2019,6 +2066,8 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
   } finally {
     fastJob = null; fv = null;
     soul.setClock(null); soul.force(null); visuals.hold(false); visuals.setTarget(null);
+    // the Video look's decoding: the export log line, then the decoder closed (D13)
+    if (vf) { const S = vf.stats; globalThis.codingMiskFastVideoStats = { ...S }; console.info(`[fast video] Video: ${S.parts} part(s), decoded at ${[...new Set(S.sizes)].join(', ') || '—'}, ${S.decoded} frames decoded, ${S.reused} reused, ${S.cached} from the loop cache${S.failed.length ? `, failed: ${S.failed.join(', ')}` : ''}`); vf.close(); }
   }
 }
 // code-widgets D11 (cw-5): the instruments of the scope and spectrum widgets rendered alone, mono at a quarter of the
