@@ -22,12 +22,17 @@ The Decode tab SHALL have an Autoplay switch, off by default. Its state SHALL be
 
 ### Requirement: The next track
 
-When a track opens from the list, the tab SHALL remember the list as it was then: the chosen folder chip, the search text and the order. When a track opens from a mixtape, the tab SHALL remember the mixtape and the row. With Autoplay on, the next track SHALL be the track after the playing one in that list or mixtape, read when the next track is prepared, so files added in the meantime count. A track opened with "Choose a file…" or by dropping it SHALL have no next track.
+When a track opens from the list, the tab SHALL remember the list as it was then: the chosen folder chip, the kind filter, the search text and the order. When a track opens from a mixtape, the tab SHALL remember the mixtape and the row. With Autoplay on, the next track SHALL be the track after the playing one in that list or mixtape, read when the next track is prepared, so files added in the meantime count. A track opened with "Choose a file…" or by dropping it SHALL have no next track.
 
 #### Scenario: Filtered list
 
 - **WHEN** the "Demos" chip is active, the order is by name, Autoplay is on and the track "B" of Demos ends
 - **THEN** the next track of Demos by name after "B" opens, even if a track of another folder would come first by name
+
+#### Scenario: Kind filter
+
+- **WHEN** the Video kind is picked, Autoplay is on and a video of the list ends
+- **THEN** the next video of the list opens, not an audio file between them by name
 
 #### Scenario: Order by recent
 

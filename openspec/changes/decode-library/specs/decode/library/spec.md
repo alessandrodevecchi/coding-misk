@@ -171,6 +171,20 @@ The panel SHALL have one chip per folder plus All; a chip SHALL keep only that f
 - **WHEN** the user presses × on the "Demos" chip and confirms
 - **THEN** the chip and its tracks leave the list, and a track of Demos decoded before still opens with its stored analysis when picked again
 
+### Requirement: Kind filter
+
+The panel SHALL have a kind filter "All / Audio / Video" ("Tutti / Audio / Video") that keeps every track, the audio files only, or the video files only; a video without sound SHALL count as Video. It SHALL combine with the folder chip, the search and the order, and SHALL be remembered with them. Each choice SHALL show how many tracks it holds within the chip and the search, counted from the list already in memory, with no file read.
+
+#### Scenario: Videos only
+
+- **WHEN** a folder holds two MP3 files, an MP4 with sound and an MP4 without sound, and the user picks Video
+- **THEN** the list holds the two MP4 files and the Video choice shows 2
+
+#### Scenario: Remembered
+
+- **WHEN** the user picks Audio and reloads the page
+- **THEN** the kind filter is still Audio
+
 ### Requirement: Order
 
 The panel SHALL order the rows by name or by recent: by recent, the tracks opened last come first and the tracks never opened follow by name. The chosen order SHALL be remembered.
