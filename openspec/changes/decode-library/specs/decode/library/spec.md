@@ -80,9 +80,18 @@ Video files that Decode accepts SHALL be listed with a small video icon next to 
 - **WHEN** a folder holds `clip.mp4`
 - **THEN** its row shows the video icon, and a click opens its sound in Decode
 
-### Requirement: Rows that cannot play
+### Requirement: Videos without sound
 
-A file that the app has found to hold no sound (a video without an audio track) SHALL be shown as a row that cannot play: dimmed, with the video icon and a small "no sound" mark with a tooltip. The app SHALL find it while it reads the tags in idle time, or when the file fails to open for that reason, and SHALL remember it in the folder's index.
+A video without an audio track is not a broken file: it SHALL be shown as a "video only" row in the normal style, with the video icon and a small "no sound" mark ("Video without sound: nothing for Decode to analyse"). It SHALL stay selectable and SHALL be allowed in mixtapes.
+
+#### Scenario: In a mixtape
+
+- **WHEN** the user selects a video without sound and adds it to a mixtape
+- **THEN** it is added like any other row
+
+### Requirement: Finding videos without sound
+
+The app SHALL find a video without sound while it reads the tags in idle time, or when the file fails to open for that reason, and SHALL remember it in the folder's index with generic fields (`video: true`, `audio: false`), so a later feature can list such videos.
 
 #### Scenario: Found while reading tags
 
@@ -91,12 +100,12 @@ A file that the app has found to hold no sound (a video without an audio track) 
 
 ### Requirement: A row that fails to open
 
-A click on a row that cannot play, or on a file that fails to open, SHALL show a short note in the panel naming the file and the reason ("This video has no sound"). The panel SHALL stay open and the open track SHALL NOT stop or change.
+A click on a video without sound SHALL show a short neutral note in the panel naming it ("Video without sound: nothing for Decode to analyse"); a click on a file that fails to open SHALL show a short note naming the file and the reason. In both cases the panel SHALL stay open and the open track SHALL NOT stop or change.
 
 #### Scenario: A screen recording without sound
 
 - **WHEN** a folder holds an MP4 with only a video track and the user clicks its row while another track plays
-- **THEN** the panel says that this video has no sound, the row is marked "no sound", the panel stays open and the other track keeps playing
+- **THEN** the panel says that this video has no sound for Decode to analyse, the row shows the "no sound" mark in the normal style, the panel stays open and the other track keeps playing
 
 ### Requirement: A kind icon on every row
 
