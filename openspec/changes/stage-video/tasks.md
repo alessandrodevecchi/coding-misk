@@ -42,6 +42,6 @@ Estimate: about 25 agent hours (22 to 30), in the order below: the stage layer w
 
 ## 6. Strings, Guide, docs and final checks (about 2 h)
 
-- [ ] 6.1 Italian and English strings; Guide lines for the Video look and the card (`npm run check:guide`) (about 0.5 h).
-- [ ] 6.2 `docs/knowledge/visuals.md`, `settings.md`, `export.md`, `decisions.md` (the rejected multi-pass export, the speed target), `npm run knowledge` and `npm run check:knowledge`; `docs/ARCHITECTURE.md` (about 1 h).
-- [ ] 6.3 Final run: `npm run check:render-styles`, `node tools/check-render-styles.cjs`, `npm run check:video`, `node tools/check-video.cjs`, `npm run check:clips`, `npm run check:decode-library`, `npm run build`; DEVLOG entry (about 0.5 h).
+- [x] 6.1 Italian and English strings; Guide lines for the Video look and the card (`npm run check:guide`) (about 0.5 h).
+- [x] 6.2 `docs/knowledge/visuals.md`, `settings.md`, `export.md`, `decisions.md` (the rejected multi-pass export, the speed target), `npm run knowledge` and `npm run check:knowledge`; `docs/ARCHITECTURE.md` (about 1 h).
+- [x] 6.3 Final run: `npm run check:render-styles`, `node tools/check-render-styles.cjs`, `npm run check:video`, `node tools/check-video.cjs`, `npm run check:clips`, `npm run check:decode-library`, `npm run build`; DEVLOG entry (about 0.5 h).
