@@ -24,8 +24,8 @@ import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
-import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors } from '../src/decode/full.js';
-import { writeFull, inKey } from '../src/decode/writer.js';
+import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey } from '../src/decode/full.js';
+import { writeFull, inKey, leadCode } from '../src/decode/writer.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
 import { followSong, crescendoSong } from '../src/song/crescendo.js';
 import { growthRules } from '../src/live/profiles.js';
@@ -245,7 +245,7 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
   // the same model shape as level A for the same bars (analysis spec: One song model)
   const A = createAnalyzer(pcm).model(30), B = runs['Essentia.js'];
-  check(JSON.stringify(Object.keys(A.bars[0]).sort()) === JSON.stringify(Object.keys(B.bars[0]).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields');
+  check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !['lead', 'leadVoiced', 'third'].includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !['lead', 'leadVoiced', 'third'].includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line, decode-refine D2)');
   // level A never calls Essentia.js: the worker loads it only for "analyse all"
   const wsrc = fs.readFileSync('src/decode/worker.js', 'utf8'), msrc = fs.readFileSync('src/decode/misk-analyzer.js', 'utf8');
   check(!/essentia/i.test(msrc.replace(/\/\/.*$/gm, '')) && /async function all[\s\S]*import\('\.\/engine-essentia\.js'\)/.test(wsrc) && !/^import .*(engine-essentia|full)/m.test(wsrc), 'level A uses misk-analyzer only: Essentia.js is imported only by level B, inside the worker');
@@ -404,6 +404,33 @@ if (process.argv.includes('--app')) {
   const qm = [{ chord: 'A', third: true }, { chord: 'C', third: true }, { chord: 'A' }];
   quietMinors(qm, { root: 9, mode: 'minor' });
   check(qm.map(b => b.chord).join() === 'Am,C,A', 'a quiet minor third turns a chord minor only where the key holds that minor chord', qm.map(b => b.chord).join());
+}
+// decode-refine group 9 (D2): the top line and the Lead
+{
+  check(snapToKey(69.3, { root: 9, mode: 'minor' }) === 69 && snapToKey(70.45, { root: 9, mode: 'minor' }) === 70 && snapToKey(72.35, { root: 9, mode: 'minor' }) === 72 && snapToKey(null, null) === null, 'the top line snaps to the key\'s scale within 40 cents');
+  const loop = [[69, null, 72, null, 76, null, null, null, 69, null, 72, null, 74, null, null, null]];
+  check(leadCode(loop, { root: 9, mode: 'minor' }) === 'n("0 2 4 ~ 0 2 3 ~").scale("A4:minor")', 'the Lead is written as degrees of the key\'s scale', leadCode(loop, { root: 9, mode: 'minor' }));
+  // a generated song: a hook section between two verses of chords; the Lead in the hook only, its notes right
+  const D = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' }, mel = [76, null, 74, null, 72, null, null, 79, null, 77, null, 76, 74, null, 72, null];
+  const { pcm } = renderSong({ bpm: 124, lead: 0.3, bass: 'x..x..x...x.x...', sections: [{ name: 'Verse', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: D }, { name: 'Hook', bars: 8, chords: null, drums: D, melody: mel }, { name: 'Out', bars: 8, chords: ['Am', 'F', 'C', 'G'], drums: D }] });
+  for (const [name, engine] of [['Essentia.js', nodeEssentia], ['misk-analyzer', null]]) {
+    const H = await analyseFull(pcm, { engine }), sg = writeFull(H), ld = sg.tracks.find(x => x.id === 'lead');
+    const hook = H.sections.find(s => s.start <= 9 && s.start + s.bars >= 15), inHook = ld && ld.clips.every(c => hook && c.start >= hook.start && c.start + c.bars <= hook.start + hook.bars);
+    let ok = 0, n = 0;
+    for (let i = 9; i < 16; i++) { const b = H.bars[i]; mel.forEach((x, j) => { if (x === null) return; n++; if (b.lead && b.lead[j] !== null && ((((b.lead[j] - x) % 12) + 12) % 12) === 0) ok++; }); }
+    check(ld && inHook && ok / n >= 0.7 && H.engines.lead === (engine ? 'essentia.js' : 'misk-analyzer'), `the Lead of a generated hook (${name}): written in the hook only, its notes right on at least 70 % of the steps`, `${ld ? JSON.stringify(ld.clips) : 'no lead'}, ${Math.round((100 * ok) / n)} %, engine ${H.engines.lead}`);
+    check(compileSong(sg).includes('n("') && !validateSong(sg).errors.length, `the Lead compiles in a valid song (${name})`);
+  }
+  // an instrumental song with no top line: no Lead
+  const P = renderSong({ bpm: 124, lead: 0.3, chords: ['Am', 'F'], bass: 'x..x..x...x.x...', bars: 16, drums: D });
+  const I = await analyseFull(P.pcm, { engine: null });
+  check(!writeFull(I).tracks.some(x => x.id === 'lead'), 'no Lead on a song without a top line', `voiced ${I.bars.map(b => b.leadVoiced).join(',')}`);
+  // a sung melody: muted by default (hush), in the song Open in Compose saves too; the mix starts it muted by the user
+  const V = { ...I, bars: I.bars.map(b => ({ ...b, top: { up: 0.5 }, lead: mel, leadVoiced: 0.6 })) };
+  const vs = writeFull(V), vl = vs.tracks.find(x => x.id === 'lead');
+  check(vl && vl.hush === true && /_\$:/.test(compileSong(vs)), 'a sung melody\'s Lead is muted by default, also in the song Open in Compose saves', vl ? JSON.stringify({ hush: vl.hush }) : 'no lead');
+  const mx = mixApply(defaultMix(['drums']), { type: 'tracks', codeIds: ['drums', 'lead'], muted: ['lead'] }), lt = mx.tracks.find(t => t.id === 'lead');
+  check(lt.mute && lt.by === 'user', 'the mix starts a muted Lead muted by the user, so the slider does not unmute it');
 }
 // a tapped or stored tempo is never moved by the relock (decode-refine D4)
 {

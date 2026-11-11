@@ -7,6 +7,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Decode: in Full, a Lead track writes the top line as a loop per section, with mute and solo; a sung melody starts muted.
 - Decode: All, Audio and Video filters in the library list, with the count of each, remembered and followed by Autoplay, Previous and Next.
 - Stage: Video look in the look menu and the arrows, showing a muted video with every render style, Code over, the widgets and the captions over it.
 - Stage: with Video chosen and nothing to show, the stage shows the song's own look or Palco, and the menu keeps Video.

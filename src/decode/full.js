@@ -52,6 +52,33 @@ export function settleMode(key, bars) {
   return score(rel) > score(key) ? { ...key, root: rel.root, mode: rel.mode } : key;
 }
 
+// the top line's frames (Essentia.js, { hop, sr, pitch, conf }) as one note per 16th step: the frames in the middle 60 %
+// of the step, a note where at least half of them are voiced (their median pitch, fractional MIDI) → per bar 16 values
+// Essentia.js's melody reports a pitch about 60 ms after it sounds (MELODIA's frames and its contour smoothing; measured
+// on a generated hook: 0.06 s puts every note on its step, none puts it a 16th late)
+export const MELODY_LAG = 0.06;
+export function melodySteps(mel, downbeat, barSec, n) {
+  const step = barSec / 16, fps = mel.sr / mel.hop, out = [];
+  for (let i = 0; i < n; i++) {
+    const row = [];
+    for (let j = 0; j < 16; j++) {
+      const t0 = downbeat + i * barSec + j * step + MELODY_LAG, a = Math.max(0, Math.round((t0 + 0.2 * step) * fps)), z = Math.min(mel.pitch.length, Math.round((t0 + 0.8 * step) * fps));
+      const v = []; for (let k = a; k < z; k++) if (mel.pitch[k] > 0) v.push(69 + 12 * Math.log2(mel.pitch[k] / 440));
+      v.sort((x, y) => x - y);
+      row.push(z > a && v.length >= 0.5 * (z - a) ? v[Math.floor(v.length / 2)] : null);
+    }
+    out.push(row);
+  }
+  return out;
+}
+const SCALES = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11] };
+// a fractional MIDI note → a whole note: the key's scale note when within 40 cents of it, else the nearest semitone
+export function snapToKey(x, key) {
+  if (x === null || x === undefined || !Number.isFinite(x)) return null;
+  if (key) { const sc = SCALES[key.mode === 'major' ? 'major' : 'minor']; for (const d of [Math.floor(x), Math.ceil(x)]) if (Math.abs(x - d) <= 0.4 && sc.includes((((d - key.root) % 12) + 12) % 12)) return d; }
+  return Math.round(x);
+}
+
 // harmony and bass per section (decode-refine D5); the numbers in one place
 export const HARMONY_RULE = { clear: 0.8, clearBars: 2, range: 7, quietBass: 0.2 };
 // a bar misk-analyzer marked `third` (a quiet minor third over a major third the bass's harmonics explain) is minor when
@@ -154,6 +181,15 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   }
   // misk-analyzer's own key, its mode settled the same way over the whole file
   if (engines.key === MISK && m.key) m.key = { ...settleMode(m.key, m.bars), conf: m.key.conf };
+  // 6b. the top line (decode-refine D2): Essentia.js's predominant melody, else misk-analyzer's YIN on the 200-2000 Hz
+  // band; one note per 16th step, snapped to the key's scale within 40 cents
+  onProgress(0.93, 'melody');
+  let mel = null;
+  if (E && E.melody) { try { mel = E.melody(pcm, { sr }); engines.lead = 'essentia.js'; } catch (e) { notes.push(`Essentia.js melody failed: ${e && e.message || e}`); } }
+  await pause();
+  const steps = mel ? melodySteps(mel, downbeat, 240 / bpm, m.bars.length) : A.topLineYin(downbeat, 240 / bpm, m.bars.length);
+  if (!mel) engines.lead = MISK;
+  m.bars.forEach((b, i) => { const x = steps[i].map(v => snapToKey(v, m.key)); b.lead = x; b.leadVoiced = Math.round((x.filter(v => v !== null).length / x.length) * 100) / 100; });
   onProgress(0.95, 'sections');
   // 7. sections, kinds, the ending, the variations (on the bars with their chroma)
   const { sections, ending } = sectionsOf(m.bars.map((b, i) => ({ ...b, chroma: raw[i] ? raw[i].chroma : null })));

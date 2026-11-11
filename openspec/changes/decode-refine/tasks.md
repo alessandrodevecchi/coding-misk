@@ -59,8 +59,8 @@ Two rounds (owner, 8 November). **Part 1** is done now: about 14 agent hours (11
 ### 9. Top line and Lead part (about 7 h)
 
 - [ ] 9.1 Top line in level B with Essentia.js's predominant pitch and the YIN fallback, snapped to the scale; verify at least 70 % of the lead steps on the arp-and-lead song, with and without Essentia.js; its voicing replaces part 1's `top.up` for the top line lines.
-- [ ] 9.2 The `lead` code track in `writeFull` with one loop per section and no Lead below 30 % voiced, a sung melody muted by default; the Lead track in the Full track list with mute and solo; Open in Compose keeps it.
-- [ ] 9.3 `check:decode` cases (Lead written, no Lead on an instrumental test song, the same code in Decode and Compose); `check:strudel` passes.
+- [x] 9.2 The `lead` code track in `writeFull` with one loop per section and no Lead below 30 % voiced, a sung melody muted by default; the Lead track in the Full track list with mute and solo; Open in Compose keeps it.
+- [x] 9.3 `check:decode` cases (Lead written, no Lead on an instrumental test song, the same code in Decode and Compose); `check:strudel` passes.
 
 ### 10. Sounds by measure (about 6 h)
 

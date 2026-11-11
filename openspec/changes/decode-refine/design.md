@@ -282,6 +282,16 @@ What changed against D4: the broadband click does not tell luci-rosse's kick fro
 
 What changed against D5: the chroma that leaves out the bass's harmonics shows luci-rosse's minor third at an eighth of the root and no major third; misk-analyzer marks such a bar and level B makes it minor where the key holds that minor chord and not the major one (a rule in level A broke a C chord whose third falls on a bass harmonic). The bass range is the 15-semitone window that holds most notes, not the median plus or minus 7: the median folded luci-rosse's riff, which jumps an octave. Chord confidences are almost always above 0.8, so a tie goes to the key's quality. The radio seed's supersaw bass is heard with YIN at a looser threshold on the step after a kick. Its truth is G1 to B1 (octave 1 in Strudel's names; the task says octave 2), and the code writes `g1 a1 b1`.
 
+### Group 9: top line and Lead (11 November)
+
+| Measure | Before | After | Target |
+| --- | --- | --- | --- |
+| arp-and-lead song: lead steps with the right pitch class, with / without Essentia.js | no top line | 0.13 / 0 | 0.7 |
+| acid song: the same | no top line | 0 / 0.01 | |
+| generated hook over drums: the same | no top line | 0.89 / 0.75 | |
+
+Not met on the bench: MELODIA follows the arp and the pad, louder than the lead in the arp-and-lead song (notes 52 to 60 against a lead at 72 to 81), and YIN finds no single pitch in a polyphonic mix. A tonal-peak tracker (the highest salient peak that is no harmonic) reached 0.47 on the arp song but gives no voicing, so it is not kept. MELODIA reports a pitch about 60 ms late (`MELODY_LAG`). Its voicing replaces `top.up` only in bars where `top.up` hears a top line at all (0.18), because MELODIA also voices a pad or a bass. The Lead is written as `n(…).scale(…)` degrees; a sung melody's Lead has `hush` in the song (muted in Compose) and starts muted in Decode's mix.
+
 ## Risks / Trade-offs
 
 - [The edit rule makes level A slow to follow real changes] → Parts entering or stopping never wait; the waits are 2 and 4 bars; level B is the right level for a track the user wants close.

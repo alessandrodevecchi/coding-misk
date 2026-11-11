@@ -54,6 +54,17 @@ export async function createEssentiaEngine(load = browserLoader) {
         return { root, mode: k.scale === 'minor' ? 'minor' : 'major', strength: k.strength };
       } finally { free(v); }
     },
+    // the top line (decode-refine D2): PredominantPitchMelodia (MELODIA), a pitch per frame of `hop` samples and its
+    // confidence; 0 Hz where no melody is voiced → { hop, sr, pitch: Float32Array (Hz), conf: Float32Array }
+    melody(pcm, { sr = 44100 } = {}) {
+      const v = e.arrayToVector(pcm);
+      try {
+        const r = e.PredominantPitchMelodia(v, 10, 3, 2048, false, 0.8, 256, 1, 40, 2100, 100, 150, 20, 0.9, 0.9, 27.5625, 55, sr);
+        const out = { hop: 256, sr, pitch: Float32Array.from(e.vectorToArray(r.pitch)), conf: Float32Array.from(e.vectorToArray(r.pitchConfidence)) };
+        free(r.pitch, r.pitchConfidence);
+        return out;
+      } finally { free(v); }
+    },
     // chords between consecutive ticks: HPCP frames (4096 points, hop 2048, up to 5 kHz, 8 harmonics), then
     // ChordsDetectionBeats → [{ chord: "A#m" | "C" …, strength }] one per interval (the last ones may be missing)
     chords(pcm, ticks, { sr = 44100, onProgress = null } = {}) {

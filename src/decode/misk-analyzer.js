@@ -24,6 +24,8 @@ export const CLAP_RULE = { snare: 0.5, local: 1.3, seconds: 6, flat: 0.3 };
 export const HAT_RULE = { median: 0.5, bars: 4 };
 // level A's relock (D4): the tempo and the beat phase checked again on the first bars with kicks, this many
 export const RELOCK_BARS = 8;
+// the top line by YIN (D2): a step's band level must reach `floor` of the band's peak
+export const TOP_LINE = { floor: 0.02 };
 // the bass (D5): YIN's looser threshold for a bass that the usual one does not hear (a detuned unison)
 export const BASS_RULE = { loose: 0.35 };
 
@@ -73,6 +75,16 @@ const pearson = (a, b) => { const ma = mean(a), mb = mean(b); let d = 0, x = 0, 
 function lowpass(x, sr, fc, q = 0.707) {
   const w = (2 * Math.PI * fc) / sr, al = Math.sin(w) / (2 * q), c = Math.cos(w), a0 = 1 + al;
   const b0 = (1 - c) / 2 / a0, b1 = (1 - c) / a0, b2 = b0, a1 = (-2 * c) / a0, a2 = (1 - al) / a0;
+  const y = new Float32Array(x.length);
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < x.length; i++) { const v = b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v; }
+  return y;
+}
+
+// a biquad high-pass (RBJ), for the top line's band
+function highpass(x, sr, fc, q = 0.707) {
+  const w = (2 * Math.PI * fc) / sr, al = Math.sin(w) / (2 * q), c = Math.cos(w), a0 = 1 + al;
+  const b0 = (1 + c) / 2 / a0, b1 = -(1 + c) / a0, b2 = b0, a1 = (-2 * c) / a0, a2 = (1 - al) / a0;
   const y = new Float32Array(x.length);
   let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
   for (let i = 0; i < x.length; i++) { const v = b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v; }
@@ -742,6 +754,25 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     }
     return out;
   }
+  // the top line by YIN (decode-refine D2, level B without Essentia.js): the 200-2000 Hz band, decimated by 4, one pitch
+  // per 16th step (a window in the step's middle) → per bar 16 fractional MIDI notes or null
+  let topSig = null;
+  function topLineYin(downbeat, barSec, n) {
+    if (!topSig) { const bp = lowpass(lowpass(highpass(highpass(pcm, sr, 200), sr, 200), sr, 2000), sr, 2000); topSig = new Float32Array(Math.floor(bp.length / 4)); for (let i = 0; i < topSig.length; i++) topSig[i] = bp[i * 4]; }
+    const r = sr / 4, step = barSec / STEPS, w = Math.max(48, Math.min(256, Math.round(0.45 * step * r))), out = [];
+    for (let i = 0; i < n; i++) {
+      const notes = [];
+      for (let j = 0; j < STEPS; j++) {
+        const s0 = (downbeat + i * barSec + j * step) * r, p = yin(topSig, Math.round(s0 + 0.2 * step * r), r, { w, threshold: 0.25, fmin: 190, fmax: 2100 });
+        notes.push(p && rmsOf(topSig, s0, s0 + step * r) > TOP_LINE.floor * topTop() ? midiOf(p.f0) : null);
+      }
+      out.push(notes);
+    }
+    return out;
+  }
+  let topMax = 0;
+  const topTop = () => { if (!topMax) { for (let i = 0; i < topSig.length; i += 64) topMax = Math.max(topMax, Math.abs(topSig[i])); topMax = topMax || 1; } return topMax; };
+
   // the bars complete before t (with a frame of margin for the onsets)
   function bars(t) {
     if (!lockS) return [];
@@ -791,7 +822,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     m.sections = [{ start: 0, bars: list.length, kind: 'verse' }];
     return m;
   }
-  return { duration, advance, lock, model, setTempo, resetTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), barsRaw: t => bars(t) };
+  return { duration, advance, lock, model, setTempo, resetTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), barsRaw: t => bars(t), topLineYin };
 }
 
 // level A's horizon (D8): the playhead plus the look ahead; values 'off', '2s', '4s', '2bars', '4bars'

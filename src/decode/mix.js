@@ -23,14 +23,16 @@ function slide(s, x) {
   if (s.slider === 1) { const o = orig(s); if (o && !o.mute) { o.mute = true; o.by = 'slider'; } }
   return s;
 }
-// action: { type: 'slider', value } | { type: 'mute', id } | { type: 'solo', id } | { type: 'tracks', codeIds }
+// action: { type: 'slider', value } | { type: 'mute', id } | { type: 'solo', id } | { type: 'tracks', codeIds, muted? }
 export function mixApply(state, action) {
   const s = clone(state);
   if (action.type === 'slider') return slide(s, +action.value);
   if (action.type === 'tracks') {
     // the code tracks change (level A one, level B one per part): new ones follow the slider at an end
     const keep = new Map(s.tracks.map(t => [t.id, t]));
-    s.tracks = [orig(s) || { id: ORIG, kind: 'orig', mute: false, solo: false, by: null }, ...action.codeIds.map(id => keep.get(id) || { id, kind: 'code', mute: false, solo: false, by: null })];
+    // (muted: new tracks that start muted by the user, decode-refine D2: a sung melody's Lead)
+    const muted = new Set(action.muted || []);
+    s.tracks = [orig(s) || { id: ORIG, kind: 'orig', mute: false, solo: false, by: null }, ...action.codeIds.map(id => keep.get(id) || (muted.has(id) ? { id, kind: 'code', mute: true, solo: false, by: 'user' } : { id, kind: 'code', mute: false, solo: false, by: null }))];
     return slide(s, s.slider);
   }
   const t = s.tracks.find(x => x.id === action.id);

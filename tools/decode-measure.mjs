@@ -35,7 +35,7 @@ export function score(m, truth) {
   const n = Math.min(m.bars.length, truth.bars.length);
   let chordOk = 0, chordN = 0, presOk = 0;
   const f1 = {}; for (const r of ROWS) f1[r] = { tp: 0, fp: 0, fn: 0 };
-  let bassOk = 0, bassN = 0;
+  let bassOk = 0, bassN = 0, leadOk = 0, leadN = 0;
   for (let i = 0; i < n; i++) {
     const b = m.bars[i], tb = truth.bars[i];
     if (tb.chord) { chordN++; if (b.chord === tb.chord) chordOk++; }
@@ -46,9 +46,15 @@ export function score(m, truth) {
     }
     if (tb.bass) for (let j = 0; j < 16; j++) if (tb.bass[j] !== null) { bassN++; if (b.bass[j] === tb.bass[j]) bassOk++; }
   }
+  // (decode-refine 9.1: the lead's note steps with the right pitch class, each true step on the model's step at its time:
+  // a model whose downbeat sits a beat or two off still holds the notes)
+  if (truth.bars.some(t => t.lead) && m.barSeconds) {
+    const tStep = 15 / truth.bpm, mStep = m.barSeconds / 16;
+    truth.bars.forEach((t, i) => { if (!t.lead) return; t.lead.forEach((x, j) => { if (x === null) return; leadN++; const k = Math.round(((i * 16 + j) * tStep - m.downbeat) / mStep), b = m.bars[Math.floor(k / 16)], y = b && b.lead ? b.lead[((k % 16) + 16) % 16] : null; if (k >= 0 && y !== null && y !== undefined && ((((y - x) % 12) + 12) % 12) === 0) leadOk++; }); });
+  }
   const F = x => (x.tp ? (2 * x.tp) / (2 * x.tp + x.fp + x.fn) : x.fp + x.fn ? 0 : 1);
   const keyOk = !!(m.key && truth.key && m.key.root === truth.key.root && m.key.mode === truth.key.mode);
-  return { bpm: m.bpm, bpmTruth: truth.bpm, tempoErr: Math.round(Math.abs(m.bpm - truth.bpm) * 100) / 100, octave: m.bpm && Math.abs(m.bpm / truth.bpm - 1) > 0.03, downbeat: m.downbeat, key: m.key, keyOk, bars: n, chords: chordN ? Math.round((chordOk / chordN) * 1000) / 1000 : null, drumsPresence: n ? Math.round((presOk / n) * 1000) / 1000 : null, f1: Object.fromEntries(ROWS.map(r => [r, Math.round(F(f1[r]) * 1000) / 1000])), bass: bassN ? Math.round((bassOk / bassN) * 1000) / 1000 : null };
+  return { bpm: m.bpm, bpmTruth: truth.bpm, tempoErr: Math.round(Math.abs(m.bpm - truth.bpm) * 100) / 100, octave: m.bpm && Math.abs(m.bpm / truth.bpm - 1) > 0.03, downbeat: m.downbeat, key: m.key, keyOk, bars: n, chords: chordN ? Math.round((chordOk / chordN) * 1000) / 1000 : null, drumsPresence: n ? Math.round((presOk / n) * 1000) / 1000 : null, f1: Object.fromEntries(ROWS.map(r => [r, Math.round(F(f1[r]) * 1000) / 1000])), bass: bassN ? Math.round((bassOk / bassN) * 1000) / 1000 : null, ...(leadN ? { lead: Math.round((leadOk / leadN) * 1000) / 1000 } : {}) };
 }
 
 export function measureApp() {
@@ -232,7 +238,7 @@ if (process.argv[1] && process.argv[1].endsWith('decode-measure.mjs')) {
   const tls = await measureTimelines({ full: process.argv.includes('--full') });
   if (process.argv.includes('--json')) console.log(JSON.stringify({ ...res, timeline: tls }, null, 2));
   else {
-    for (const [g, list] of Object.entries(res)) for (const [id, r] of Object.entries(list)) console.log(`${g.padEnd(7)} ${id.padEnd(16)} tempo ${r.bpm} (truth ${r.bpmTruth}) downbeat ${r.downbeat}s key ${r.key ? `${['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'][r.key.root]} ${r.key.mode}` : '-'} ${r.keyOk ? 'ok' : 'WRONG'} chords ${r.chords} drums on/off ${r.drumsPresence} F1 bd ${r.f1.bd} cp ${r.f1.cp} hh ${r.f1.hh}${r.bass !== null ? ` bass ${r.bass}` : ''}${r.bounds ? ` bounds ${r.bounds.join(',')} (err ${r.boundsErr}, extra ${r.extra}) ending ${r.ending}` : ''}${r.essentiaTempo ? ` essentia tempo ${r.essentiaTempo.bpm} (confidence ${r.essentiaTempo.confidence}, tempo by ${r.engines.tempo})` : ''}${r.hard ? ' (new bench song)' : ''} · ${r.ms} ms`);
+    for (const [g, list] of Object.entries(res)) for (const [id, r] of Object.entries(list)) console.log(`${g.padEnd(7)} ${id.padEnd(16)} tempo ${r.bpm} (truth ${r.bpmTruth}) downbeat ${r.downbeat}s key ${r.key ? `${['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'][r.key.root]} ${r.key.mode}` : '-'} ${r.keyOk ? 'ok' : 'WRONG'} chords ${r.chords} drums on/off ${r.drumsPresence} F1 bd ${r.f1.bd} cp ${r.f1.cp} hh ${r.f1.hh}${r.bass !== null ? ` bass ${r.bass}` : ''}${r.bounds ? ` bounds ${r.bounds.join(',')} (err ${r.boundsErr}, extra ${r.extra}) ending ${r.ending}` : ''}${r.lead !== undefined ? ` lead ${r.lead} (top line by ${r.engines ? r.engines.lead : '-'})` : ''}${r.essentiaTempo ? ` essentia tempo ${r.essentiaTempo.bpm} (confidence ${r.essentiaTempo.confidence}, tempo by ${r.engines.tempo})` : ''}${r.hard ? ' (new bench song)' : ''} · ${r.ms} ms`);
     if (!Object.keys(tls).length) console.log('timeline: no app song with its timeline in .cache/decode/wav: run tools/decode-export.cjs with the dev server');
     for (const [id, r] of Object.entries(tls)) for (const [lv, x] of Object.entries(r)) console.log(`timeline ${timelineLine(id, lv, x)}`);
     // the owner's files (DECODE_OWNER_DIR), printed only: level B's bass span per section (decode-refine 8.2, at most 15
