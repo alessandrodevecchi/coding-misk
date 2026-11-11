@@ -1,0 +1,60 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>SRC-TAB</title></head>
+<body>
+<button id="clicks">clicks</button>
+<button id="eme">eme</button>
+<button id="plain">plain</button>
+<audio id="a" controls></audio>
+<script>
+window.log = [];
+// clicks: a 5 ms burst every 500 ms for 20 s; logs the wall time each burst reaches the output
+document.getElementById('clicks').onclick = async () => {
+  const ctx = new AudioContext();
+  await ctx.resume();
+  const t0 = ctx.currentTime + 0.5;
+  for (let i = 0; i < 40; i++) {
+    const T = t0 + i * 0.5, o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = 2000; g.gain.value = 0;
+    g.gain.setValueAtTime(0.8, T); g.gain.setValueAtTime(0, T + 0.02);
+    o.connect(g).connect(ctx.destination); o.start(T); o.stop(T + 0.03);
+  }
+  const ts = ctx.getOutputTimestamp();
+  window.clickWall = [];
+  for (let i = 0; i < 40; i++) {
+    const T = t0 + i * 0.5;
+    window.clickWall.push(performance.timeOrigin + ts.performanceTime + (T - ts.contextTime) * 1000);
+  }
+  window.outputLatency = ctx.outputLatency; window.baseLatency = ctx.baseLatency;
+};
+const b64u = h => btoa(String.fromCharCode(...h.match(/../g).map(x => parseInt(x, 16)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function playMse(url, eme) {
+  const a = document.getElementById('a');
+  if (eme) {
+    const access = await navigator.requestMediaKeySystemAccess('org.w3.clearkey', [{ initDataTypes: ['keyids', 'cenc'], audioCapabilities: [{ contentType: 'audio/mp4; codecs="mp4a.40.2"' }] }]);
+    const keys = await access.createMediaKeys();
+    await a.setMediaKeys(keys);
+    const s = keys.createSession();
+    s.addEventListener('message', async e => {
+      const lic = { keys: [{ kty: 'oct', kid: b64u('0102030405060708090a0b0c0d0e0f10'), k: b64u('00112233445566778899aabbccddeeff') }], type: 'temporary' };
+      await s.update(new TextEncoder().encode(JSON.stringify(lic)));
+      window.log.push('license applied');
+    });
+    await s.generateRequest('keyids', new TextEncoder().encode(JSON.stringify({ kids: [b64u('0102030405060708090a0b0c0d0e0f10')] })));
+  }
+  const ms = new MediaSource();
+  a.src = URL.createObjectURL(ms);
+  await new Promise(r => ms.addEventListener('sourceopen', r, { once: true }));
+  const sb = ms.addSourceBuffer('audio/mp4; codecs="mp4a.40.2"');
+  const buf = await (await fetch(url)).arrayBuffer();
+  sb.appendBuffer(buf);
+  await new Promise(r => sb.addEventListener('updateend', r, { once: true }));
+  ms.endOfStream();
+  await a.play();
+  window.log.push(`playing ${url}`);
+}
+document.getElementById('eme').onclick = () => playMse('enc.mp4', true).catch(e => window.log.push('ERR ' + e.message));
+document.getElementById('plain').onclick = () => playMse('plainf.mp4', false).catch(e => window.log.push('ERR ' + e.message));
+// (a commercial key system, read from KEY_SYSTEM in the URL hash: whether the automated browser offers it)
+window.keySystem = location.hash.length > 1 ? navigator.requestMediaKeySystemAccess(location.hash.slice(1), [{ initDataTypes: ['cenc'], audioCapabilities: [{ contentType: 'audio/mp4; codecs="mp4a.40.2"' }] }]).then(() => 'available', e => 'unavailable: ' + e.message) : Promise.resolve('not asked');
+</script>
+</body></html>
