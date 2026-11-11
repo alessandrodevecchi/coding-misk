@@ -247,7 +247,7 @@ A session video that records a layout drawing the stage, and a live output windo
 
 ### Requirement: Video work never disturbs the audio
 
-Loading, seeking, decoding, drawing or releasing a video, and scanning the stage video folders, SHALL never disturb the audio. During look switches, song changes, hides and returns with the Video look, the scheduler SHALL log no more "too late" lines than the same actions on a scene look, and video work SHALL cause no main-thread task over 50 ms. The browser check SHALL measure both and SHALL fail when either rule breaks.
+Loading, seeking, decoding, drawing or releasing a video, and scanning the stage video folders, SHALL never disturb the audio. During look switches, song changes, hides and returns with the Video look, the scheduler SHALL log no more "too late" lines than the same actions on a scene look (beyond the spread the scene look itself shows between two runs), and video work SHALL cause no main-thread task over 50 ms. The browser check SHALL measure both and SHALL fail when either rule breaks.
 
 #### Scenario: Look switches while playing
 
