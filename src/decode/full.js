@@ -7,7 +7,7 @@ import { createAnalyzer, ANALYSIS_RATE } from './misk-analyzer.js';
 import { chordName, parseChord } from './model.js';
 import { sectionsOf } from './sections.js';
 import { variationsOf } from './writer.js';
-import { mixHatShape, mixHatBright, rankKits, bandEnergy, sustainOf, LEVEL_BANDS } from './kit-measure.js';
+import { mixHatShape, mixHatBright, rankKits, bandEnergy, sustainOf, bassDrive, LEVEL_BANDS } from './kit-measure.js';
 import { KIT_MEASURES } from './kits.js';
 
 export const MISK = 'misk-analyzer';
@@ -221,6 +221,12 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
     m.bars.forEach((b, i) => { for (let j = 0; j < 16; j++) { const t = m.downbeat + i * bs + j * st; if ((b.drums.bd || '')[j] === 'x') kicks.push(t); if ((b.drums.hh || '')[j] === 'x' && !['bd', 'cp', 'oh'].some(r => (b.drums[r] || '')[j] === 'x')) hats.push(t); } });
     const ranks = rankKits(mixHatShape(pcm, sr, hats), KIT_MEASURES, mixHatBright(pcm, sr, hats)), kit = ranks.length ? ranks[0].kit : null;
     m.drumSound = { kit, ranks: ranks.slice(0, 3) };
+    // (decode-refine 10.1, fifth round: the bass's drive, its even harmonics against its odd ones on the steps with a
+    // bass note and no kick or clap, and its low band against the kicks')
+    const notes = [];
+    m.bars.forEach((b, i) => { for (let j = 0; j < 16; j++) { const x = b.bass && b.bass[j], d = b.drums || {}; if (x !== null && x !== undefined && (d.bd || '')[j] !== 'x' && (d.cp || '')[j] !== 'x') notes.push({ t: m.downbeat + i * bs + j * st, midi: x }); } });
+    const drive = bassDrive(pcm, sr, notes, kicks);
+    if (drive) m.bassDrive = drive;
   }
   // 10. the levels and the chords' sustain (decode-refine D3): the band shares of the original over the bars (the
   // writer sets each part's gain to come near them), and per bar with a chord how much of it is left at its end

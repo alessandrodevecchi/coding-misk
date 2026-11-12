@@ -26,7 +26,7 @@ import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
 import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
 import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead } from '../src/decode/writer.js';
-import { nearestKit, rankKits, shapeOf as hatShapeOf } from '../src/decode/kit-measure.js';
+import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
 import { followSong, crescendoSong } from '../src/song/crescendo.js';
@@ -465,6 +465,13 @@ if (process.argv.includes('--app')) {
     const lead = (bars, hush) => ({ id: 'lead', type: 'code', patterns: { A: { code: 'n("0 2 4").scale("A3:minor").s("triangle").lpf(1600).gain(.25)' } }, clips: [{ start: 0, bars, pattern: 'A' }], ...(hush ? { hush: true } : {}) });
     const over = [pad(8), lead(6)], under = [pad(8), lead(3)], muted = [pad(8), lead(8, true)];
     check(cutUnderLead(over) && /\.hpf\(1200\)\.lpf\(4000\)\.room/.test(over[0].patterns.A.code) && !cutUnderLead(under) && !/hpf/.test(under[0].patterns.A.code) && !cutUnderLead(muted) && !cutUnderLead([pad(8)]), 'chords under a Lead on most of their bars lose their body, not under a short or muted Lead', over[0].patterns.A.code);
+  }
+  // the bass's drive (decode-refine 10.1, fifth round): a clipped sawtooth (odd harmonics) is driven, a plain one is not
+  {
+    const sr = 44100, notes = Array.from({ length: 32 }, (_, i) => ({ t: 0.05 + i * 0.12, midi: 33 })), f0 = 55;
+    const saw = t => 2 * ((t * f0) % 1) - 1, clean = Float32Array.from({ length: 4.2 * sr }, (_, i) => 0.3 * saw(i / sr)), driven = clean.map(x => Math.tanh(20 * x) * 0.5);
+    const a = bassDrive(clean, sr, notes), b = bassDrive(driven, sr, notes);
+    check(a && b && !a.driven && b.driven && bassDrive(clean, sr, notes.slice(0, 4)) === null, 'a clipped bass reads as driven by its even against odd harmonics, a plain sawtooth not, too few notes no measure', JSON.stringify({ clean: a && a.evenOdd, driven: b && b.evenOdd }));
   }
   check(writeFull({ ...Mk, shares: [0.5, 0.48, 0.02] }, { sounds: 'simple' }).tracks.find(t => t.id === 'bass') === undefined || /gain\(\.75\)/.test(JSON.stringify(writeFull({ ...Mk, shares: [0.9, 0.05, 0.05] }, { sounds: 'simple' }))), 'Simple kit keeps its levels');
 }

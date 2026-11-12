@@ -84,6 +84,35 @@ export function bandEnergy(x, sr, a, z, bands = SHARE_BANDS, hop = 4096) {
   }
   return out;
 }
+// The bass's drive (decode-refine 10.1, fifth round). A driven bass is clipped: a symmetric clip turns a sawtooth's
+// wave toward a square, and a square holds odd harmonics only. So the measure is the bass's even harmonics against its
+// odd ones (2nd, 4th, 6th over 3rd, 5th, 7th, in dB) at the pitch level B decoded, on the steps with a bass note and no
+// kick or clap, the median over the steps. Measured on the bench: the two driven acid basses -5.2 and -5.7 dB, the six
+// clean basses -1.3 (a resonant supersaw) to +4.6 (a sawtooth's even harmonics hold more energy than its odd ones,
+// +3 dB); DRIVE_RULE.evenOdd sits between them. The kicks' and the clean basses' harmonics did not tell drive apart
+// (decode-refine 10.1, rounds 1 to 3). level: the low band (20-150 Hz) on those steps against the kick steps, in dB
+// (the driven basses -0.3 to -2.7, the clean ones -0.4 to -18.6: a loud bass is not always a driven one)
+export const DRIVE_RULE = { evenOdd: -3, window: 4096, size: 8192, steps: 256 };
+const powerAt = (p, hz, f, tol = 0.03) => { let m = 0; for (let k = Math.floor((f * (1 - tol)) / hz); k <= Math.ceil((f * (1 + tol)) / hz); k++) m = Math.max(m, p[k] || 0); return m; };
+// x: mono PCM at sr; notes: [{ t (seconds), midi }] for the steps with a bass note and no kick or clap; kicks: the kick
+// steps' times → { evenOdd, level, n, driven } or null
+export function bassDrive(x, sr, notes, kicks = [], rule = DRIVE_RULE) {
+  if (notes.length < 8) return null;
+  const hz = sr / rule.size, pick = (list, n) => { const step = Math.max(1, Math.ceil(list.length / n)); return list.filter((_, i) => i % step === 0); };
+  const low = p => { let s = 0; for (let k = Math.ceil(20 / hz); k < 150 / hz; k++) s += p[k]; return s; };
+  const eo = [], lowB = [], lowK = [];
+  for (const { t, midi } of pick(notes, rule.steps)) {
+    const p = spectrum(x, Math.round(t * sr), rule.window, rule.size), f0 = 440 * 2 ** ((midi - 69) / 12), H = k => powerAt(p, hz, k * f0);
+    const even = H(2) + H(4) + H(6), odd = H(3) + H(5) + H(7);
+    if (even > 0 && odd > 0) eo.push(10 * Math.log10(even / odd));
+    lowB.push(low(p));
+  }
+  for (const t of pick(kicks, rule.steps)) lowK.push(low(spectrum(x, Math.round(t * sr), rule.window, rule.size)));
+  const med = v => { const s = v.slice().sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null; };
+  const e = med(eo), b = med(lowB), k = med(lowK);
+  if (e === null) return null;
+  return { evenOdd: Math.round(e * 10) / 10, level: b && k ? Math.round(10 * Math.log10(b / k) * 10) / 10 : null, n: eo.length, driven: e <= rule.evenOdd };
+}
 // a chord's sustain: the energy of the 250-2000 Hz band in the bar's last eighth over its mean in the whole bar, in
 // 1024-sample frames (a held or reverberant chord near 1, a short one near 0)
 export function sustainOf(x, sr, a, z) {
