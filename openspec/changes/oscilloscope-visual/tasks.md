@@ -11,10 +11,13 @@
 
 - [ ] 2.1 The open questions settled in the design.
 - [ ] 2.2 Every parameter in the card (Line and Screen saturation, Smoothing, Trigger), with a short help line each.
-- [ ] 2.3 The look card in `src/guide.js` and the knowledge note (`docs/knowledge/`), `npm run knowledge`, `check:guide`, `check:knowledge`.
+- [x] 2.3 The look card in `src/guide.js` and the knowledge note (`docs/knowledge/`), `npm run knowledge`, `check:guide`, `check:knowledge`.
 - [ ] 2.4 The fast video: the module loaded before the first frame, the feed's wave (or the full buffer, question 3); a fragment and a 1080p video checked against the stage.
-- [ ] 2.5 Cost: the frame time at 1080p and 4K with each overlay and Glow 1, CPU slowed 4 times; a smaller glow canvas if over budget.
-- [ ] 2.6 A browser check (`tools/check-oscilloscope.cjs`): the look in the menu, the module not loaded before, every overlay drawn, a setting change on the next frame, a reload, render passes over it.
+  - [x] 2.4a The module loaded before the first frame (`visuals.loadLook`, awaited before the render when a part shows the look and before the frame where a section brings it); a fragment with no frame drawn black, in `tools/check-oscilloscope.cjs` (4 black frames without it).
+  - [ ] 2.4b The feed's wave or the full buffer (question 3), and a 1080p video against the stage.
+- [x] 2.5 Cost: the frame time at 1080p and 4K with each overlay and Glow 1, CPU slowed 4 times (design, Cost).
+- [ ] 2.5b A smaller glow canvas on the software path (design, Cost), after the owner's look at the defaults.
+- [x] 2.6 A browser check (`tools/check-oscilloscope.cjs`): the look in the menu, the module not loaded before, every overlay and both modes drawn, a slider and a link stored, a reload, a fragment's frames; AGENTS.md line and knowledge row. Render passes over the look are not checked yet.
 
 ## 3. Later
 
