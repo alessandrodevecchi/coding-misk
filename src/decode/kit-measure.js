@@ -71,12 +71,16 @@ export const nearestKit = (shape, table) => { const r = rankKits(shape, table); 
 
 // the similarity check's bands (tools/decode-similarity.mjs): low 20-150 Hz, mid 150-2000, high 2000-16000
 export const SHARE_BANDS = [[20, 150], [150, 2000], [2000, 16000]];
-// the energy of x[a, z) in the share bands, from 2048-point frames every 4096 samples → [low, mid, high] (sums)
-export function bandEnergy(x, sr, a, z) {
-  const out = [0, 0, 0], hz = sr / SIZE;
-  for (let i = Math.max(0, Math.round(a)); i + 2048 <= Math.min(x.length, Math.round(z)); i += 4096) {
+// the writer's level bands (decode-refine D3): the share bands with the mid band split in three, so a part's level is
+// not matched with another part's sound in a far corner of the mid band (a kick's click for a pad's body)
+export const LEVEL_BANDS = [[20, 150], [150, 400], [400, 1000], [1000, 2000], [2000, 16000]];
+// the energy of x[a, z) in the share bands (or `bands`), from 2048-point frames every `hop` samples → sums per band
+// (a short sound measured alone needs a dense hop: frames 4096 samples apart catch a drum hit's attack or miss it)
+export function bandEnergy(x, sr, a, z, bands = SHARE_BANDS, hop = 4096) {
+  const out = bands.map(() => 0), hz = sr / SIZE;
+  for (let i = Math.max(0, Math.round(a)); i + 2048 <= Math.min(x.length, Math.round(z)); i += hop) {
     const p = spectrum(x, i, 2048);
-    SHARE_BANDS.forEach(([lo, hi], j) => { for (let k = Math.ceil(lo / hz); k < Math.min(p.length, hi / hz); k++) out[j] += p[k]; });
+    bands.forEach(([lo, hi], j) => { for (let k = Math.ceil(lo / hz); k < Math.min(p.length, hi / hz); k++) out[j] += p[k]; });
   }
   return out;
 }

@@ -156,47 +156,83 @@ export function soundsOf(bars, preset = 'ours', whole = bars) {
 
 // the drum track's default gain (src/music.js DEFAULT.drums.gain), the level the part table measured the drums at
 const DRUMS_GAIN = 0.9;
-// the part levels (decode-refine D3): level B's drums, bass, chords and Lead gains scaled so the code's band shares (low, mid,
-// high) come nearest the original's (`shares`, full.js), the largest difference the smallest. The code's energy per
-// band is predicted from each sound alone at gain 1 (src/decode/part-levels.js, measured through the app), its gain
-// and the share of the song's bars it plays; the drums' level is their track's gain. When even the best gains leave a band further
-// than SOUND_RULE.shares (the spec's target) from the original, the prediction does not explain the original (a part
-// the code does not write, a sound the table does not hold) and the gains stay as written. Changes the tracks' code in place
-// → { before, after, gains } (the predicted largest share difference, the multipliers) or null
+// the part levels (decode-refine D3): level B's drums, bass, chords and Lead gains scaled so the code's band shares come
+// nearest the original's (`shares`, full.js: the five level bands of kit-measure.js LEVEL_BANDS, or the three share
+// bands), the largest difference the smallest, in the five bands and in the three the similarity check reads. The
+// code's energy per band is predicted from each sound alone (src/decode/part-levels.js, measured through the app): the
+// drums per machine and row times the hits the patterns play, the bass and the Lead times the steps their loops sound,
+// each with its gain and the share of the song's bars it plays; the drums' level is their track's gain. When even the
+// best gains leave one of the three bands further than SOUND_RULE.shares (the spec's target) from the original, the
+// prediction does not explain the original (a part the code does not write, a sound the table does not hold) and the
+// gains stay as written. Changes the tracks' code in place → { before, after, gains } (the predicted largest share
+// difference in the three bands, the multipliers) or null
 const levelKey = (id, code) => {
   const wave = (/\.s\("([a-z]+)"\)/.exec(code) || [])[1], cut = +((/\.lpf\((\d+)\)/.exec(code) || [])[1] || 0);
-  const near = list => list.reduce((a, b) => (Math.abs(Math.log(b / (cut || b))) < Math.abs(Math.log(a / (cut || a))) ? b : a));
-  if (id === 'bass') return /lpq\(/.test(code) ? 'bass:acid' : `bass:${wave}:${near([300, 600, 900, 1200])}`;
+  const near = (list, v = cut) => list.reduce((a, b) => (Math.abs(Math.log(b / (v || b))) < Math.abs(Math.log(a / (v || a))) ? b : a));
+  if (id === 'bass') { const top = /lpq\(/.test(code) && +((/range\(\d+,\s*(\d+)\)/.exec(code) || [])[1] || 1000); return top ? `bass:acid:${near([500, 1000, 2000], top)}` : `bass:${wave}:${near([300, 600, 900, 1200])}`; }
   if (id === 'chords') return `chords:${wave}:${near([800, 1600, 2400, 4000])}`;
   if (id === 'lead') return `lead:${wave}`;
   return null;
 };
+// the share of a loop's steps that sound a note, from its first mini-notation string (1 for chords, held all bar)
+export function stepShare(code) {
+  const m = /\b(?:note|n)\("([^"]*)"\)/.exec(code);
+  if (!m) return 1;
+  let all = 0, on = 0;
+  for (const tok of m[1].replace(/[<>[\]]/g, ' ').split(/\s+/).filter(Boolean)) { const r = /^(.*?)(?:!(\d+))?$/.exec(tok), n = r[2] ? +r[2] : 1; all += n; if (r[1] !== '~') on += n; }
+  return all ? on / all : 1;
+}
+// a three-band view of five level bands (the mid bands summed)
+const fold = v => (v.length === 5 ? [v[0], v[1] + v[2] + v[3], v[4]] : v);
 export function balanceLevels(tracks, shares, bars) {
   if (!shares || !bars) return null;
-  const parts = [];
+  const nb = shares.length, parts = [];
+  // a table entry in the bands of `shares`
+  const inBands = v => (v && (nb === 3 ? fold(v) : v));
+  const clipBars = (t, pid) => t.clips.filter(c => pid === undefined || c.pattern === pid).reduce((a, c) => a + (c.bars || 1), 0);
   for (const t of tracks) {
     if (t.hush) continue;
-    const on = t.clips.reduce((a, c) => a + (c.bars || 1), 0) / bars;
-    // (the drums: measured at the drum track's default gain, DRUMS_GAIN; their level is the track's `gain` setting)
-    if (t.type === 'drums') { const T0 = PART_LEVELS[`drums:${t.settings.kit}`] || PART_LEVELS['drums:RolandTR909'], g = t.settings.gain ?? DRUMS_GAIN; parts.push({ t, T: T0.map(v => v / DRUMS_GAIN ** 2), g, on, drums: true }); continue; }
-    const codes = Object.values(t.patterns).map(p => p.code), key = codes.length && levelKey(t.id, codes[0]), T = key && PART_LEVELS[key];
-    const g = codes.length ? +((/\.gain\(([\d.]+)\)(?!.*\.gain\()/.exec(codes[0]) || [])[1] || 0) : 0;
-    if (T && g > 0) parts.push({ t, T, g, on });
+    const on = clipBars(t) / bars, T = Array(nb).fill(0);
+    if (t.type === 'drums') {
+      // (the drums: per row and hit in a bar, measured at the drum track's default gain, DRUMS_GAIN; their level is the
+      // track's `gain` setting)
+      const kit = PART_LEVELS[`drums:${t.settings.kit}:bd`] ? t.settings.kit : 'RolandTR909', g = t.settings.gain ?? DRUMS_GAIN;
+      for (const [pid, p] of Object.entries(t.patterns)) {
+        const w = clipBars(t, pid) / bars;
+        for (const [row, steps] of Object.entries(p.rows || {})) { const v = inBands(PART_LEVELS[`drums:${kit}:${row}`]), hitsN = (String(steps).match(/x/g) || []).length; if (v) v.forEach((x, j) => { T[j] += (x * hitsN * w) / DRUMS_GAIN ** 2; }); }
+      }
+      parts.push({ t, T, g, on: 1, drums: true });
+      continue;
+    }
+    const pats = Object.entries(t.patterns).filter(([, p]) => p.code);
+    if (!pats.length) continue;
+    const key = levelKey(t.id, pats[0][1].code), base = inBands(PART_LEVELS[key]);
+    const g = +((/\.gain\(([\d.]+)\)(?!.*\.gain\()/.exec(pats[0][1].code) || [])[1] || 0);
+    if (!base || !(g > 0)) continue;
+    for (const [pid, p] of pats) { const w = clipBars(t, pid) / bars, d = stepShare(p.code); base.forEach((x, j) => { T[j] += x * d * w; }); }
+    parts.push({ t, T, g, on });
   }
   const free = parts;
   if (!free.length) return null;
-  const worst = ks => { const e = [0, 0, 0]; parts.forEach(p => { const k = ks[free.indexOf(p)]; for (let j = 0; j < 3; j++) e[j] += p.T[j] * (p.g * k) ** 2 * p.on; }); const s = e[0] + e[1] + e[2]; return s ? Math.max(...e.map((v, j) => Math.abs(v / s - shares[j]))) : 1; };
+  const sh3 = fold(shares);
+  // the largest share difference, in the bands of `shares` and in the three bands → [both, three]
+  const worst = ks => {
+    const e = Array(nb).fill(0); parts.forEach((p, i) => { for (let j = 0; j < nb; j++) e[j] += p.T[j] * (p.g * ks[i]) ** 2; });
+    const s = e.reduce((a, b) => a + b, 0); if (!s) return [1, 1];
+    const d = e.map((v, j) => Math.abs(v / s - shares[j])), e3 = fold(e), d3 = e3.map((v, j) => Math.abs(v / s - sh3[j]));
+    return [Math.max(...d, ...d3), Math.max(...d3)];
+  };
   const steps = SOUND_RULE.levels.map(k => k), allowed = p => steps.filter(k => p.g * k <= SOUND_RULE.maxGain + 1e-9);
-  let best = free.map(() => 1), bv = worst(best);
-  const before = bv;
+  let best = free.map(() => 1), [bv, b3] = worst(best);
+  const before = b3;
   const walk = (i, ks) => {
-    if (i === free.length) { const v = worst(ks), dist = ks.reduce((a, k) => a + Math.abs(Math.log2(k)), 0), bd = best.reduce((a, k) => a + Math.abs(Math.log2(k)), 0); if (v < bv - 1e-6 || (Math.abs(v - bv) <= 1e-6 && dist < bd)) { bv = v; best = ks.slice(); } return; }
+    if (i === free.length) { const [v, v3] = worst(ks), dist = ks.reduce((a, k) => a + Math.abs(Math.log2(k)), 0), bd = best.reduce((a, k) => a + Math.abs(Math.log2(k)), 0); if (v < bv - 1e-6 || (Math.abs(v - bv) <= 1e-6 && dist < bd)) { bv = v; b3 = v3; best = ks.slice(); } return; }
     for (const k of allowed(free[i])) { ks[i] = k; walk(i + 1, ks); }
   };
   walk(0, free.map(() => 1));
-  if (bv > SOUND_RULE.shares) return { before: Math.round(before * 1000) / 1000, after: Math.round(bv * 1000) / 1000, gains: null };
-  free.forEach((p, i) => { const k = best[i]; if (k === 1) return; if (p.drums) { p.t.settings.gain = Math.round(p.g * k * 100) / 100; return; } for (const pat of Object.values(p.t.patterns)) pat.code = pat.code.replace(/\.gain\(([\d.]+)\)(?!.*\.gain\()/, (_, x) => `.gain(${Math.round(+x * k * 100) / 100})`); });
-  return { before: Math.round(before * 1000) / 1000, after: Math.round(bv * 1000) / 1000, gains: Object.fromEntries(free.map((p, i) => [p.t.id, Math.round(best[i] * 100) / 100])) };
+  if (b3 > SOUND_RULE.shares) return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: null };
+  free.forEach((p, i) => { const k = best[i]; if (k === 1) return; if (p.drums) { p.t.settings.gain = Math.round(p.g * k * 100) / 100; return; } for (const pat of Object.values(p.t.patterns)) if (pat.code) pat.code = pat.code.replace(/\.gain\(([\d.]+)\)(?!.*\.gain\()/, (_, x) => `.gain(${Math.round(+x * k * 100) / 100})`); });
+  return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: Object.fromEntries(free.map((p, i) => [p.t.id, Math.round(best[i] * 100) / 100])) };
 }
 
 // the song of a decoded track. opts: { id, title, artist, attribution, sounds, upTo (bars written, default all) }

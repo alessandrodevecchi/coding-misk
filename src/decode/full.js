@@ -7,7 +7,7 @@ import { createAnalyzer, ANALYSIS_RATE } from './misk-analyzer.js';
 import { chordName, parseChord } from './model.js';
 import { sectionsOf } from './sections.js';
 import { variationsOf } from './writer.js';
-import { mixHatShape, mixHatBright, rankKits, bandEnergy, sustainOf } from './kit-measure.js';
+import { mixHatShape, mixHatBright, rankKits, bandEnergy, sustainOf, LEVEL_BANDS } from './kit-measure.js';
 import { KIT_MEASURES } from './kits.js';
 
 export const MISK = 'misk-analyzer';
@@ -225,7 +225,7 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   // 10. the levels and the chords' sustain (decode-refine D3): the band shares of the original over the bars (the
   // writer sets each part's gain to come near them), and per bar with a chord how much of it is left at its end
   {
-    const e = bandEnergy(pcm, sr, m.downbeat * sr, (m.downbeat + m.bars.length * m.barSeconds) * sr), tot = e[0] + e[1] + e[2];
+    const e = bandEnergy(pcm, sr, m.downbeat * sr, (m.downbeat + m.bars.length * m.barSeconds) * sr, LEVEL_BANDS), tot = e.reduce((a, b) => a + b, 0);
     if (tot > 0) m.shares = e.map(v => Math.round((v / tot) * 1000) / 1000);
     m.bars.forEach((b, i) => { if (b.chord) { const a = (m.downbeat + i * m.barSeconds) * sr; b.sustain = sustainOf(pcm, sr, a, a + m.barSeconds * sr); } });
   }

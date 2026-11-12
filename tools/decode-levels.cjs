@@ -1,26 +1,33 @@
-// The sounds level B writes, measured once through the app (decode-refine D3, task 10.2): each sound alone for four
-// bars at 120 BPM in one fast export, its energy per bar in the similarity check's three bands (low 20-150 Hz, mid
-// 150-2000, high 2000-16000) at gain 1. Writes src/decode/part-levels.js, which the writer reads to set each part's
-// gain so the code's band shares come near the original's. Run again when the writer's sounds change.
+// The sounds level B writes, measured once through the app (decode-refine D3, task 10.2): each sound alone for two
+// bars at 120 BPM in one fast export (the acid bass for five), its mean energy per analysis frame after the first bar, in the writer's level bands
+// (src/decode/kit-measure.js LEVEL_BANDS: low 20-150 Hz, three mid bands 150-400, 400-1000 and 1000-2000, high
+// 2000-16000), read as level B reads the original (`bandEnergy`), at gain 1. The drums per machine and row (four hits
+// in the bar, stored per hit in a bar, at the drum track's default gain); the bass and the Lead stored as if a note
+// sounded on every step (the bass line sounds on 8 of 16 steps, the Lead's on 7), so the writer scales them by the
+// steps its loops sound. Writes src/decode/part-levels.js, which the writer reads to set each part's gain so the
+// code's band shares come near the original's. Run again when the writer's sounds change.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-levels.cjs [--print]   (dev server on PORT; needs ffmpeg)
 const fs = require('node:fs'), path = require('node:path');
 const { exportSong } = require('./decode-export.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ROOT = path.join(__dirname, '..'), OUT = path.join(ROOT, '.cache', 'decode', 'levels');
 // the measured gain: each sound plays at this gain, its energy divided by its square (the master limiter stays idle)
-const G = 0.4, BARS = 4, BPM = 120;
+const G = 0.4, BARS = 2, BPM = 120;
+// frames every 256 samples: every hit's attack counted as a long track's frames count it on average
+const HOP = 256;
 const BASS = 'note("a1 ~ a1 ~ c2 ~ a1 ~ e1 ~ a1 ~ g1 ~ a1 ~")', CHORDS = 'chord("<Am F>").voicing()', LEAD = 'n("0 ~ 2 ~ 4 ~ 2 ~ 0 ~ ~ ~ 4 3 2 ~").scale("A4:minor")';
-const CUTS = { bass: [300, 600, 900, 1200], chords: [800, 1600, 2400, 4000] };
+const CUTS = { bass: [300, 600, 900, 1200], chords: [800, 1600, 2400, 4000], acid: [500, 1000, 2000] };
+const ROW_HITS = 4, DRUM_ROWS = ['bd', 'cp', 'hh', 'oh'], HIT = { bd: 'x...x...x...x...', cp: 'x...x...x...x...', hh: '..x...x...x...x.', oh: '..x...x...x...x.' };
 const items = [];
-for (const kit of ['RolandTR909', 'RolandTR808']) items.push({ key: `drums:${kit}`, track: { type: 'drums', settings: { kit, gain: 0.9 }, rows: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' } } });
-for (const w of ['sine', 'square', 'sawtooth']) for (const c of CUTS.bass) items.push({ key: `bass:${w}:${c}`, code: `${BASS}.s("${w}").lpf(${c}).gain(${G})` });
-items.push({ key: 'bass:acid', code: `${BASS}.s("sawtooth").lpf(sine.range(250, 1000).slow(4)).lpq(8).gain(${G})` });
-for (const w of ['supersaw', 'sawtooth', 'triangle']) for (const c of CUTS.chords) items.push({ key: `chords:${w}:${c}`, code: `${CHORDS}.s("${w}").lpf(${c}).gain(${G})` });
-for (const w of ['sawtooth', 'square', 'triangle']) items.push({ key: `lead:${w}`, code: `${LEAD}.s("${w}").lpf(2400).gain(${G})` });
-
 (async () => {
+  const { KITS } = await import('../src/music.js');
+  for (const kit of KITS) for (const row of DRUM_ROWS) items.push({ key: `drums:${kit}:${row}`, per: ROW_HITS, track: { type: 'drums', settings: { kit, gain: 0.9 }, rows: { [row]: HIT[row] } } });
+  for (const w of ['sine', 'square', 'sawtooth']) for (const c of CUTS.bass) items.push({ key: `bass:${w}:${c}`, per: 8 / 16, code: `${BASS}.s("${w}").lpf(${c}).gain(${G})` });
+  for (const c of CUTS.acid) items.push({ key: `bass:acid:${c}`, per: 8 / 16, bars: 5, code: `${BASS}.s("sawtooth").lpf(sine.range(200, ${c}).slow(4)).lpq(8).gain(${G})` });
+  for (const w of ['supersaw', 'sawtooth', 'triangle']) for (const c of CUTS.chords) items.push({ key: `chords:${w}:${c}`, per: 1, code: `${CHORDS}.s("${w}").lpf(${c}).gain(${G})` });
+  for (const w of ['sawtooth', 'square', 'triangle']) items.push({ key: `lead:${w}`, per: 7 / 16, code: `${LEAD}.s("${w}").lpf(2400).gain(${G})` });
   const S = await import('./decode-similarity.mjs');
-  const sections = items.map((x, i) => ({ name: `S${i}`, bars: BARS, bpm: BPM, key: 'A' }));
+  const sections = items.map((x, i) => ({ name: `S${i}`, bars: x.bars || BARS, bpm: BPM, key: 'A' }));
   const tracks = items.map((x, i) => x.track
     ? { id: `t${i}`, name: x.key, type: 'drums', settings: x.track.settings, patterns: { A: { rows: x.track.rows } }, clips: [{ section: `S${i}`, pattern: 'A' }] }
     : { id: `t${i}`, name: x.key, type: 'code', settings: {}, patterns: { A: { code: x.code } }, clips: [{ section: `S${i}`, pattern: 'A' }] });
@@ -33,17 +40,21 @@ for (const w of ['sawtooth', 'square', 'triangle']) items.push({ key: `lead:${w}
   const wav = path.join(OUT, 'levels.wav');
   console.log(`exported the calibration song (${await exportSong(page, song, wav)} s)`);
   await browser.close();
-  const f = S.features(S.readAudio(wav)), bar = 240 / BPM, out = {};
-  items.forEach((x, i) => {
-    // the bars after the first (no tail of the sound before), the mean energy per frame in each band at gain 1
-    const t0 = (i * BARS + 1) * bar, t1 = (i + 1) * BARS * bar, sum = [0, 0, 0]; let n = 0;
-    f.fr.forEach((fr, k) => { const t = k * f.hop; if (t >= t0 && t < t1) { sum[0] += fr.sl; sum[1] += fr.sm; sum[2] += fr.sh; n++; } });
-    const g2 = x.track ? 1 : G * G;
-    out[x.key] = sum.map(v => +(v / n / g2).toPrecision(3));
+  const { bandEnergy, LEVEL_BANDS } = await import('../src/decode/kit-measure.js');
+  const x = S.readAudio(wav), sr = S.RATE, bar = 240 / BPM, out = {};
+  let at = 0;
+  items.forEach(it => {
+    // the item's bars after its first (no tail of the sound before; the acid bass's four bars hold its filter's whole
+    // sweep), the mean energy per frame in each band at gain 1, per unit
+    const n = it.bars || BARS, a = (at + 1) * bar * sr, z = (at + n) * bar * sr, frames = Math.floor((z - a - 2048) / HOP) + 1;
+    at += n;
+    const g2 = it.track ? 1 : G * G;
+    out[it.key] = bandEnergy(x, sr, a, z, LEVEL_BANDS, HOP).map(v => +(v / frames / g2 / it.per).toPrecision(3));
   });
   const src = `// The sounds level B writes, measured once through the app by tools/decode-levels.cjs (decode-refine D3): the mean
-// energy per analysis frame of each sound alone at gain 1 (drums at their own gain), in the similarity check's bands
-// [low 20-150 Hz, mid 150-2000, high 2000-16000]. Made by the tool; do not edit.
+// energy per analysis frame of each sound alone at gain 1 (drums at their track's default gain), in the writer's level
+// bands (kit-measure.js LEVEL_BANDS: 20-150, 150-400, 400-1000, 1000-2000, 2000-16000 Hz); drums per machine and row for
+// one hit in a bar, the bass and the Lead for a note on every step. Made by the tool; do not edit.
 export const PART_LEVELS = {
 ${Object.entries(out).map(([k, v]) => `  '${k}': [${v.join(', ')}],`).join('\n')}
 };

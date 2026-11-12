@@ -25,7 +25,7 @@ import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
 import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode, balanceLevels } from '../src/decode/writer.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare } from '../src/decode/writer.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
@@ -452,9 +452,12 @@ if (process.argv.includes('--app')) {
   check(/\.room\(/.test(soundsOf([{ ...base, sustain: 0.8 }], 'ours').chords) && !/\.room\(/.test(soundsOf([{ ...base, sustain: 0.2 }], 'ours').chords), 'chords still sounding at the end of their bar get a room, short ones none');
   check(soundsOf([{ ...base, bright: 0.6 }], 'ours').lead !== soundsOf([{ ...base, bright: 0.1 }], 'ours').lead, 'the Lead\'s sound follows the brightness');
   // the part levels: the balance moves the gains toward the original's band shares, and leaves them when it cannot
-  const tr = () => [{ id: 'drums', type: 'drums', settings: { kit: 'RolandTR909' }, patterns: { A: { rows: {} } }, clips: [{ start: 0, bars: 8 }] }, { id: 'bass', type: 'code', patterns: { A: { code: 'note("a1").s("sine").lpf(400).gain(.75)' } }, clips: [{ start: 0, bars: 8 }] }, { id: 'chords', type: 'code', patterns: { A: { code: 'chord("Am").voicing().s("triangle").lpf(1200).gain(.3)' } }, clips: [{ start: 0, bars: 8 }] }];
+  const tr = () => [{ id: 'drums', type: 'drums', settings: { kit: 'RolandTR909' }, patterns: { A: { rows: { bd: 'x...x...x...x...', hh: '..x...x...x...x.' } } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }, { id: 'bass', type: 'code', patterns: { A: { code: 'note("a1").s("sine").lpf(400).gain(.75)' } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }, { id: 'chords', type: 'code', patterns: { A: { code: 'chord("Am").voicing().s("triangle").lpf(1200).gain(.3)' } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
   const t1 = tr(), r1 = balanceLevels(t1, [0.5, 0.48, 0.02], 8), t2 = tr(), r2 = balanceLevels(t2, [0.05, 0.05, 0.9], 8);
   check(r1 && r1.after <= 0.1 && r1.after <= r1.before && JSON.stringify(t1) !== JSON.stringify(tr()) && r2 && r2.gains === null && JSON.stringify(t2) === JSON.stringify(tr()), 'the part levels come near the original\'s band shares, and stay as written when no gains can reach them', JSON.stringify({ r1, r2 }));
+  // the prediction counts the steps a loop sounds and the hits a drum row plays (decode-refine D3, third round)
+  check(stepShare('note("<[~!8 d1 d2 ~!6] [a1 ~ a1 ~]>").s("sine")') === 4 / 20 && stepShare('chord("<Am F>").voicing()') === 1, 'a loop\'s share of sounding steps', stepShare('note("<[~!8 d1 d2 ~!6] [a1 ~ a1 ~]>")'));
+  { const dense = tr(), sparse = tr(); sparse[0].patterns.A.rows = { bd: 'x...............' }; const rd = balanceLevels(dense, [0.5, 0.48, 0.02], 8), rs = balanceLevels(sparse, [0.5, 0.48, 0.02], 8); check(rd && rs && rd.before !== rs.before, 'the drums\' predicted level follows the hits their rows play', JSON.stringify({ rd, rs })); }
   check(writeFull({ ...Mk, shares: [0.5, 0.48, 0.02] }, { sounds: 'simple' }).tracks.find(t => t.id === 'bass') === undefined || /gain\(\.75\)/.test(JSON.stringify(writeFull({ ...Mk, shares: [0.9, 0.05, 0.05] }, { sounds: 'simple' }))), 'Simple kit keeps its levels');
 }
 // a tapped or stored tempo is never moved by the relock (decode-refine D4)
