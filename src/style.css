@@ -157,6 +157,11 @@
 
   /* area di lavoro */
   .work { display: grid; gap: 20px; margin-top: 20px; }
+  /* light-start D3: before the first render, labels the app fills keep one line, and the work area keeps its space
+     invisible (no layout shift) until the app marks itself ready; after 4 s it shows anyway */
+  html:not([data-ready]) [data-i18n]:empty::before { content: "\a0"; }
+  html:not([data-ready]) .work { visibility: hidden; animation: work-show 0s 4s forwards; }
+  @keyframes work-show { to { visibility: visible; } }
   @media (min-width: 1040px) {
     .work { grid-template-columns: minmax(0, 1fr) var(--code-w, minmax(360px, 42%)); align-items: start; }
     .codecol { position: sticky; top: 96px; }

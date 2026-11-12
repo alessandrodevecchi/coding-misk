@@ -60,9 +60,12 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
   // a machine, family or kind has its own picture
   const groupPx = (cat, g, w) => `<img class="px" alt="" data-gart="${esc(cat)}|${esc(g)}" data-w="${w}">`;
   // picture of a group: the photo when there is one, otherwise the pixel art
-  const groupPic = (cat, g, w) => { const p = photoOf(cat, g); return p ? `<img class="photo" src="${p.file}" alt="">` : groupPx(cat, g, w); };
+  // (photos load lazily with a size, so only the rows on screen ask for theirs and keep their place: light-start D2)
+  const groupPic = (cat, g, w) => { const p = photoOf(cat, g); return p ? `<img class="photo" src="${p.file}" alt="" loading="lazy" decoding="async" width="${w}" height="${w}">` : groupPx(cat, g, w); };
 
   function render() {
+    // nothing is built while the tab is hidden: showing the tab renders it (light-start D1)
+    if (!root.offsetParent) return;
     refresh();
     const counts = Object.fromEntries(CATEGORIES.map(c => [c, items.filter(it => it.cat === c).length]));
     const gs = st.cat === 'favs' || st.q ? [] : groups();
@@ -172,7 +175,7 @@ export function createSoundBrowser({ root, store, t, tx, esc, getCustom, play, s
   // picture block of the inspector: the whole photo (click to enlarge) or the pixel art, credit below
   function picture(cat, g, it) {
     const p = photoOf(cat, g);
-    if (p) return `<button class="sb-photo" data-sb-zoom="${esc(g)}" aria-label="${esc(t('sbZoom'))}"><img src="${p.file}" alt="${esc(groupLabel(cat, g))}"></button>`;
+    if (p) return `<button class="sb-photo" data-sb-zoom="${esc(g)}" aria-label="${esc(t('sbZoom'))}"><img src="${p.file}" alt="${esc(groupLabel(cat, g))}" loading="lazy" decoding="async"></button>`;
     return `<div class="sb-photo">${it ? px(it, 64) : groupPx(cat, g, 64)}</div>`;
   }
   const credit = (cat, g) => { const p = photoOf(cat, g); return p ? `<p class="sb-credit">${t('sbPhotoBy')} <a href="${p.page}" target="_blank" rel="noopener">${esc(p.credit)}</a>, Wikimedia Commons</p>` : ''; };
