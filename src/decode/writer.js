@@ -19,7 +19,7 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // sustain: the chords' mean energy left in the last eighth of their bar (amplitude ratio, 0.6 is about -4 dB) from which
 // they get a room of `room`; levels: the gain steps the balance tries for each part (multipliers, 1.5 dB apart) and the
 // highest gain it writes
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1 };
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -164,8 +164,10 @@ const DRUMS_GAIN = 0.9;
 // each with its gain and the share of the song's bars it plays; the drums' level is their track's gain. When even the
 // best gains leave one of the three bands further than SOUND_RULE.shares (the spec's target) from the original, the
 // prediction does not explain the original (a part the code does not write, a sound the table does not hold) and the
-// gains stay as written. Changes the tracks' code in place → { before, after, gains } (the predicted largest share
-// difference in the three bands, the multipliers) or null
+// gains stay as written. Among the gains that bring every band within SOUND_RULE.near (half the target), the smallest
+// change wins: a part the written levels already balance keeps its level (the arp song's arpeggio, written as its
+// bass, lost 9 dB and its mid-band rhythm for a share 0.016 nearer). Changes the tracks' code in place → { before,
+// after, gains } (the predicted largest share difference in the three bands, the multipliers) or null
 const levelKey = (id, code) => {
   const wave = (/\.s\("([a-z]+)"\)/.exec(code) || [])[1], cut = +((/\.lpf\((\d+)\)/.exec(code) || [])[1] || 0);
   const near = (list, v = cut) => list.reduce((a, b) => (Math.abs(Math.log(b / (v || b))) < Math.abs(Math.log(a / (v || a))) ? b : a));
@@ -226,7 +228,13 @@ export function balanceLevels(tracks, shares, bars) {
   let best = free.map(() => 1), [bv, b3] = worst(best);
   const before = b3;
   const walk = (i, ks) => {
-    if (i === free.length) { const [v, v3] = worst(ks), dist = ks.reduce((a, k) => a + Math.abs(Math.log2(k)), 0), bd = best.reduce((a, k) => a + Math.abs(Math.log2(k)), 0); if (v < bv - 1e-6 || (Math.abs(v - bv) <= 1e-6 && dist < bd)) { bv = v; b3 = v3; best = ks.slice(); } return; }
+    if (i === free.length) {
+      const [v, v3] = worst(ks), dist = ks.reduce((a, k) => a + Math.abs(Math.log2(k)), 0), bd = best.reduce((a, k) => a + Math.abs(Math.log2(k)), 0), ok = v <= SOUND_RULE.near + 1e-9, bok = bv <= SOUND_RULE.near + 1e-9;
+      // within SOUND_RULE.near: the smallest change wins; else the nearest shares
+      const better = ok && bok ? dist < bd - 1e-9 || (Math.abs(dist - bd) <= 1e-9 && v < bv - 1e-6) : ok !== bok ? ok : v < bv - 1e-6 || (Math.abs(v - bv) <= 1e-6 && dist < bd);
+      if (better) { bv = v; b3 = v3; best = ks.slice(); }
+      return;
+    }
     for (const k of allowed(free[i])) { ks[i] = k; walk(i + 1, ks); }
   };
   walk(0, free.map(() => 1));
