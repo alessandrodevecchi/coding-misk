@@ -11,7 +11,7 @@ import { stateAt } from '../song/build.js';
 import { windowSong } from '../endless/join.js';
 import { combosRecord } from '../voices/combos.js';
 import { withMine, withCombos, sessionItems, recipeOptionsAt, howOf, GROWTH_ON_AIR, growsOnAir, waypointsOnAir, airChooserOf, holdsGrown, extraStylesOf } from '../endless/items.js';
-import { steerOnAir, airBoundaries, airOffset, directorView, AIR_CHOOSER, chooserOf } from '../endless/waypoints.js';
+import { steerOnAir, airBoundaries, airOffset, directorView, AIR_CHOOSER, chooserOf, airWhy, airDropped } from '../endless/waypoints.js';
 import { PROFILE_CHOICES, RADIO_CHOICES, RADIO_PROFILES, CUSTOM_DEFAULT, customControls, profileOptions, savedSongProfile } from '../endless/profile.js';
 import { growOnAir, airControls, leadOnAir, shapeSearchSetting, searchOf, playedOf } from '../endless/growth.js';
 import { resolveProfile, CONTROLS, displayOf, withDisplay } from '../live/profiles.js';
@@ -223,7 +223,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   }
   // the commands as the steering placed them: each pending one gets the boundary that leaves time for its typing (the
   // queue and the recipe show it); one no boundary was left for is dropped
+  // (a riser the steering dropped, with no room left within two phrases of its bar, says so as a refused press does, #82)
   function airSettle(item, resolved) {
+    if (S && item === S.stream[S.onAir] && airDropped(item.commands, resolved).some(c => c.kind === 'riser')) toast(t('steerRiserNoRoom'));
     const byId = new Map(resolved.map(c => [c.id, c]));
     item.commands = item.commands.flatMap(c => { const r = byId.get(c.id); if (!r) return c.pend ? [] : [c]; const { pend, ...x } = { ...c, ...r }; return [x]; });
     S.recipe.steering = (S.recipe.steering || []).flatMap(x => { if (x.song !== item.n) return [x]; const c = item.commands.find(y => y.id === x.id); return c ? [{ song: item.n, ...c }] : x.pend ? [] : [x]; });
@@ -683,6 +685,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const air = airSteer(item) && item.g0, off = air ? airOffset(item.g0) : 0;
     let at;
     if (air) {
+      // (a riser inside the growth goes on the grown song: refused with its reason when no bar within two phrases fits, #82)
+      if (c.kind === 'riser' && airWhy(c, { rel, plan: item.plan, base: item.base.plan, grown: item.g0, plain: item.plain || item.base.song }) === 'no-room') { toast(t('steerRiserNoRoom')); return false; }
       const cands = pre ? [pre.at] : airBoundaries(c.kind, rel, item.plan, item.g0);
       if (!cands.length || (c.kind === 'extend' && whyNot(c, item.plain || item.base.song, item.plan, rel - off, tailOf(item)))) { toast(t('steerLate')); return false; }
       at = cands[0];
@@ -1694,7 +1698,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const air = airSteer(item) && item.g0, airOff = air ? airOffset(item.g0) : 0;
     // a disabled button says why in its tooltip ("this song has no pad")
     // (a grown song: the director's view in its own bars, late when no boundary is left, radio-profiles D9)
-    const whyOf = c => (S.paused !== undefined ? 'paused' : air && !airBoundaries(c.kind, rel, item.plan, item.g0).length ? 'late' : whyNot(c, air ? item.plain || item.base.song : item.song, item.plan, rel - airOff, tailOf(item), item.opts || (item.base && item.base.opts) || {}));
+    // (a riser inside the growth: the reason from its placement on the grown song, airWhy, #82)
+    const whyOf = c => (S.paused !== undefined ? 'paused' : air ? airWhy(c, { rel, plan: item.plan, base: item.base.plan, grown: item.g0, plain: item.plain || item.base.song, tail: tailOf(item), opts: item.opts || (item.base && item.base.opts) || {} }) : whyNot(c, item.song, item.plan, rel, tailOf(item), item.opts || (item.base && item.base.opts) || {}));
     const btn = (c, label) => {
       const part = ['vary', 'swap', 'voicing'].includes(c.kind);
       const why = whyOf(c), k = KEYS_OF[c.kind];

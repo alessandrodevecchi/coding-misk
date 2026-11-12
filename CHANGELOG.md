@@ -88,6 +88,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Presets Strum (country guitar), Swell (ambient pad) and Two-feel (jazz bass).
 - Radio: a countdown badge next to Extend until it enters ("Extend +16 s · in 24 s").
 - `npm run check:steer-memo`: the radio steering with kept results compared with a full steering.
+- `npm run check:added-play`: tracks added with the radio console's "+" play every bar of the phrase they enter.
 - `tools/steer-bench.mjs`: steering time per console press.
 - One-row pianoroll looks: a pianoroll widget whose hits fall on one row draws thin ticks in a low strip when every hit is as loud, and shows accents by bar height, transparency or both, in the editor, on the stage panels and in videos.
 - Settings "One-row pianoroll, equal volume" (Thin, Full) and "One-row pianoroll, varying volume" (Height, Transparency, Both, Random) in the Code widgets card.
@@ -97,6 +98,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Guide: the Decode card describes the Lead track in Full, the tempo checked again after 8 bars with a kick in Live, Essentia.js for the top line and the video picture with the Video visual.
+- Guide: the Settings card says what the backup holds of Decode and the "Include all Decode analyses" choice.
+- Guide: the "Video on the stage" card says that the fast video and fragments offer Video as a chosen visual.
+- Guide: the Stage widgets card says that the hit grid panel comes in with the first drum line and that a new song chooses its panels again.
 - Decode: the store keeps up to 2000 analyses instead of 50 and drops Live-only analyses before full ones.
 - Decode: a light index of the stored analyses feeds the lists; opening the tab no longer reads every stored analysis.
 - Settings backup: it carries the 100 Decode analyses used last by default, and the import counts Decode analyses and mixtapes.
@@ -149,6 +154,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - The first boundary a console change on a grown radio song takes follows that song's measured steering time per command.
 
 ### Fixed
+
+- Radio: near the end of a growth the console's riser button stays enabled when the riser fits on the grown song, and a riser with no room within two phrases shows a notice instead of disappearing.
+- Radio: a track added with "+" on the half-phrase start just before a break or a charge plays its whole first phrase instead of leaving with the drums after 4 bars.
 
 - Decode: in Full, a two-bar drum groove is written as its two bars in turn, not as the hits they share.
 - Decode: in Full, a chord from Essentia.js on another root no longer turns minor from the old chord's quiet third.

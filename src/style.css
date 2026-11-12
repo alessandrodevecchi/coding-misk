@@ -2097,3 +2097,8 @@ summary .vt-cs-dot { margin-left: 0; }
 .sv-empty { padding: 4px 0; }
 .sv-msg:empty { display: none; }
 @media (max-width: 560px) { .sv-name { max-width: 100%; flex-basis: 60%; } }
+
+/* the Oscilloscope card (oscilloscope-visual D7): a slider, its value and the link to the song on one row */
+.osc-param { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.osc-param input[type="range"] { flex: 1 1 140px; min-width: 120px; }
+.osc-param output { font: 12px var(--mono); min-width: 3.5em; color: var(--muted); }

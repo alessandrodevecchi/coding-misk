@@ -674,6 +674,10 @@ export function directSong(plan, opts, rng, comments, steer = {}) {
     // the listener's moves come first on their boundary (they ignore the one-move-per-track rule, not the locks)
     // (a track the listener brings in here is not taken out by the break or the charge of the same boundary)
     const brought = new Set();
+    // (a "+" on the half-phrase start just before this boundary, console-add-waves D6, counts as brought in here: it
+    // plays at least the phrase it enters, so the break or the charge of this boundary leaves it in, added-tracks-play)
+    // (read from protect, which holds every listener track with its bar, so a later rewrite from this boundary keeps it)
+    for (const p of protect) if (p.at === at - phrase / 2) brought.add(p.id);
     for (const f of forced[k] || []) {
       if (f.mixer && f.step && f.step.add !== undefined) [].concat(f.step.add).forEach(id => brought.add(id));
       const ids = f.tracks || [f.track];

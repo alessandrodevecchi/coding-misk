@@ -283,6 +283,8 @@ export const LOOKS = [
   ['claude', 'Claude'],
   // a real video as the stage's picture (stage-video D1): the file Decode plays, or the user's stage video folders
   ['video', 'Video'],
+  // the sound as a beam on a phosphor screen (oscilloscope-visual D1), drawn by a module loaded when picked
+  ['oscilloscope', { it: 'Oscilloscopio', en: 'Oscilloscope' }],
 ];
 // render styles (widget-render-styles D1): how the stage is drawn, chosen next to the look. ASCII and Terminal are drawn
 // by the widget painters on the widget looks (native), and as a pass over the frame on the other looks
@@ -291,7 +293,7 @@ export const RENDERS = [
 ];
 export const NATIVE_RENDERS = ['ascii', 'terminal'];
 // the light gain of 1-bit and ASCII per look (D3): the dark looks need more to keep their shapes
-export const RENDER_GAIN = { default: 1.5, spazio: 2.4, sonar: 2.6, montagne: 1.8, edgerunners: 1.3, monitor: 2, rullo: 2, claude: 1.8, soul: 1.6, video: 1.2 };
+export const RENDER_GAIN = { default: 1.5, spazio: 2.4, sonar: 2.6, montagne: 1.8, edgerunners: 1.3, monitor: 2, rullo: 2, claude: 1.8, soul: 1.6, video: 1.2, oscilloscope: 2.4 };
 // looks set aside for now: not in the menus, a song or setting that names one falls back to the stage
 export const HIDDEN_LOOKS = ['studio'];
 export const PICK_LOOKS = LOOKS.filter(([k]) => !HIDDEN_LOOKS.includes(k));

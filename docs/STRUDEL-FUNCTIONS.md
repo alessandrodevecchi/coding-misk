@@ -334,7 +334,7 @@ Line labels the REPL handles (`@strudel/core` repl.mjs). They are not functions.
 | [`krush`](#fn-krush) (undocumented) |  | core | never |  |
 | [`label`](#fn-label) |  | core | never |  |
 | [`lastOf`](#fn-lastOf) |  | core | never | yes: A fill on the last cycle of a phrase. |
-| [`late`](#fn-late) |  | core | songs 30, live 80, radio 41 |  |
+| [`late`](#fn-late) |  | core | songs 30, live 64, radio 41 |  |
 | [`layer`](#fn-layer) | `apply` | core | never |  |
 | [`lbrick`](#fn-lbrick) (undocumented) |  | core | never |  |
 | [`leslie`](#fn-leslie) |  | core | never |  |
@@ -384,7 +384,7 @@ Line labels the REPL handles (`@strudel/core` repl.mjs). They are not functions.
 | [`moveXY`](#fn-moveXY) (undocumented) |  | draw | never |  |
 | [`mtranspose`](#fn-mtranspose) (undocumented) |  | core | never |  |
 | [`mul`](#fn-mul) |  | core | songs 8, live 8, radio 10 |  |
-| [`n`](#fn-n) |  | core | songs 37, live 37, radio 54 |  |
+| [`n`](#fn-n) |  | core | songs 37, live 46, radio 54 |  |
 | [`never`](#fn-never) |  | core | never |  |
 | [`noise`](#fn-noise) |  | core | never |  |
 | [`note`](#fn-note) |  | core | songs 44, live 93, radio 55 |  |
@@ -410,7 +410,7 @@ Line labels the REPL handles (`@strudel/core` repl.mjs). They are not functions.
 | [`overshape`](#fn-overshape) (undocumented) |  | core | never |  |
 | [`pace`](#fn-pace) (undocumented) |  | core | never |  |
 | [`palindrome`](#fn-palindrome) (undocumented) |  | core | never |  |
-| [`pan`](#fn-pan) |  | core | songs 10, live 25, radio 9 |  |
+| [`pan`](#fn-pan) |  | core | songs 10, live 41, radio 9 |  |
 | [`panchor`](#fn-panchor) |  | core | never |  |
 | [`panorient`](#fn-panorient) (undocumented) |  | core | never |  |
 | [`panspan`](#fn-panspan) (undocumented) |  | core | never |  |
@@ -486,7 +486,7 @@ Line labels the REPL handles (`@strudel/core` repl.mjs). They are not functions.
 | [`ring`](#fn-ring) (undocumented) |  | core | never |  |
 | [`ringdf`](#fn-ringdf) (undocumented) |  | core | never |  |
 | [`ringf`](#fn-ringf) (undocumented) |  | core | never |  |
-| [`room`](#fn-room) |  | core | songs 44, live 93, radio 59, prelude 1 |  |
+| [`room`](#fn-room) |  | core | songs 44, live 77, radio 59, prelude 1 |  |
 | [`roomdim`](#fn-roomdim) | `rdim` | core | never |  |
 | [`roomfade`](#fn-roomfade) | `rfade` | core | never |  |
 | [`roomlp`](#fn-roomlp) | `rlp` | core | never |  |
@@ -498,7 +498,7 @@ Line labels the REPL handles (`@strudel/core` repl.mjs). They are not functions.
 | [`samples`](#fn-samples) (undocumented) |  | superdough | never |  |
 | [`saw`](#fn-saw) (undocumented) |  | core | never |  |
 | [`saw2`](#fn-saw2) (undocumented) |  | core | never |  |
-| [`scale`](#fn-scale) |  | tonal | songs 34, live 34, radio 44 |  |
+| [`scale`](#fn-scale) |  | tonal | songs 34, live 43, radio 44 |  |
 | [`scaleTranspose`](#fn-scaleTranspose) | `scaleTrans`, `strans` | tonal | never |  |
 | [`scope`](#fn-scope) | `tscope` | webaudio | never |  |
 | [`scram`](#fn-scram) (undocumented) |  | core | never |  |

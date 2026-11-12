@@ -304,7 +304,7 @@
     },
     "late": {
       "songs": 30,
-      "live": 80,
+      "live": 64,
       "radio": 41,
       "prelude": 0,
       "as": [
@@ -358,7 +358,7 @@
     },
     "n": {
       "songs": 37,
-      "live": 37,
+      "live": 46,
       "radio": 54,
       "prelude": 0,
       "as": [
@@ -385,7 +385,7 @@
     },
     "pan": {
       "songs": 10,
-      "live": 25,
+      "live": 41,
       "radio": 9,
       "prelude": 0,
       "as": [
@@ -457,7 +457,7 @@
     },
     "room": {
       "songs": 44,
-      "live": 93,
+      "live": 77,
       "radio": 59,
       "prelude": 1,
       "as": [
@@ -484,7 +484,7 @@
     },
     "scale": {
       "songs": 34,
-      "live": 34,
+      "live": 43,
       "radio": 44,
       "prelude": 0,
       "as": [
