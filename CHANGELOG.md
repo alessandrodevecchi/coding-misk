@@ -9,6 +9,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 - `tools/decode-kits.mjs`: the app's drum machines measured from their hat samples into `src/decode/kits.js`; `--holdout` checks the choice on held-out songs.
 - `tools/decode-levels.cjs`: the sounds Decode writes, measured through the app into `src/decode/part-levels.js`.
+- `tools/decode-similarity.cjs --holdout`: the held-out songs' similarity, printed only.
 - Decode: in Full, a Lead track writes the top line as a loop per section, with mute and solo; a sung melody starts muted.
 - Decode: All, Audio and Video filters in the library list, with the count of each, remembered and followed by Autoplay, Previous and Next.
 - Stage: Video look in the look menu and the arrows, showing a muted video with every render style, Code over, the widgets and the captions over it.
@@ -98,6 +99,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Decode: in Full, each part's level is predicted from the drum rows and the steps the code plays, in five bands, and a part that already balances keeps its written level.
 - Guide: the Decode card describes the Lead track in Full, the tempo checked again after 8 bars with a kick in Live, Essentia.js for the top line and the video picture with the Video visual.
 - Guide: the Settings card says what the backup holds of Decode and the "Include all Decode analyses" choice.
 - Guide: the "Video on the stage" card says that the fast video and fragments offer Video as a chosen visual.

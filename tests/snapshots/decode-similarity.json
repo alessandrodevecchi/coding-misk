@@ -3,39 +3,39 @@
   "margin": 0.05,
   "files": {
     "decode-test-124": {
-      "rhythmLow": 0.38,
+      "rhythmLow": 0.386,
       "rhythmMid": 0.975,
-      "rhythmHigh": 0.967,
+      "rhythmHigh": 0.968,
       "chroma": 0.972,
       "bassChroma": 0.955,
-      "brightness": 0.838,
-      "shares": 0.978,
+      "brightness": 0.878,
+      "shares": 0.994,
       "arc": 0.907
     },
     "decode-test-90": {
       "rhythmLow": 0.1,
       "rhythmMid": 0.434,
       "rhythmHigh": 0.98,
-      "chroma": 0.931,
+      "chroma": 0.933,
       "bassChroma": 0.896,
-      "brightness": 0.716,
-      "shares": 0.878,
+      "brightness": 0.717,
+      "shares": 0.989,
       "arc": 0.908
     },
     "decode-test-174": {
       "rhythmLow": 0.859,
-      "rhythmMid": 0.881,
+      "rhythmMid": 0.954,
       "rhythmHigh": 0.98,
-      "chroma": 0.953,
+      "chroma": 0.971,
       "bassChroma": 0.872,
-      "brightness": 0.71,
+      "brightness": 0.746,
       "shares": 0.978,
       "arc": -0.003
     },
     "decode-test-long": {
       "rhythmLow": 0.726,
-      "rhythmMid": 0.949,
-      "rhythmHigh": 0.966,
+      "rhythmMid": 0.972,
+      "rhythmHigh": 0.972,
       "chroma": 0.969,
       "bassChroma": 0.914,
       "brightness": 0.821,
@@ -74,12 +74,12 @@
     },
     "radio-bench-c": {
       "rhythmLow": 0.757,
-      "rhythmMid": 0.966,
-      "rhythmHigh": 0.811,
+      "rhythmMid": 0.98,
+      "rhythmHigh": 0.813,
       "chroma": 0.991,
       "bassChroma": 0.996,
       "brightness": 0.629,
-      "shares": 0.972,
+      "shares": 0.998,
       "arc": 0.01
     }
   },

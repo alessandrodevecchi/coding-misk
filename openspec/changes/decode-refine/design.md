@@ -342,6 +342,30 @@ The first round's machine choice (hat brightness times 1.1, tuned on the bench) 
 
 Met: the brightness of luci-rosse, acid, decode-test-124 and long; the shares of six files. Not met: the radio seed's brightness (0.62: its supersaw bass, arp and hook are brighter than any sound the writer has), decode-test-90 (1.40) and 174 (2.37, the wrong machine), the arp song's (0.74: the balance lowered its chords and Lead to fit the shares); the shares of acid and luci-rosse (the acid bass); low-band rhythm on decode-test-124 and 90 and high-band rhythm on luci-rosse (not part of group 10's sounds). The first round's mid-band rhythm loss on decode-test-124 and long is gone (0.98 and 0.95): with the right machine, the hats now line up. The snapshot takes each score that improved; the scores that fell stay at their old values, so the check fails on decode-test-174's and the arp song's brightness and on acid's and luci-rosse's shares until they are fixed.
 
+### Group 10, third round (12 November)
+
+The four scores the similarity check failed after the second round, and why:
+
+- **decode-test-174's brightness (2.37) was not the machine.** Level B picks the 909 there (0.828 against the MC303's 0.822, a hair apart), and the exported song already played the 909. The balance had cut the chords by 15 dB (gain 0.05): its prediction counted the 909 with kick, clap and hat wherever a drum pattern played, and the bass on 8 steps of 16 where it sounds 3. The three shares matched, with the kick's mids standing in for the chords' body, so the code was all drums and twice as bright.
+- **The prediction now follows the code** (`balanceLevels` in `writer.js`): the drums per machine, row and hit in a bar, times the hits each pattern plays; the bass and the Lead times the share of steps their loops sound (`stepShare`); the acid bass by its filter's top (500, 1000 or 2000 Hz). It works in five bands (`LEVEL_BANDS`: 20-150, 150-400, 400-1000, 1000-2000, 2000-16000 Hz) and in the check's three, so a pad's body is not traded for a kick's click; the rule that leaves the gains as written stays on the three bands (0.10). `full.js` measures the original's five shares; `ANALYSIS_VERSION` 9.
+- **The table is measured again** (`tools/decode-levels.cjs`, 122 sounds: 23 machines by 4 rows, bass, acid bass, chords, Lead) with frames every 256 samples. With 4 hits and frames 4096 samples apart, a hit's attack fell inside a frame or between two by chance (the 909's kick read 5950 low and 6760 low-mid, now 7540 and 4010).
+- **The smallest change** (`SOUND_RULE.near`, half the target): among the gains that bring every band within 0.05, the one that moves the gains least wins. Before, the balance moved levels for any gain in the shares (the arp song's arpeggio, written as its bass, lost 9 dB and the Lead 15 dB for a share 0.016 nearer).
+- **Held out:** `tools/decode-similarity.cjs --holdout` prints the held-out songs' scores; they verified the two rules and chose none.
+
+| Similarity (B) | After the second round | After the third | Target |
+| --- | --- | --- | --- |
+| Brightness ratio, decode-test-174 | 2.37 | 1.34 | 0.75 to 1.33 |
+| Brightness ratio, arp | 0.74 | 0.79 | 0.75 to 1.33 |
+| Brightness ratio, decode-test-124 / 90 / long | 0.84 / 1.40 / 1.22 | 0.88 / 1.39 / 1.22 | 0.75 to 1.33 |
+| Brightness ratio, luci-rosse / acid / radio seed | 0.93 / 1.03 / 0.62 | 0.93 / 1.03 / 0.61 | 0.75 to 1.33 |
+| Band shares, largest difference: acid / luci-rosse | 0.20 / 0.20 | 0.20 / 0.20 | 0.10 |
+| Band shares: decode-test-124 / 90 / 174 / long / arp / radio seed | 0.02 / 0.12 / 0.02 / 0.02 / 0.02 / 0.03 | 0.01 / 0.01 / 0.04 / 0.02 / 0.03 / 0.00 | 0.10 |
+| Mid-band rhythm, arp | 0.68 (snapshot) | 0.44 | |
+| Held out: shares within 0.10 | 3 of 8 | 6 of 8 | |
+| Held out: brightness within 0.75 to 1.33 | 4 of 8 | 4 of 8 | |
+
+Not met: acid and luci-rosse's shares. The original holds 77 % of its energy below 150 Hz; the 909's kick and the acid bass each hold about 65 %, so no gains reach it and they stay as written (a sub under the acid line would, a new sound not tried in this round). decode-test-174's brightness is 0.01 over the range, decode-test-90's 1.39 and the radio seed's 0.61 as before. The arp song's brightness meets the range but stays under its snapshot (0.93, from before group 10, when the balance did not exist), and its mid-band rhythm fell from 0.68 to 0.44: with the chords at their written level the pad covers the arpeggio's onsets in the mid band; cutting the pad gave the rhythm back and the brightness 0.74. Held out, held-505-drive (0.17) and held-808-clean (0.57: the code holds 11 % low against 68 %) do not move. Distortion was not tried again (no new measure). The snapshot takes the scores that improved (decode-test-124's brightness and shares, decode-test-90's shares, decode-test-174's brightness and mid-band rhythm, and others); the check still fails on acid's and luci-rosse's shares and on the arp song's brightness and mid-band rhythm.
+
 ### Task 11.3: a stable similarity check (12 November)
 
 The arc score moved between two runs of the check on the same code (decode-test-124, 90 and 174 failed on the base commit; the radio seed's arc went from 0.48 to -0.03). Two causes:
