@@ -25,7 +25,7 @@ import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
 import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode, balanceLevels, stepShare } from '../src/decode/writer.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead } from '../src/decode/writer.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
@@ -458,6 +458,14 @@ if (process.argv.includes('--app')) {
   // the prediction counts the steps a loop sounds and the hits a drum row plays (decode-refine D3, third round)
   check(stepShare('note("<[~!8 d1 d2 ~!6] [a1 ~ a1 ~]>").s("sine")') === 4 / 20 && stepShare('chord("<Am F>").voicing()') === 1, 'a loop\'s share of sounding steps', stepShare('note("<[~!8 d1 d2 ~!6] [a1 ~ a1 ~]>")'));
   { const dense = tr(), sparse = tr(); sparse[0].patterns.A.rows = { bd: 'x...............' }; const rd = balanceLevels(dense, [0.5, 0.48, 0.02], 8), rs = balanceLevels(sparse, [0.5, 0.48, 0.02], 8); check(rd && rs && rd.before !== rs.before, 'the drums\' predicted level follows the hits their rows play', JSON.stringify({ rd, rs })); }
+  // the chords under a Lead lose their body (decode-refine D3, fourth round): over most of their bars only, never under a
+  // muted Lead
+  {
+    const pad = (bars) => ({ id: 'chords', type: 'code', patterns: { A: { code: 'chord("<Am F>").voicing().s("triangle").lpf(1100).room(0.4).gain(.3)' } }, clips: [{ start: 0, bars, pattern: 'A' }] });
+    const lead = (bars, hush) => ({ id: 'lead', type: 'code', patterns: { A: { code: 'n("0 2 4").scale("A3:minor").s("triangle").lpf(1600).gain(.25)' } }, clips: [{ start: 0, bars, pattern: 'A' }], ...(hush ? { hush: true } : {}) });
+    const over = [pad(8), lead(6)], under = [pad(8), lead(3)], muted = [pad(8), lead(8, true)];
+    check(cutUnderLead(over) && /\.hpf\(1200\)\.lpf\(4000\)\.room/.test(over[0].patterns.A.code) && !cutUnderLead(under) && !/hpf/.test(under[0].patterns.A.code) && !cutUnderLead(muted) && !cutUnderLead([pad(8)]), 'chords under a Lead on most of their bars lose their body, not under a short or muted Lead', over[0].patterns.A.code);
+  }
   check(writeFull({ ...Mk, shares: [0.5, 0.48, 0.02] }, { sounds: 'simple' }).tracks.find(t => t.id === 'bass') === undefined || /gain\(\.75\)/.test(JSON.stringify(writeFull({ ...Mk, shares: [0.9, 0.05, 0.05] }, { sounds: 'simple' }))), 'Simple kit keeps its levels');
 }
 // a tapped or stored tempo is never moved by the relock (decode-refine D4)

@@ -19,7 +19,8 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // sustain: the chords' mean energy left in the last eighth of their bar (amplitude ratio, 0.6 is about -4 dB) from which
 // they get a room of `room`; levels: the gain steps the balance tries for each part (multipliers, 1.5 dB apart) and the
 // highest gain it writes
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05 };
+// cut: the chords' high-pass and low-pass (Hz) when a Lead plays over at least leadOver of their bars
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -241,6 +242,20 @@ export function balanceLevels(tracks, shares, bars) {
   if (b3 > SOUND_RULE.shares) return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: null };
   free.forEach((p, i) => { const k = best[i]; if (k === 1) return; if (p.drums) { p.t.settings.gain = Math.round(p.g * k * 100) / 100; return; } for (const pat of Object.values(p.t.patterns)) if (pat.code) pat.code = pat.code.replace(/\.gain\(([\d.]+)\)(?!.*\.gain\()/, (_, x) => `.gain(${Math.round(+x * k * 100) / 100})`); });
   return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: Object.fromEntries(free.map((p, i) => [p.t.id, Math.round(best[i] * 100) / 100])) };
+}
+
+// the chords under a Lead (decode-refine D3, fourth round): a Lead heard over at least SOUND_RULE.leadOver of the
+// chords' bars plays in the pad's band, and the pad's held body covers the Lead's and the drums' onsets in the mid band;
+// the chords then lose their body under SOUND_RULE.cut[0] and keep their top up to cut[1]. Applied after the balance,
+// which sets the pad's level from its whole sound (the table's prediction of the cut pad moved the bass and the Lead
+// for nothing). A Lead muted by default (a sung melody) does not count. Changes the chords' code in place → whether it cut
+export function cutUnderLead(tracks) {
+  const lead = tracks.find(t => t.id === 'lead' && !t.hush), ch = tracks.find(t => t.id === 'chords');
+  if (!lead || !ch) return false;
+  const bars = t => t.clips.flatMap(c => range(c.start, c.start + (c.bars || 1))), on = new Set(bars(lead)), chBars = bars(ch);
+  if (!chBars.length || chBars.filter(b => on.has(b)).length < SOUND_RULE.leadOver * chBars.length) return false;
+  for (const p of Object.values(ch.patterns)) if (p.code) p.code = p.code.replace(/\.lpf\(\d+\)/, `.hpf(${SOUND_RULE.cut[0]}).lpf(${SOUND_RULE.cut[1]})`);
+  return true;
 }
 
 // the song of a decoded track. opts: { id, title, artist, attribution, sounds, upTo (bars written, default all) }
@@ -629,7 +644,10 @@ export function writeFull(model, opts = {}) {
     });
     if (clips.length) tracks.push({ id: 'lead', name: 'Lead', type: 'code', settings: { visual: 'hook' }, patterns, clips, ...(kind === 'vox' ? { hush: true } : {}) });
   }
-  if (opts.sounds !== 'simple') balanceLevels(tracks, model.shares, end);
+  if (opts.sounds !== 'simple') {
+    balanceLevels(tracks, model.shares, end);
+    cutUnderLead(tracks);
+  }
   const song = songShell(model, opts, end, tracks);
   const key = formatKey(model.key), bpm = song.sections[0].bpm;
   song.sections = secs.map((s, i) => ({ name: names[i], bars: s.bars, bpm, key }));
