@@ -43,13 +43,13 @@
       "arc": 0.952
     },
     "decode-test-acid": {
-      "rhythmLow": 0.875,
-      "rhythmMid": 0.757,
-      "rhythmHigh": 0.69,
-      "chroma": 0.981,
+      "rhythmLow": 0.905,
+      "rhythmMid": 0.772,
+      "rhythmHigh": 0.759,
+      "chroma": 0.984,
       "bassChroma": 0.989,
       "brightness": 0.97,
-      "shares": 0.863,
+      "shares": 0.925,
       "arc": 0.222
     },
     "decode-test-arp": {
@@ -63,11 +63,11 @@
       "arc": 0.963
     },
     "luci-rosse": {
-      "rhythmLow": 0.757,
-      "rhythmMid": 0.563,
-      "rhythmHigh": 0.349,
-      "chroma": 0.973,
-      "bassChroma": 0.973,
+      "rhythmLow": 0.767,
+      "rhythmMid": 0.592,
+      "rhythmHigh": 0.44,
+      "chroma": 0.984,
+      "bassChroma": 0.98,
       "brightness": 0.926,
       "shares": 0.932,
       "arc": 0.606

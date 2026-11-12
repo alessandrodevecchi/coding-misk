@@ -383,6 +383,37 @@ The owner approved two tries for the four scores the check still failed: a sub u
 
 Met: the arp song's mid-band rhythm and brightness range; every other bench file is unchanged; the held-out songs are unchanged. Not met: acid's and luci-rosse's shares (0.20), which no sound of the app reaches without losing the brightness; the arp song's brightness stays under its snapshot (0.771 against 0.934, from before group 10). The snapshot takes the arp song's shares (0.983 to 0.984), the one score above it. The check fails on three scores: acid's and luci-rosse's shares and the arp song's brightness.
 
+### Group 10, fifth round (12 November)
+
+The owner approved a new distortion measure, on the bass this time (rounds 1 to 3 tried only kick and hat measures), and a bass written closer to the original. Success: acid's and luci-rosse's largest share difference at most 0.10 and their brightness at most 0.05 under the snapshot; the arp song's brightness back toward its snapshot; distortion found on driven basses and not on clean ones, on the bench and the held-out songs; the held-out songs not worse; no other bench score more than 0.05 under the snapshot.
+
+- **The bass's level and drive, measured** (`bassDrive` in `kit-measure.js`, `m.bassDrive` in `full.js`; `ANALYSIS_VERSION` 10). On the steps with a bass note and no kick or clap, at the pitch level B decoded (a 4096-sample window, 8192-point spectrum): the even harmonics against the odd ones (2nd, 4th, 6th over 3rd, 5th, 7th, in dB, the median), and the low band (20-150 Hz) against the kick steps'. A clip turns a sawtooth toward a square, which holds odd harmonics only. Tried first and dropped: the harmonics from 400 to 2000 Hz against the fundamental (driven -13 to -15 dB, clean -2 to -7: it reads how loud the fundamental is, and a pad's notes sit on the bass's harmonics) and the slope of the harmonics (-3.3 to -6.8 dB an octave for both).
+
+| Bass (truth) | Even against odd (dB) | Low band against the kicks (dB) |
+| --- | --- | --- |
+| Bench, driven: decode-test-acid / luci-rosse | -5.2 / -5.6 | -0.3 / -2.5 |
+| Bench, clean: decode-test-124 / 90 / 174 / long / arp / radio seed | 2.7 / 2.2 / 4.6 / 1.9 / 4.1 / -1.3 | -16.0 / -0.4 / -14.9 / -15.9 / -18.6 / -15.7 |
+| Held out, driven: held-909-drive / held-909-clean-dist-bass | -5.9 / -4.8 | -2.5 / -2.7 |
+| Held out, clean: 707 / 505-drive / 606-drive / r8 / linn / 808 | 4.2 / 1.6 / 0.8 / 5.3 / 1.9 / no measure (7 notes) | -12.1 / -12.2 / -8.1 / -14.1 / -9.4 / - |
+
+  `DRIVE_RULE.evenOdd` is -3 dB, between the bench's clean -1.3 and driven -5.2: every driven bass is found and no clean one, on the bench and the held-out songs (the two held-out songs with driven drums and a clean bass read clean). The level does not tell drive: decode-test-90's clean bass is as loud as its kicks.
+- **The driven bass** (`soundsOf`, `SOUND_RULE.drive`): `.distort(4.5).distortvol(0.5).crush(4.85)` after the filter, and a moving filter's resonance of 4 instead of 8. The clip makes the bass the loud low end the original has. A resonance of 8 before the clip left a peak in the 150-400 Hz band (mid share 0.30 against 0.21; 2 or 4 brought it to 0.23 to 0.28). The louder bass made the code darker (brightness 0.69 to 0.80), and the crusher gives the highs back. Its bits are a narrow choice: on acid and luci-rosse `crush(6)` gave 0.85 and 0.75, `crush(5)` 0.98 and 0.86, `crush(4.85)` 0.93 and 0.88, `crush(4.8)` 0.90 and 0.90, `crush(4.6)` 0.82 and 0.98, `crush(4)` 0.58 and 0.78 (too bright). Also tried: `distort` 2 and 3 (darker, shares 0.82 to 0.86), a lower filter range, a fixed `lpf(300)`, `shape(.6)` before the clip.
+- **The level balance** (`balanceLevels`, `tools/decode-levels.cjs`): the part table measures the driven basses at the gain the writer writes (`bass:<wave>:<cut>:drive`, `bass:acid:<top>:drive`; alone, the driven acid bass holds 85 % of its energy below 150 Hz), and the balance moves a driven bass by its `distortvol`: the clip makes its level almost independent of the gain before it. On luci-rosse the balance raised the bass to `distortvol(0.59)`, on held-909-clean-dist-bass it lowered it to 0.15.
+
+| Similarity (B) | After the fourth round (snapshot) | After the fifth | Target |
+| --- | --- | --- | --- |
+| Band shares, largest difference: acid / luci-rosse | 0.205 / 0.225 (0.863 / 0.932) | 0.075 / 0.077 | 0.10 |
+| Brightness score: acid / luci-rosse | 0.97 / 0.926 (ratio 1.03 / 0.93) | 0.926 / 0.878 (ratio 1.08 / 0.878) | at least 0.92 / 0.876 |
+| Arc: acid / luci-rosse | 0.222 / 0.606 | 0.116 / 0.551 | at least 0.172 / 0.556 |
+| Rhythm low, mid, high: acid | 0.875, 0.757, 0.69 | 0.905, 0.772, 0.759 | |
+| Rhythm low, mid, high: luci-rosse | 0.757, 0.563, 0.349 | 0.767, 0.592, 0.44 | |
+| Brightness score, arp | 0.934 | 0.771 (unchanged: its bass is clean) | toward 0.934 |
+| Held out, driven: brightness ratio held-909-drive / held-909-clean-dist-bass | 0.60 / 0.73 | 0.79 / 1.28 | 0.75 to 1.33 |
+| Held out, driven: shares, largest difference | 0.058 / 0.035 | 0.039 / 0.043 | 0.10 |
+| Held out: shares within 0.10, brightness inside the range, machine right | 6, 4, 6 of 8 | 6, 6, 6 of 8 | not worse |
+
+Met: the shares of acid and luci-rosse; their brightness within 0.05 of the snapshot; drive found on the four driven basses and on no clean one; the held-out songs better (the two driven ones' brightness enters the range, every other held-out score unchanged). Not met: the arc of acid (0.116, 0.106 under the snapshot) and luci-rosse (0.551, 0.055 under): the louder bass flattens the code's loudness per bar (acid's arc 0.222 with the clean bass, 0.16 with the clip at `distortvol(.3)`, 0.10 to 0.12 at 0.5), while the original's arc comes mostly from the hook and the crash of its main sections, which the code does not write. The arp song's brightness does not move (0.771): its bass is clean, so nothing of this round reaches it. The snapshot takes the scores that rose (acid's rhythm in the three bands, chroma and shares; luci-rosse's rhythm, chroma and bass chroma); the check fails on acid's and luci-rosse's arc and on the arp song's brightness.
+
 ### Task 11.3: a stable similarity check (12 November)
 
 The arc score moved between two runs of the check on the same code (decode-test-124, 90 and 174 failed on the base commit; the radio seed's arc went from 0.48 to -0.03). Two causes:
