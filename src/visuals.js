@@ -440,12 +440,18 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   // the Oscilloscope look (oscilloscope-visual D2): its module is imported the first time a frame asks for it; until it
   // arrives the screen is black
   let oscMod = null, oscLoading = null;
+  // (a fast video with the look awaits it before its first frame, loadLook: its frames never start black)
+  const oscLoad = () => oscLoading || (oscLoading = import('./visuals/oscilloscope.js').then(m => { oscMod = m.createOscilloscope(); }, e => { oscLoading = null; console.warn('[oscilloscope] not loaded', e); }));
+  // the look's own draw time per frame in ms (the cost measured by tools/check-oscilloscope.cjs --cost, task 2.5)
+  const oscTimes = globalThis.codingMiskOscTimes = [];
   function drawOscilloscope(cyc, dt, playing) {
     if (!oscMod) {
       cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H);
-      if (!oscLoading) oscLoading = import('./visuals/oscilloscope.js').then(m => { oscMod = m.createOscilloscope(); }, e => { oscLoading = null; console.warn('[oscilloscope] not loaded', e); });
+      globalThis.codingMiskOscBlack = (globalThis.codingMiskOscBlack || 0) + 1;
+      oscLoad();
       return;
     }
+    const t0 = performance.now();
     const info = stage && stage.sectionInfo ? stage.sectionInfo(cyc) : null;
     const mix = osc.mix && osc.mix.length ? osc.mix : wave;
     oscMod.draw(cx, W, H, dpr, {
@@ -454,8 +460,15 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       section: info && Number.isFinite(info.i) ? { i: info.i, n: info.n } : null, dt, playing,
       raw: stage && stage.oscilloscope ? stage.oscilloscope() : null,
     });
+    // (codingMiskOscFlush: the check reads a pixel so the time holds the drawing itself, not only its commands queued
+    // for the GPU; a fast video reads its frames back anyway)
+    if (globalThis.codingMiskOscFlush) cx.getImageData(0, 0, 1, 1);
+    oscTimes.push(performance.now() - t0); if (oscTimes.length > 600) oscTimes.shift();
   }
-  // (the stage checks wait for the module before a picture: codingMiskOscReady)
+  // a look's module loaded (the Oscilloscope's; the other looks are in this file): resolves when it can draw
+  function loadLook(look) { return look === 'oscilloscope' && !oscMod ? oscLoad().then(() => !!oscMod) : Promise.resolve(true); }
+  // (the stage checks wait for the module before a picture: codingMiskOscReady; codingMiskOscBlack counts the frames
+  // drawn black while it loads)
   globalThis.codingMiskOscReady = () => !!oscMod;
 
   const SCENE_DRAW = {
@@ -1215,5 +1228,5 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
   let idle = 0, spin = 0;
   requestAnimationFrame(frame);
   // levels: the current level of each instrument (analysers live, the feed in a fast video)
-  return { setTarget, drawAt, pump, get lightForm() { return renderer.light; }, get lastPass() { return renderer.last; }, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; }, get levels() { return lastLevels; } };
+  return { setTarget, drawAt, loadLook, pump, get lightForm() { return renderer.light; }, get lastPass() { return renderer.last; }, hold(on) { held = !!on; lastT = performance.now(); }, get canvas() { return cc; }, get levels() { return lastLevels; } };
 }

@@ -69,6 +69,31 @@ A card "Oscilloscope" in Settings: overlay, mode, Oversample, and in the prototy
 
 The phosphor buffer and the glow could become a Render ("Phosphor") for the other looks: the look's frame instead of the beam fed into the same fade and glow. Not in this change; the module keeps the phosphor and the beam apart so it can.
 
+## Cost (measured 12 November, task 2.5)
+
+`tools/check-oscilloscope.cjs --cost`, kellerlicht playing, headless Chrome on the owner's Mac (Apple M4, ANGLE Metal), the stage drawn into a target of the size below (`setTarget`), 4 s per row. The time is the look's own draw (`codingMiskOscTimes`, 0.1 ms resolution). Two readings:
+
+- **Main thread only.** The canvas commands as recorded, the drawing left to the GPU: median 0.3 ms, p95 0.4 ms for every overlay at 1080p and at 4K, with Glow 1 too; XY with Glow 1 0.4 / 0.5 ms. Load average 3.0 to 3.5.
+- **With the drawing.** A pixel read after each frame, so the time holds the drawing itself. After a few reads Chrome draws the canvas on the CPU, so this is the software path, the worst case:
+
+| Size | Overlay, settings | Median | p95 | Load average |
+| --- | --- | --- | --- | --- |
+| 1920 × 1080 | each overlay, defaults (Glow 0.3) | 18.2 to 18.7 ms | 21.4 to 22.2 ms | 2.8 to 3.1 |
+| 1920 × 1080 | Real oscilloscope, Glow 1 | 17.8 ms | 20.2 ms | 2.9 |
+| 1920 × 1080 | Real oscilloscope, XY, Glow 1 | 18.0 ms | 20.9 ms | 2.8 |
+| 1920 × 1080 | Real oscilloscope, Glow 1, CPU slowed 4× | 67.9 ms | 71.9 ms | 2.8 |
+| 3840 × 2160 | each overlay, defaults | 60.6 to 61.4 ms | 62.8 to 63.8 ms | 2.7 to 3.1 |
+| 3840 × 2160 | Real oscilloscope, Glow 1 | 63.6 ms | 67.5 ms | 3.2 |
+| 3840 × 2160 | Real oscilloscope, XY, Glow 1 | 66.4 ms | 69.9 ms | 3.0 |
+
+(Empty at 1080p measured first: 9.7 ms median, 26.7 ms p95, before Chrome moved the canvas to the CPU.)
+
+Where the time goes, on the same software canvas: the Glow blur of the full phosphor buffer 7.8 ms at 1080p and 33 ms at 4K, the three full-size copies (screen, phosphor, glass) and the fade 2.8 ms and 11 ms; a glow drawn on a canvas a quarter of the size and scaled up 3.0 ms and 9.9 ms. The overlay hardly counts (cached).
+
+The fast video: an 8-second 9:16 fragment of kellerlicht exported in 4.1 s with the look against 5.0 s with Palco (best of two each, load average 2.2), so the look does not slow the exports.
+
+Reading: on the live stage the look costs well under a millisecond of main-thread time; the software path only matters for a canvas that is read back every frame. The smaller glow canvas (Risks) would take about 5 ms off at 1080p and 23 ms at 4K on that path; it changes how the glow looks a little, so it waits for the owner's look at the defaults (open question 4).
+
 ## Risks / Trade-offs
 
 - **`ctx.filter` blur** costs on large stages and is missing in some older browsers (then Glow is skipped, the trace still shows). Measure at 1080p and 4K before the full card; fall back to a smaller glow canvas if needed.
