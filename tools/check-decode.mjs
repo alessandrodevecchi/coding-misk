@@ -473,6 +473,15 @@ if (process.argv.includes('--app')) {
     const a = bassDrive(clean, sr, notes), b = bassDrive(driven, sr, notes);
     check(a && b && !a.driven && b.driven && bassDrive(clean, sr, notes.slice(0, 4)) === null, 'a clipped bass reads as driven by its even against odd harmonics, a plain sawtooth not, too few notes no measure', JSON.stringify({ clean: a && a.evenOdd, driven: b && b.evenOdd }));
   }
+  // a driven bass (decode-refine 10.2, fifth round): clipped and crushed after its filter with Our sounds, never with
+  // Simple kit; the balance scales the clip's volume, not the gain before the clip
+  {
+    const dr = soundsOf([acid, acid], 'ours', [acid, acid], true).bass, pl = soundsOf([base], 'ours', [base], true).bass;
+    check(/lpq\(4\)\.distort\(4\.5\)\.distortvol\(0\.5\)\.crush\(4\.85\)\.gain\(\.6\)$/.test(dr) && /\.distort\(/.test(pl) && !/distort/.test(soundsOf([acid], 'ours').bass) && soundsOf([acid], 'simple', [acid], true).bass === soundsOf([acid], 'simple').bass, 'a driven bass is clipped and crushed after its filter, a clean one not, Simple kit unchanged', dr);
+    const t = [{ id: 'drums', type: 'drums', settings: { kit: 'RolandTR909' }, patterns: { A: { rows: { bd: 'x...x...x...x...', hh: '..x...x...x...x.' } } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }, { id: 'bass', type: 'code', patterns: { A: { code: `note("a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~")${dr}` } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
+    const r = balanceLevels(t, [0.6, 0.38, 0.02], 8), code = t[1].patterns.A.code;
+    check(r && r.gains && /\.gain\(\.6\)$/.test(code) && (r.gains.bass === 1 || !/distortvol\(0\.5\)/.test(code)), 'the balance moves a driven bass by its clip\'s volume and keeps the gain before the clip', JSON.stringify({ r, code: code.slice(-70) }));
+  }
   check(writeFull({ ...Mk, shares: [0.5, 0.48, 0.02] }, { sounds: 'simple' }).tracks.find(t => t.id === 'bass') === undefined || /gain\(\.75\)/.test(JSON.stringify(writeFull({ ...Mk, shares: [0.9, 0.05, 0.05] }, { sounds: 'simple' }))), 'Simple kit keeps its levels');
 }
 // a tapped or stored tempo is never moved by the relock (decode-refine D4)

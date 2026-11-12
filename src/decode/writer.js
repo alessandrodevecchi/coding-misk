@@ -20,7 +20,12 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // they get a room of `room`; levels: the gain steps the balance tries for each part (multipliers, 1.5 dB apart) and the
 // highest gain it writes
 // cut: the chords' high-pass and low-pass (Hz) when a Lead plays over at least leadOver of their bars
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5 };
+// drive: a driven bass (decode-refine 10.2, fifth round; the model's `bassDrive`, kit-measure.js): `.distort(distort)`
+// with `.distortvol(vol)` after its filter, then `.crush(crush)`, and a moving filter's resonance `lpq`. Chosen on the
+// bench's two driven acid basses: the clip makes the bass the loud low end the original has (its low band share 0.57 to
+// 0.70); a resonance of 8 before the clip left a peak in the 150-400 Hz band (mid share 0.30 against 0.21), 2 to 4 not;
+// the crusher gives back the highs the louder bass covers (brightness 0.69 to 0.87-0.98; crush 6 too dark, 4 too bright)
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, drive: { distort: 4.5, vol: 0.5, crush: 4.85, lpq: 4 } };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -131,7 +136,8 @@ export function leadCode(loop, key, snd = '') {
 // sounds by measure (D10): "Our sounds" picks from the generator's tables by the model's brightness and low-end
 // weight; "Simple kit" is one fixed set. bars: the bars heard so far (level A) or the section's (level B)
 // whole: the bars of the whole track (level B), where the bass's moving filter is decided once (decode-refine D3)
-export function soundsOf(bars, preset = 'ours', whole = bars) {
+// drive: the model's bass is driven (level B, model.bassDrive.driven)
+export function soundsOf(bars, preset = 'ours', whole = bars, drive = false) {
   if (preset === 'simple' || !bars.length) return { kit: 'RolandTR909', bass: '.s("sawtooth").lpf(700).gain(.75)', chords: '.s("supersaw").lpf(2000).gain(.3)', lead: '.s("square").lpf(2400).gain(.25)', why: 'simple' };
   const avg = k => bars.reduce((a, b) => a + (b[k] || 0), 0) / bars.length;
   const bright = avg('bright'), low = avg('low');
@@ -144,7 +150,9 @@ export function soundsOf(bars, preset = 'ours', whole = bars) {
   const midOf = v => { const x = v.filter(y => y > 0).sort((a, b) => a - b); return x.length ? x[Math.floor(x.length / 2)] : 0; };
   const lo = midOf(bars.map(b => b.bassLo)), hi = midOf(bars.map(b => b.bassHi)), moving = midOf(whole.filter(b => b.bassHi > 0).map(b => b.bassHi - b.bassLo)) >= SOUND_RULE.move;
   const r50 = x => Math.round(x / 50) * 50;
-  const bassSound = moving ? `.s("sawtooth").lpf(sine.range(${r50(Math.max(200, lo))}, ${r50(Math.min(3000, hi))}).slow(4)).lpq(8).gain(.6)` : `.s("${bassWave}").lpf(${bassCut}).gain(.75)`;
+  // (decode-refine 10.2, fifth round: a driven bass is clipped after its filter and crushed, SOUND_RULE.drive)
+  const D = SOUND_RULE.drive, clip = drive ? `.distort(${D.distort}).distortvol(${D.vol}).crush(${D.crush})` : '';
+  const bassSound = moving ? `.s("sawtooth").lpf(sine.range(${r50(Math.max(200, lo))}, ${r50(Math.min(3000, hi))}).slow(4)).lpq(${drive ? D.lpq : 8})${clip}.gain(.6)` : `.s("${bassWave}").lpf(${bassCut})${clip}.gain(.75)`;
   const chordWave = bright > 0.45 ? 'supersaw' : bright > 0.25 ? 'sawtooth' : 'triangle';
   const chordCut = Math.round((800 + 3200 * Math.min(1, bright * 1.5)) / 100) * 100;
   // (decode-refine D3: chords that are still sounding at the end of their bar, a held or reverberant pad, get a room;
@@ -172,7 +180,7 @@ const DRUMS_GAIN = 0.9;
 const levelKey = (id, code) => {
   const wave = (/\.s\("([a-z]+)"\)/.exec(code) || [])[1], cut = +((/\.lpf\((\d+)\)/.exec(code) || [])[1] || 0);
   const near = (list, v = cut) => list.reduce((a, b) => (Math.abs(Math.log(b / (v || b))) < Math.abs(Math.log(a / (v || a))) ? b : a));
-  if (id === 'bass') { const top = /lpq\(/.test(code) && +((/range\(\d+,\s*(\d+)\)/.exec(code) || [])[1] || 1000); return top ? `bass:acid:${near([500, 1000, 2000], top)}` : `bass:${wave}:${near([300, 600, 900, 1200])}`; }
+  if (id === 'bass') { const top = /lpq\(/.test(code) && +((/range\(\d+,\s*(\d+)\)/.exec(code) || [])[1] || 1000), d = /\.distort\(/.test(code) ? ':drive' : ''; return top ? `bass:acid:${near([500, 1000, 2000], top)}${d}` : `bass:${wave}:${near([300, 600, 900, 1200])}${d}`; }
   if (id === 'chords') return `chords:${wave}:${near([800, 1600, 2400, 4000])}`;
   if (id === 'lead') return `lead:${wave}`;
   return null;
@@ -210,10 +218,12 @@ export function balanceLevels(tracks, shares, bars) {
     const pats = Object.entries(t.patterns).filter(([, p]) => p.code);
     if (!pats.length) continue;
     const key = levelKey(t.id, pats[0][1].code), base = inBands(PART_LEVELS[key]);
-    const g = +((/\.gain\(([\d.]+)\)(?!.*\.gain\()/.exec(pats[0][1].code) || [])[1] || 0);
+    // (a driven bass: its level is the clip's volume, `distortvol`; the gain before the clip barely moves it, and the
+    // table measured it at the gain the writer writes)
+    const vol = /\.distortvol\(([\d.]+)\)/.exec(pats[0][1].code), g = vol ? +vol[1] : +((/\.gain\(([\d.]+)\)(?!.*\.gain\()/.exec(pats[0][1].code) || [])[1] || 0);
     if (!base || !(g > 0)) continue;
     for (const [pid, p] of pats) { const w = clipBars(t, pid) / bars, d = stepShare(p.code); base.forEach((x, j) => { T[j] += x * d * w; }); }
-    parts.push({ t, T, g, on });
+    parts.push({ t, T, g, on, vol: !!vol });
   }
   const free = parts;
   if (!free.length) return null;
@@ -240,7 +250,7 @@ export function balanceLevels(tracks, shares, bars) {
   };
   walk(0, free.map(() => 1));
   if (b3 > SOUND_RULE.shares) return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: null };
-  free.forEach((p, i) => { const k = best[i]; if (k === 1) return; if (p.drums) { p.t.settings.gain = Math.round(p.g * k * 100) / 100; return; } for (const pat of Object.values(p.t.patterns)) if (pat.code) pat.code = pat.code.replace(/\.gain\(([\d.]+)\)(?!.*\.gain\()/, (_, x) => `.gain(${Math.round(+x * k * 100) / 100})`); });
+  free.forEach((p, i) => { const k = best[i]; if (k === 1) return; if (p.drums) { p.t.settings.gain = Math.round(p.g * k * 100) / 100; return; } for (const pat of Object.values(p.t.patterns)) if (pat.code) pat.code = p.vol ? pat.code.replace(/\.distortvol\(([\d.]+)\)/, (_, x) => `.distortvol(${Math.round(+x * k * 100) / 100})`) : pat.code.replace(/\.gain\(([\d.]+)\)(?!.*\.gain\()/, (_, x) => `.gain(${Math.round(+x * k * 100) / 100})`); });
   return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: Object.fromEntries(free.map((p, i) => [p.t.id, Math.round(best[i] * 100) / 100])) };
 }
 
@@ -620,7 +630,7 @@ export function writeFull(model, opts = {}) {
       const byBar = {}; idx.forEach((i, j) => { byBar[i] = on[j] && heardOf(bars[i]) ? valueOf(bars[i]) : null; });
       const loop = sectionLoop(byBar, idx, same ? { same } : {});
       if (!loop) return;
-      const snd = soundsOf(idx.map(i => bars[i]), opts.sounds, bars.slice(0, end)), c = code(loop, id === 'bass' ? snd.bass : snd.chords);
+      const snd = soundsOf(idx.map(i => bars[i]), opts.sounds, bars.slice(0, end), !!(model.bassDrive && model.bassDrive.driven)), c = code(loop, id === 'bass' ? snd.bass : snd.chords);
       if (!ids.has(c)) { const p = pid(ids.size); ids.set(c, p); patterns[p] = { code: c }; }
       clips.push(...runs(on.map(x => (x ? ids.get(c) : null)), sec.start));
     });

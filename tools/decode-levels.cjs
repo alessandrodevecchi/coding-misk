@@ -26,6 +26,12 @@ const items = [];
   for (const c of CUTS.acid) items.push({ key: `bass:acid:${c}`, per: 8 / 16, bars: 5, code: `${BASS}.s("sawtooth").lpf(sine.range(200, ${c}).slow(4)).lpq(8).gain(${G})` });
   for (const w of ['supersaw', 'sawtooth', 'triangle']) for (const c of CUTS.chords) items.push({ key: `chords:${w}:${c}`, per: 1, code: `${CHORDS}.s("${w}").lpf(${c}).gain(${G})` });
   for (const w of ['sawtooth', 'square', 'triangle']) items.push({ key: `lead:${w}`, per: 7 / 16, code: `${LEAD}.s("${w}").lpf(2400).gain(${G})` });
+  // (a driven bass, decode-refine 10.2 fifth round: the writer's clip at the gain it writes, stored per unit of the clip's
+  // volume, which the balance scales: the clip makes the level almost independent of the gain before it; last, so its tail
+  // falls on no other sound)
+  const { SOUND_RULE } = await import('../src/decode/writer.js'), D = SOUND_RULE.drive, clip = `.distort(${D.distort}).distortvol(${D.vol}).crush(${D.crush})`;
+  for (const w of ['sine', 'square', 'sawtooth']) for (const c of CUTS.bass) items.push({ key: `bass:${w}:${c}:drive`, per: 8 / 16, g: D.vol, code: `${BASS}.s("${w}").lpf(${c})${clip}.gain(.75)` });
+  for (const c of CUTS.acid) items.push({ key: `bass:acid:${c}:drive`, per: 8 / 16, bars: 5, g: D.vol, code: `${BASS}.s("sawtooth").lpf(sine.range(200, ${c}).slow(4)).lpq(${D.lpq})${clip}.gain(.6)` });
   const S = await import('./decode-similarity.mjs');
   const sections = items.map((x, i) => ({ name: `S${i}`, bars: x.bars || BARS, bpm: BPM, key: 'A' }));
   const tracks = items.map((x, i) => x.track
@@ -48,7 +54,7 @@ const items = [];
     // sweep), the mean energy per frame in each band at gain 1, per unit
     const n = it.bars || BARS, a = (at + 1) * bar * sr, z = (at + n) * bar * sr, frames = Math.floor((z - a - 2048) / HOP) + 1;
     at += n;
-    const g2 = it.track ? 1 : G * G;
+    const g2 = it.track ? 1 : (it.g ?? G) ** 2;
     out[it.key] = bandEnergy(x, sr, a, z, LEVEL_BANDS, HOP).map(v => +(v / frames / g2 / it.per).toPrecision(3));
   });
   const src = `// The sounds level B writes, measured once through the app by tools/decode-levels.cjs (decode-refine D3): the mean
