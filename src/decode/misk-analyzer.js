@@ -22,6 +22,9 @@ export const KICK_RULE = { flux: 0.45, beat: 0.25 };
 export const CLAP_RULE = { snare: 0.5, local: 1.3, seconds: 6, flat: 0.3 };
 // hats (D4): a step is on when its hat is at least `median` times the median hat of the bar and the `bars` bars before
 export const HAT_RULE = { median: 0.5, bars: 4 };
+// whether the two bass steps before step j are rests, counting the bar before's last steps (`before`) for steps 0 and 1:
+// a pitch heard only at the looser threshold right after a kick starts a note only then (decode-refine D5)
+export const quietBefore = (out, before, j) => { const at = k => (k >= 0 ? out[k] : before[before.length + k]) ?? null; return at(j - 1) === null && at(j - 2) === null; };
 // level A's relock (D4): the tempo and the beat phase checked again on the first bars with kicks, this many
 export const RELOCK_BARS = 8;
 // the top line by YIN (D2): a step's band level must reach `floor` of the band's peak
@@ -386,7 +389,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   // and a bass on the off steps. Once RELOCK_BARS bars with kicks are complete, the tempo and the beat phase are checked
   // again on them alone: a tempo that is a ratio of the old one (one half, two thirds, three halves, double) replaces it,
   // and the downbeat moves to the new phase. Once per track, never after a tapped, picked or stored tempo. The bars are
-  // made again on the new grid. → true when the grid changed
+  // made again on the new grid (a stored tempo saved before this check ran is checked too). → true when the grid changed
   function relock(t) {
     if (!lockS || lockS.fixed || lockS.checked) return false;
     // (the first bar with kicks; with none by then, the first bar with drums: a grid a 16th off hears no kick at all)
@@ -488,11 +491,12 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     while (db - bar >= -0.02) db -= bar;
     return Math.max(0, db);
   }
-  // a tapped or picked tempo (level A), or level B's whole-file grid (confidence and uncertainty given)
-  const setTempo = ({ bpm, downbeat, tapped = true, confidence, uncertain = false, round = 2 }) => {
+  // a tapped or picked tempo (level A), or level B's whole-file grid (confidence and uncertainty given). fixed: false for a
+  // stored tempo saved before the relock ran (the model's relockChecked missing): the relock may still check it
+  const setTempo = ({ bpm, downbeat, tapped = true, confidence, uncertain = false, round = 2, fixed = true }) => {
     const L = lockS || { candidates: [], confidence: 0, uncertain: false };
     const k = 10 ** round, b = Math.round(bpm * k) / k;
-    lockS = { ...L, bpm: b, candidates: [b / 2, b, b * 2].filter(x => x >= 40 && x <= 240).map(x => Math.round(x * k) / k), downbeat: downbeat ?? L.downbeat ?? 0, uncertain, tapped, fixed: true, ...(confidence !== undefined ? { confidence } : {}) };
+    lockS = { ...L, bpm: b, candidates: [b / 2, b, b * 2].filter(x => x >= 40 && x <= 240).map(x => Math.round(x * k) / k), downbeat: downbeat ?? L.downbeat ?? 0, uncertain, tapped, fixed, checked: false, checkedDrums: false, ...(confidence !== undefined ? { confidence } : {}) };
     barCache.length = 0; held = null;
     return lockS;
   };
@@ -660,7 +664,8 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     // bass: one note per step, YIN on the low-passed signal in the second half of the step (after the kick's click)
     // bass: a note where a new note starts (the low band rises after the step before, or the pitch moves), its pitch by
     // YIN twice in the step (a kick's falling pitch never holds); the kick's own tail is no note
-    const bass = bassSteps(start, step);
+    // (the bar before's last two steps, for a note under a kick on this bar's first steps)
+    const bass = bassSteps(start, step, prev && prev.bass ? prev.bass.slice(-2) : []);
     // levels and colour
     const fa = Math.max(0, f1(start)), fz = Math.min(done1, f1(end));
     const kickNear = new Set(); for (const o of onsets.kick) { if (o.t < start - 0.1) continue; if (o.t > end) break; for (let k = 0; k < Math.round(0.07 * fr); k++) kickNear.add(o.f + k); }
@@ -720,7 +725,8 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   const rmsOf = (x, a, z) => { a = Math.max(0, Math.round(a)); z = Math.min(x.length, Math.round(z)); let s = 0; for (let i = a; i < z; i++) s += x[i] * x[i]; return z > a ? Math.sqrt(s / (z - a)) : 0; };
   let bassTop = 0;
   let heardPitches = new Set();
-  function bassSteps(start, step) {
+  // before: the bass steps of the bar before (its last two count for a note under a kick on steps 0 and 1)
+  function bassSteps(start, step, before = []) {
     heardPitches = new Set();
     const x = bassSignal(), out = [], L = step * decRate, tmax = Math.floor(decRate / 30);
     // one pitch window inside the first 85 % of the step, and a second one later when the step is long enough
@@ -746,7 +752,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       // a new note needs an attack, or a new pitch at about the same level (a kick's tail fades at its own pitch)
       // (or, D5, a pitch heard only at the looser threshold right after a kick: the kick's tail is louder than a short
       // bass note and hides its attack; a kick's own tail is a clean sine the usual threshold hears, and never a note)
-      const underKick = loose && (out[j - 1] ?? null) === null && (out[j - 2] ?? null) === null;
+      const underKick = loose && quietBefore(out, before, j);
       const fresh = voiced && !kickOnly && (head > 1.4 * before || (prev !== null && Math.abs(midi - prev) >= 1 && head > 0.7 * before) || underKick);
       out.push(fresh ? midi : null);
       prev = m1 !== null ? Math.round(m1) : null;
@@ -816,7 +822,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     bars(t);
     if (relock(t)) bars(t);
     const list = levels(bars(t));
-    Object.assign(m, { ...(lockS.relocked ? { relocked: lockS.relocked } : {}), bpm: lockS.bpm, bpmCandidates: lockS.candidates, confidence: lockS.confidence, uncertain: !!lockS.uncertain, downbeat: Math.round(lockS.downbeat * 10000) / 10000, barSeconds: 240 / lockS.bpm, tapped: !!lockS.tapped, analysedTo: Math.min(duration, t) });
+    Object.assign(m, { ...(lockS.relocked ? { relocked: lockS.relocked } : {}), ...(lockS.checked || lockS.fixed ? { relockChecked: true } : {}), bpm: lockS.bpm, bpmCandidates: lockS.candidates, confidence: lockS.confidence, uncertain: !!lockS.uncertain, downbeat: Math.round(lockS.downbeat * 10000) / 10000, barSeconds: 240 / lockS.bpm, tapped: !!lockS.tapped, analysedTo: Math.min(duration, t) });
     m.bars = list.map(({ raw, chroma: c, chromaEx, ...b }) => b);
     m.key = keyOf(list);
     m.sections = [{ start: 0, bars: list.length, kind: 'verse' }];

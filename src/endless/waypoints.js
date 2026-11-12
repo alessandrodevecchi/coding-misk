@@ -8,7 +8,7 @@
 // Bars: a grown song keeps the bars of its written form after its growth, moved by the growth (airOffset): grown bar
 // b plays the written bar b - off. A command records its boundary in the grown song's bars (what the queue shows); the
 // director's rewrite gets the same boundary in its own bars.
-import { steerSong, sayAir, COMMANDS, patternPart, riserAirTarget, riserAir } from './steering.js';
+import { steerSong, sayAir, COMMANDS, patternPart, riserAirTarget, riserAir, whyNot } from './steering.js';
 import { writtenForm, growOnAir, airControls } from './growth.js';
 import { energyOf } from './energy.js';
 import { stream } from './random.js';
@@ -58,6 +58,21 @@ export function airBoundaries(kind, rel, plan, g, lead = 0.5, tries = PHRASE_TRI
   for (let d = Math.max(0, (Math.floor((rel - off) / step) + 1) * step); d <= last && out.length < tries; d += step) if (d + off > rel) out.push(d + off);
   return out;
 }
+// why a console command cannot apply now on a grown song, or null when it can (the console's disabled buttons and the
+// press itself). rel: the bar now in the grown song's bars; plan: the director's plan as steered so far; base: the
+// director's plan before the steering (the one steerOnAir places a riser with); plain: the director's song as steered;
+// tail, opts: as whyNot's. A riser pressed inside the growth goes on the grown song (airRiser), so its reason comes
+// from the same placement, riserAirTarget, not from the written form's next part change (#82: near the end of a growth
+// the button said "late" while the riser fit within two phrases): 'no-room' when no bar within two phrases fits it
+export function airWhy(c, { rel, plan, base = plan, grown, plain, tail = 0, opts = {} }) {
+  const q = Math.round(rel * 100) / 100;
+  if (airRiser({ ...c, kind: c.kind, pend: true, q }, grown) && !c.air) return riserAirTarget(grown, base, q, c) ? null : 'no-room';
+  if (!airBoundaries(c.kind, rel, plan, grown).length) return 'late';
+  return whyNot(c, plain, plan, rel - airOffset(grown), tail, opts);
+}
+// the pending commands the steering on air dropped (no boundary left, or a riser with no room within two phrases):
+// the console says so for a riser (#82), as for a press refused
+export const airDropped = (commands, resolved) => { const ids = new Set(resolved.map(c => c.id)); return commands.filter(c => c.pend && !ids.has(c.id)); };
 
 // ---------- small notes edits (radio-variation 5.1) ----------
 // a bracket group spanning a whole token: "<0 2 4>", "[~ x x]*4" → { open, inner, close, tail }

@@ -2,7 +2,7 @@
 // A, as the playhead moves plus the look ahead) and "analyse all" (level B: the whole file, with Essentia.js loaded
 // only then, full.js) away from the page's main thread. The tab runs level B in a worker of its own, so a cancel ends
 // that worker and level A goes on. Messages in: { type: 'load', pcm, rate } | { type: 'upTo', t, id } | { type:
-// 'tempo', bpm, downbeat } | { type: 'auto' } (back to the tempo found) | { type: 'all', id, tempo, essentia } | { type: 'cancel' }. Out: { type: 'model', id, model }
+// 'tempo', bpm, downbeat, tapped, fixed } | { type: 'auto' } (back to the tempo found) | { type: 'all', id, tempo, essentia } | { type: 'cancel' }. Out: { type: 'model', id, model }
 // | { type: 'progress', id, f, stage } | { type: 'full', id, model } | { type: 'error', id, message }.
 import { createAnalyzer } from './misk-analyzer.js';
 
@@ -31,7 +31,7 @@ onmessage = e => {
   const m = e.data || {};
   if (m.type === 'load') { pcm = m.pcm; rate = m.rate; A = createAnalyzer(m.pcm, { sr: m.rate }); cancelled = false; postMessage({ type: 'loaded', duration: A.duration }); return; }
   if (m.type === 'upTo') { cancelled = false; want = { t: m.t, id: m.id }; run(); return; }
-  if (m.type === 'tempo' && A) { A.setTempo({ bpm: m.bpm, downbeat: m.downbeat, tapped: m.tapped !== false }); return; }
+  if (m.type === 'tempo' && A) { A.setTempo({ bpm: m.bpm, downbeat: m.downbeat, tapped: m.tapped !== false, fixed: m.fixed !== false }); return; }
   if (m.type === 'auto' && A) { A.resetTempo(); return; }
   if (m.type === 'all' && pcm) { all(m); return; }
   if (m.type === 'cancel') { cancelled = true; want = null; }

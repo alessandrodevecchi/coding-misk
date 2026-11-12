@@ -76,6 +76,7 @@ import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createStageVideo } from './visuals/stage-video.js';
 import { createStageFolders } from './visuals/stage-video-folders.js';
+import { OSC_KEY } from './visuals/oscilloscope-rules.js';
 import { SV_KEY, sizeOf as svSizeOf, fallbackLookOf, folderSignature, seededPick, trackTime, loopTime, decodeSize } from './visuals/stage-video-rules.js';
 import { createVideoFrames } from './video/stage-video-frames.js';
 import { MUTED_LINE, lineNamesOf, writeLineNames } from './song/line-names.js';
@@ -2005,7 +2006,7 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     vf.timesFor = (p, dur) => { const out = []; for (let fi = 0; fi < nFrames; fi++) { const t = fi / q.fps; if (partOf(Math.max(0, VT.cycleAt(vOff + t))) === p) out.push(vTime(p, t, dur)); } return out; };
     if (!vSrc.size) console.info('[fast video] Video: no stage video and no Decode file; the frames use the fallback look');
   }
-  const prepareFrame = vf ? async (t, cyc) => {
+  const prepareVideo = vf ? async (t, cyc) => {
     vCanvas = null;
     const p = partOf(cyc), src = vSrc.get(p.n);
     if (!src || vFailed.has(p.n) || lookOfPart(p) !== 'video') return;
@@ -2016,6 +2017,14 @@ async function exportVideoFastIn(sg, title = sg.title, { songs = null, after = n
     }
     vCanvas = await vf.frame(vTime(p, t, vf.duration));
   } : null;
+  // a look drawn by a module of its own (the Oscilloscope, oscilloscope-visual D2) is loaded before the first frame
+  // that uses it, so no frame of the file is drawn black while it arrives: before the render when a part shows it
+  // from its start, else before the frame where a section brings it
+  const lookAt = cyc => { const p = partOf(cyc); return fragLook || lookFor(o, looks, { n: p.n, section: sg.meta.sectionAt(Math.min(cyc, sg.meta.bars - .001)), own, stage: stageLook }); };
+  let oscLoaded = false;
+  const loadOsc = async () => { if (oscLoaded) return; oscLoaded = await visuals.loadLook('oscilloscope'); console.info(`[fast video] Oscilloscope: ${oscLoaded ? 'module loaded before the first frame' : 'module not loaded; its frames stay black'}`); oscLoaded = true; };
+  if (fragLook === 'oscilloscope' || parts.some(p => lookOfPart(p) === 'oscilloscope')) await loadOsc();
+  const prepareFrame = async (t, cyc, fi) => { if (!oscLoaded && lookAt(cyc) === 'oscilloscope') await loadOsc(); if (prepareVideo) await prepareVideo(t, cyc, fi); };
   visuals.hold(true);
   let clockT = 0;
   soul.setClock(() => clockT);
@@ -6181,6 +6190,8 @@ const visuals = startVisuals({
     // the Video look (stage-video D2, D7): the live picture, the size mode, Fit's bands, the look without Video
     video: () => { const f = stageVideo.frame(); if (f) lookBeforeVideo = null; return f; },
     videoSize: () => svSizeOf(store.get(SV_KEY, null)),
+    // the Oscilloscope look's stored settings (oscilloscope-visual D7), read each frame so a change shows at once
+    oscilloscope: () => store.get(OSC_KEY, null),
     videoBands: () => { if (svBands.ui !== ui) svBands = { ui, c: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#000' }; return svBands.c; },
     fallbackLook: stageFallback,
     word: (k, vars) => { const key = `term:${k}`, v = t(key, vars); return v === key ? null : v; },
