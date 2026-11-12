@@ -150,6 +150,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Radio: near the end of a growth the console's riser button stays enabled when the riser fits on the grown song, and a riser with no room within two phrases shows a notice instead of disappearing.
 - Radio: a track added with "+" on the half-phrase start just before a break or a charge plays its whole first phrase instead of leaving with the drums after 4 bars.
 
 - Decode: in Full, a two-bar drum groove is written as its two bars in turn, not as the hits they share.

@@ -25,8 +25,9 @@ import { compileSong } from '../src/song/compile.js';
 import { liveCode, liveBuildOf } from '../src/live/live-code.js';
 import { typingLoad, rushedOf } from '../src/live/typing-load.js';
 import { resolveShape, shapeFacts, canPlay, OPENINGS } from '../src/song/shapes.js';
-import { steerOnAir, airBoundaries, airOffset, ideaSteps, directorView, AIR_CHOOSERS, AIR_CHOOSER, AIR_CHOOSER_NAMES, chooserOf, chooserName } from '../src/endless/waypoints.js';
-import { steerSong } from '../src/endless/steering.js';
+import { steerOnAir, airBoundaries, airOffset, airWhy, airDropped, ideaSteps, directorView, AIR_CHOOSERS, AIR_CHOOSER, AIR_CHOOSER_NAMES, chooserOf, chooserName } from '../src/endless/waypoints.js';
+import { steerSong, whyNot, riserAirTarget } from '../src/endless/steering.js';
+import { t, setLang } from '../src/i18n.js';
 import { waypointsOnAir, airChooserOf } from '../src/endless/items.js';
 import { typingPlan, settleOthers, chainLines } from '../src/song/typing.js';
 import { hapsAt } from './mixer-checks.mjs';
@@ -34,6 +35,8 @@ import { meterSteps } from '../src/music.js';
 import { energyOf } from '../src/endless/energy.js';
 
 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
+// a string of one language as written (t falls back to Italian)
+const STR_OF = (lang, k) => { setLang(lang); const v = t(k); return v !== k ? v : null; };
 const WRITE = process.argv.includes('--write-fixtures');
 const FIXTURES_FILE = new URL('../tests/snapshots/radio-growth.json', import.meta.url);
 // the recipes as the radio uses them (usableRecipes in src/radio/radio.js): valid ones, in their order
@@ -778,6 +781,63 @@ const CHECKS = {
     });
     assert(seen.length >= 2, `only ${seen.length} Crescendo presses with a long growth`);
     console.log(`      Crescendo risers: ${seen.join(', ')}`);
+  },
+  '#82: near the end of a growth the console\'s riser reason follows the placement on the grown song'() {
+    // the console's reason before the fix: the written form's next part change (whyNot after airBoundaries)
+    const written = (c, x, rel) => (!airBoundaries(c.kind, rel, x.plan, x.g0).length ? 'late' : whyNot(c, x.song, x.plan, rel - airOffset(x.g0)));
+    let presses = 0, wasLate = 0, songs = 0;
+    grown().live.forEach((y, i) => {
+      const g0 = y.song;
+      if (!g0.onAir || !g0.crescendo || songs >= 8) return;
+      const rec = recipeOf(i, 'switch'), g = createSession(RECIPES, rec.seed).next(rec.options);
+      const x = { id: g0.id, seed: rec.seed, song: g.song, plan: g.plan, opts: g.opts, g0 }, ph = x.plan.phrase, G = g0.crescendo.growth;
+      songs++;
+      let steered = 0;
+      // the last two phrases of the growth, a press on every bar
+      for (let rel = Math.max(0.4, G - 2 * ph + 0.4); rel < G; rel += 1) {
+        for (const dir of ['up', 'down']) {
+          const c = { kind: 'riser', bars: 'auto', dir, sound: 'noise' }, fit = riserAirTarget(g0, x.plan, rel, c);
+          const why = airWhy(c, { rel, plan: x.plan, grown: g0, plain: x.song });
+          assert(why === (fit ? null : 'no-room'), `${x.id}: riser ${dir} on ${rel} (growth ${G}): the console says ${why}, the grown song ${fit ? `fits ${fit.start}-${fit.end}` : 'has no room'}`);
+          presses++;
+          const old = written(c, x, rel);
+          if (old && fit) wasLate++;
+          // the steering places the riser where the console said it fits (a few presses per song, the first the written
+          // form refused among them)
+          if (fit && (steered < 2 || (old && steered < 3))) {
+            const at = airBoundaries('riser', rel, x.plan, g0)[0];
+            const r = steer(x, [{ ...c, q: rel, at, at0: at, pend: true, id: 1 }]), got = r.commands[0];
+            assert(got && got.air && got.air.start === fit.start && got.air.end === fit.end, `${x.id}: riser ${dir} on ${rel} placed ${JSON.stringify(got && got.air)}, the console said ${fit.start}-${fit.end}`);
+            steered++;
+          }
+        }
+      }
+    });
+    assert(songs >= 4 && wasLate >= 1, `${songs} songs, ${wasLate} presses the written form called late`);
+    console.log(`      ${presses} presses near the end of ${songs} growths, ${wasLate} of them called late by the written form fit on the grown song`);
+  },
+  '#82: a riser with no room within two phrases is refused with its reason, and one dropped by the steering is reported'() {
+    const x = airCases()[0], total = barsOf(x.g0);
+    // a growth that ends with the song: a riser pressed near its end finds no bar within two phrases
+    const g1 = { ...x.g0, crescendo: { ...x.g0.crescendo, growth: total } }, q = total - 1.6;
+    const c = { kind: 'riser', bars: 'auto', dir: 'up', sound: 'noise' };
+    assert(airWhy(c, { rel: q, plan: x.plan, grown: g1, plain: x.song }) === 'no-room', `the console's reason for a riser with no room: ${airWhy(c, { rel: q, plan: x.plan, grown: g1, plain: x.song })}`);
+    const cmds = [{ ...c, q, at: Math.ceil(q), at0: Math.ceil(q), pend: true, id: 7 }];
+    const r = steerOnAir({ grown: g1, song: x.song, plan: x.plan, opts: x.opts, commands: cmds, seed: x.seed, n: 0, ctx: { profile: 'switch', styles: STYLES, phrase: x.plan.phrase } });
+    assert(!r.commands.some(y => y.id === 7), `the riser with no room was placed: ${JSON.stringify(r.commands)}`);
+    const lost = airDropped(cmds, r.commands);
+    assert(lost.length === 1 && lost[0].kind === 'riser', `the dropped riser is not reported: ${JSON.stringify(lost)}`);
+    // a riser with room, placed, is not reported
+    const ok = airCases()[1] || x, q2 = 2 * ok.plan.phrase + 0.4, at2 = airBoundaries('riser', q2, ok.plan, ok.g0)[0], cmds2 = [{ ...c, q: q2, at: at2, at0: at2, pend: true, id: 8 }];
+    assert(!airDropped(cmds2, steer(ok, cmds2).commands).length, 'a placed riser reported as dropped');
+    // the notice and the button's reason in both languages (the toast and the tooltip of a refused riser)
+    globalThis.document ??= { documentElement: {} };
+    for (const lang of ['en', 'it']) {
+      setLang(lang);
+      for (const k of ['steerRiserNoRoom', 'steerWhy:no-room']) assert(t(k) !== k && STR_OF(lang, k), `${k} missing in ${lang}`);
+    }
+    assert(STR_OF('en', 'steerRiserNoRoom') !== STR_OF('it', 'steerRiserNoRoom'), 'the riser notice is not translated');
+    setLang('en');
   },
   'radio fixtures: Classic sessions rebuild the same items'() {
     for (const { name, recipe } of CLASSIC) {
