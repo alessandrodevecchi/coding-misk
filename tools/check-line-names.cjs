@@ -27,11 +27,13 @@ const LABEL = /^\s*([_S]?)(\$|[a-z][A-Za-z0-9]*):(?=\s|$)/;
   const st = () => page.evaluate(() => { const e = document.querySelector('strudel-editor').editor; return { code: e.code, active: e.repl.state.activeCode || '', err: String(e.repl.state.evalError || ''), cyc: e.repl.scheduler.now(), started: e.repl.scheduler.started }; });
   const labels = code => code.split('\n').map(l => LABEL.exec(l)).filter(Boolean).map(m => `${m[1]}${m[2]}`);
   check(await page.evaluate(() => !!document.querySelector('#live-names') && document.querySelector('#live-names').options.length === 3), 'the Instrument name option has three choices');
-  const runs = [['crescendo', 'names'], ['crescendo', 'dollar'], ['switch', 'names'], ['switch', 'dollar']];
+  check(await page.evaluate(() => !!document.querySelector('#live-name-style') && document.querySelector('#live-name-style').value === 'instrument'), 'the Names from option, instrument by default');
+  const runs = [['crescendo', 'names'], ['crescendo', 'dollar'], ['switch', 'names'], ['switch', 'dollar'], ['switch', 'names', 'track']];
   if (!(await page.evaluate(() => document.querySelector('#live-toggle').getAttribute('aria-pressed') === 'true'))) { await page.click('#live-toggle'); await sleep(500); }
-  for (const [profile, form] of runs) {
+  for (const [profile, form, style = 'instrument'] of runs) {
     await page.click(`#live-profile [data-profile="${profile}"]`); await sleep(1200);
     await page.selectOption('#live-names', form); await sleep(800);
+    await page.selectOption('#live-name-style', style); await sleep(800);
     // (the song grows away from the page: wait for it, then play)
     for (let i = 0; i < 60 && await page.evaluate(() => !document.getElementById('live-growing').hidden); i++) await sleep(500);
     await page.keyboard.press('Control+Enter');
@@ -52,11 +54,12 @@ const LABEL = /^\s*([_S]?)(\$|[a-z][A-Za-z0-9]*):(?=\s|$)/;
       check(names.length > 0 && dollars.every(d => d === '$'), `${profile} names: lines named`, `${names.slice(0, 12).join(' ')}${dollars.length ? ` · ${dollars.join(' ')}` : ''}`);
       const plain = labels(s.code).filter(l => l !== '$').map(l => l.replace(/^[_S]/, ''));
       check(new Set(plain).size === plain.length, `${profile} names: names unique in the code shown`, plain.join(' '));
-      check(names.every(n => /^[_S]?[a-z][A-Za-z0-9]*$/.test(n)), `${profile} names: lower case`);
+      check(names.every(n => /^[_S]?[a-z][A-Za-z0-9]*$/.test(n)), `${profile} names (${style}): never a capital first letter`);
+      if (style === 'track') check(!names.some(n => /^[_S]?(kick|snare|hats)\d*$/.test(n)), `${profile} names from the track: no instrument names`, names.slice(0, 12).join(' '));
     } else check(names.length === 0, `${profile} dollar: only $: lines`, names.slice(0, 6).join(' '));
     console.log(`      muted seen: ${[...muted].slice(0, 10).join(' ') || '-'}`);
     if (shots) {
-      await page.screenshot({ path: path.join(shots, `${SONG}-${profile}-${form}.png`) });
+      await page.screenshot({ path: path.join(shots, `${SONG}-${profile}-${form}${style === 'track' ? '-track' : ''}.png`) });
     }
     await page.keyboard.press('Control+.'); await sleep(800);
   }
