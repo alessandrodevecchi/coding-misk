@@ -9,7 +9,7 @@ const shots = process.argv[2] || null, SONG = process.argv[3] || 'luci-rosse', P
 if (shots) fs.mkdirSync(shots, { recursive: true });
 let failed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (!ok) failed++; };
-const LABEL = /^\s*([_S]?)(\$|[a-z][a-z0-9]*):(?=\s|$)/;
+const LABEL = /^\s*([_S]?)(\$|[a-z][A-Za-z0-9]*):(?=\s|$)/;
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
@@ -52,7 +52,7 @@ const LABEL = /^\s*([_S]?)(\$|[a-z][a-z0-9]*):(?=\s|$)/;
       check(names.length > 0 && dollars.every(d => d === '$'), `${profile} names: lines named`, `${names.slice(0, 12).join(' ')}${dollars.length ? ` · ${dollars.join(' ')}` : ''}`);
       const plain = labels(s.code).filter(l => l !== '$').map(l => l.replace(/^[_S]/, ''));
       check(new Set(plain).size === plain.length, `${profile} names: names unique in the code shown`, plain.join(' '));
-      check(names.every(n => /^[_S]?[a-z][a-z0-9]*$/.test(n)), `${profile} names: lower case`);
+      check(names.every(n => /^[_S]?[a-z][A-Za-z0-9]*$/.test(n)), `${profile} names: lower case`);
     } else check(names.length === 0, `${profile} dollar: only $: lines`, names.slice(0, 6).join(' '));
     console.log(`      muted seen: ${[...muted].slice(0, 10).join(' ') || '-'}`);
     if (shots) {

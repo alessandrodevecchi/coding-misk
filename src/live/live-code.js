@@ -12,7 +12,7 @@ import { planWrittenSteps } from './written-plan.js';
 import { resolveProfile } from './profiles.js';
 import { rampLists } from '../song/ramps.js';
 import { widgetMemory, tracksOf, stripWidgets, instrumentOf, widgetSettings } from './widgets.js';
-import { isLine as isPatLine, isMuted, unmuteLine, toDollar, lineNamesOf, writeLineNames } from '../song/line-names.js';
+import { isLine as isPatLine, isMuted, unmuteLine, toDollar, lineNamesOf, writeLineNames, nameHints, headersOf } from '../song/line-names.js';
 import { writeCode, levelsOf, busesOf, tail, preludeText, splitVoice, splitSpoken, maskBars, functionOptions, functionContext, FUNCTION_OPTIONS, lineKey, addEntry } from '../song/writer.js';
 
 // build: the live build (a song with steps); C: the controls; lang(): the language of the comments; files(): the
@@ -90,7 +90,7 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
   // technical functions (code-writing, song-functions, code-lanes): `any`, the options the writer folds (all but fnLanes)
   // line names (line-names): `$:` or the instrument's name, Random per song from its id; the plan of the written part
   // is made on the same form (refC below), the growth's shape search measures `$:` (crescendo.js)
-  const form = lineNamesOf(C.names, build);
+  const form = lineNamesOf(C.names, build), hints = nameHints(build), nameStyle = C.nameStyle === 'track' ? 'track' : 'instrument';
   const o = functionOptions(C), any = FUNCTION_OPTIONS.some(k => k !== 'fnLanes' && o[k]);
   const { lanes, now, inPlace, bounds } = M;
   const boundary = bar => { let a = 0; for (const x of build.sections) { a += x.bars; if (a > bar) return a; } return Infinity; };
@@ -217,7 +217,11 @@ export function liveCode(build, C, { lang = () => 'en', files = () => ({}), cols
     // the line names (line-names): on the code shown, after its lanes are lifted (two equal lines become one there) and
     // before the writer folds the visuals, which name the lines; the hidden tail keeps `$:`, so its lines never take a
     // name of the code shown
-    const lifted = { ...lifted0, code: writeLineNames(lifted0.code, lf) };
+    // (each line's track is read from the code before the comments, lifted the same way: the track style names it, the
+    // instrument style tells a texture from a riser by it; the headers are taken only when both have as many pattern
+    // lines, else a line without its header is named after its instrument alone)
+    const heads = lf === 'names' ? headersOf(inPlace ? liftLanes(v.shown, { gated: lanes }).code : v.shown) : null;
+    const lifted = { ...lifted0, code: writeLineNames(lifted0.code, lf, { hints, style: nameStyle, headers: heads && heads.length === headersOf(lifted0.code).length ? heads : null }) };
     const w = writeCode(lifted.code, { mode: o, written, buses, fns: fctx });
     // (hidden voice code keeps its effects folded with Voice effects on, voice-track-tuning D11: the same song function
     // as when it shows; written after the code shown, so the shown lines name their functions first)

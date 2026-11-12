@@ -14,7 +14,7 @@ const STRUDEL_TAGS = ['atom|bool|variableName*', 'labelName', 'keyword', 'operat
 const tagName = t => [t].flat().map(x => x.name + (x.modified && x.modified.length ? '*' : '')).join('|');
 // the lines of a muted block: a `_$:` line and the indented lines below it
 // (line-names: `_$:` or `_kick:`)
-const START = /^\s*(_?)(?:\$|[a-z][a-z0-9]*):(?=\s|$)/;
+const START = /^\s*(_?)(?:\$|[a-z][A-Za-z0-9]*):(?=\s|$)/;
 
 export function createCodeThemes({ store, root = document.documentElement, host = () => document.getElementById('edhost'), full = () => false }) {
   let ed = null, kit = null, installed = '', fontKey = '', state = null, warned = false, dimOn = false, dimTried = false;

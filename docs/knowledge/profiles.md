@@ -56,6 +56,7 @@ Every control, its values and its default per profile. Texts come from the app's
 | `notes` | `true`, `false` | `true` | `true` | `false` | Notes (it: Note): The section and pattern notes (// Intro · bars 1-8) |
 | `steps` | `true`, `false` | `true` | `true` | `false` | Step phrases (it: Frasi dei passi): The step phrases (// > …) and the phrase the narrator says |
 | `names` | `random`, `dollar`, `names` | `random` | `random` | `random` | no help text: described below |
+| `nameStyle` | `instrument`, `track` | `instrument` | `instrument` | `instrument` | no help text: described below |
 | `voice` | `true`, `false` | `true` | `false` | `false` | V:N code (it: Codice V:N): Voice: narrator: show its code in the panel; off: it still speaks, the code goes to the hidden code |
 | `spoken` | `true`, `false` | `true` | `false` | `false` | V:T code (it: Codice V:T): Voice: track: show its code in the panel; off: it still speaks, the code goes to the hidden code |
 | `highlights` | `false`, `true` | `false` | `false` | `true` | Lit notes (it: Note accese): In the code of videos and of the live picture the playing notes light up in time |
@@ -75,6 +76,8 @@ Every control, its values and its default per profile. Texts come from the app's
 <!-- /generated -->
 
 `names` (line-names, prototype on `feat/82-line-names`): how each pattern line starts, Instrument name in the code options. `dollar` writes `$:`, `names` writes the instrument's name (`kick:`, `bass2:`, muted `_kick:`), `random` draws one of them from the song's id, so a song always looks the same. It changes only how the code looks: the growth, the steering and the written part's plan are measured on `$:` (`src/song/line-names.js`).
+
+`nameStyle` (line-names, owner 12 November): Names from, next to Instrument name in Compose, the radio's Custom section and the Decode tab's Options. `instrument` (default) names a line after the instrument it plays (`kick`, `snare`, `hats`), `track` after its track (`drums`, `drums2`, `drums3`). Names never start with a capital letter: one word lower case, several words camelCase (`openHat`, `openHat2`). The Decode tab draws Random from the file and writes the form drawn into the song Open in Compose saves; its Lead is `lead:` (`_lead:` muted).
 
 Overrides saved before the Live coder growth used `natural` for what is now `gradual`. `migrateGrowth` moves them once (`PROFILE_STORE_VERSION` 2).
 

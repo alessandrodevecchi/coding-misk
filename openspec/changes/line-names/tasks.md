@@ -14,8 +14,9 @@
 
 ## 3. After the owner's review
 
-- [ ] 3.1 Answers to the open questions (default, instrument or track name, numbering, radio, Decode, saved songs, lessons)
-- [ ] 3.2 The choice in the radio's Custom section and in the Decode tab's Options
-- [ ] 3.3 Browser checks with names: `check-code-widgets.cjs`, `check-code-themes.cjs` (dimmed named lines), `check-compact-code.cjs`, `check-radio.cjs`, `check-video.cjs`; `check:mixer -- --full` with Random
-- [ ] 3.4 `npm run durations` and the Crescendo fixtures unchanged (the growth measures `$:`); `npm run catalog:strudel`
-- [ ] 3.5 Merge into `develop` after the owner says go
+- [x] 3.1 Answers to the open questions (owner, 12 November; design, Owner's answers)
+- [x] 3.2 The choices in the radio's Custom section and in the Decode tab's Options; the Decode Lead named `lead`, its form kept by Open in Compose
+- [x] 3.3 Names from the track (`drums`, `drums2`) next to names from the instrument; camelCase names, never a capital first letter; `check:line-names` on all three forms
+- [ ] 3.4 Browser checks with names: `check-code-widgets.cjs`, `check-code-themes.cjs` (dimmed named lines), `check-code-over.cjs`; `check:mixer -- --full`
+- [ ] 3.5 `npm run durations` and the Crescendo fixtures unchanged (the growth measures `$:`); `npm run catalog:strudel`
+- [ ] 3.6 Merge into `develop` after the owner says go

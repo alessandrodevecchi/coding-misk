@@ -33,7 +33,7 @@ OpenSpec changes not archived: 123. With open tasks: 40. All tasks ticked, waiti
 | [incremental-steering](../../openspec/changes/incremental-steering/tasks.md) | 1 | 12 |
 | [invented-styles](../../openspec/changes/invented-styles/tasks.md) | 1 | 22 |
 | [light-theme](../../openspec/changes/light-theme/tasks.md) | 1 | 13 |
-| [line-names](../../openspec/changes/line-names/tasks.md) | 5 | 13 |
+| [line-names](../../openspec/changes/line-names/tasks.md) | 3 | 14 |
 | [live-output](../../openspec/changes/live-output/tasks.md) | 5 | 9 |
 | [live-timeline](../../openspec/changes/live-timeline/tasks.md) | 1 | 11 |
 | [live-typing](../../openspec/changes/live-typing/tasks.md) | 1 | 10 |

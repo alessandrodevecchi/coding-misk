@@ -57,12 +57,16 @@ Counts: at the base commit 131 lines mention `$:` in 31 files of `src/` (comment
 Every writer keeps `$:`. `nameLines` runs once, in `liveCode`'s `codeWith` on the code shown (after the lanes are lifted, before the writer folds the visuals), and in `playable` for the song as written. The hidden tail (mixer, hidden voice, lines hidden in place) keeps `$:`, so its lines never take a name of the code shown. Rejected: naming in the compiler (the code of the moment would show `kick3` for the only kick of a section, and `liftLanes` merges equal lines by text).
 
 ### D2. Names
-The visual the line lights (`.analyze("kick")` or `.chan("kick")`): `kick`, `snare`, `hats`, `bass`, `pad`, `arp`, `hook`, `guitar`, `riser`; `crash` for a crash; for other `fx` lines the track's type from its header (`texture`); `voice` for spoken samples; else the track's name from its header; else `line`. Lower case letters and digits, at most 12 characters, never a reserved word. Unique in order: `kick`, `kick2`, `kick3`. A name already written counts.
+Owner's rule (12 November): a name never starts with a capital letter. One word is lower case; several words are camelCase (`openHat`, `synthBass`), letters and digits only, at most 16 characters (`safeName`). Two styles, the setting "Names from" (`nameStyle`, owner 12 November): **instrument** (default) and **track**.
+
+Instrument: the visual the line lights (`.analyze("kick")` or `.chan("kick")`): `kick`, `snare`, `hats`, `bass`, `pad`, `arp`, `hook`, `guitar`, `riser`; `crash` for a crash; for other `fx` lines the track's type from its header (`texture`); `voice` for spoken samples; else the track's name from its header; else `line`. A track may ask for its own name (`lineName`) for the visual it alone lights: the Decode tab's Lead lights the hook visual and is named `lead` (`_lead:` when hushed). Track: the track's name from its header (`Drums · drums` → `drums`, `drums2`, `drums3`; `Open Hat` → `openHat`); the code shown without headers (comments off) takes them from the same code before the comments, lifted the same way, and only when both have as many pattern lines; a line with no known track and a narrator line fall back to the instrument. Never a reserved word. Unique in order: `kick`, `kick2`, `kick3`, `openHat2`. A name already written counts.
 
 ### D3. Marks
 `_name:` muted, `Sname:` alone (Strudel's own S rule). Names are lower case, so a capital S is only ever the solo mark. A trailing `_` is never written.
 
 ### D4. Random per song
+Drawn from the id, not stored (open question 6, the owner left it to us): nothing to write into saved songs, the radio's songs and their replays look the same without a field, and an explicit choice is already stored in the song's configuration like every other control. Storing would freeze a form the user never chose, and a song copied or saved as new would keep it. The one place the id changes is Decode's Open in Compose (a new `u-…` id): there the form drawn from the file is written into the new song's configuration, so Compose shows what Decode showed.
+
 `lineNamesOf(setting, song)`: a song's own `lineNames` first, then `dollar` or `names`, else Random from a hash of the song's id (title as fallback). About half the songs are named: 100 of 200 test ids, 17 of the 38 built-in songs. The same song looks the same on every replay; a radio song keeps its id.
 
 ### D5. The same song in both forms
@@ -72,7 +76,7 @@ The growth's shape search, the radio steering and the written part's plan measur
 A radio window evaluates the song on air with the next songs (visible during a transition, or hidden). Two songs can both have a `kick:`, and Strudel would keep only the last. `localSolo` writes the songs off air with `$:`, so only the song on air carries names.
 
 ### D7. Readers
-`LINE` (`^\s*[_S]?(\$|[a-z][a-z0-9]*):(?=\s|$)`), `MUTED_LINE`, `LABEL_SPACE`, `isMuted`, `isAlone`, `muteLine`, `withMark`, `toDollar`. A name is followed by a space: a mini-notation line such as `  bd:3 hh` is never a label. A user's `kick_:` (muted by Strudel) is not read as a pattern line.
+`LINE` (`^\s*[_S]?(\$|[a-z][A-Za-z0-9]*):(?=\s|$)`), `MUTED_LINE`, `LABEL_SPACE`, `isMuted`, `isAlone`, `muteLine`, `withMark`, `toDollar`. A name is followed by a space: a mini-notation line such as `  bd:3 hh` is never a label. A user's `kick_:` (muted by Strudel) is not read as a pattern line.
 
 ## Risks
 
@@ -80,12 +84,15 @@ A radio window evaluates the song on air with the next songs (visible during a t
 - **Code typed by hand** with a capital-S name or two equal names behaves as Strudel says; the app only writes safe names.
 - **Typing time** rises a little in the named form (D5).
 
-## Open questions
+## Owner's answers (12 November)
 
-1. **Default.** Random per song, `$:` or names? Recommended: Random per song, as asked; `$:` stays the default of the checks.
-2. **Instrument or track name?** `kick`/`snare`/`hats` come from the visual, so one drum track gives three names; the track's own name (`drums`, `rolling`) would give `drums`, `drums2`, `drums3`. Recommended: the visual (instrument), as now.
-3. **Numbering.** `kick`, `kick2` or `kick`, `kick_2`? Recommended: `kick2` (`_` would be read as mute at the edges and looks like the mute mark).
-4. **The radio.** Random from the song's id in the radio too, and a choice in the radio's Custom section? Recommended: yes to Random; add the choice to the radio's Custom section next to Comments (not in the prototype).
-5. **Decode.** The Decode tab names its code through `liveCode` like Compose. Recommended: keep `$:` in Decode until the Decode work of tonight is merged, then add the choice to its Options.
-6. **Saved songs.** Write `lineNames` into a saved song when the form is drawn, or keep drawing it from the id? Recommended: keep drawing from the id (nothing to store); a song saved with an explicit choice keeps it in its configuration.
-7. **Lessons and sound cards.** Keep `$:`? Recommended: yes, they teach Strudel's own form.
+1. **Default:** Random per song. Confirmed. `$:` stays the default of the checks.
+2. **Instrument or track name:** both, as the setting "Names from" (instrument by default, track: `drums`, `drums2`), in Compose's code options, the radio's Custom section and the Decode tab's Options. Confirmed.
+3. **Numbering:** `kick2`. Confirmed. Names never start with a capital letter; several words are camelCase (`openHat`, `openHat2`). Owner's rule.
+4. **The radio:** Random from the song's id, and both choices in the Custom section next to Comments. Confirmed.
+5. **Decode:** both choices in its Options; Random drawn from the file's fingerprint; the Lead is `lead:` (`_lead:` muted); Open in Compose keeps the form. Confirmed.
+6. **Saved songs:** left to us; drawn from the id, not stored (D4 says why).
+7. **Lessons and sound cards:** stay `$:`. Confirmed.
+8. **Song as written:** keeps numbered names (`kick` … `kick7`, one line per clip and section). Confirmed after the screenshots.
+
+Hard rules: no name starts with a capital letter (so never Strudel's `S` solo), and the music is identical in every form (`check:line-names` compares the haps of `$:`, instrument names and track names at every step).
