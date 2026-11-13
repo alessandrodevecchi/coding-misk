@@ -31,11 +31,12 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // `.distort(d).distortvol(vol)` after the filter (src/music.js writes the bass track's drive so), d the drive of the
 // nearest bass the app can write (src/decode/bass-profiles.js, measured through the app inside a mix) by the fundamental's
 // share h1 and the even/odd ratio, each over its spread in the table; a share of sineShare or more is a sine or a
-// triangle, never a drive; a moving filter's resonance `lpq`; `table`, the drive the level table measured a driven bass
+// triangle, never a drive; bassWave: the cutoff the measured bass's wave is written through (round 6, C1: the app bass's
+// default, where the candidates were measured); a moving filter's resonance `lpq`; `table`, the drive the level table measured a driven bass
 // at. (Round 5 wrote a fixed `.distort(4.5).distortvol(0.5).crush(4.85)` when the even/odd ratio was under -3 dB: the
 // crusher matched a median-centroid score with broadband noise, +12 to +14 dB above 5.6 kHz, and the ratio read square,
 // triangle and sine basses as driven; review of 13 November.)
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.93 } };
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.93 }, bassWave: 700 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -146,8 +147,10 @@ export function leadCode(loop, key, snd = '') {
 // sounds by measure (D10): "Our sounds" picks from the generator's tables by the model's brightness and low-end
 // weight; "Simple kit" is one fixed set. bars: the bars heard so far (level A) or the section's (level B)
 // whole: the bars of the whole track (level B), where the bass's moving filter is decided once (decode-refine D3)
-// drive: the bass's drive amount to write (level B, bassDriveOf(model.bassDrive)), 0 for none
-export function soundsOf(bars, preset = 'ours', whole = bars, drive = 0) {
+// drive: the bass's drive amount to write (level B, bassDriveOf(model.bassDrive)), 0 for none; wave: the measured bass's
+// wave (round 6, C1), written through the app bass's default filter (cutoff 700, resonance 8, where the candidates were
+// measured)
+export function soundsOf(bars, preset = 'ours', whole = bars, drive = 0, wave = null) {
   if (preset === 'simple' || !bars.length) return { kit: 'RolandTR909', bass: '.s("sawtooth").lpf(700).gain(.75)', chords: '.s("supersaw").lpf(2000).gain(.3)', lead: '.s("square").lpf(2400).gain(.25)', why: 'simple' };
   const avg = k => bars.reduce((a, b) => a + (b[k] || 0), 0) / bars.length;
   const bright = avg('bright'), low = avg('low');
@@ -162,7 +165,10 @@ export function soundsOf(bars, preset = 'ours', whole = bars, drive = 0) {
   const r50 = x => Math.round(x / 50) * 50;
   // (round 6, C2: a driven bass gets the app's drive after its filter, SOUND_RULE.drive)
   const D = SOUND_RULE.drive, clip = drive > 0 ? `.distort(${drive}).distortvol(${D.vol})` : '';
-  const bassSound = moving ? `.s("sawtooth").lpf(sine.range(${r50(Math.max(200, lo))}, ${r50(Math.min(3000, hi))}).slow(4)).lpq(${drive ? D.lpq : 8})${clip}.gain(.6)` : `.s("${bassWave}").lpf(${bassCut})${clip}.gain(.75)`;
+  // (a measured square or sine is that wave, not a moving sawtooth: the moving rule reads a kick against a bass or an
+  // octave jump as a filter, review P7)
+  const measured = wave && SOUND_RULE.bassWave, mv = moving && !(measured && wave !== 'sawtooth');
+  const bassSound = mv ? `.s("sawtooth").lpf(sine.range(${r50(Math.max(200, lo))}, ${r50(Math.min(3000, hi))}).slow(4)).lpq(${drive ? D.lpq : 8})${clip}.gain(.6)` : measured ? `.s("${wave}").lpf(${SOUND_RULE.bassWave}).lpq(8)${clip}.gain(.75)` : `.s("${bassWave}").lpf(${bassCut})${clip}.gain(.75)`;
   const chordWave = bright > 0.45 ? 'supersaw' : bright > 0.25 ? 'sawtooth' : 'triangle';
   const chordCut = Math.round((800 + 3200 * Math.min(1, bright * 1.5)) / 100) * 100;
   // (decode-refine D3: chords that are still sounding at the end of their bar, a held or reverberant pad, get a room;
@@ -177,15 +183,20 @@ export function soundsOf(bars, preset = 'ours', whole = bars, drive = 0) {
 // sawtooth and square basses at the app's drive amounts and the supersaw) by the fundamental's share and the even/odd
 // ratio, each divided by its spread over the candidates; a share of SOUND_RULE.drive.sineShare or more is a sine or a
 // triangle (no drive). → { drive, near } or null without a profile
-const PROFILE_KEYS = Object.keys(BASS_PROFILES).filter(k => !/^(sine|triangle):/.test(k));
+// (round 6: the drive-1 candidates are left out: their fundamental share, 0.44 for the sawtooth, sits inside the spread
+// of the clean sawtooth basses of the tuning songs, 0.38 to 0.58, and four of five drive-1 readings there were clean)
+const PROFILE_KEYS = Object.keys(BASS_PROFILES).filter(k => !/^(sine|triangle):/.test(k) && BASS_PROFILES[k].drive !== 1);
 const spread = f => { const v = PROFILE_KEYS.map(k => BASS_PROFILES[k][f]), m = v.reduce((a, b) => a + b, 0) / v.length; return Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length) || 1; };
 const SPREAD = { h1: spread('h1'), evenOdd: spread('evenOdd') };
+// (round 6, C1: also the candidate's wave; a profile whose harmonics rise with their number is not a bass note at its
+// decoded pitch, a wrong octave or another part, and gives nothing)
 export function bassDriveOf(p) {
   if (!p || p.h1 === null || p.h1 === undefined) return null;
-  if (p.h1 >= SOUND_RULE.drive.sineShare) return { drive: 0, near: 'sine' };
+  if (!(p.slope < 0)) return null;
+  if (p.h1 >= SOUND_RULE.drive.sineShare) return { drive: 0, near: 'sine', wave: 'sine' };
   let best = null, bd = Infinity;
   for (const k of PROFILE_KEYS) { const c = BASS_PROFILES[k], d = ((p.h1 - c.h1) / SPREAD.h1) ** 2 + ((p.evenOdd - c.evenOdd) / SPREAD.evenOdd) ** 2; if (d < bd) { bd = d; best = k; } }
-  return { drive: BASS_PROFILES[best].drive, near: best };
+  return { drive: BASS_PROFILES[best].drive, near: best, wave: BASS_PROFILES[best].wave };
 }
 
 // the drum track's default gain (src/music.js DEFAULT.drums.gain), the level the part table measured the drums at
@@ -205,7 +216,7 @@ const DRUMS_GAIN = 0.9;
 const levelKey = (id, code) => {
   const wave = (/\.s\("([a-z]+)"\)/.exec(code) || [])[1], cut = +((/\.lpf\((\d+)\)/.exec(code) || [])[1] || 0);
   const near = (list, v = cut) => list.reduce((a, b) => (Math.abs(Math.log(b / (v || b))) < Math.abs(Math.log(a / (v || a))) ? b : a));
-  if (id === 'bass') { const top = /lpq\(/.test(code) && +((/range\(\d+,\s*(\d+)\)/.exec(code) || [])[1] || 1000), d = /\.distort\(/.test(code) ? ':drive' : ''; return top ? `bass:acid:${near([500, 1000, 2000], top)}${d}` : `bass:${wave}:${near([300, 600, 900, 1200])}${d}`; }
+  if (id === 'bass') { const top = /sine\.range\(/.test(code) && +((/range\(\d+,\s*(\d+)\)/.exec(code) || [])[1] || 1000), d = /\.distort\(/.test(code) ? ':drive' : ''; return top ? `bass:acid:${near([500, 1000, 2000], top)}${d}` : `bass:${wave}:${near([300, 600, 900, 1200])}${d}`; }
   if (id === 'chords') return `chords:${wave}:${near([800, 1600, 2400, 4000])}`;
   if (id === 'lead') return `lead:${wave}`;
   return null;
@@ -656,7 +667,7 @@ export function writeFull(model, opts = {}) {
       const byBar = {}; idx.forEach((i, j) => { byBar[i] = on[j] && heardOf(bars[i]) ? valueOf(bars[i]) : null; });
       const loop = sectionLoop(byBar, idx, same ? { same } : {});
       if (!loop) return;
-      const snd = soundsOf(idx.map(i => bars[i]), opts.sounds, bars.slice(0, end), (bassDriveOf(model.bassDrive) || { drive: 0 }).drive), c = code(loop, id === 'bass' ? snd.bass : snd.chords);
+      const bp = bassDriveOf(model.bassDrive) || { drive: 0, wave: null }, snd = soundsOf(idx.map(i => bars[i]), opts.sounds, bars.slice(0, end), bp.drive, bp.wave), c = code(loop, id === 'bass' ? snd.bass : snd.chords);
       if (!ids.has(c)) { const p = pid(ids.size); ids.set(c, p); patterns[p] = { code: c }; }
       clips.push(...runs(on.map(x => (x ? ids.get(c) : null)), sec.start));
     });

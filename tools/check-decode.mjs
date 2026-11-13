@@ -475,7 +475,7 @@ if (process.argv.includes('--app')) {
     const a = bassDrive(clean, sr, notes), b = bassDrive(driven, sr, notes);
     // (round 6: the profile, the fundamental's share rising with the clip, and the drive of the nearest app bass)
     const da = bassDriveOf(a), db = bassDriveOf(b);
-    check(a && b && b.h1 > a.h1 && db.drive > da.drive && bassDriveOf(null) === null && bassDriveOf({ h1: 0.97, evenOdd: -4 }).drive === 0 && bassDrive(clean, sr, notes.slice(0, 4)) === null, 'a clipped bass gets a higher fundamental share and a larger drive than a plain sawtooth, a sine-like share none, too few notes no measure', JSON.stringify({ clean: a && [a.h1, a.evenOdd, da], driven: b && [b.h1, b.evenOdd, db] }));
+    check(a && b && b.h1 > a.h1 && db.drive > da.drive && bassDriveOf(null) === null && bassDriveOf({ h1: 0.97, evenOdd: -4, slope: -10 }).drive === 0 && bassDriveOf({ h1: 0, evenOdd: 3, slope: 8 }) === null && bassDrive(clean, sr, notes.slice(0, 4)) === null, 'a clipped bass gets a higher fundamental share and a larger drive than a plain sawtooth, a sine-like share none, too few notes no measure', JSON.stringify({ clean: a && [a.h1, a.evenOdd, da], driven: b && [b.h1, b.evenOdd, db] }));
   }
   // a driven bass (decode-refine 10.2, round 6): the app's drive after its filter with Our sounds, never with
   // Simple kit; the balance scales the clip's volume, not the gain before the clip
