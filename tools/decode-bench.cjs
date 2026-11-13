@@ -8,11 +8,12 @@
 // --sweep: also every group-10 constant at -20 %, -10 %, +10 % and +20 %, one at a time (KNOBS below); a song whose
 // written song does not change is not exported again. Nothing in src/ is changed: the tool moves the exported rule
 // objects in its own process (SOUND_RULE, PART_LEVELS) and edits the written code for the constants written inline.
+// --oracle-drums: the true drum drive written on songs whose drums are driven (bench only, sizes a drum-drive measure).
 // --models-only: only the analyses, into the cache (several runs with --only can fill it at once).
 // --src <dir>: the decoder of another checkout (its src/decode/full.js and writer.js), for a baseline of another branch.
 // The owner's files: their ids and numbers are printed only; write --json under the git-ignored notes/.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-bench.cjs [--set tuning|validation|fresh|all|every|variation|owner]
-//          [--only id,id] [--src dir] [--tag name] [--sweep] [--knobs a,b] [--json out.jsonl] [--models-only]   (dev server on PORT; ffmpeg)
+//          [--only id,id] [--src dir] [--tag name] [--sweep] [--knobs a,b] [--json out.jsonl] [--models-only] [--oracle-drums]   (dev server on PORT; ffmpeg)
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { exportSong, appSong, APP_SONGS, DIR: WAV, HOLDOUT_DIR, SET_DIRS } = require('./decode-export.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -124,6 +125,9 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
       try { song = W.writeFull(m, { id: `sim-${x.id}`, title: x.id }); } finally { if (K && !K.post && !K.model) K.set(old); }
       delete song.config;
       if (K && K.post) K.edit(song, v.f);
+      // (round 7, --oracle-drums: the song's true drum drive written on the drum track, to size what a drum-drive
+      // measure could give; bench only, the decoder does not know it)
+      if (args.includes('--oracle-drums') && x.truth && x.truth.drumsDrive > 0) { const dt = song.tracks.find(t => t.type === 'drums'); if (dt) dt.settings = { ...dt.settings, drive: x.truth.drumsDrive }; }
       const { h, wav } = await render(song);
       const ck = `${x.id}:${h}`;
       if (!cmp.has(ck)) {
