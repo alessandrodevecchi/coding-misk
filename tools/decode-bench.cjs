@@ -13,7 +13,7 @@
 // --src <dir>: the decoder of another checkout (its src/decode/full.js and writer.js), for a baseline of another branch.
 // The owner's files: their ids and numbers are printed only; write --json under the git-ignored notes/.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-bench.cjs [--set tuning|validation|fresh|all|every|variation|owner]
-//          [--only id,id] [--src dir] [--tag name] [--sweep] [--knobs a,b] [--json out.jsonl] [--models-only] [--oracle-drums]   (dev server on PORT; ffmpeg)
+//          [--only id,id] [--src dir] [--tag name] [--sweep] [--knobs a,b] [--json out.jsonl] [--models-only] [--oracle-drums] [--rerender tag]   (dev server on PORT; ffmpeg)
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { exportSong, appSong, APP_SONGS, DIR: WAV, HOLDOUT_DIR, SET_DIRS } = require('./decode-export.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -92,7 +92,8 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
   let browser = null, page = null;
   const rdir = path.join(CACHE, 'render'); fs.mkdirSync(rdir, { recursive: true });
   async function render(song) {
-    const h = crypto.createHash('sha1').update(JSON.stringify(song)).digest('hex').slice(0, 16), wav = path.join(rdir, `${h}.wav`);
+    // (--rerender <tag>: export again under that tag, to measure how much two exports of one song differ)
+    const h = crypto.createHash('sha1').update(JSON.stringify(song)).digest('hex').slice(0, 16), wav = path.join(rdir, `${h}${opt('--rerender') ? `.${opt('--rerender')}` : ''}.wav`);
     if (!fs.existsSync(wav)) {
       if (!page) {
         const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');

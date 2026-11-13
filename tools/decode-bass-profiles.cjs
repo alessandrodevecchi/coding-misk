@@ -1,9 +1,13 @@
 // The bass sounds the writer can write, measured once through the app (decode-refine group 10, round 6, review C1/C2):
-// each candidate alone for four bars at 120 BPM in one fast export, its harmonic profile read as level B reads the
-// original's bass (src/decode/kit-measure.js bassDrive: the fundamental's share of the first 12 harmonics, their slope,
+// each candidate for four bars at 120 BPM in one fast export, inside a mix (a 909 with the kick on the beat and the
+// hats between, the app's pad: a bass alone reads far from a bass in a song, a clean square at -38 dB even/odd alone and
+// near -5 in a mix), its harmonic profile read as level B reads the original's bass on the steps without a kick
+// (src/decode/kit-measure.js bassDrive: the fundamental's share of the first 12 harmonics, their slope,
 // the even against the odd harmonics) on bars 2 to 4. The candidates are the app's own bass sounds: a wave through the
 // bass track's default filter (cutoff 700, resonance 8) and the app's drive `.distort(d).distortvol(.5)` at
-// d = 0, 1, 2, 3, 4.5 on the sawtooth and the square. Writes src/decode/bass-profiles.js, which the writer reads to
+// d = 0, 1, 2, 3, 4.5 on the sawtooth and the square, the triangle, the sine and the supersaw clean. The pad's overlap
+// shapes the table as much as the bass (the sine reads a share of 0.80 here, 0.94 to 1.0 in the bench's sine songs), so
+// the writer leaves the sine and triangle rows out and the driven squares too (round 7). Writes src/decode/bass-profiles.js, which the writer reads to
 // write the nearest candidate's drive (and wave). Run again when the writer's bass sounds or the measure change.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-bass-profiles.cjs [--print]   (dev server on PORT; ffmpeg)
 const fs = require('node:fs'), path = require('node:path');

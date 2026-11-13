@@ -11,7 +11,8 @@
 //   band error        RMS dB difference of the 10 octave bands' shares (round 6); reported, not in the snapshot yet
 //   (the brightness, a median frame centroid, stays as a reported score: it mostly says whether something sustained
 //   plays between the drum hits, decode-g10 review)
-// score(): the numbers a later run must not lose by more than MARGIN (higher is better for each).
+// score(): the numbers a later run must not lose by more than MARGIN (higher is better for each; round 7: the band error
+// is lower-better with its own margin, LOWER, and the brightness is reported only, REPORTED).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -150,14 +151,23 @@ export function compare(fo, fc, grid) {
 // minus the largest band difference
 export function score(c) {
   const b = c.brightness ? Math.min(c.brightness, 1 / c.brightness) : 0;
-  return { rhythmLow: c.rhythm.low, rhythmMid: c.rhythm.mid, rhythmHigh: c.rhythm.high, chroma: c.chroma, bassChroma: c.bassChroma, brightness: r3(b), shares: r3(1 - Math.max(...c.shares.orig.map((x, i) => Math.abs(x - c.shares.code[i])))), arc: c.arc };
+  return { rhythmLow: c.rhythm.low, rhythmMid: c.rhythm.mid, rhythmHigh: c.rhythm.high, chroma: c.chroma, bassChroma: c.bassChroma, brightness: r3(b), shares: r3(1 - Math.max(...c.shares.orig.map((x, i) => Math.abs(x - c.shares.code[i])))), arc: c.arc, bandError: c.bandError };
 }
+// (round 7) REPORTED: scores the snapshot holds but the check does not gate: the brightness, a median frame centroid
+// that mostly says whether something sustained plays between the drum hits (decode-g10 review); LOWER: scores where
+// lower is better, with their own margin: the band error in dB
+export const REPORTED = ['brightness'];
+export const LOWER = { bandError: 0.3 };
 // a run's scores against the snapshot's: the drops beyond the margin, [{ id, key, was, now }]
 export function drops(snapshot, now, margin = MARGIN) {
   const out = [];
   for (const [id, s] of Object.entries(snapshot || {})) {
     if (!now[id]) continue;
-    for (const [k, was] of Object.entries(s)) { const v = now[id][k]; if (was !== null && v !== null && v !== undefined && v < was - margin - 1e-9) out.push({ id, key: k, was, now: v }); }
+    for (const [k, was] of Object.entries(s)) {
+      const v = now[id][k];
+      if (REPORTED.includes(k) || was === null || v === null || v === undefined) continue;
+      if (k in LOWER ? v > was + LOWER[k] + 1e-9 : v < was - margin - 1e-9) out.push({ id, key: k, was, now: v });
+    }
   }
   return out;
 }
