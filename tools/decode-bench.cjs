@@ -56,6 +56,8 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
   const post = re => ({ get: () => 1, post: true, edit: (song, k) => { for (const t of song.tracks) if (t.id === 'bass') for (const p of Object.values(t.patterns)) if (p.code) p.code = re(p.code, k); } });
   const KNOBS = SR && SR.drive ? {
     crush: field(SR.drive, 'crush'), distortvol: field(SR.drive, 'vol'), distort: field(SR.drive, 'distort'), lpq: field(SR.drive, 'lpq'),
+    // (round 6: the cut's Lead level, the level under which a part is not written, the missing-bass guard)
+    ...('leadKeep' in SR ? { leadKeep: field(SR, 'leadKeep'), bassMissing: field(SR, 'bassMissing') } : {}),
     cutHpf: field(SR.cut, 0), cutLpf: field(SR.cut, 1), leadOver: field(SR, 'leadOver'), move: field(SR, 'move'), sustain: field(SR, 'sustain'), room: field(SR, 'room'), shares: field(SR, 'shares'), near: field(SR, 'near'),
     // the drive rule's threshold: level B's `driven` read again from the cached measure (no new analysis)
     evenOdd: { get: () => DR.evenOdd, model: true, apply: (m, v) => { if (m.bassDrive) m.bassDrive.driven = m.bassDrive.evenOdd <= v; } },

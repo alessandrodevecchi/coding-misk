@@ -19,13 +19,19 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // sustain: the chords' mean energy left in the last eighth of their bar (amplitude ratio, 0.6 is about -4 dB) from which
 // they get a room of `room`; levels: the gain steps the balance tries for each part (multipliers, 1.5 dB apart) and the
 // highest gain it writes
-// cut: the chords' high-pass and low-pass (Hz) when a Lead plays over at least leadOver of their bars
+// cut: the chords' high-pass and low-pass (Hz) when a Lead plays over at least leadOver of their bars, the song has
+// drums and the balance kept the Lead within leadKeep dB of its written level (round 6, review P5: the cut fired on a
+// pad-only song whose Lead the balance had turned down by 16 dB)
+// bassMissing: when the model has bass notes on more than this share of the bars and no bass track is written, the
+// balance may not raise the drums (their kick would fill the bass's band). (Round 6 also tried leaving out a part the
+// balance turns down by 12 dB or more: it removed real parts, the trap song's chords and three basses, band error
+// 2.2 to 4.1 dB on the trap song; dropped.)
 // drive: a driven bass (decode-refine 10.2, fifth round; the model's `bassDrive`, kit-measure.js): `.distort(distort)`
 // with `.distortvol(vol)` after its filter, then `.crush(crush)`, and a moving filter's resonance `lpq`. Chosen on the
 // bench's two driven acid basses: the clip makes the bass the loud low end the original has (its low band share 0.57 to
 // 0.70); a resonance of 8 before the clip left a peak in the 150-400 Hz band (mid share 0.30 against 0.21), 2 to 4 not;
 // the crusher gives back the highs the louder bass covers (brightness 0.69 to 0.87-0.98; crush 6 too dark, 4 too bright)
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, drive: { distort: 4.5, vol: 0.5, crush: 4.85, lpq: 4 } };
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, drive: { distort: 4.5, vol: 0.5, crush: 4.85, lpq: 4 } };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -195,7 +201,7 @@ export function stepShare(code) {
 }
 // a three-band view of five level bands (the mid bands summed)
 const fold = v => (v.length === 5 ? [v[0], v[1] + v[2] + v[3], v[4]] : v);
-export function balanceLevels(tracks, shares, bars) {
+export function balanceLevels(tracks, shares, bars, { bassMissing = false } = {}) {
   if (!shares || !bars) return null;
   const nb = shares.length, parts = [];
   // a table entry in the bands of `shares`
@@ -235,7 +241,7 @@ export function balanceLevels(tracks, shares, bars) {
     const d = e.map((v, j) => Math.abs(v / s - shares[j])), e3 = fold(e), d3 = e3.map((v, j) => Math.abs(v / s - sh3[j]));
     return [Math.max(...d, ...d3), Math.max(...d3)];
   };
-  const steps = SOUND_RULE.levels.map(k => k), allowed = p => steps.filter(k => p.g * k <= SOUND_RULE.maxGain + 1e-9);
+  const steps = SOUND_RULE.levels.map(k => k), allowed = p => steps.filter(k => p.g * k <= SOUND_RULE.maxGain + 1e-9 && !(bassMissing && p.drums && k > 1));
   let best = free.map(() => 1), [bv, b3] = worst(best);
   const before = b3;
   const walk = (i, ks) => {
@@ -259,9 +265,10 @@ export function balanceLevels(tracks, shares, bars) {
 // the chords then lose their body under SOUND_RULE.cut[0] and keep their top up to cut[1]. Applied after the balance,
 // which sets the pad's level from its whole sound (the table's prediction of the cut pad moved the bass and the Lead
 // for nothing). A Lead muted by default (a sung melody) does not count. Changes the chords' code in place → whether it cut
-export function cutUnderLead(tracks) {
+export function cutUnderLead(tracks, gains = null) {
   const lead = tracks.find(t => t.id === 'lead' && !t.hush), ch = tracks.find(t => t.id === 'chords');
-  if (!lead || !ch) return false;
+  if (!lead || !ch || !tracks.some(t => t.type === 'drums')) return false;
+  if (gains && gains.lead !== undefined && 20 * Math.log10(gains.lead) < -SOUND_RULE.leadKeep) return false;
   const bars = t => t.clips.flatMap(c => range(c.start, c.start + (c.bars || 1))), on = new Set(bars(lead)), chBars = bars(ch);
   if (!chBars.length || chBars.filter(b => on.has(b)).length < SOUND_RULE.leadOver * chBars.length) return false;
   for (const p of Object.values(ch.patterns)) if (p.code) p.code = p.code.replace(/\.lpf\(\d+\)/, `.hpf(${SOUND_RULE.cut[0]}).lpf(${SOUND_RULE.cut[1]})`);
@@ -655,8 +662,11 @@ export function writeFull(model, opts = {}) {
     if (clips.length) tracks.push({ id: 'lead', name: 'Lead', type: 'code', settings: { visual: 'hook' }, patterns, clips, ...(kind === 'vox' ? { hush: true } : {}) });
   }
   if (opts.sounds !== 'simple') {
-    balanceLevels(tracks, model.shares, end);
-    cutUnderLead(tracks);
+    // (round 6: bass notes on more than SOUND_RULE.bassMissing of the bars and no bass track: the drums keep their level)
+    const noted = bars.slice(0, end).filter(b => (b.bass || []).some(x => x !== null && x !== undefined)).length;
+    const bal = balanceLevels(tracks, model.shares, end, { bassMissing: !tracks.some(t => t.id === 'bass') && noted > SOUND_RULE.bassMissing * end });
+    const gains = bal && bal.gains;
+    cutUnderLead(tracks, gains);
   }
   const song = songShell(model, opts, end, tracks);
   const key = formatKey(model.key), bpm = song.sections[0].bpm;
