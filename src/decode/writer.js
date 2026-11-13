@@ -213,6 +213,9 @@ export function bassDriveOf(p) {
   return { drive: drive >= D.min ? drive : 0, near: best, wave: BASS_PROFILES[best].wave };
 }
 
+// the drums' drive by measure (task 10.6): drives, the drum track's drives the level table measures; ratio, the
+// original's high band (2-16 kHz) share against the clean kit's predicted share from which the drums are driven
+export const DRUM_DRIVE = { drives: [2], ratio: 2 };
 // the drum track's default gain (src/music.js DEFAULT.drums.gain), the level the part table measured the drums at
 const DRUMS_GAIN = 0.9;
 // the part levels (decode-refine D3): level B's drums, bass, chords and Lead gains scaled so the code's band shares come
@@ -262,7 +265,17 @@ export function balanceLevels(tracks, shares, bars, { bassMissing = false } = {}
         const w = clipBars(t, pid) / bars;
         for (const [row, steps] of Object.entries(p.rows || {})) { const v = inBands(PART_LEVELS[`drums:${kit}:${row}`]), hitsN = (String(steps).match(/x/g) || []).length; if (v) v.forEach((x, j) => { T[j] += (x * hitsN * w) / DRUMS_GAIN ** 2; }); }
       }
-      parts.push({ t, T, g, on: 1, drums: true });
+      // (task 10.6: the same drums driven by the track's drive, per drive of DRUM_DRIVE.drives, when the table holds them)
+      const Td = {};
+      for (const d of DRUM_DRIVE.drives) {
+        const X = Array(nb).fill(0); let ok = true;
+        for (const [pid, p] of Object.entries(t.patterns)) {
+          const w = clipBars(t, pid) / bars;
+          for (const [row, steps] of Object.entries(p.rows || {})) { const v = inBands(PART_LEVELS[`drums:${kit}:${row}:d${d}`]), hitsN = (String(steps).match(/x/g) || []).length; if (!v) { ok = false; continue; } v.forEach((x, j) => { X[j] += (x * hitsN * w) / DRUMS_GAIN ** 2; }); }
+        }
+        if (ok) Td[d] = X;
+      }
+      parts.push({ t, T, g, on: 1, drums: true, Td });
       continue;
     }
     const pats = Object.entries(t.patterns).filter(([, p]) => p.code);
@@ -300,6 +313,19 @@ export function balanceLevels(tracks, shares, bars, { bassMissing = false } = {}
   };
   walk(0, free.map(() => 1));
   if (b3 > SOUND_RULE.shares) return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: null };
+  // (task 10.6: the drums' drive by the high band: with the chosen gains, the original's high-band share against the
+  // predicted one; when the original holds DRUM_DRIVE.ratio times more or above, the drive whose driven rows bring the
+  // prediction nearest, if nearer than the clean kit)
+  if (nb === 5) {
+    const dr = parts.find(p => p.drums && Object.keys(p.Td || {}).length), H = nb - 1;
+    const pred = T0 => { const e = Array(nb).fill(0); parts.forEach((p, i) => { const TT = p === dr && T0 ? T0 : p.T; for (let j = 0; j < nb; j++) e[j] += TT[j] * (p.g * best[i]) ** 2; }); const s = e.reduce((a, b) => a + b, 0) || 1; return e[H] / s; };
+    const clean = pred(null), err = x => Math.abs(Math.log(shares[H] / x));
+    if (dr && clean > 0 && shares[H] / clean >= DRUM_DRIVE.ratio) {
+      let bd = null, be = err(clean);
+      for (const [d, X] of Object.entries(dr.Td)) { const e = err(pred(X)); if (e < be - 1e-9) { be = e; bd = +d; } }
+      if (bd) dr.t.settings.drive = bd;
+    }
+  }
   free.forEach((p, i) => { const k = best[i]; if (k === 1) return; if (p.drums) { p.t.settings.gain = Math.round(p.g * k * 100) / 100; return; } for (const pat of Object.values(p.t.patterns)) if (pat.code) pat.code = p.vol ? pat.code.replace(/\.distortvol\(([\d.]+)\)/, (_, x) => `.distortvol(${Math.round(+x * k * 100) / 100})`) : pat.code.replace(/\.gain\(([\d.]+)\)(?!.*\.gain\()/, (_, x) => `.gain(${Math.round(+x * k * 100) / 100})`); });
   return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: Object.fromEntries(free.map((p, i) => [p.t.id, Math.round(best[i] * 100) / 100])) };
 }

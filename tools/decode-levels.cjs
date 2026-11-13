@@ -6,7 +6,7 @@
 // sounded on every step (the bass line sounds on 8 of 16 steps, the Lead's on 7), so the writer scales them by the
 // steps its loops sound. Writes src/decode/part-levels.js, which the writer reads to set each part's gain so the
 // code's band shares come near the original's. Run again when the writer's sounds change.
-// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-levels.cjs [--print]   (dev server on PORT; needs ffmpeg)
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-levels.cjs [--print] [--drums-drive]   (dev server on PORT; needs ffmpeg)
 const fs = require('node:fs'), path = require('node:path');
 const { exportSong } = require('./decode-export.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -17,6 +17,7 @@ const G = 0.4, BARS = 2, BPM = 120;
 const HOP = 256;
 const BASS = 'note("a1 ~ a1 ~ c2 ~ a1 ~ e1 ~ a1 ~ g1 ~ a1 ~")', CHORDS = 'chord("<Am F>").voicing()', LEAD = 'n("0 ~ 2 ~ 4 ~ 2 ~ 0 ~ ~ ~ 4 3 2 ~").scale("A4:minor")';
 const CUTS = { bass: [300, 600, 900, 1200], chords: [800, 1600, 2400, 4000], acid: [500, 1000, 2000] };
+const DRUM_DRIVES = [2];
 const ROW_HITS = 4, DRUM_ROWS = ['bd', 'cp', 'hh', 'oh'], HIT = { bd: 'x...x...x...x...', cp: 'x...x...x...x...', hh: '..x...x...x...x.', oh: '..x...x...x...x.' };
 const items = [];
 (async () => {
@@ -32,6 +33,12 @@ const items = [];
   const { SOUND_RULE } = await import('../src/decode/writer.js'), D = SOUND_RULE.drive, clip = `.distort(${D.table}).distortvol(${D.vol})`;
   for (const w of ['sine', 'square', 'sawtooth']) for (const c of CUTS.bass) items.push({ key: `bass:${w}:${c}:drive`, per: 8 / 16, g: D.vol, code: `${BASS}.s("${w}").lpf(${c})${clip}.gain(.75)` });
   for (const c of CUTS.acid) items.push({ key: `bass:acid:${c}:drive`, per: 8 / 16, bars: 5, g: D.vol, code: `${BASS}.s("sawtooth").lpf(sine.range(200, ${c}).slow(4)).lpq(${D.lpq})${clip}.gain(.6)` });
+  // (task 10.6: the drums driven by the drum track's own drive, DRUM_DRIVES, per machine and row: the level B writer
+  // reads the original's high band against the clean kit's prediction and picks the drive; last, after the basses)
+  for (const d of DRUM_DRIVES) for (const kit of KITS) for (const row of DRUM_ROWS) items.push({ key: `drums:${kit}:${row}:d${d}`, per: ROW_HITS, track: { type: 'drums', settings: { kit, gain: 0.9, drive: d }, rows: { [row]: HIT[row] } } });
+  // (--drums-drive: only the driven drums, merged into the table already written: one short export)
+  const only = process.argv.includes('--drums-drive');
+  if (only) items.splice(0, items.length, ...items.filter(x => /:d\d+$/.test(x.key)));
   const S = await import('./decode-similarity.mjs');
   const sections = items.map((x, i) => ({ name: `S${i}`, bars: x.bars || BARS, bpm: BPM, key: 'A' }));
   const tracks = items.map((x, i) => x.track
@@ -57,6 +64,7 @@ const items = [];
     const g2 = it.track ? 1 : (it.g ?? G) ** 2;
     out[it.key] = bandEnergy(x, sr, a, z, LEVEL_BANDS, HOP).map(v => +(v / frames / g2 / it.per).toPrecision(3));
   });
+  if (only) { const { PART_LEVELS } = await import('../src/decode/part-levels.js'); for (const [k, v] of Object.entries(PART_LEVELS)) if (!(k in out)) out[k] = v; }
   const src = `// The sounds level B writes, measured once through the app by tools/decode-levels.cjs (decode-refine D3): the mean
 // energy per analysis frame of each sound alone at gain 1 (drums at their track's default gain), in the writer's level
 // bands (kit-measure.js LEVEL_BANDS: 20-150, 150-400, 400-1000, 1000-2000, 2000-16000 Hz); drums per machine and row for
