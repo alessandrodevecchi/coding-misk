@@ -91,7 +91,10 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
         page.on('pageerror', e => console.error('pageerror', e.message));
         await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
       }
-      const part = `${wav}.${process.pid}.part.wav`; await exportSong(page, song, part); fs.renameSync(part, wav);
+      // (a download the browser cancels under load is tried once more)
+      const part = `${wav}.${process.pid}.part.wav`;
+      try { await exportSong(page, song, part); } catch (e) { console.error(`export failed (${e.message.split('\n')[0]}), trying again`); await exportSong(page, song, part); }
+      fs.renameSync(part, wav);
     }
     return { h, wav };
   }
