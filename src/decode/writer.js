@@ -23,6 +23,8 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // cut: the chords' high-pass and low-pass (Hz) when a Lead plays over at least leadOver of their bars, the song has
 // drums and the balance kept the Lead within leadKeep dB of its written level (round 6, review P5: the cut fired on a
 // pad-only song whose Lead the balance had turned down by 16 dB)
+// bassBar: level B writes a bar with a single bass note when its bass level is at least this share of the song's loudest
+// bar (round 6, C6; the same share as full.js HARMONY_RULE.quietBass, which is relative to the section)
 // bassMissing: when the model has bass notes on more than this share of the bars and no bass track is written, the
 // balance may not raise the drums (their kick would fill the bass's band). (Round 6 also tried leaving out a part the
 // balance turns down by 12 dB or more: it removed real parts, the trap song's chords and three basses, band error
@@ -36,7 +38,7 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // at. (Round 5 wrote a fixed `.distort(4.5).distortvol(0.5).crush(4.85)` when the even/odd ratio was under -3 dB: the
 // crusher matched a median-centroid score with broadband noise, +12 to +14 dB above 5.6 kHz, and the ratio read square,
 // triangle and sine basses as driven; review of 13 November.)
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.93 }, bassWave: 700 };
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.93 }, bassWave: 700 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -68,6 +70,11 @@ const gridKey = g => DRUM_ROWS.map(r => g[r] || EMPTY).join('|');
 // two notes or more; chords with a confident chord over a fair chord level.
 export const drumsHeard = b => { const d = b.drums || {}; const n = DRUM_ROWS.reduce((a, r) => a + hits(d[r]), 0); return n >= 2 && (hits(d.bd) > 0 || hits(d.hh) > 0 || hits(d.oh) > 0 || hits(d.cp) >= 2); };
 export const bassHeard = b => (b.bass || []).filter(x => x !== null && x !== undefined).length >= 2;
+// level B (round 6, C6, group 8 work): one note is a bass line (a two-feel or a held sub has one note a bar) when the
+// bar's bass level reaches SOUND_RULE.bassBar of the song's loudest bar (a stray note a bar in a section without a bass,
+// the pad's root read by the pitch tracker, stays out; full.js bassRange's gate is relative to each section). top: the
+// song's loudest bar bass level
+export const bassHeardB = (b, top = 0) => { const n = (b.bass || []).filter(x => x !== null && x !== undefined).length; return n >= 2 || (n === 1 && top > 0 && !!b.level && (b.level.bass || 0) >= SOUND_RULE.bassBar * top); };
 export const chordsHeard = b => !!b.chord && (b.chordConf || 0) >= 0.5 && (!b.level || b.level.chords >= 0.15);
 
 export function partsByBar(model) {
@@ -628,6 +635,7 @@ export function writeFull(model, opts = {}) {
   const M = { ...model, sections: secs, ending: end };
   const named = new Map(), names = secs.map(s => { const base = SECTION_NAMES[s.kind] || 'Part', n = (named.get(base) || 0) + 1; named.set(base, n); return n > 1 ? `${base} ${n}` : base; });
   const all = soundsOf(bars.slice(0, end), opts.sounds), tracks = [];
+  const topBass = Math.max(0, ...bars.slice(0, end).map(b => (b.level ? b.level.bass || 0 : 0))), heardBass = b => bassHeardB(b, topBass);
   const pid = n => String.fromCharCode(65 + (n % 26)) + (n >= 26 ? Math.floor(n / 26) : '');
   const runs = (list, k) => { const out = []; list.forEach((x, j) => { if (x === null) return; const last = out[out.length - 1]; if (last && last.pattern === x && last.start + last.bars === k + j) last.bars++; else out.push({ start: k + j, bars: 1, pattern: x }); }); return out; };
   // drums
@@ -637,7 +645,7 @@ export function writeFull(model, opts = {}) {
     // the edit rule (decode-refine D7): a variant starts only when lineBars passed since the drums' last edit and
     // anyBars since any part entered or stopped; the way back to the main grid is always written
     const rule = opts.rule || EDIT_RULE, events = new Set();
-    for (const heardOf of [bassHeard, chordsHeard]) secs.forEach(sec => { const on = steady(range(sec.start, sec.start + sec.bars).map(i => heardOf(bars[i])), rule.runBars); on.forEach((x, j) => { if (j && x !== on[j - 1]) events.add(sec.start + j); }); });
+    for (const heardOf of [heardBass, chordsHeard]) secs.forEach(sec => { const on = steady(range(sec.start, sec.start + sec.bars).map(i => heardOf(bars[i])), rule.runBars); on.forEach((x, j) => { if (j && x !== on[j - 1]) events.add(sec.start + j); }); });
     plan.forEach((p, k) => {
       if (!p.main) return;
       const s0 = secs[k].start, out = [];
@@ -673,7 +681,7 @@ export function writeFull(model, opts = {}) {
     });
     if (clips.length) tracks.push({ id, name, type: 'code', settings: { visual }, patterns, clips });
   };
-  part('bass', 'Bass', 'bass', bassHeard, b => b.bass.map(x => (x === null || x === undefined ? null : x)), bassCode, sameBassB);
+  part('bass', 'Bass', 'bass', heardBass, b => b.bass.map(x => (x === null || x === undefined ? null : x)), bassCode, sameBassB);
   part('chords', 'Chords', 'pad', chordsHeard, b => b.chord, chordCode, undefined, inKey(model.key));
   // the Lead (decode-refine D2): the top line as one loop per section where it is voiced on at least LEAD_RULE.voiced
   // of the section's steps; a sung melody (the top line lines' kind `vox`) muted by default (`hush`)
