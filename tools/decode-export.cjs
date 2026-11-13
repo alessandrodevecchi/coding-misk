@@ -4,7 +4,8 @@
 // in tests/snapshots/decode-radio-song.json), each with the timeline JSON the export saves next to it (<id>.timeline.json,
 // the truth of tools/decode-measure.mjs). exportSong is the one fast export the similarity check uses too.
 // --holdout: the held-out songs of decode-refine 10.1 instead (HOLDOUT_SONGS, into .cache/decode/holdout/).
-// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-export.cjs [--force] [--holdout]   (dev server on PORT)
+// --genre, --variation: the genre songs or the variation sweep's songs (decode-refine group 10, phase 1).
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-export.cjs [--force] [--holdout|--genre|--variation]   (dev server on PORT)
 const fs = require('node:fs'), path = require('node:path');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ROOT = path.join(__dirname, '..');
@@ -66,7 +67,22 @@ async function exportHoldout(page, { force = false, log = () => {} } = {}) {
   }
   return out;
 }
-module.exports = { exportTestSongs, exportHoldout, exportSong, appSong, APP_SONGS, DIR, HOLDOUT_DIR };
+// decode-refine group 10, phase 1: the genre songs (GENRE_SONGS, into .cache/decode/genre/) and the variation sweep's
+// songs (VARIATION_SONGS, into .cache/decode/variation/) → { id: file }
+const SET_DIRS = { genre: path.join(ROOT, '.cache', 'decode', 'genre'), variation: path.join(ROOT, '.cache', 'decode', 'variation') };
+async function exportSet(page, name, { force = false, log = () => {} } = {}) {
+  const S = await import('./decode-songs.mjs'), list = name === 'genre' ? S.GENRE_SONGS : S.VARIATION_SONGS;
+  fs.mkdirSync(SET_DIRS[name], { recursive: true });
+  const out = {};
+  for (const s of list) {
+    const file = path.join(SET_DIRS[name], `${s.id}.wav`);
+    out[s.id] = file;
+    if (!force && fs.existsSync(file)) continue;
+    log(`exported ${s.id} (${await exportSong(page, s, file)} s)`);
+  }
+  return out;
+}
+module.exports = { exportTestSongs, exportHoldout, exportSet, exportSong, appSong, APP_SONGS, DIR, HOLDOUT_DIR, SET_DIRS };
 
 if (require.main === module) {
   (async () => {
@@ -76,7 +92,7 @@ if (require.main === module) {
     page.on('pageerror', e => console.error('pageerror', e.message));
     await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
     const opts = { force: process.argv.includes('--force'), log: console.log };
-    const files = process.argv.includes('--holdout') ? await exportHoldout(page, opts) : await exportTestSongs(page, opts);
+    const files = process.argv.includes('--holdout') ? await exportHoldout(page, opts) : process.argv.includes('--genre') ? await exportSet(page, 'genre', opts) : process.argv.includes('--variation') ? await exportSet(page, 'variation', opts) : await exportTestSongs(page, opts);
     for (const [id, f] of Object.entries(files)) console.log(`${id}: ${f} (${Math.round(fs.statSync(f).size / 1024)} KB)`);
     await browser.close();
   })().catch(e => { console.error(e); process.exit(1); });
