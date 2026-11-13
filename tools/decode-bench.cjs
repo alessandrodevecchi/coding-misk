@@ -11,7 +11,7 @@
 // --models-only: only the analyses, into the cache (several runs with --only can fill it at once).
 // --src <dir>: the decoder of another checkout (its src/decode/full.js and writer.js), for a baseline of another branch.
 // The owner's files: their ids and numbers are printed only; write --json under the git-ignored notes/.
-// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-bench.cjs [--set tuning|validation|all|variation|owner]
+// Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-bench.cjs [--set tuning|validation|fresh|all|every|variation|owner]
 //          [--only id,id] [--src dir] [--tag name] [--sweep] [--knobs a,b] [--json out.jsonl] [--models-only]   (dev server on PORT; ffmpeg)
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { exportSong, appSong, APP_SONGS, DIR: WAV, HOLDOUT_DIR, SET_DIRS } = require('./decode-export.cjs');
@@ -39,12 +39,13 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
     ...APP_SONGS.map(x => ({ id: x.id, file: path.join(WAV, `${x.id}.wav`), truth: truth(appSong(x)) })),
     ...songs.HOLDOUT_SONGS.map(s => ({ id: s.id, file: path.join(HOLDOUT_DIR, `${s.id}.wav`), truth: truth(s) })),
     ...songs.GENRE_SONGS.map(s => ({ id: s.id, file: path.join(SET_DIRS.genre, `${s.id}.wav`), truth: truth(s) })),
-  ].map(x => ({ ...x, set: songs.TUNING.includes(x.id) ? 'tuning' : songs.VALIDATION.includes(x.id) ? 'validation' : '?' }));
+    ...songs.FRESH_SONGS.map(s => ({ id: s.id, file: path.join(SET_DIRS.fresh, `${s.id}.wav`), truth: truth(s) })),
+  ].map(x => ({ ...x, set: songs.TUNING.includes(x.id) ? 'tuning' : songs.VALIDATION.includes(x.id) ? 'validation' : songs.FRESH.includes(x.id) ? 'fresh' : '?' }));
   const set = opt('--set') || 'all', only = opt('--only') ? opt('--only').split(',') : null;
   let files;
   if (set === 'variation') files = songs.VARIATION_SONGS.map(s => ({ id: s.id, file: path.join(SET_DIRS.variation, `${s.id}.wav`), truth: truth(s), set: 'variation' }));
   else if (set === 'owner') { const dir = process.env.DECODE_OWNER_DIR; files = fs.readdirSync(dir).filter(f => AUDIO.test(f) && !f.startsWith('.')).sort().map(f => ({ id: `owner-${slug(f.replace(AUDIO, ''))}`, file: path.join(dir, f), truth: null, set: 'owner' })); }
-  else files = all.filter(x => set === 'all' || x.set === set);
+  else files = all.filter(x => (set === 'all' && x.set !== 'fresh') || set === 'every' || x.set === set);
   files = files.filter(x => (!only || only.includes(x.id)) && fs.existsSync(x.file));
 
   // the constants of group 10 the sweep moves: [get, set] on the rule objects, or an edit of the written song
@@ -67,11 +68,15 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
   const variants = [{ name: 'base' }];
   if (args.includes('--sweep')) for (const k of knobs) for (const f of STEPS) variants.push({ name: `${k}×${f}`, knob: k, f });
 
-  // the analysis of a file, cached while the file and the decoder do not change
+  // the analysis of a file, cached while the file and the decoder do not change (the decoder: every file of src/decode/
+  // but the writer and the tables it reads, which run on each variant)
+  const ddir = path.join(src, 'src', 'decode'), h = crypto.createHash('sha1');
+  for (const f of fs.readdirSync(ddir).filter(f => f.endsWith('.js') && !['writer.js', 'part-levels.js'].includes(f)).sort()) h.update(fs.readFileSync(path.join(ddir, f)));
+  const SRC_HASH = h.digest('hex').slice(0, 10);
   const mdir = path.join(CACHE, 'models', tag); fs.mkdirSync(mdir, { recursive: true });
   const pcmOf = new Map(), pcm = f => { if (!pcmOf.has(f)) pcmOf.set(f, S.readAudio(f)); return pcmOf.get(f); };
   async function model(x) {
-    const st = fs.statSync(x.file), key = `${st.size}-${Math.round(st.mtimeMs)}`, f = path.join(mdir, `${x.id}.json`);
+    const st = fs.statSync(x.file), key = `${st.size}-${Math.round(st.mtimeMs)}-${SRC_HASH}`, f = path.join(mdir, `${x.id}.json`);
     if (fs.existsSync(f)) { const c = JSON.parse(fs.readFileSync(f, 'utf8')); if (c.key === key) return c.m; }
     const m = await analyseFull(pcm(x.file), { engine: nodeEssentia });
     fs.writeFileSync(f, JSON.stringify({ key, m }));
@@ -133,12 +138,26 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
         cut: !!(chords && Object.values(chords.patterns).some(p => p.code && /\.hpf\(/.test(p.code))),
         ...sc, brightRatio: c.brightness, shareDiff, sharesOrig: c.shares.orig, sharesCode: c.shares.code, bars: c.bars,
       };
+      // (round 6) the band error, the bass's presence, coverage and wave family, the parts written, the tempo
+      const fam = w => (!w ? null : /sine|triangle/.test(w) ? 'sine' : /square/.test(w) ? 'square' : 'saw');
+      const barsOf = t => { const out = new Set(); if (t) for (const c of t.clips) for (let i = 0; i < (c.bars || 1); i++) out.add(c.start + i); return out; };
+      const bb = barsOf(bass), tb = x.truth ? x.truth.bassBars || [] : [];
+      Object.assign(row, {
+        bandError: c.bandError, bandDb: c.bandDb, highOff: c.highOff,
+        tracks: song.tracks.filter(t => !t.hush).map(t => t.id), bassBarsWritten: bb.size, bassBarsTruth: tb.length,
+        bassCoverage: tb.length ? Math.round((tb.filter(b => bb.has(b)).length / tb.length) * 1000) / 1000 : null,
+        bassFamily: bass ? fam((/\.s\("([a-z]+)"\)/.exec(Object.values(bass.patterns).find(p => p.code).code) || [])[1]) : null,
+        bassFamilyTruth: x.truth ? fam(x.truth.bassWave) : null,
+        driveWritten: !!(bass && Object.values(bass.patterns).some(p => p.code && /\.distort\(/.test(p.code))),
+        leadTruth: x.truth ? (x.truth.leadBars || []).length > 0 : null,
+        tempoOK: x.truth && x.truth.bpm ? Math.abs(m.bpm - x.truth.bpm) < 1 : null,
+      });
       row.sharesOK = shareDiff <= 0.1;
       row.brightOK = c.brightness !== null && c.brightness >= 0.75 && c.brightness <= 1.33;
       row.kitOK = row.kitTruth ? row.kit === row.kitTruth : null;
       row.driveOK = row.bassDriveTruth === null || row.driven === null ? null : row.driven === row.bassDriveTruth > 0;
       if (out) out.write(JSON.stringify(row) + '\n');
-      console.log(`${tag} ${v.name.padEnd(16)} ${x.set.slice(0, 5)} ${x.id.padEnd(26)} kit ${String(row.kit).padEnd(12)}${row.kitOK === false ? '✗' : ' '} drive ${row.evenOdd} ${row.driven ? 'D' : '-'}${row.driveOK === false ? '✗' : ' '} cut ${row.cut ? 'y' : '-'} · rhythm ${sc.rhythmLow}/${sc.rhythmMid}/${sc.rhythmHigh} chroma ${sc.chroma}/${sc.bassChroma} bright ${c.brightness}${row.brightOK ? '' : '✗'} shares ${shareDiff}${row.sharesOK ? '' : '✗'} arc ${sc.arc}`);
+      console.log(`${tag} ${v.name.padEnd(16)} ${x.set.slice(0, 5)} ${x.id.padEnd(26)} kit ${String(row.kit).padEnd(12)}${row.kitOK === false ? '✗' : ' '} drive ${row.evenOdd} ${row.driven ? 'D' : '-'}${row.driveOK === false ? '✗' : ' '} cut ${row.cut ? 'y' : '-'} · rhythm ${sc.rhythmLow}/${sc.rhythmMid}/${sc.rhythmHigh} chroma ${sc.chroma}/${sc.bassChroma} band ${c.bandError} dB bright ${c.brightness}${row.brightOK ? '' : '✗'} shares ${shareDiff}${row.sharesOK ? '' : '✗'} arc ${sc.arc}`);
     }
   }
   if (out) out.end();

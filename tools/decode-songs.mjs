@@ -167,14 +167,68 @@ export const GENRE_SONGS = [
     tr('bass', 'bass', { wave: 'sawtooth', gain: 0.6, cutoff: 800, cutoffEnd: 3000, move: 'lento', reso: 4, drive: 0 }, { A: { preset: 'spirale' } }, [['Main'], ['Break'], ['Main 2']]),
   ]),
 ];
+// decode-refine group 10, round 6: a FRESH validation set, built before any rule of round 6 and never used to choose a
+// value; each song carries a sound the earlier sets lack: a supersaw bass, a Lead over chords, a square bass, driven
+// basses on presets other than spirale, a held sub, a two-feel bass, stab chords and driven drums.
+export const FRESH_SONGS = [
+  song('fresh-supersaw-128', 'fresh-supersaw-128', [gsec('Intro', 8, 128, 'C', 'notturna'), gsec('Main', 24, 128, 'C', 'notturna')], [
+    tr('drums', 'drums', { kit: 'RolandTR909' }, { A: { rows: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' } } }, [['Intro'], ['Main']]),
+    tr('bass', 'bass', { wave: 'supersaw', cutoff: 900, reso: 4 }, { A: { preset: 'rolling' } }, [['Main']]),
+    tr('pad', 'pad', {}, { A: { preset: 'pad' } }, [['Intro'], ['Main']]),
+  ]),
+  song('fresh-lead-110', 'fresh-lead-110', [gsec('Verse', 16, 110, 'G', 'epica'), gsec('Chorus', 16, 110, 'G', 'epica', { crash: true })], [
+    tr('drums', 'drums', { kit: 'RolandTR707' }, { A: { rows: { bd: 'x.......x.......', cp: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.' } } }, [['Verse'], ['Chorus']]),
+    tr('bass', 'bass', { wave: 'sawtooth', cutoff: 800 }, { A: { preset: 'offbeat' } }, [['Verse'], ['Chorus']]),
+    tr('hook', 'hook', { wave: 'square', gain: 0.35 }, { A: { preset: 'discesa' } }, [['Verse'], ['Chorus']]),
+    tr('pad', 'pad', {}, { A: { preset: 'pad' } }, [['Verse'], ['Chorus']]),
+  ]),
+  song('fresh-square-120', 'fresh-square-120', [gsec('A', 16, 120, 'D', 'cyber'), gsec('B', 8, 120, 'D', 'cyber')], [
+    tr('drums', 'drums', { kit: 'RolandR8' }, { A: { rows: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' } } }, [['A'], ['B']]),
+    tr('bass', 'bass', { wave: 'square', cutoff: 1000 }, { A: { preset: 'ottavi' } }, [['A'], ['B']]),
+    tr('pad', 'pad', {}, { A: { preset: 'pad' } }, [['B']]),
+  ]),
+  song('fresh-drive-pumping-126', 'fresh-drive-pumping-126', [gsec('Main', 16, 126, 'E', 'ipnotica'), gsec('Break', 4, 126, 'E', 'ipnotica'), gsec('Main 2', 12, 126, 'E', 'ipnotica')], [
+    tr('drums', 'drums', { kit: 'RolandTR909' }, { A: { rows: { bd: 'x...x...x...x...', hh: '..x...x...x...x.' } } }, [['Main'], ['Main 2']]),
+    tr('bass', 'bass', { wave: 'sawtooth', cutoff: 700, drive: 3 }, { A: { preset: 'pumping' } }, [['Main'], ['Break'], ['Main 2']]),
+    tr('pad', 'pad', {}, { A: { preset: 'pad' } }, [['Break'], ['Main 2']]),
+  ]),
+  song('fresh-drive-galoppo-140', 'fresh-drive-galoppo-140', [gsec('Main', 24, 140, 'B', 'frigio')], [
+    tr('drums', 'drums', { kit: 'RolandTR909' }, { A: { rows: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.' } } }, [['Main']]),
+    tr('bass', 'bass', { wave: 'sawtooth', cutoff: 900, drive: 4.5 }, { A: { preset: 'galoppo' } }, [['Main']]),
+  ]),
+  song('fresh-held-sub-85', 'fresh-held-sub-85', [gsec('A', 16, 85, 'F', 'malinconica'), gsec('B', 16, 85, 'F', 'malinconica')], [
+    tr('drums', 'drums', { kit: 'RolandTR808' }, { A: { rows: { bd: 'x.........x.....', cp: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.' } } }, [['A'], ['B']]),
+    tr('bass', 'bass', { wave: 'sine', cutoff: 300, gain: 1 }, { A: { preset: 'sub' } }, [['A'], ['B']]),
+    tr('pad', 'pad', {}, { A: { preset: 'pad' } }, [['B']]),
+  ]),
+  song('fresh-twofeel-95', 'fresh-twofeel-95', [gsec('A', 12, 95, 'A', 'dorico'), gsec('B', 12, 95, 'A', 'dorico')], [
+    tr('drums', 'drums', { kit: 'LinnDrum' }, { A: { rows: { bd: 'x.......x.......', cp: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.' } } }, [['A'], ['B']]),
+    tr('bass', 'bass', { wave: 'triangle', cutoff: 600 }, { A: { preset: 'twoFeel' } }, [['A'], ['B']]),
+    tr('pad', 'pad', { cutoff: 2000 }, { A: { preset: 'pad' } }, [['A'], ['B']]),
+  ]),
+  song('fresh-stab-122', 'fresh-stab-122', [gsec('Intro', 4, 122, 'C', 'euforica'), gsec('Main', 20, 122, 'C', 'euforica')], [
+    tr('drums', 'drums', { kit: 'RolandTR909' }, { A: { rows: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.', oh: '..x.......x.....' } } }, [['Main']]),
+    tr('bass', 'bass', { wave: 'sawtooth', cutoff: 700 }, { A: { preset: 'offbeat' } }, [['Main']]),
+    tr('pad', 'pad', { cutoff: 2500 }, { A: { preset: 'stab' } }, [['Intro'], ['Main']]),
+  ]),
+  song('fresh-drumdrive-132', 'fresh-drumdrive-132', [gsec('Main', 16, 132, 'G', 'tensione'), gsec('Main 2', 16, 132, 'G', 'tensione')], [
+    tr('drums', 'drums', { kit: 'RolandTR606', drive: 2.5 }, { A: { rows: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: 'x.x.x.x.x.x.x.x.' } } }, [['Main'], ['Main 2']]),
+    tr('bass', 'bass', { wave: 'sawtooth', cutoff: 600 }, { A: { preset: 'rolling' } }, [['Main'], ['Main 2']]),
+    tr('pad', 'pad', {}, { A: { preset: 'pad' } }, [['Main 2']]),
+  ]),
+];
+
 // The split of every bench song (decode-refine group 10, phase 1). TUNING songs may be used to choose a value of the
 // decoder; VALIDATION songs are never used to choose a value: they only verify a value chosen on the tuning songs.
 // The old bench (TEST_SONGS and the app songs) was already used to tune groups 7 to 10, so it is tuning; the held-out
 // songs stay held out; the genre songs are split in two, one acid variant each side.
 export const TUNING = ['decode-test-124', 'decode-test-90', 'decode-test-174', 'decode-test-long', 'decode-test-acid', 'decode-test-arp', 'luci-rosse', 'radio-bench-c',
   'genre-house-124', 'genre-techno-130-drive', 'genre-dnb-174-reese', 'genre-trap-140', 'genre-synthwave-100', 'genre-acid-dark-128'];
+// (round 6: the held-out songs were looked at in rounds 2 to 5 and this VALIDATION set in phase 1 and its review, so it
+// is a validation set already seen; FRESH, below, is the one never looked at before the end of round 6)
 export const VALIDATION = [...HOLDOUT_SONGS.map(s => s.id),
   'genre-boombap-90', 'genre-ambient-70', 'genre-dub-75', 'genre-breakbeat-135', 'genre-lofi-80', 'genre-acid-bright-132'];
+export const FRESH = FRESH_SONGS.map(s => s.id);
 // the variation sweep (phase 1): one 8-bar techno song at 130 BPM, the bass's drive and gain and the drums' drive moved
 // one at a time, to see where level B's drive detection switches on
 export const VARIATION_SONGS = [
@@ -189,9 +243,14 @@ export const VARIATION_SONGS = [
   ]);
 });
 // the truth the bench checks against: the drums' kit and drive, the bass's drive (null where the song has none)
+// (round 6: also the bass's wave, the bars each part plays, whether a Lead plays and the tempo)
 export function soundTruth(s) {
   const d = s.tracks.find(t => t.type === 'drums'), b = s.tracks.find(t => t.type === 'bass');
-  return { kit: d ? d.settings.kit || 'RolandTR909' : null, drumsDrive: d ? d.settings.drive || 0 : null, bassDrive: b ? b.settings.drive || 0 : null };
+  const start = {}; let at = 0; for (const x of s.sections) { start[x.name] = at; at += x.bars; }
+  const barsOf = t => { const out = []; if (t) for (const c of t.clips) { const sec = s.sections.find(x => x.name === c.section); if (sec) for (let i = 0; i < sec.bars; i++) out.push(start[c.section] + i); else if (Number.isFinite(c.start)) for (let i = 0; i < (c.bars || 1); i++) out.push(c.start + i); } return [...new Set(out)].sort((p, q) => p - q); };
+  const lead = s.tracks.filter(t => t.type === 'hook' || t.id === 'lead');
+  return { kit: d ? d.settings.kit || 'RolandTR909' : null, drumsDrive: d ? d.settings.drive || 0 : null, bassDrive: b ? b.settings.drive || 0 : null,
+    bassWave: b ? b.settings.wave || 'sawtooth' : null, bassBars: barsOf(b), leadBars: [...new Set(lead.flatMap(barsOf))], drums: !!d, bars: at, bpm: s.sections[0].bpm };
 }
 
 // the new test songs (decode-refine 6.1) carry the sound the analysis does not handle yet (groups 7 to 10): the checks
