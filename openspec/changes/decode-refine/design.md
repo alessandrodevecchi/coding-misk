@@ -414,6 +414,38 @@ The owner approved a new distortion measure, on the bass this time (rounds 1 to 
 
 Met: the shares of acid and luci-rosse; their brightness within 0.05 of the snapshot; drive found on the four driven basses and on no clean one; the held-out songs better (the two driven ones' brightness enters the range, every other held-out score unchanged). Not met: the arc of acid (0.116, 0.106 under the snapshot) and luci-rosse (0.551, 0.055 under): the louder bass flattens the code's loudness per bar (acid's arc 0.222 with the clean bass, 0.16 with the clip at `distortvol(.3)`, 0.10 to 0.12 at 0.5), while the original's arc comes mostly from the hook and the crash of its main sections, which the code does not write. The arp song's brightness does not move (0.771): its bass is clean, so nothing of this round reaches it. The snapshot takes the scores that rose (acid's rhythm in the three bands, chroma and shares; luci-rosse's rhythm, chroma and bass chroma); the check fails on acid's and luci-rosse's arc and on the arp song's brightness.
 
+### Group 10, sixth round (13 November)
+
+Phase 1 widened the bench (12 genre songs, a tuning and a validation split, `tools/decode-bench.cjs`); an independent review read the measurements (`notes/`, git-ignored) and found that the score that got worse on validation, the brightness ratio, is a median frame centroid that mostly says whether something sustained plays between the drum hits, and that the three largest problems were not sound constants: a missing or thin bass on sparse and held lines, a bass sound that is not measured (a sine on 13 of 28 songs), and a crusher that matched the brightness score with broadband noise.
+
+- **New measures first** (`tools/decode-similarity.mjs`, `tools/decode-bench.cjs`): the band error, the RMS dB difference of the 10 octave bands' shares from 20 Hz to 16 kHz, and the largest error above 5.6 kHz; per song the bass track's presence, its bar coverage against the truth, its wave family, whether drive was written, the parts written and the tempo. The brightness ratio stays as a reported score, no longer a target; the similarity snapshot is unchanged (its brightness and arc keys still fail as recorded in the fifth round).
+- **Sets.** TUNING (14), VALIDATION (14: the 8 held-out songs and 6 genre songs; looked at in phase 1 and its review, so a validation set already seen) and FRESH (9 songs built before any rule of this round and looked at only at its end: a supersaw bass, a Lead over chords, a square bass, driven basses on two other presets, a held sub, a two-feel bass, stab chords, driven drums). Each step was kept only when the validation set improved.
+- **C3, the cut under a Lead** (`cutUnderLead`): only in a song with drums and when the balance kept the Lead within `leadKeep` (6) dB; when the model has bass notes on more than `bassMissing` (a third) of the bars and no bass track is written, the balance may not raise the drums. The ambient song's chords are no longer cut (share difference 0.65 to 0.21). Tried and dropped: leaving out a part the balance turns down by 12 dB or more; it removed real chords and basses (the trap song's band error 2.2 to 4.1 dB).
+- **C2, the app's drive at a measured amount, no crusher.** `bassDrive` also reads the bass's harmonic profile (the fundamental's share of 12 harmonics, their slope); `tools/decode-bass-profiles.cjs` measures the app's own basses inside a mix (sawtooth and square at drive 0 to 4.5, supersaw; the share rises 0.37, 0.44, 0.64, 0.78, 0.86 with the sawtooth's drive) into `src/decode/bass-profiles.js`; the writer writes `.distort(d).distortvol(.5)` as the app does, d the drive of the nearest candidate by the share and the even/odd ratio over their spread; a share of `sineShare` (0.93) or more is a sine or a triangle. The even/odd threshold, `crush` and the fixed `distort` are gone; the level table was measured again. Alone, C2 made validation worse (band error at most 3 dB on 7 of 14 to 4): without the crusher a driven sine or a low-swept sawtooth has 3 to 6 dB too little above 355 Hz.
+- **C1, the wave of the nearest app bass** (on top of C2): the candidate's wave (sawtooth, square, supersaw, or a sine) through the app bass's default filter (`bassWave` 700, resonance 8, where the candidates were measured); a measured square or sine is not turned into a moving sawtooth; a profile whose harmonics rise with their number (a wrong octave) gives no measure. The drive-1 candidates are left out: on the tuning songs their share (0.44) sits inside the clean sawtooths' spread (0.38 to 0.58), and four of five drive-1 readings there were clean.
+- **C6, a bass bar by its level** (group 8 work, task 8.3): level B writes a bar with one bass note when its bass level reaches `bassBar` (0.2) of the song's loudest bar; two notes still count alone. A two-feel or held sub had no bass track.
+
+| Validation (14) | Base (76a2b93) | Round 6 | Review's target |
+| --- | --- | --- | --- |
+| Band error at most 3 dB | 7 | 8 | 10 |
+| Band error above 6 dB | 3 | 2 | 0 (1 without C4) |
+| A band above 5.6 kHz off by more than 6 dB | 2 | 3 | 0 |
+| Mean band error (dB) | 4.47 | 4.20 | 3.0 |
+| Gap to tuning (dB) | 1.53 | 1.36 | 1.0 |
+| Drive written on a clean bass | 1 of 11 | 2 of 11 | 0 |
+| Drive written on a driven bass | 2 of 2 | 2 of 2 | 2 of 2 |
+| Bass wave family right | 1 of 9 | 10 of 13 | 7 of 9 |
+| Share difference within 0.10 | 10 | 10 | 11 |
+| Chords cut without a Lead in the truth | 1 | 0 | 0 |
+| Kit right | 9 of 13 | 9 of 13 | 9 of 13 |
+| Bass track where the song has a bass | 9 of 13 | 13 of 13 | 12 of 13 |
+| Bass bars covered at least 80 % | 8 of 13 | 11 of 13 | 11 of 13 |
+| Tempo right | 11 of 14 | 11 of 14 | 13 of 14 |
+| Drums, bass or Lead on the ambient song | all three | all three | none |
+| Low-band rhythm, mean | 0.509 | 0.518 | 0.60 |
+
+Not met: the high band (the hats follow the kick's gain, C4 not done; the breakbeat's hats were masked by the crusher's noise before), the drive on clean basses (the clean bright acid reads drive 2, a sweep raises the fundamental's share), the tempo octave (task 7.5), the ambient song's phantom parts (analysis), and per-song rhythm on validation and tuning together: the low band down by 0.06 to 0.07 on three songs, the mid band by 0.05 to 0.13 on three, the high band by 0.09 on one (the resonant sawtooth at 700 holds through the mid onsets). On tuning the two driven acid songs got further from their originals (band error 1.8 to 3.6 and 3.3 to 5.5 dB: without the crusher their low sweep, 200 to 550 Hz before the clip, leaves the highs 5 to 12 dB short); the other tuning songs got closer (mean 2.94 to 2.84 dB). The sweep of every new constant is in the DEVLOG entry. The fresh set and the owner's files are reported in the git-ignored notes.
+
 ### Task 11.3: a stable similarity check (12 November)
 
 The arc score moved between two runs of the check on the same code (decode-test-124, 90 and 174 failed on the base commit; the radio seed's arc went from 0.48 to -0.03). Two causes:
