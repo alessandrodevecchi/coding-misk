@@ -283,7 +283,7 @@ const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  
     const on1 = await waitFor(async () => (await R()).state.onAir === 1, 60000);
     await sleep(1500);
     e = await ed(); const c2 = await code();
-    check(on1 && !e.err && names(c2, s1.title) && !c2.includes(s0.title) && /^\s*[_S]?\$:/m.test(c2), 'the next song appears whole when it goes on air', c2.split('\n')[0]);
+    check(on1 && !e.err && names(c2, s1.title) && !c2.includes(s0.title) && /^\s*[_S]?(?:\$|[a-z][A-Za-z0-9]*):(?=\s|$)/m.test(c2), 'the next song appears whole when it goes on air', c2.split('\n')[0]);
     // #82: the window of the natural change made ahead (its plan in the plan worker) and handed over at the change, the
     // same code at every bar as the window made at the change
     const ch = await page.evaluate(([b0, n]) => { const r = globalThis.codingMiskRadio, c = r.changed, w = r.airPlayable; let diff = 0; for (let b = b0; b < b0 + n; b++) if (c.p.codeAt(b) !== w.codeAt(b)) diff++; return { ahead: c.ahead, here: c.here, diff }; }, [s1.start, s1.bars]);

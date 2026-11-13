@@ -616,7 +616,7 @@ if (shots) fs.mkdirSync(shots, { recursive: true });
       const m = t2 && a.song.build.find(x => x.by === 'listener' && x.mute === t2), v = t1 && a.song.build.find(x => x.by === 'listener' && x.set && x.set.track === t1 && x.set.gain === 0.3);
       check(!!m && !!v, 'mute and volume on a grown song: steps on the lines', `volume ${t1}, mute ${t2}: ${JSON.stringify(mineOf(a.song, 0).slice(-5))}`);
       if (v) { await seekTo(v.at - 1); check(await waitCode(v.at, cd => block(cd, t1).some(l => l.includes('.gain(0.3)'))), 'the volume shows as .gain(0.3) on the line', block(await code(), t1).join(' | ').slice(0, 200)); }
-      if (m) { await seekTo(m.at - 1); check(await waitCode(m.at, cd => block(cd, t2).some(l => /^_\$:/.test(l))), 'the muted line shows "_$:"', block(await code(), t2).join(' | ').slice(0, 200)); }
+      if (m) { await seekTo(m.at - 1); check(await waitCode(m.at, cd => block(cd, t2).some(l => /^_(?:\$|[a-z][A-Za-z0-9]*):/.test(l))), 'the muted line shows "_$:"', block(await code(), t2).join(' | ').slice(0, 200)); }
       check(!(await err()), 'no evaluation error after the mixer commands', (await err()).slice(0, 120));
       // replay: the same commands give the same song
       const heard = JSON.stringify(a.song.build), kinds = a.commands.map(x => x.kind).join();

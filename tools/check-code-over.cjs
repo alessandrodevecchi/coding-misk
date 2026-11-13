@@ -65,7 +65,7 @@ const state = page => page.evaluate(() => {
     const { page, ctx, errors } = await open(browser, { 'coding-misk-code-over': { stage: true } });
     await page.locator('#track-pick').selectOption('luci-rosse'); await sleep(800);
     await page.click('#play'); await sleep(3000);
-    const line = await page.evaluate(() => { const v = document.querySelector('strudel-editor').editor.editor, doc = v.state.doc; for (let i = 1; i <= doc.lines; i++) if (/^\$: /.test(doc.line(i).text)) { const ln = doc.line(i); v.dispatch({ selection: { anchor: ln.to } }); v.focus(); return i - 1; } return -1; });
+    const line = await page.evaluate(() => { const v = document.querySelector('strudel-editor').editor.editor, doc = v.state.doc; for (let i = 1; i <= doc.lines; i++) if (/^(?:\$|[a-z][A-Za-z0-9]*): /.test(doc.line(i).text)) { const ln = doc.line(i); v.dispatch({ selection: { anchor: ln.to } }); v.focus(); return i - 1; } return -1; });
     await page.keyboard.type(' '); await sleep(400);
     const s = await state(page);
     check(s.on && s.co && s.co.edit === line, 'typing by hand: the line of the caret is the edited line', `edit ${s.co && s.co.edit}, caret line ${line}`);

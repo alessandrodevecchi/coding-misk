@@ -17,7 +17,7 @@ const SONGS = ['ferro', 'cavo-scoperto'];
     return { code: e.code, err: String(e.repl.state.evalError || ''), started: e.repl.scheduler.started, cyc: e.repl.scheduler.now(), hand: !document.getElementById('hand-tag').hidden };
   });
   // track blocks that play (a "$:" line; "_$:" is a track still to come), without the voice that speaks the comments
-  const tracks = code => code.split(/^\/\/ ========== /m).slice(1).filter(b => !/^[^\n]*voice ==========/.test(b) && /^\$:/m.test(b)).length;
+  const tracks = code => code.split(/^\/\/ ========== /m).slice(1).filter(b => !/^[^\n]*voice ==========/.test(b) && /^(?:\$|[a-z][A-Za-z0-9]*):(?=\s|$)/m.test(b)).length;
   const seek = async k => { await page.evaluate(v => { const x = document.getElementById('pb-seek'); x.value = v; x.dispatchEvent(new Event('change')); }, k); await sleep(1500); };
 
   await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(5000);
@@ -32,9 +32,9 @@ const SONGS = ['ferro', 'cavo-scoperto'];
       await page.locator('#live-code').selectOption('compact'); await sleep(600);
       const c = (await st()).code;
       check(nowCode.split('\n').length < c.split('\n').length && !/const section\d/.test(nowCode), `${id}: code of the moment is the shortest, without section lanes`);
-      check(/^_\$:/m.test(c) && !(await page.isHidden('#live-code')), `${id}: compact code shows the tracks still to come with _$:`);
+      check(/^_(?:\$|[a-z][A-Za-z0-9]*):/m.test(c) && !(await page.isHidden('#live-code')), `${id}: compact code shows the tracks still to come with _$:`);
       await page.locator('#live-code').selectOption('sections'); await sleep(600);
-      check(!/^_\$:/m.test((await st()).code), `${id}: code per section without _$:`);
+      check(!/^_(?:\$|[a-z][A-Za-z0-9]*):/m.test((await st()).code), `${id}: code per section without _$:`);
       await page.locator('#live-code').selectOption('track'); await sleep(600);
       check(/\.pick\(\[/.test((await st()).code) || (await st()).code.length < c.length, `${id}: one line per track`);
       await page.locator('#live-code').selectOption('now'); await sleep(600);
@@ -93,7 +93,7 @@ const SONGS = ['ferro', 'cavo-scoperto'];
   const { crescendoSong } = await import(`${ROOT}/src/song/crescendo.js`), { resolveProfile, growthRules } = await import(`${ROOT}/src/live/profiles.js`);
   const styles = Object.fromEntries(fs.readdirSync(`${ROOT}/styles`).filter(f => f.endsWith('.json')).map(f => JSON.parse(fs.readFileSync(`${ROOT}/styles/${f}`, 'utf8'))).map(r => [r.id, r]));
   const shapeOf = (id, over) => crescendoSong(JSON.parse(fs.readFileSync(`${ROOT}/songs/${id}.json`, 'utf8')), { rules: growthRules(resolveProfile('switch', over), { styles }) });
-  const heard = code => code.split('\n').filter(l => /^S?\$:/.test(l) && !/^\$: silence/.test(l)).length;
+  const heard = code => code.split('\n').filter(l => /^S?(?:\$|[a-z][A-Za-z0-9]*):(?=\s|$)/.test(l) && !/^\$: silence/.test(l)).length;
   await page.locator('#track-pick').selectOption('switch-prima-luce'); await sleep(600);
   await page.click('#live-profile [data-profile="switch"]'); await sleep(800);
   await page.locator('#live-opening').selectOption('typed'); await sleep(1200);
@@ -110,7 +110,7 @@ const SONGS = ['ferro', 'cavo-scoperto'];
   const after = await page.evaluate(L0 => { const r = document.querySelector('strudel-editor').editor.repl; return r.state.pattern ? r.state.pattern.queryArc(L0, L0 + 1).filter(h => h.hasOnset()).length : 0; }, L);
   check(!cur.err && heard(cur.code) >= 1 && after > 0, 'typed opening: the first line sounds whole on its bar', cur.err || `${after} events`);
   await page.click('#play'); await sleep(400);
-  for (let [opening, development, re] of [['muted-base', 'by-type', /^_\$:/m], ['mid-set', 'by-type', /^S\$:/m], ['slow', 'second-section', /^S\$:/m], ['slow', 'metamorphosis', /setcpm\(134\/4\)/]]) {
+  for (let [opening, development, re] of [['muted-base', 'by-type', /^_(?:\$|[a-z][A-Za-z0-9]*):/m], ['mid-set', 'by-type', /^S(?:\$|[a-z][A-Za-z0-9]*):/m], ['slow', 'second-section', /^S(?:\$|[a-z][A-Za-z0-9]*):/m], ['slow', 'metamorphosis', /setcpm\(134\/4\)/]]) {
     await page.locator('#live-opening').selectOption(opening); await page.locator('#live-development').selectOption(development); await sleep(1000);
     const c = shapeOf('switch-prima-luce', { opening, development }), steps = [...new Set(c.build.map(x => x.at))].sort((a, b) => a - b);
     // (the second skin's tempo is drawn with the shape: read it from the build)

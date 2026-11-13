@@ -168,8 +168,8 @@ for (const s of SONGS) {
     check(named > 0 || pick.length === 0, `${s.id} ${profile}: no named line`);
     let planSame = null, rushedD = null, rushedN = null;
     if (b.crescendo && b.crescendo.coder) {
-      const pd = D.plan(), pn = N.plan(), j = p => JSON.stringify({ edits: [...(p.edits || [])], ahead: (p.ahead || []).map(a => ({ ...a, text: toDollar(a.text || '') })) });
-      planSame = j(pd) === j(pn);
+      const pd = D.plan(), pn = N.plan(), pt = T.plan(), j = p => JSON.stringify({ edits: [...(p.edits || [])], ahead: (p.ahead || []).map(a => ({ ...a, text: toDollar(a.text || '') })) });
+      planSame = j(pd) === j(pn) && j(pd) === j(pt);
       check(planSame, `${s.id} ${profile}: the plan of the written part differs between the forms`);
     }
     if (b.crescendo && !quick) {

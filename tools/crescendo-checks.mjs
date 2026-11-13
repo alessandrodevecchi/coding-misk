@@ -414,7 +414,8 @@ export const CHECKS = [
       let prev = marks(0);
       for (const b of [...new Set(buildSteps(c).map(x => x.at))].filter(b => b > 0)) { const m = marks(b); assert(m === prev || m === prev - 1, `${who} bar ${b}: ${prev} → ${m}`); prev = m; }
       assert(prev === 0, `${who}: ${prev} marks left`);
-      const re = opening === 'muted-base' ? /^_\$:/m : /^S\$:/m, C = resolveProfile('switch');
+      // (line-names: Random per song may name the lines, `_kick:` and `Skick:` as well as `_$:` and `S$:`)
+      const re = opening === 'muted-base' ? /^_(?:\$|[a-z][A-Za-z0-9]*):/m : /^S(?:\$|[a-z][A-Za-z0-9]*):/m, C = resolveProfile('switch');
       for (const view of ['now', 'compact', 'track', 'sections']) { const L = liveCode(c, { ...C, view }, { cols: () => 80 }); assert(re.test(L.codeAt(0)), `${who}: no mark in the ${view} view`); }
     }
   } },

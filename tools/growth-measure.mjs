@@ -6,6 +6,7 @@ import { buildSteps, stateAt } from '../src/song/build.js';
 import { normalizeSong } from '../src/song/format.js';
 import { ideaRows } from '../src/song/ideas.js';
 import { meterSteps } from '../src/music.js';
+import { labelOf, LABEL_SPACE } from '../src/song/line-names.js';
 
 // seconds of one bar of the growth (the first section)
 export { barSeconds } from '../src/live/typing-load.js';
@@ -17,7 +18,9 @@ export function audible(code) {
   const layers = [];
   let cur = null;
   for (const l of code.split('\n')) {
-    if (/^[_S]?\$:/.test(l)) { cur = { solo: l.startsWith('S'), muted: l.startsWith('_'), text: l.replace(/^[_S]?\$:\s*/, '') }; layers.push(cur); continue; }
+    // (line-names: `kick:`, `_kick:` and `Skick:` read like `$:`, `_$:` and `S$:`)
+    const lb = labelOf(l);
+    if (lb && !lb.indent) { cur = { solo: lb.mark === 'S', muted: lb.mark === '_', text: l.replace(LABEL_SPACE, '') }; layers.push(cur); continue; }
     if (cur && /^\s+\S/.test(l) && !/^\s*\/\//.test(l)) { cur.text += l.trim(); continue; }
     cur = null;
   }

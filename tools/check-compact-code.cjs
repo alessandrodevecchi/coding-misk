@@ -193,7 +193,7 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
       const e = document.querySelector('strudel-editor').editor;
       const midiOf = n => { const m = String(n).match(/^([a-g])(#|b)?(-?\d)$/i); return m ? { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }[m[1].toLowerCase()] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (+m[3] + 1) * 12 : null; };
       const haps = async (code, a, z) => {
-        if (!/^\s*[_S]?\$:/m.test(code)) return '';
+        if (!/^\s*[_S]?(?:\$|[a-z][A-Za-z0-9]*):(?=\s|$)/m.test(code)) return '';
         await e.repl.evaluate(code, false);
         if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError));
         return e.repl.scheduler.pattern.queryArc(a, z).filter(h => h.hasOnset())
@@ -209,7 +209,7 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
         try {
           const shown = L.codeAt(x);
           if (/\.mask\((section|clip)\d+\)|const (section|clip)\d+ =|const SECTIONS =/.test(shown)) { err = `bar ${x}: a section or clip lane is shown`; break; }
-          lines = Math.max(lines, (shown.match(/^\s*[_S]?\$:/gm) || []).length);
+          lines = Math.max(lines, (shown.match(/^\s*[_S]?(?:\$|[a-z][A-Za-z0-9]*):(?=\s|$)/gm) || []).length);
           globalThis.miskBuses = L.buses; useFns(L.fns);
           const w = L.run(shown);
           if (/ x [\d.]/.test(w.slice(shown.length))) gated++;
@@ -239,7 +239,7 @@ const SONGS = ['crescendo-primo-passo', 'crescendo-filo-di-luce', 'crescendo-not
       const orbits = new Set();
       const haps = async (code, a, z) => {
         // (a song with nothing playing yet compiles to no line at all)
-        if (!/^\s*[_S]?\$:/m.test(code)) return [];
+        if (!/^\s*[_S]?(?:\$|[a-z][A-Za-z0-9]*):(?=\s|$)/m.test(code)) return [];
         await e.repl.evaluate(code, false);
         if (e.repl.state.evalError) throw new Error(String(e.repl.state.evalError));
         return e.repl.scheduler.pattern.queryArc(a, z).filter(h => h.hasOnset()).map(h => { orbits.add(h.value.orbit); return JSON.stringify([+h.whole.begin.valueOf().toFixed(4), h.value.bank ? 0 : +h.duration.valueOf().toFixed(4), Object.fromEntries(Object.entries({ ...h.value, ...(typeof h.value.note === 'string' && midiOf(h.value.note) !== null ? { note: midiOf(h.value.note) } : {}) }).filter(([k, v]) => typeof v !== 'function' && k !== 'orbit' && !(k === 'velocity' && v === 1)).sort())]); });

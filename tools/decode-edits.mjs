@@ -15,6 +15,7 @@ import { momentSong, writeFull, withoutVox, EDIT_RULE } from '../src/decode/writ
 import { liveCode } from '../src/live/live-code.js';
 import { followSong } from '../src/song/crescendo.js';
 import { decodeControls } from '../src/decode/tab.js';
+import { LINE, labelOf } from '../src/song/line-names.js';
 
 // the PCM of a file: mono float at the analysis rate, by ffmpeg
 export function readAudio(file) {
@@ -23,7 +24,7 @@ export function readAudio(file) {
 }
 
 // the lines of the code that carry music (the cover line, the tempo and comments left out)
-const musicLines = code => withoutVox(code).split('\n').filter(l => /^\s*[_S]?\$:|^\s*\./.test(l));
+const musicLines = code => withoutVox(code).split('\n').filter(l => LINE.test(l) || /^\s*\./.test(l));
 function lev(a, b) {
   if (a === b) return 0;
   const m = a.length, n = b.length; let prev = Array.from({ length: n + 1 }, (_, j) => j);
@@ -86,7 +87,7 @@ export function liveCodes(pcm, { look = LOOK_AHEAD_DEFAULT, sounds = 'ours', tit
     out.push(memo.get(key));
   }
   // from the first bar with a part
-  const first = out.findIndex(c => musicLines(c).some(l => /^\s*\$:/.test(l) && !/\$: silence/.test(l)));
+  const first = out.findIndex(c => musicLines(c).some(l => { const lb = labelOf(l); return lb && lb.mark === '' && !/^\s*\$:\s*silence/.test(l); }));
   return { codes: first < 0 ? [] : out.slice(first), bpm: m.bpm, offset: Math.max(0, first) };
 }
 // level B: the code of every bar of the whole-file song with "Follow the song"
