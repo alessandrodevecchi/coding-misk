@@ -476,6 +476,10 @@ if (process.argv.includes('--app')) {
     // (round 6: the profile, the fundamental's share rising with the clip, and the drive of the nearest app bass)
     const da = bassDriveOf(a), db = bassDriveOf(b);
     check(a && b && b.h1 > a.h1 && db.drive > da.drive && bassDriveOf(null) === null && bassDriveOf({ h1: 0.97, evenOdd: -4, slope: -10 }).drive === 0 && bassDriveOf({ h1: 0, evenOdd: 3, slope: 8 }) === null && bassDrive(clean, sr, notes.slice(0, 4)) === null, 'a clipped bass gets a higher fundamental share and a larger drive than a plain sawtooth, a sine-like share none, too few notes no measure', JSON.stringify({ clean: a && [a.h1, a.evenOdd, da], driven: b && [b.h1, b.evenOdd, db] }));
+    // (round 7: the drive rule on the bench's readings: a clean sawtooth at 0.58 (the drive-2 row is gone), a clean square
+    // alone at -38 dB even/odd (clamped at -8: square, no drive), a driven sawtooth at 4.5, a sine at 0.92; fixed scale)
+    const R = (h1, evenOdd) => bassDriveOf({ h1, evenOdd, slope: -5 });
+    check(R(0.582, 2.7).drive === 0 && R(0.706, -38).near === 'square:0' && R(0.706, -38).drive === 0 && R(0.86, -5.6).drive === 4.5 && R(0.776, 1.7).drive === 3 && R(0.92, -3).wave === 'sine' && R(0.42, 2.8).drive === 0, 'the drive rule writes drive only from 3 up, never on a square, with a clamped even/odd and a sine from 0.91', JSON.stringify([R(0.582, 2.7), R(0.706, -38), R(0.86, -5.6), R(0.776, 1.7), R(0.92, -3)]));
   }
   // a driven bass (decode-refine 10.2, round 6): the app's drive after its filter with Our sounds, never with
   // Simple kit; the balance scales the clip's volume, not the gain before the clip

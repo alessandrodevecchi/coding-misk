@@ -33,12 +33,14 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // `.distort(d).distortvol(vol)` after the filter (src/music.js writes the bass track's drive so), d the drive of the
 // nearest bass the app can write (src/decode/bass-profiles.js, measured through the app inside a mix) by the fundamental's
 // share h1 and the even/odd ratio, each over its spread in the table; a share of sineShare or more is a sine or a
-// triangle, never a drive; bassWave: the cutoff the measured bass's wave is written through (round 6, C1: the app bass's
+// triangle, never a drive (round 7: 0.91, mid-gap between the highest driven reading and the lowest sine, 0.935);
+// spread, eoFloor, min: the distance's fixed scale (share, even/odd dB), the floor of the even/odd read, the lowest drive
+// written (round 7, review 2); bassWave: the cutoff the measured bass's wave is written through (round 6, C1: the app bass's
 // default, where the candidates were measured); a moving filter's resonance `lpq`; `table`, the drive the level table measured a driven bass
 // at. (Round 5 wrote a fixed `.distort(4.5).distortvol(0.5).crush(4.85)` when the even/odd ratio was under -3 dB: the
 // crusher matched a median-centroid score with broadband noise, +12 to +14 dB above 5.6 kHz, and the ratio read square,
 // triangle and sine basses as driven; review of 13 November.)
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.93 }, bassWave: 700 };
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.91, spread: [0.227, 6.44], eoFloor: -8, min: 3 }, bassWave: 700 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -192,18 +194,23 @@ export function soundsOf(bars, preset = 'ours', whole = bars, drive = 0, wave = 
 // triangle (no drive). → { drive, near } or null without a profile
 // (round 6: the drive-1 candidates are left out: their fundamental share, 0.44 for the sawtooth, sits inside the spread
 // of the clean sawtooth basses of the tuning songs, 0.38 to 0.58, and four of five drive-1 readings there were clean)
-const PROFILE_KEYS = Object.keys(BASS_PROFILES).filter(k => !/^(sine|triangle):/.test(k) && BASS_PROFILES[k].drive !== 1);
-const spread = f => { const v = PROFILE_KEYS.map(k => BASS_PROFILES[k][f]), m = v.reduce((a, b) => a + b, 0) / v.length; return Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length) || 1; };
-const SPREAD = { h1: spread('h1'), evenOdd: spread('evenOdd') };
+// (round 7, review 2: the driven squares are left out too: a driven square won only once, on a clean square; the
+// drive-2 sawtooth fired only on clean basses, so it stays as a row that writes no drive (min below). The distance scale is two fixed numbers,
+// the spreads of round 6's table, SOUND_RULE.drive.spread: computed from the list, removing a row moved every decision.
+// The measured even/odd is clamped at SOUND_RULE.drive.eoFloor: a clean square alone reads near -38 dB, far below any
+// row; a nearest row under SOUND_RULE.drive.min writes no drive)
 // (round 6, C1: also the candidate's wave; a profile whose harmonics rise with their number is not a bass note at its
 // decoded pitch, a wrong octave or another part, and gives nothing)
+const PROFILE_KEYS = Object.keys(BASS_PROFILES).filter(k => !/^(sine|triangle):/.test(k) && BASS_PROFILES[k].drive !== 1 && !(BASS_PROFILES[k].wave === 'square' && BASS_PROFILES[k].drive > 0));
 export function bassDriveOf(p) {
   if (!p || p.h1 === null || p.h1 === undefined) return null;
   if (!(p.slope < 0)) return null;
   if (p.h1 >= SOUND_RULE.drive.sineShare) return { drive: 0, near: 'sine', wave: 'sine' };
+  const D = SOUND_RULE.drive, eo = Math.max(D.eoFloor, p.evenOdd);
   let best = null, bd = Infinity;
-  for (const k of PROFILE_KEYS) { const c = BASS_PROFILES[k], d = ((p.h1 - c.h1) / SPREAD.h1) ** 2 + ((p.evenOdd - c.evenOdd) / SPREAD.evenOdd) ** 2; if (d < bd) { bd = d; best = k; } }
-  return { drive: BASS_PROFILES[best].drive, near: best, wave: BASS_PROFILES[best].wave };
+  for (const k of PROFILE_KEYS) { const c = BASS_PROFILES[k], d = ((p.h1 - c.h1) / D.spread[0]) ** 2 + ((eo - c.evenOdd) / D.spread[1]) ** 2; if (d < bd) { bd = d; best = k; } }
+  const drive = BASS_PROFILES[best].drive;
+  return { drive: drive >= D.min ? drive : 0, near: best, wave: BASS_PROFILES[best].wave };
 }
 
 // the drum track's default gain (src/music.js DEFAULT.drums.gain), the level the part table measured the drums at

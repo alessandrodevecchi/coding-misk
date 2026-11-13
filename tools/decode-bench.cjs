@@ -148,6 +148,8 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
       const bb = barsOf(bass), tb = x.truth ? x.truth.bassBars || [] : [];
       Object.assign(row, {
         bandError: c.bandError, bandDb: c.bandDb, highOff: c.highOff,
+        // (round 7: also without the 11.2-16 kHz band, which no written sound reaches on some third-party files)
+        bandErrorNoTop: (v => (v.length ? Math.round(Math.sqrt(v.reduce((a, x) => a + x * x, 0) / v.length) * 1000) / 1000 : null))(c.bandDb.slice(0, -1).filter(x => x !== null)),
         tracks: song.tracks.filter(t => !t.hush).map(t => t.id), bassBarsWritten: bb.size, bassBarsTruth: tb.length,
         bassCoverage: tb.length ? Math.round((tb.filter(b => bb.has(b)).length / tb.length) * 1000) / 1000 : null,
         bassFamily: bass ? fam((/\.s\("([a-z]+)"\)/.exec(Object.values(bass.patterns).find(p => p.code).code) || [])[1]) : null,
