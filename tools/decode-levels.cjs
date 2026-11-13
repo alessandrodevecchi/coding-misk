@@ -29,7 +29,7 @@ const items = [];
   // (a driven bass, decode-refine 10.2 fifth round: the writer's clip at the gain it writes, stored per unit of the clip's
   // volume, which the balance scales: the clip makes the level almost independent of the gain before it; last, so its tail
   // falls on no other sound)
-  const { SOUND_RULE } = await import('../src/decode/writer.js'), D = SOUND_RULE.drive, clip = `.distort(${D.distort}).distortvol(${D.vol}).crush(${D.crush})`;
+  const { SOUND_RULE } = await import('../src/decode/writer.js'), D = SOUND_RULE.drive, clip = `.distort(${D.table}).distortvol(${D.vol})`;
   for (const w of ['sine', 'square', 'sawtooth']) for (const c of CUTS.bass) items.push({ key: `bass:${w}:${c}:drive`, per: 8 / 16, g: D.vol, code: `${BASS}.s("${w}").lpf(${c})${clip}.gain(.75)` });
   for (const c of CUTS.acid) items.push({ key: `bass:acid:${c}:drive`, per: 8 / 16, bars: 5, g: D.vol, code: `${BASS}.s("sawtooth").lpf(sine.range(200, ${c}).slow(4)).lpq(${D.lpq})${clip}.gain(.6)` });
   const S = await import('./decode-similarity.mjs');

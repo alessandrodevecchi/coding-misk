@@ -55,12 +55,13 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
   // an inline number of the bass's code scaled after the writer: the last gain, or the moving filter's range
   const post = re => ({ get: () => 1, post: true, edit: (song, k) => { for (const t of song.tracks) if (t.id === 'bass') for (const p of Object.values(t.patterns)) if (p.code) p.code = re(p.code, k); } });
   const KNOBS = SR && SR.drive ? {
-    crush: field(SR.drive, 'crush'), distortvol: field(SR.drive, 'vol'), distort: field(SR.drive, 'distort'), lpq: field(SR.drive, 'lpq'),
+    // (the drive's constants that exist in this decoder: round 5's crush and distort, round 6's sineShare)
+    ...Object.fromEntries([['crush', 'crush'], ['distortvol', 'vol'], ['distort', 'distort'], ['lpq', 'lpq'], ['sineShare', 'sineShare']].filter(([, f]) => f in SR.drive).map(([k, f]) => [k, field(SR.drive, f)])),
     // (round 6: the cut's Lead level, the level under which a part is not written, the missing-bass guard)
     ...('leadKeep' in SR ? { leadKeep: field(SR, 'leadKeep'), bassMissing: field(SR, 'bassMissing') } : {}),
     cutHpf: field(SR.cut, 0), cutLpf: field(SR.cut, 1), leadOver: field(SR, 'leadOver'), move: field(SR, 'move'), sustain: field(SR, 'sustain'), room: field(SR, 'room'), shares: field(SR, 'shares'), near: field(SR, 'near'),
     // the drive rule's threshold: level B's `driven` read again from the cached measure (no new analysis)
-    evenOdd: { get: () => DR.evenOdd, model: true, apply: (m, v) => { if (m.bassDrive) m.bassDrive.driven = m.bassDrive.evenOdd <= v; } },
+    ...(DR && 'evenOdd' in DR ? { evenOdd: { get: () => DR.evenOdd, model: true, apply: (m, v) => { if (m.bassDrive) m.bassDrive.driven = m.bassDrive.evenOdd <= v; } } } : {}),
     tableDrums: table('drums:'), tableBass: table('bass:'), tableChords: table('chords:'),
     bassGain: post((c, k) => c.replace(/\.gain\(([\d.]+)\)(?!.*\.gain\()/, (_, x) => `.gain(${Math.round(+x * k * 1000) / 1000})`)),
     sineLo: post((c, k) => c.replace(/sine\.range\((\d+),\s*(\d+)\)/, (_, a, b) => `sine.range(${Math.round(+a * k)}, ${b})`)),
@@ -157,7 +158,10 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
       row.sharesOK = shareDiff <= 0.1;
       row.brightOK = c.brightness !== null && c.brightness >= 0.75 && c.brightness <= 1.33;
       row.kitOK = row.kitTruth ? row.kit === row.kitTruth : null;
+      // (round 6: the drive is the one written; round 5's `driven` flag when the model has it)
+      if (row.driven === null || row.driven === undefined) row.driven = bd ? row.driveWritten : null;
       row.driveOK = row.bassDriveTruth === null || row.driven === null ? null : row.driven === row.bassDriveTruth > 0;
+      if (W.bassDriveOf) { const dd = W.bassDriveOf(bd); Object.assign(row, { h1: bd ? bd.h1 : null, slope: bd ? bd.slope : null, driveAmount: dd ? dd.drive : null, driveNear: dd ? dd.near : null }); }
       if (out) out.write(JSON.stringify(row) + '\n');
       console.log(`${tag} ${v.name.padEnd(16)} ${x.set.slice(0, 5)} ${x.id.padEnd(26)} kit ${String(row.kit).padEnd(12)}${row.kitOK === false ? '✗' : ' '} drive ${row.evenOdd} ${row.driven ? 'D' : '-'}${row.driveOK === false ? '✗' : ' '} cut ${row.cut ? 'y' : '-'} · rhythm ${sc.rhythmLow}/${sc.rhythmMid}/${sc.rhythmHigh} chroma ${sc.chroma}/${sc.bassChroma} band ${c.bandError} dB bright ${c.brightness}${row.brightOK ? '' : '✗'} shares ${shareDiff}${row.sharesOK ? '' : '✗'} arc ${sc.arc}`);
     }

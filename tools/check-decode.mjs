@@ -25,7 +25,7 @@ import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
 import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead } from '../src/decode/writer.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf } from '../src/decode/writer.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
@@ -473,13 +473,15 @@ if (process.argv.includes('--app')) {
     const sr = 44100, notes = Array.from({ length: 32 }, (_, i) => ({ t: 0.05 + i * 0.12, midi: 33 })), f0 = 55;
     const saw = t => 2 * ((t * f0) % 1) - 1, clean = Float32Array.from({ length: 4.2 * sr }, (_, i) => 0.3 * saw(i / sr)), driven = clean.map(x => Math.tanh(20 * x) * 0.5);
     const a = bassDrive(clean, sr, notes), b = bassDrive(driven, sr, notes);
-    check(a && b && !a.driven && b.driven && bassDrive(clean, sr, notes.slice(0, 4)) === null, 'a clipped bass reads as driven by its even against odd harmonics, a plain sawtooth not, too few notes no measure', JSON.stringify({ clean: a && a.evenOdd, driven: b && b.evenOdd }));
+    // (round 6: the profile, the fundamental's share rising with the clip, and the drive of the nearest app bass)
+    const da = bassDriveOf(a), db = bassDriveOf(b);
+    check(a && b && b.h1 > a.h1 && db.drive > da.drive && bassDriveOf(null) === null && bassDriveOf({ h1: 0.97, evenOdd: -4 }).drive === 0 && bassDrive(clean, sr, notes.slice(0, 4)) === null, 'a clipped bass gets a higher fundamental share and a larger drive than a plain sawtooth, a sine-like share none, too few notes no measure', JSON.stringify({ clean: a && [a.h1, a.evenOdd, da], driven: b && [b.h1, b.evenOdd, db] }));
   }
-  // a driven bass (decode-refine 10.2, fifth round): clipped and crushed after its filter with Our sounds, never with
+  // a driven bass (decode-refine 10.2, round 6): the app's drive after its filter with Our sounds, never with
   // Simple kit; the balance scales the clip's volume, not the gain before the clip
   {
-    const dr = soundsOf([acid, acid], 'ours', [acid, acid], true).bass, pl = soundsOf([base], 'ours', [base], true).bass;
-    check(/lpq\(4\)\.distort\(4\.5\)\.distortvol\(0\.5\)\.crush\(4\.85\)\.gain\(\.6\)$/.test(dr) && /\.distort\(/.test(pl) && !/distort/.test(soundsOf([acid], 'ours').bass) && soundsOf([acid], 'simple', [acid], true).bass === soundsOf([acid], 'simple').bass, 'a driven bass is clipped and crushed after its filter, a clean one not, Simple kit unchanged', dr);
+    const dr = soundsOf([acid, acid], 'ours', [acid, acid], 4.5).bass, pl = soundsOf([base], 'ours', [base], 2).bass;
+    check(/lpq\(4\)\.distort\(4\.5\)\.distortvol\(0\.5\)\.gain\(\.6\)$/.test(dr) && /\.distort\(2\)\.distortvol/.test(pl) && !/crush/.test(dr) && !/distort/.test(soundsOf([acid], 'ours').bass) && soundsOf([acid], 'simple', [acid], 4.5).bass === soundsOf([acid], 'simple').bass, 'a driven bass gets the app\'s drive at its measured amount after its filter, no crusher, a clean one none, Simple kit unchanged', dr);
     const t = [{ id: 'drums', type: 'drums', settings: { kit: 'RolandTR909' }, patterns: { A: { rows: { bd: 'x...x...x...x...', hh: '..x...x...x...x.' } } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }, { id: 'bass', type: 'code', patterns: { A: { code: `note("a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~")${dr}` } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
     const r = balanceLevels(t, [0.6, 0.38, 0.02], 8), code = t[1].patterns.A.code;
     check(r && r.gains && /\.gain\(\.6\)$/.test(code) && (r.gains.bass === 1 || !/distortvol\(0\.5\)/.test(code)), 'the balance moves a driven bass by its clip\'s volume and keeps the gain before the clip', JSON.stringify({ r, code: code.slice(-70) }));
