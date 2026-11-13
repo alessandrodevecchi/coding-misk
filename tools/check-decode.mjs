@@ -463,8 +463,10 @@ if (process.argv.includes('--app')) {
   {
     const pad = (bars) => ({ id: 'chords', type: 'code', patterns: { A: { code: 'chord("<Am F>").voicing().s("triangle").lpf(1100).room(0.4).gain(.3)' } }, clips: [{ start: 0, bars, pattern: 'A' }] });
     const lead = (bars, hush) => ({ id: 'lead', type: 'code', patterns: { A: { code: 'n("0 2 4").scale("A3:minor").s("triangle").lpf(1600).gain(.25)' } }, clips: [{ start: 0, bars, pattern: 'A' }], ...(hush ? { hush: true } : {}) });
-    const over = [pad(8), lead(6)], under = [pad(8), lead(3)], muted = [pad(8), lead(8, true)];
-    check(cutUnderLead(over) && /\.hpf\(1200\)\.lpf\(4000\)\.room/.test(over[0].patterns.A.code) && !cutUnderLead(under) && !/hpf/.test(under[0].patterns.A.code) && !cutUnderLead(muted) && !cutUnderLead([pad(8)]), 'chords under a Lead on most of their bars lose their body, not under a short or muted Lead', over[0].patterns.A.code);
+    // (round 6: only in a song with drums, and only when the balance kept the Lead within SOUND_RULE.leadKeep dB)
+    const dr = () => ({ id: 'drums', type: 'drums', settings: {}, patterns: { A: { rows: { bd: 'x...x...x...x...' } } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] });
+    const over = [pad(8), lead(6), dr()], under = [pad(8), lead(3), dr()], muted = [pad(8), lead(8, true), dr()], noDrums = [pad(8), lead(6)], quiet = [pad(8), lead(6), dr()];
+    check(cutUnderLead(over, { lead: 1 }) && /\.hpf\(1200\)\.lpf\(4000\)\.room/.test(over[0].patterns.A.code) && !cutUnderLead(under) && !/hpf/.test(under[0].patterns.A.code) && !cutUnderLead(muted) && !cutUnderLead([pad(8), dr()]) && !cutUnderLead(noDrums) && !cutUnderLead(quiet, { lead: 0.16 }) && !/hpf/.test(quiet[0].patterns.A.code), 'chords under a Lead on most of their bars lose their body, not under a short, muted or turned-down Lead, nor without drums', over[0].patterns.A.code);
   }
   // the bass's drive (decode-refine 10.1, fifth round): a clipped sawtooth (odd harmonics) is driven, a plain one is not
   {
