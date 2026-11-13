@@ -60,6 +60,7 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
     ...Object.fromEntries([['crush', 'crush'], ['distortvol', 'vol'], ['distort', 'distort'], ['lpq', 'lpq'], ['sineShare', 'sineShare']].filter(([, f]) => f in SR.drive).map(([k, f]) => [k, field(SR.drive, f)])),
     // (round 6: the cut's Lead level, the level under which a part is not written, the missing-bass guard)
     ...('leadKeep' in SR ? { leadKeep: field(SR, 'leadKeep'), bassMissing: field(SR, 'bassMissing') } : {}),
+    ...(W.DRUM_DRIVE ? { drumRatio: field(W.DRUM_DRIVE, 'ratio') } : {}),
     ...('bassBar' in SR ? { bassBar: field(SR, 'bassBar') } : {}), ...('bassWave' in SR ? { bassWave: field(SR, 'bassWave') } : {}),
     cutHpf: field(SR.cut, 0), cutLpf: field(SR.cut, 1), leadOver: field(SR, 'leadOver'), move: field(SR, 'move'), sustain: field(SR, 'sustain'), room: field(SR, 'room'), shares: field(SR, 'shares'), near: field(SR, 'near'),
     // the drive rule's threshold: level B's `driven` read again from the cached measure (no new analysis)
