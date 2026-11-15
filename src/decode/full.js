@@ -90,6 +90,18 @@ export function takeChord(b, c) {
   b.chord = c.chord; b.chordConf = c.conf;
   return b;
 }
+// the phantom parts (decode round 8): parts the analysis finds in a track that has none. noBeat: Essentia.js's tempo
+// confidence under this means no steady beat, and level B writes no drums (on the bench a pad-only song reads -0.11,
+// every song with drums and every real file 1.6 or more); lowShare and h1: the original's 20-150 Hz share of the energy
+// under lowShare and the decoded bass notes with almost no energy at their own fundamental (the bass profile's h1 under
+// h1) mean the notes are a pad's or a voice's low notes, and level B writes no bass (the pad-only song: 0.20 and 0.00;
+// the lowest share of a song with a bass 0.39, and a bass decoded an octave off keeps a share of 0.48 or more)
+export const PARTS_RULE = { noBeat: 1.0, lowShare: 0.3, h1: 0.1 };
+// → whether a file has no steady beat (null when Essentia.js gave no tempo: unknown, so nothing changes)
+export const noSteadyBeat = (ess, rule = PARTS_RULE) => (ess && Number.isFinite(ess.confidence) ? ess.confidence < rule.noBeat : null);
+// → whether the decoded bass notes are no bass (the low band's share of the original, the bass profile)
+export const noBassPart = (shares, drive, rule = PARTS_RULE) => !!(shares && drive && Number.isFinite(drive.h1) && shares[0] < rule.lowShare && drive.h1 < rule.h1);
+
 // harmony and bass per section (decode-refine D5); the numbers in one place
 export const HARMONY_RULE = { clear: 0.8, clearBars: 2, range: 7, quietBass: 0.2 };
 // a bar misk-analyzer marked `third` (a quiet minor third over a major third the bass's harmonics explain) is minor when
@@ -173,6 +185,11 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   const barSec = 240 / bpm;
   for (let t = downbeat + 8 * barSec; t < duration + barSec; t += 8 * barSec) { A.barsRaw(Math.min(duration, t)); onProgress(0.4 + 0.3 * Math.min(1, t / duration), 'bars'); await pause(); }
   const m = A.model(duration), raw = A.barsRaw(duration);
+  // (round 8: no steady beat, no drums: the hits misk-analyzer finds in a pad's swells or a voice are no drum part; the
+  // flag is kept in the model)
+  const noBeat = noSteadyBeat(ess);
+  if (noBeat !== null) m.beat = { steady: !noBeat, confidence: Math.round(ess.confidence * 1000) / 1000 };
+  if (noBeat) for (const b of m.bars) b.drums = Object.fromEntries(Object.keys(b.drums).map(r => [r, '.'.repeat(b.drums[r].length)]));
   onProgress(0.72, 'harmony');
   // 6. key and chords from Essentia.js (the chords on the beats of the bars), else misk-analyzer's own
   if (E && m.bars.length) {
@@ -235,6 +252,8 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
     if (tot > 0) m.shares = e.map(v => Math.round((v / tot) * 1000) / 1000);
     m.bars.forEach((b, i) => { if (b.chord) { const a = (m.downbeat + i * m.barSeconds) * sr; b.sustain = sustainOf(pcm, sr, a, a + m.barSeconds * sr); } });
   }
+  // (round 8: decoded bass notes that are no bass, a pad's low notes, are not a bass part)
+  if (noBassPart(m.shares, m.bassDrive)) { for (const b of m.bars) if (b.bass) b.bass = b.bass.map(() => null); m.noBass = true; }
   // (Essentia.js's own tempo and confidence, to read why the engine was or was not taken)
   if (ess) m.essentiaTempo = { bpm: Math.round(ess.bpm * 1000) / 1000, confidence: Math.round(ess.confidence * 1000) / 1000 };
   Object.assign(m, { level: 'B', engines, ms: Date.now() - t0, ...(notes.length ? { notes } : {}), ...(E ? { essentia: E.version } : {}) });

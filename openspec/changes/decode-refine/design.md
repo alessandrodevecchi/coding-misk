@@ -470,6 +470,27 @@ The arc score moved between two runs of the check on the same code (decode-test-
 
 Proof: the snapshot was written from one run, then the check ran twice more, each time from an empty cache (every original and every level B song exported again): both runs pass, and the scores of the two runs are equal except on decode-test-acid (at most 0.005 apart). The snapshot also takes the drops groups 7 to 9 brought, for the reasons in their entries: the brightness of decode-test-acid (0.74 to 0.50) and luci-rosse (0.67 to 0.61), the right drums playing on the 808 until group 10 picks the kit; luci-rosse's high-band rhythm (0.41 to 0.35), measured with the old noisy exports. The 0.05 margin is unchanged.
 
+### Group 10, round 8: phantom parts and the no-beat flag (15 November)
+
+Problem: on the bench's pad-only song level B wrote a kick, a bass, the chords and a Lead (band error 20.1 dB, the largest single error of validation). misk-analyzer finds hits in the pad's swells and YIN finds the pad's low notes; its per-bar levels are relative to the file's loudest bar, so they cannot tell an absent part from a quiet one.
+
+Decision (`PARTS_RULE` in `full.js`, bench only measures, no new download):
+
+- **No steady beat:** Essentia.js's `RhythmExtractor2013` confidence (already computed for the tempo) under 1.0 marks the file as having no steady beat (`model.beat = { steady, confidence }`). Level B then clears the drum hits and writes no drums. Measured on every bench song, the app's two bench songs and seven owner files: the pad-only song reads -0.11; every other file reads 1.63 or more. Without Essentia.js the flag is unknown and nothing changes.
+- **No bass:** the decoded bass notes are no bass when the original's 20-150 Hz share is under 0.3 and the bass profile at the decoded pitch has almost no energy at the fundamental (`h1` under 0.1). Level B clears the notes (`model.noBass`) and writes no bass. Pad-only song: 0.20 and 0.00. The lowest low-band share of a file with a bass is 0.39 (two owner files, `h1` 0.29 and 0.58). Three bench songs whose bass is decoded an octave off have `h1` near 0 but a low-band share of 0.48 or more, so they keep their bass.
+- Rejected: misk-analyzer's per-bar drum and bass levels (relative to the loudest bar: the pad-only song reads 0.25 drums and 0.56 bass); the bass profile alone (it would drop three real basses decoded an octave off).
+- Not changed: the tempo (the vote with other estimators waits for a listening test), the Lead (the pad-only song keeps a Lead and its chords keep the cut under it).
+
+| Bench (level B) | Before | After |
+| --- | --- | --- |
+| pad-only song: parts written | drums, bass, chords, Lead | chords, Lead |
+| pad-only song: band error | 20.1 dB | 13.0 dB |
+| pad-only song: share difference | 0.204 | 0.079 |
+| validation, mean band error (14 songs) | 3.77 dB | 3.26 dB |
+| tuning, fresh, owner files: band error and parts | | unchanged (every other file writes the same parts and scores) |
+
+`ANALYSIS_VERSION` 11 → 12 (stored level B models are made again).
+
 ### Group 10: sounds by measure, in part (11 November)
 
 Done: the drum machines measured once from their first kick and closed hat samples (`tools/decode-kits.mjs`, `src/decode/kits.js`: kick decay, hat brightness above 2 kHz), the nearest machine in level B (`kit-measure.js`; a mix's hats read about 9 % darker than the sample, `MIX_HAT`; a kick decay under 20 ms, a loud bass stopping the measure, does not count); a bass whose band brightness moves by 350 Hz or more over a bar becomes a sawtooth with a moving resonant filter. Picked: the 909 on luci-rosse, the radio seed, decode-test-124 and long, the 808 on decode-test-90 (right); R8, 707 and 505 on decode-test-174, acid and arp (wrong: those machines' hats sit within 4 % of the 909's). Not done: distortion (neither the click above 1 kHz nor the 150-1000 Hz overtones of the first 50 ms separate driven kicks from clean ones on the bench), the chord and Lead sounds, and the part levels. The radio seed has no distortion (drive 0), so 10.3's "909 with distortion" holds for luci-rosse only.

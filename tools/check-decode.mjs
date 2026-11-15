@@ -24,7 +24,7 @@ import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
-import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
+import { analyseFull, pickTempo, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
 import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf } from '../src/decode/writer.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
@@ -244,6 +244,8 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(Object.values(runs['Essentia.js'].engines).every(x => x === 'essentia.js'), 'with Essentia.js: tempo, key and chords from it', `${JSON.stringify(runs['Essentia.js'].engines)} · Essentia.js tempo ${JSON.stringify(runs['Essentia.js'].essentiaTempo)}`);
   // the tempo's engine (D7): confident alone, or confirmed by misk-analyzer from 2.0; never a disagreeing weak tempo
   check(pickTempo({ bpm: 124 }, { bpm: 123.8, confidence: 2.49 }).from === 'essentia.js' && pickTempo({ bpm: 124 }, { bpm: 61.9, confidence: 2.2 }).bpm === 123.8 && pickTempo({ bpm: 124 }, { bpm: 97, confidence: 2.49 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, { bpm: 123.8, confidence: 1.9 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, { bpm: 97, confidence: 2.6 }).from === 'essentia.js', 'level B tempo: Essentia.js confident (2.5), or from 2.0 when misk-analyzer agrees (any octave); a weak disagreeing tempo stays misk-analyzer\'s');
+  check(noSteadyBeat({ bpm: 135.6, confidence: -0.11 }) === true && noSteadyBeat({ bpm: 124, confidence: 1.63 }) === false && noSteadyBeat(null) === null && PARTS_RULE.noBeat === 1, 'round 8: no steady beat under Essentia.js confidence 1.0 (a pad-only song -0.11, every file with drums 1.6 or more); unknown without Essentia.js');
+  check(noBassPart([0.2, 0.55, 0.18, 0.06, 0.01], { h1: 0 }) && !noBassPart([0.48, 0.4, 0.1, 0.01, 0.01], { h1: 0 }) && !noBassPart([0.2, 0.55, 0.18, 0.06, 0.01], { h1: 0.6 }) && !noBassPart(null, { h1: 0 }) && !noBassPart([0.2], null), 'round 8: decoded bass notes are no bass only with a low 20-150 Hz share and no energy at their fundamental (a bass an octave off keeps a share of 0.48)');
   check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
   // the same model shape as level A for the same bars (analysis spec: One song model)
   const A = createAnalyzer(pcm).model(30), B = runs['Essentia.js'];
