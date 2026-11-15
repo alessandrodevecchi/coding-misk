@@ -4685,8 +4685,16 @@ $('#sw-btn').addEventListener('click', () => { store.set(SW_KEY, stageSettings(t
 function oscPanel(open) {
   const b = $('#osc-btn'), p = $('#osc-panel'); if (!b || !p) return;
   p.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.setAttribute('aria-pressed', String(open));
-  if (open) { $('#osc-panel-body').innerHTML = oscRows(oscSettings(store.get(OSC_KEY, null)), t); p.dataset.lang = getLang(); }
+  if (open) { $('#osc-panel-body').innerHTML = oscRows(oscSettings(store.get(OSC_KEY, null)), t); p.dataset.lang = getLang(); oscPanelPlace(); }
 }
+// the panel starts under the toolbar, wherever its rows end (one row on a desktop, two on a phone, full screen)
+function oscPanelPlace() {
+  const p = $('#osc-panel'), row = $('#osc-btn').closest('.hud-row'); if (!p || p.hidden || !row) return;
+  const w = $('#stagewrap').getBoundingClientRect(), r = row.getBoundingClientRect();
+  p.style.setProperty('--osc-top', `${Math.max(0, Math.round(r.bottom - w.top + 8))}px`);
+}
+window.addEventListener('resize', oscPanelPlace);
+document.addEventListener('fullscreenchange', () => requestAnimationFrame(oscPanelPlace));
 function syncOscBtn() {
   const b = $('#osc-btn'), p = $('#osc-panel'); if (!b || !p) return;
   const on = look === 'oscilloscope' && !soulOverride;
