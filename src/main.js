@@ -76,7 +76,8 @@ import { GUIDE, guideText } from './guide.js';
 import { startVisuals } from './visuals.js';
 import { createStageVideo } from './visuals/stage-video.js';
 import { createStageFolders } from './visuals/stage-video-folders.js';
-import { OSC_KEY } from './visuals/oscilloscope-rules.js';
+import { OSC_KEY, oscSettings } from './visuals/oscilloscope-rules.js';
+import { oscRows, oscHandle, oscSync, OSC_EVENT } from './visuals/osc-controls.js';
 import { SV_KEY, sizeOf as svSizeOf, fallbackLookOf, folderSignature, seededPick, trackTime, loopTime, decodeSize } from './visuals/stage-video-rules.js';
 import { createVideoFrames } from './video/stage-video-frames.js';
 import { passSizes } from './visuals/render-styles.js';
@@ -4679,9 +4680,30 @@ function syncWidgetsBtn() {
   b.setAttribute('aria-pressed', String(sw.layer !== 'off'));
 }
 $('#sw-btn').addEventListener('click', () => { store.set(SW_KEY, stageSettings(toggleLayer(stageSettings(store.get(SW_KEY, null))))); syncWidgetsBtn(); if (settingsPage) settingsPage.render(); });
+// the Oscilloscope look's settings on the stage (oscilloscope-smudge D8): a button shown only with the look, a panel
+// with the same controls as the Settings card; the stage reads the settings each frame, so a change shows on the next
+function oscPanel(open) {
+  const b = $('#osc-btn'), p = $('#osc-panel'); if (!b || !p) return;
+  p.hidden = !open; b.setAttribute('aria-expanded', String(open)); b.setAttribute('aria-pressed', String(open));
+  if (open) { $('#osc-panel-body').innerHTML = oscRows(oscSettings(store.get(OSC_KEY, null)), t); p.dataset.lang = getLang(); }
+}
+function syncOscBtn() {
+  const b = $('#osc-btn'), p = $('#osc-panel'); if (!b || !p) return;
+  const on = look === 'oscilloscope' && !soulOverride;
+  b.hidden = !on;
+  if (!on && !p.hidden) oscPanel(false);
+  else if (!p.hidden && p.dataset.lang !== getLang()) oscPanel(true);
+}
+$('#osc-btn').addEventListener('click', () => oscPanel($('#osc-panel').hidden));
+$('#osc-panel-close').addEventListener('click', () => { oscPanel(false); $('#osc-btn').focus(); });
+for (const ev of ['input', 'change', 'click']) $('#osc-panel-body').addEventListener(ev, e => { if (oscHandle(e, store, 'panel') && ev === 'click') oscSync($('#osc-panel-body'), store); });
+document.addEventListener(OSC_EVENT, e => { if (e.detail && e.detail.from !== 'panel' && !$('#osc-panel').hidden) oscSync($('#osc-panel-body'), store); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#osc-panel').hidden) { oscPanel(false); $('#osc-btn').focus(); } });
+document.addEventListener('pointerdown', e => { const p = $('#osc-panel'); if (!p.hidden && !p.contains(e.target) && !$('#osc-btn').contains(e.target)) oscPanel(false); });
 function syncAll() {
   syncTranscript();
   syncWidgetsBtn();
+  syncOscBtn();
   document.documentElement.dataset.look = look;
   $('#stagewrap').dataset.soul = soulOverride;
   $('#soul-ctl').hidden = !soulOverride;

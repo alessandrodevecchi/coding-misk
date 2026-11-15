@@ -150,6 +150,24 @@
   @media (max-width: 640px) { .sv-chip span { display: none; } .sv-chip { padding: 4px 9px; } }
   .sw-ico { width: 14px; height: 10px; flex: none; }
   @media (max-width: 640px) { .sw-chip span { display: none; } .sw-chip { padding: 4px 9px; } }
+  /* the Oscilloscope look's settings button and its panel on the stage (oscilloscope-smudge D8) */
+  .osc-chip { display: inline-flex; align-items: center; gap: 5px; }
+  .osc-chip[hidden] { display: none; }
+  .osc-ico { width: 14px; height: 10px; flex: none; }
+  @media (max-width: 640px) { .osc-chip span { display: none; } .osc-chip { padding: 4px 9px; } }
+  .osc-panel { position: absolute; z-index: 4; top: 52px; right: 10px; width: min(340px, calc(100% - 20px)); max-height: calc(100% - 62px); display: flex; flex-direction: column; background: color-mix(in srgb, var(--panel) 94%, transparent); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.5); color: var(--ink); backdrop-filter: blur(6px); }
+  .osc-panel[hidden] { display: none; }
+  .osc-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .osc-panel-body { overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px 12px; display: grid; gap: 8px; min-height: 0; }
+  .osc-panel .set-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .osc-panel .set-row > .lbl { padding-top: 0; }
+  .osc-panel .hint { display: none; }
+  .osc-panel .langs button { min-height: 30px; }
+  .osc-panel .osc-param input[type="range"] { min-width: 90px; flex-basis: 100px; }
+  .osc-panel .osc-param select { font-size: 12px; }
+  /* on a phone the toolbar wraps onto a second row instead of running past the stage's edge (Fullscreen was cut off) */
+  @media (max-width: 640px) { .hud-right { max-width: 100%; min-width: 0; } .hud-row { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; } }
+  @media (max-width: 640px) { .osc-panel { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-height: 62%; } }
   .stagewrap[data-soul="true"] .readout, .stagewrap[data-soul="true"] .say { display: none; }
   .stagewrap[data-soul="true"]::after { display: none; }
   @media (max-width: 640px) { .soul-name { display: none; } .soul-ctl .chip, .look-pick { padding: 3px 9px; font-size: 12px; } }

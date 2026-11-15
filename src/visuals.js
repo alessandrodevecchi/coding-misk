@@ -459,6 +459,8 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
       rate: osc.mix && osc.mix.length ? osc.rate : 6400, lv, level: Math.min(1, level), bar: cyc, cyc,
       section: info && Number.isFinite(info.i) ? { i: info.i, n: info.n } : null, dt, playing,
       raw: stage && stage.oscilloscope ? stage.oscilloscope() : null,
+      // the song's seed: its smudged glass (oscilloscope-smudge D5)
+      seed: stage && stage.seed ? stage.seed() : '',
     });
     // (codingMiskOscFlush: the check reads a pixel so the time holds the drawing itself, not only its commands queued
     // for the GPU; a fast video reads its frames back anyway)
@@ -466,7 +468,11 @@ export function startVisuals({ getS, getSteps, getMode, isPlaying, sched, readou
     oscTimes.push(performance.now() - t0); if (oscTimes.length > 600) oscTimes.shift();
   }
   // a look's module loaded (the Oscilloscope's; the other looks are in this file): resolves when it can draw
-  function loadLook(look) { return look === 'oscilloscope' && !oscMod ? oscLoad().then(() => !!oscMod) : Promise.resolve(true); }
+  // (with a smudged overlay, also the glass masks: oscilloscope-smudge D6)
+  function loadLook(look) {
+    if (look !== 'oscilloscope') return Promise.resolve(true);
+    return (oscMod ? Promise.resolve() : oscLoad()).then(() => oscMod ? oscMod.prepare(stage && stage.oscilloscope ? stage.oscilloscope() : null).then(() => true) : false);
+  }
   // (the stage checks wait for the module before a picture: codingMiskOscReady; codingMiskOscBlack counts the frames
   // drawn black while it loads)
   globalThis.codingMiskOscReady = () => !!oscMod;

@@ -28,30 +28,32 @@ The owner's preview (local notes, `notes/oscilloscope-sbavature/`) holds the 15 
 
 A texture becomes a mask: grey levels to alpha, white colour, 512 × 512, WebP (PNG as a fallback is not needed: every supported browser decodes WebP). The colour comes from the drawing (Ambient light, the hue, Screen saturation), so one mask works for every hue and theme. `tools/make-glass-masks.sh` records how each mask is made from its source (crop, levels, inversion); the sources themselves are not committed (they are 1K PBR sets with files we do not need).
 
-### D2. The element set (recommended, until the owner picks)
+### D2. The element set (the owner kept all 15, 15 November)
 
-From the preview, all CC0 (ambientCG, licence page https://docs.ambientcg.com/license/; Wikimedia Commons for the vector print):
+From the preview, all CC0 (ambientCG, licence page https://docs.ambientcg.com/license/; Wikimedia Commons for the vector print) or drawn by the app:
 
 | Role | Elements |
 | --- | --- |
-| Haze base (one, cover) | SurfaceImperfections008, SurfaceImperfections003, Smear008 |
-| Prints (cropped patches, near the edges) | Fingerprints002 crops, Fingerprint-297594.svg (blurred, broken), the app's ridged print |
-| Smears (whole) | Smear001, Smear005 |
+| Haze base (one, cover) | SurfaceImperfections008, SurfaceImperfections003, Smear008, Smear003 |
+| Prints (near the edges) | Fingerprints002 and Fingerprints008 crops, Fingerprint-297594.svg (blurred), the app's ridged print |
+| Smears | Smear001 and Smear005 (whole), Smear007 (a small crop) |
 | Drops (sometimes, cropped) | SurfaceImperfections001 |
 | Debris (sometimes, cropped, small) | SurfaceImperfections013 |
 | Drawn by the app | dust, hairs and fine scratches; a cloth wipe arc; the ridged print |
 
-Left out: Smear003 and Smear007 (too uniform or too heavy as a whole screen, kept as candidates), Fingerprints005 and Fingerprints008 (barely visible). The Commons file `Fingerprint picture.svg` (CC BY-SA 3.0) and commercial "dust and scratches" overlays are references only: the ridged print and the dust are the app's own drawings.
+Fingerprints005 is left out (barely visible, not among the 15). The Commons file `Fingerprint picture.svg` (CC BY-SA 3.0) and commercial "dust and scratches" overlays are references only: the ridged print and the dust are the app's own drawings.
 
 ### D3. The glass plan
 
 `glassPlan(seed, overlay)` in `oscilloscope-rules.js`, pure: a seeded random (string hash, then a small PRNG) gives a list of elements `{ mask | draw, x, y, size, angle, alpha, crop }` in screen units (0..1 of the screen area). Rules:
 
-- one haze base at alpha 0.35 to 0.65;
-- 2 to 4 prints, each centred within 6 % to 20 % of the screen from an edge (people touch the edges);
-- 1 or 2 smears anywhere in the middle 60 %;
-- drops with probability 0.5, a wipe arc with 0.6, dust always;
-- Real oscilloscope: half the prints and smears, no wipe arc, alphas × 0.6.
+- one haze base at alpha 0.35 to 0.65 (one of the four bases);
+- 2 to 4 prints, each centred within 6 % to 20 % of the screen from an edge (people touch the edges): the app's ridged print, a crop of Fingerprints002 or 008, or the vector print blurred;
+- 1 or 2 smears anywhere in the middle 60 %: Smear001 or Smear005 whole, or a crop of Smear007;
+- drops with probability 0.5, debris with 0.4, a wipe arc with 0.6, dust always;
+- Real oscilloscope: half the prints, one smear, no wipe arc, alphas × 0.6.
+
+Over 300 seeds every one of the 15 elements appears (`check:oscilloscope`).
 
 The plan does not depend on the size of the stage, so a 9:16 fragment and the 16:9 stage place the elements in the same places of the screen.
 
@@ -76,6 +78,7 @@ The plan does not depend on the size of the stage, so a 9:16 fragment and the 16
 
 ### D8. The stage button and the panel
 
+- **Toolbar on a phone.** At 640 px or less the toolbar row wraps to a second row, right-aligned: before this change Fullscreen already ran past the stage's edge at 400 px (right edge 448 px on a 384 px stage), and one more button would have pushed Widgets out too.
 - **Button.** `#osc-btn`, a `.chip` with a small drawn icon (a sine in a rounded screen) and the label, `aria-expanded`, between Code over and Widgets. Shown only while the look on the stage is Oscilloscope (the look menu's value, the radio look and a section's look all count). Below 640 px the label hides, as `.sw-chip` does.
 - **Panel.** A popover inside `#stagewrap` (so it works in full screen), anchored under the toolbar on the right, about 320 px wide, `max-height` the stage height minus the toolbar and a margin, scrolling inside. Below 640 px it is a sheet across the bottom of the stage. Panel surface and text use the app tokens (neon, hardware, light). It is not part of the stage canvas, so recordings and exports never show it.
 - **Live.** Each control writes `coding-misk-oscilloscope` through the same `setOsc`; the frame reads the store each frame (as today), so the change shows on the next frame. Sliders update while dragging (`input`). The Settings card listens to the same store change and refreshes its values when it is open.
@@ -99,6 +102,19 @@ The overlay names stay (Smudged, Smudged graticule; Sbavato, Reticolo sbavato).
 
 The Oscilloscope card in `src/guide.js`: *how* names the stage button and its panel; *know* says the glass changes with each song and stays the same in its videos, and that the textures are CC0 with credits in `public/visuals/glass/CREDITS.md`. `docs/knowledge/visuals.md`: the glass, the plan, the two parameters, the panel.
 
+## Cost (measured 15 November, task 6.2)
+
+`tools/check-oscilloscope.cjs --cost` and a run by Smudge and Beam scatter, kellerlicht playing, headless Chrome on the owner's Mac, the stage drawn into a 1920 × 1080 target. Main thread only: 0.2 ms median for Graticule and for Smudged graticule at Smudge 0, 1 and 2 (0.3 ms before the changes below). With the canvas read back (the software path, the worst case):
+
+| Smudged graticule, 1080p | Median |
+| --- | --- |
+| Smudge 0 | 18.0 ms |
+| Beam scatter 0 (room light only) | 18.1 ms |
+| defaults (Smudge 1, Beam scatter 1) | 22.1 ms |
+| Smudge 2, Beam scatter 2 | 21.7 ms |
+
+First measured at 21.6 and 24.9 ms: the room light (a full-size `screen` copy) and the scatter cost about 3.3 ms each. The room light is now baked into the cached glass over the beam (its key holds the seed, Smudge and whether the masks arrived), and the scatter's blur is made every other frame. At 4K with the read back, before those changes: 81 ms against 62 ms for Graticule. An 8-second 9:16 fragment with Smudged graticule exported in 4.3 s against 5.2 s with Palco (load average 5).
+
 ## Cost estimate
 
 In agent hours (the owner's review rounds not counted):
@@ -120,9 +136,9 @@ In agent hours (the owner's review rounds not counted):
 - **Masks are a new kind of shipped file.** The manifest check keeps licences honest; the size budget keeps the look light.
 - **The panel covers part of the stage.** It is small, closes with Escape or a click outside, and the beam is centred so the right edge matters least.
 
-## Open Questions
+## Owner's answers (15 November)
 
-1. **Which elements.** *Recommended:* the set in D2. The owner picks from the preview; any candidate can be swapped without changing the plan's rules.
-2. **Per song or one glass.** *Recommended:* per song, as asked. A setting "Same glass for every song" can come later if wanted.
-3. **Button label.** "Oscilloscope" or a shorter "Scope". *Recommended:* "Oscilloscope" / "Oscilloscopio", hidden on phones (icon only).
-4. **Default Smudge.** *Recommended:* 1 on Smudged and Smudged graticule; Real oscilloscope uses its lighter plan at the same value.
+1. **Elements:** all 15 candidates are kept (D2).
+2. **Per song or one glass:** nothing needs saving, and a random glass each time would also be fine. Decision: keep the seeded plan from the song's seed (D3, D5): no storage, and a video or fragment shows the same glass as the stage.
+3. **Button label:** "Oscilloscope" / "Oscilloscopio", icon only on phones.
+4. **Default Smudge:** the preview's middle value, 1.

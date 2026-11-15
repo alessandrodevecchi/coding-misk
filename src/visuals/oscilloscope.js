@@ -1,15 +1,18 @@
 // The Oscilloscope look (oscilloscope-visual): the sound drawn as a beam on a phosphor screen. Loaded only when the look
 // is picked (D2). One 2D canvas pass: the phosphor buffer fades by Persistence, the new trace is added to it with a
 // brightness that follows the beam's speed, the buffer goes on the stage over the screen, once sharp and once blurred
-// for Glow, and the overlay's glass (graticule, smudges, reflection) goes on top.
-import { oscSettings, paramNow, sweepWindow, resample, binOf } from './oscilloscope-rules.js';
+// for Glow, the smudged glass (oscilloscope-smudge: the beam scattered by the grease, the room's light on it) and the
+// overlay's glass (graticule, reflection) go on top.
+import { oscSettings, paramNow, sweepWindow, resample, binOf, SMUDGED, glassPlan } from './oscilloscope-rules.js';
+import { loadGlass, glassMask, glassReady } from './oscilloscope-glass.js';
 
 const BINS = 6;
 
 export function createOscilloscope() {
   let pb = null, px = null, ov = null, ovKey = '';
-  // a seeded random for the smudges, so the glass is the same on every frame and in every video
-  const seeded = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
+  // the smudged glass of the song (oscilloscope-smudge D3, D4): its mask by plan and size, tinted copies by hue, a
+  // quarter-size mask and work canvas for the beam's scatter
+  let gl = null, glKey = '';
 
   // the screen area (D3): a 10 × 8 graticule fitted in the stage with a margin; the real oscilloscope keeps a bezel
   function screenOf(W, H, overlay) {
@@ -19,8 +22,11 @@ export function createOscilloscope() {
   }
 
   // the overlay in two layers (under and over the trace), cached by size and the values that change it
-  function overlayOf(W, H, dpr, S, hue, ambient, sat) {
-    const key = `${W}x${H}@${dpr}|${S.overlay}|${Math.round(hue)}|${ambient.toFixed(2)}|${sat.toFixed(2)}`;
+  // (with the smudged glass's room light baked in: the song's seed and Smudge are in the key, and whether the masks
+  // have arrived)
+  function overlayOf(W, H, dpr, S, hue, ambient, sat, seed, smudge) {
+    const dirty = SMUDGED.includes(S.overlay) && smudge > 0.001;
+    const key = `${W}x${H}@${dpr}|${S.overlay}|${Math.round(hue)}|${ambient.toFixed(2)}|${sat.toFixed(2)}|${dirty ? `${seed}|${smudge.toFixed(2)}|${glassReady()}` : ''}`;
     if (ov && ovKey === key) return ov;
     ovKey = key;
     const mk = () => { const c = document.createElement('canvas'); c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); return [c, g]; };
@@ -42,6 +48,11 @@ export function createOscilloscope() {
     const v = u.createRadialGradient(cxm, cym, rr * 0.1, cxm, cym, rr * (kind === 'vector' ? 0.9 : 1.1));
     v.addColorStop(0, tint(4 + ambient * 8, 0.6)); v.addColorStop(1, 'rgba(0,0,0,0.7)');
     u.fillStyle = v; u.fillRect(0, 0, W, H); u.restore();
+    // over the trace: the dirt on the glass in the room's light (oscilloscope-smudge D4), under the graticule's lines
+    if (dirty) {
+      const G = glassOf(S.overlay, seed, R, dpr);
+      if (G) { o.save(); o.globalCompositeOperation = 'screen'; o.globalAlpha = Math.min(1, 0.22 * ambient * smudge); o.drawImage(tintOf(G, hue, sat), R.x, R.y, R.w, R.h); o.restore(); }
+    }
     // over the trace: the graticule, scratched by the light of the room
     if (kind === 'graticule' || kind === 'smudged-graticule' || kind === 'real') {
       o.save(); o.strokeStyle = tint(55 + ambient * 25, 0.12 + ambient * 0.22); o.lineWidth = 1;
@@ -55,19 +66,6 @@ export function createOscilloscope() {
       for (let j = 0; j <= 40; j++) { const y = R.y + (R.h * j) / 40; o.moveTo(cxm - 3, y); o.lineTo(cxm + 3, y); }
       o.stroke(); o.restore();
     }
-    if (kind === 'smudged' || kind === 'smudged-graticule' || kind === 'real') {
-      // smudges: soft greasy patches and a few wipe strokes on the glass, seen in the room's light
-      const r = seeded(4242), n = kind === 'real' ? 7 : 14;
-      o.save(); o.globalCompositeOperation = 'lighter';
-      for (let i = 0; i < n; i++) {
-        const x = R.x + r() * R.w, y = R.y + r() * R.h, s = (0.08 + r() * 0.22) * R.w;
-        const g = o.createRadialGradient(x, y, 0, x, y, s); g.addColorStop(0, `rgba(255,255,255,${(0.025 + r() * 0.04) * (0.4 + ambient)})`); g.addColorStop(1, 'rgba(255,255,255,0)');
-        o.fillStyle = g; o.fillRect(x - s, y - s, 2 * s, 2 * s);
-      }
-      o.strokeStyle = `rgba(255,255,255,${0.025 * (0.4 + ambient)})`; o.lineCap = 'round';
-      for (let i = 0; i < n / 2; i++) { const x = R.x + r() * R.w, y = R.y + r() * R.h; o.lineWidth = 6 + r() * 14; o.beginPath(); o.arc(x, y, R.w * (0.1 + r() * 0.2), r() * 6, r() * 6 + 0.8 + r()); o.stroke(); }
-      o.restore();
-    }
     if (kind === 'real' || kind === 'vector') {
       // a reflection of the room across the top of the glass
       o.save(); roundRect(o, R.x, R.y, R.w, R.h, kind === 'real' ? 14 : 28); o.clip();
@@ -79,12 +77,65 @@ export function createOscilloscope() {
     return ov;
   }
 
+  // the glass of a song at this size: null until the masks are loaded (the first call starts loading them)
+  function glassOf(overlay, seed, R, dpr) {
+    if (!glassReady()) { loadGlass(); return null; }
+    const w = Math.round(R.w * dpr), h = Math.round(R.h * dpr), key = `${overlay}|${seed}|${w}x${h}`;
+    if (gl && glKey === key) return gl;
+    const mask = glassMask(glassPlan(seed, overlay), w, h);
+    if (!mask) return null;
+    const qw = Math.max(1, Math.round(w / 4)), qh = Math.max(1, Math.round(h / 4)), mq = document.createElement('canvas');
+    mq.width = qw; mq.height = qh; mq.getContext('2d').drawImage(mask, 0, 0, qw, qh);
+    const work = document.createElement('canvas'); work.width = qw; work.height = qh;
+    glKey = key; gl = { mask, mq, work, tints: new Map() };
+    return gl;
+  }
+  // the mask in the glass's tint (hue in steps of 10 degrees, a few kept: a hue linked to the bar does not redraw it
+  // every frame)
+  function tintOf(G, hue, sat) {
+    const key = `${Math.round(hue / 10) % 36}|${Math.round(sat * 10)}`;
+    let c = G.tints.get(key);
+    if (c) return c;
+    c = document.createElement('canvas'); c.width = G.mask.width; c.height = G.mask.height;
+    const g = c.getContext('2d'); g.drawImage(G.mask, 0, 0); g.globalCompositeOperation = 'source-in';
+    g.fillStyle = `hsl(${Math.round(hue / 10) * 10}, ${Math.round(sat * 12)}%, 80%)`; g.fillRect(0, 0, c.width, c.height);
+    if (G.tints.size >= 4) G.tints.delete(G.tints.keys().next().value);
+    G.tints.set(key, c);
+    return c;
+  }
+  // the beam scattered by the grease (oscilloscope-smudge D4): the phosphor blurred wide, kept where the glass is dirty.
+  // The blur is made every other frame and the last one drawn between (it costs about 3 ms on a software canvas at
+  // 1080p; a scattered glow moves slowly)
+  let scatterTick = 0;
+  function smudgesOn(cx, S, P, I, R, dpr) {
+    const smudge = P('smudge'), scatter = P('scatter');
+    if (!SMUDGED.includes(S.overlay) || smudge <= 0.001) return;
+    const G = glassOf(S.overlay, I.seed == null ? '' : String(I.seed), R, dpr);
+    // (codingMiskOscGlassMissing: the frames drawn before the masks arrived; a video's must be none)
+    if (!G) { globalThis.codingMiskOscGlassMissing = (globalThis.codingMiskOscGlassMissing || 0) + 1; return; }
+    if (scatter <= 0.001) return;
+    const q = G.work;
+    if (!G.scattered || (scatterTick++ & 1) === 0) {
+      const g = q.getContext('2d');
+      g.globalCompositeOperation = 'copy'; g.filter = `blur(${Math.max(1, (R.w / 4) * 0.035).toFixed(1)}px)`;
+      g.drawImage(pb, R.x * dpr, R.y * dpr, R.w * dpr, R.h * dpr, 0, 0, q.width, q.height); g.filter = 'none';
+      g.globalCompositeOperation = 'lighter'; g.drawImage(q, 0, 0); g.drawImage(q, 0, 0);
+      g.globalCompositeOperation = 'destination-in'; g.drawImage(G.mq, 0, 0);
+      G.scattered = true;
+    }
+    cx.save(); cx.globalCompositeOperation = 'lighter'; cx.globalAlpha = Math.min(1, 0.9 * scatter * smudge); cx.drawImage(q, R.x, R.y, R.w, R.h); cx.restore();
+  }
+
+  // the masks before a video's first frame (D6): resolves at once when the overlay has no smudges
+  function prepare(raw) { return SMUDGED.includes(oscSettings(raw).overlay) ? loadGlass() : Promise.resolve(); }
+
   // draw one frame. cx: the stage context (logical units, dpr transform), W, H: logical size; inputs: { mix, low, high
   // (Float32Array time data), rate, lv, level, bar, section, dt, playing, raw (the stored settings) }
   function draw(cx, W, H, dpr, I) {
     const S = oscSettings(I.raw), ctx = { bar: I.bar, section: I.section, lv: I.lv, level: I.level };
     const P = k => paramNow(S, k, ctx);
-    const hue = P('hue'), ambient = P('ambient'), O = overlayOf(W, H, dpr, S, hue, ambient, P('screenSat')), R = O.R;
+    const seed = I.seed == null ? '' : String(I.seed);
+    const hue = P('hue'), ambient = P('ambient'), O = overlayOf(W, H, dpr, S, hue, ambient, P('screenSat'), seed, P('smudge')), R = O.R;
     const dw = Math.round(W * dpr), dh = Math.round(H * dpr);
     if (!pb || pb.width !== dw || pb.height !== dh) { pb = document.createElement('canvas'); pb.width = dw; pb.height = dh; px = pb.getContext('2d'); }
     // the phosphor fades: Persistence is what is left after 1/60 s
@@ -101,6 +152,7 @@ export function createOscilloscope() {
     const glow = P('glow');
     if (glow > 0.01) { cx.filter = `blur(${(2 + glow * 10).toFixed(1)}px)`; cx.globalAlpha = Math.min(1, glow * 1.6); cx.drawImage(pb, 0, 0, W, H); cx.filter = 'none'; cx.globalAlpha = 1; }
     cx.restore();
+    smudgesOn(cx, S, P, I, R, dpr);
     cx.drawImage(O.over, 0, 0, W, H);
   }
 
@@ -144,7 +196,7 @@ export function createOscilloscope() {
     if (noise > 0) { g.fillStyle = `hsla(${hue}, ${sat}%, 70%, ${0.25 * noise})`; for (let i = 0; i < noise * 60; i++) g.fillRect(R.x + rnd() * R.w, R.y + rnd() * R.h, 1, 1); }
   }
 
-  return { draw, reset() { pb = null; ov = null; ovKey = ''; } };
+  return { draw, prepare, reset() { pb = null; ov = null; ovKey = ''; gl = null; glKey = ''; } };
 }
 
 // a random sequence seeded by a song time (cycles)

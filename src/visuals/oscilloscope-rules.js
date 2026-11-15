@@ -19,6 +19,9 @@ export const PARAMS = [
   ['smoothing', 0, 1, 0.01, 0],
   ['sweepMs', 2, 40, 0.5, 10],
   ['trigger', -1, 1, 0.01, 0],
+  // the smudged glass (oscilloscope-smudge D4): how much dirt, how much the grease catches the beam
+  ['smudge', 0, 2, 0.05, 1],
+  ['scatter', 0, 2, 0.05, 1],
 ];
 // the song links (D5): static, the bar (a ramp from the bar's start to its end), the section (a step per section), the
 // level of an instrument (its analyser), the level of the whole mix
@@ -31,8 +34,8 @@ export const OSC_DEFAULTS = Object.freeze({
   values: Object.freeze(Object.fromEntries(PARAMS.map(([k, , , , d]) => [k, d]))),
   links: Object.freeze({ ...Object.fromEntries(PARAMS.map(([k]) => [k, 'static'])), glow: 'kick', hue: 'section' }),
 });
-// the parameters the settings card shows in the prototype (D7); the others keep their defaults
-export const SHOWN = ['intensity', 'persistence', 'hue', 'glow', 'focus', 'noise', 'ambient', 'sweepMs'];
+// the order the settings card and the stage panel show the parameters in (oscilloscope-smudge D8): every parameter
+export const SHOWN = ['intensity', 'persistence', 'hue', 'glow', 'focus', 'noise', 'ambient', 'smudge', 'scatter', 'sweepMs', 'trigger', 'lineSat', 'screenSat', 'smoothing'];
 
 const clamp = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
 const one = (v, list, d) => (list.includes(v) ? v : d);
@@ -103,3 +106,60 @@ export function binOf(len, ref, bins) {
   const b = Math.min(1, ref / Math.max(1e-3, len));
   return Math.min(bins - 1, Math.floor(b * bins));
 }
+
+// ---------- the smudged glass (oscilloscope-smudge D2, D3) ----------
+// the overlays with smudges; Real oscilloscope gets the lighter plan
+export const SMUDGED = ['smudged', 'smudged-graticule', 'real'];
+// the masks in public/visuals/glass/ (white, the dirt as alpha) by role; their sources and licences are in its
+// manifest.json and CREDITS.md (tools/check-oscilloscope.mjs keeps them in step)
+export const GLASS = {
+  base: ['si008', 'si003', 'smear008', 'smear003'],
+  print: ['fp002', 'fp008', 'fpvec'],
+  smear: ['smear001', 'smear005', 'smear007'],
+  drops: ['si001'],
+  debris: ['si013'],
+};
+export const GLASS_MASKS = Object.values(GLASS).flat();
+// a seeded random from a string (FNV-1a, then mulberry32): the same song, the same glass
+export function glassRandom(seed) {
+  let h = 2166136261;
+  const str = String(seed == null ? '' : seed);
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  let a = h >>> 0;
+  return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+// the glass of a song (D3): a list of elements in screen units (x, y: 0..1 of the screen's width and height; size: of
+// its width), without the DOM, the same at any stage size. kinds: cover (a mask over the whole screen), patch (a
+// soft-edged crop of a mask: crop { x, y, s } in 0..1 of the mask), whole (a mask placed whole), ridge (the app's
+// fingerprint), wipe (a cloth wipe arc), dust (dust, hairs, fine scratches); `seed` for the drawn ones
+export function glassPlan(seed, overlay) {
+  if (!SMUDGED.includes(overlay)) return [];
+  const r = glassRandom(seed), light = overlay === 'real', k = light ? 0.6 : 1, out = [];
+  const pick = list => list[Math.floor(r() * list.length) % list.length];
+  const between = (a, b) => a + r() * (b - a);
+  const sub = () => Math.floor(r() * 2147483647);
+  const crop = () => { const s = between(0.25, 0.6); return { x: r() * (1 - s), y: r() * (1 - s), s }; };
+  // near an edge: within 6 % to 20 % of the screen from one of its sides (people touch the edges)
+  const edge = () => { const side = Math.floor(r() * 4) % 4, t = between(0.1, 0.9), d = between(0.06, 0.2); return side === 0 ? [t, d] : side === 1 ? [1 - d, t] : side === 2 ? [t, 1 - d] : [d, t]; };
+  out.push({ kind: 'cover', mask: pick(GLASS.base), alpha: between(0.35, 0.65) * k });
+  const prints = (2 + Math.floor(r() * 3)) >> (light ? 1 : 0);
+  for (let i = 0; i < prints; i++) {
+    const [x, y] = edge(), which = r(), angle = r() * Math.PI * 2;
+    if (which < 0.35) out.push({ kind: 'ridge', x, y, size: between(0.16, 0.26), angle, alpha: between(0.55, 0.85) * k, seed: sub() });
+    else if (which < 0.75) out.push({ kind: 'patch', mask: pick(['fp002', 'fp008']), x, y, size: between(0.2, 0.32), angle, alpha: between(0.6, 0.9) * k, crop: crop() });
+    else out.push({ kind: 'whole', mask: 'fpvec', x, y, size: between(0.14, 0.22), angle, alpha: between(0.3, 0.5) * k, blur: 1.2 });
+  }
+  const smears = light ? 1 : 1 + Math.floor(r() * 2);
+  for (let i = 0; i < smears; i++) {
+    const x = between(0.2, 0.8), y = between(0.2, 0.8), angle = (r() - 0.5) * 1.2, which = r();
+    if (which < 0.75) out.push({ kind: 'whole', mask: which < 0.45 ? 'smear001' : 'smear005', x, y, size: between(0.25, 0.5), angle, alpha: between(0.5, 0.9) * k });
+    else out.push({ kind: 'patch', mask: 'smear007', x, y, size: between(0.25, 0.4), angle, alpha: between(0.4, 0.7) * k, crop: crop() });
+  }
+  if (r() < 0.5) out.push({ kind: 'patch', mask: 'si001', x: between(0.2, 0.8), y: between(0.2, 0.8), size: between(0.25, 0.4), angle: r() * Math.PI * 2, alpha: 0.5 * k, crop: crop() });
+  if (r() < 0.4) out.push({ kind: 'patch', mask: 'si013', x: between(0.1, 0.9), y: between(0.1, 0.9), size: between(0.15, 0.25), angle: r() * Math.PI * 2, alpha: 0.6 * k, crop: crop() });
+  if (!light && r() < 0.6) out.push({ kind: 'wipe', x: between(0.3, 0.7), y: between(0.6, 1.2), size: between(0.35, 0.6), angle: -Math.PI * between(0.55, 0.85), span: between(0.6, 1.2), alpha: k, seed: sub() });
+  out.push({ kind: 'dust', amount: between(0.6, 1.2) * (light ? 0.6 : 1), alpha: k, seed: sub() });
+  return out;
+}
+// the masks a plan needs
+export const masksOf = plan => [...new Set(plan.filter(e => e.mask).map(e => e.mask))];

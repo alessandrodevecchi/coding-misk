@@ -1,0 +1,114 @@
+{
+  "format": 1,
+  "made": "tools/make-glass-masks.sh",
+  "licences": [
+    "CC0-1.0",
+    "own"
+  ],
+  "masks": [
+    {
+      "file": "si008.webp",
+      "role": "base",
+      "source": "ambientCG SurfaceImperfections008",
+      "sourceUrl": "https://ambientcg.com/view?id=SurfaceImperfections008",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "si003.webp",
+      "role": "base",
+      "source": "ambientCG SurfaceImperfections003",
+      "sourceUrl": "https://ambientcg.com/view?id=SurfaceImperfections003",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "smear008.webp",
+      "role": "base",
+      "source": "ambientCG Smear008",
+      "sourceUrl": "https://ambientcg.com/view?id=Smear008",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "smear003.webp",
+      "role": "base",
+      "source": "ambientCG Smear003",
+      "sourceUrl": "https://ambientcg.com/view?id=Smear003",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "fp002.webp",
+      "role": "print",
+      "source": "ambientCG Fingerprints002",
+      "sourceUrl": "https://ambientcg.com/view?id=Fingerprints002",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "fp008.webp",
+      "role": "print",
+      "source": "ambientCG Fingerprints008",
+      "sourceUrl": "https://ambientcg.com/view?id=Fingerprints008",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "fpvec.webp",
+      "role": "print",
+      "source": "Wikimedia Commons, Fingerprint-297594.svg (from Pixabay)",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Fingerprint-297594.svg",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "smear001.webp",
+      "role": "smear",
+      "source": "ambientCG Smear001",
+      "sourceUrl": "https://ambientcg.com/view?id=Smear001",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "smear005.webp",
+      "role": "smear",
+      "source": "ambientCG Smear005",
+      "sourceUrl": "https://ambientcg.com/view?id=Smear005",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "smear007.webp",
+      "role": "smear",
+      "source": "ambientCG Smear007",
+      "sourceUrl": "https://ambientcg.com/view?id=Smear007",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "si001.webp",
+      "role": "drops",
+      "source": "ambientCG SurfaceImperfections001",
+      "sourceUrl": "https://ambientcg.com/view?id=SurfaceImperfections001",
+      "licence": "CC0-1.0"
+    },
+    {
+      "file": "si013.webp",
+      "role": "debris",
+      "source": "ambientCG SurfaceImperfections013",
+      "sourceUrl": "https://ambientcg.com/view?id=SurfaceImperfections013",
+      "licence": "CC0-1.0"
+    }
+  ],
+  "drawn": [
+    {
+      "id": "ridge",
+      "role": "print",
+      "licence": "own",
+      "note": "ridged fingerprint drawn by the app; reference only: Wikimedia Commons, Fingerprint picture.svg (CC BY-SA 3.0, not shipped)"
+    },
+    {
+      "id": "dust",
+      "role": "dust",
+      "licence": "own",
+      "note": "dust, hairs and fine scratches drawn by the app; reference only: commercial dust and scratches overlays (not shipped)"
+    },
+    {
+      "id": "wipe",
+      "role": "wipe",
+      "licence": "own",
+      "note": "cloth wipe arc drawn by the app"
+    }
+  ]
+}
