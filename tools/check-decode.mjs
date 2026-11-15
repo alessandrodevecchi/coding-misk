@@ -27,8 +27,8 @@ import { measureApp, measureSynth, measureFull, measureTimelines } from './decod
 import { SOUND_RULE as SR8, DRUM_DRIVE } from '../src/decode/writer.js';
 import { PART_LEVELS } from '../src/decode/part-levels.js';
 import { BASS_RULE } from '../src/decode/misk-analyzer.js';
-import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf } from '../src/decode/writer.js';
+import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare } from '../src/decode/full.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE } from '../src/decode/writer.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
@@ -492,6 +492,9 @@ if (process.argv.includes('--app')) {
     const R = (h1, evenOdd) => bassDriveOf({ h1, evenOdd, slope: -5 });
     check(R(0.582, 2.7).drive === 0 && R(0.706, -38).wave === 'square' && R(0.706, -38).drive === 0 && R(0.86, -5.6).drive === 4.5 && R(0.776, 1.7).drive === 3 && R(0.92, -3).wave === 'sine' && R(0.42, 2.8).drive === 0 && R(0.42, 2.8).wave === 'sawtooth' && R(0.78, -5.3).drive === 4.5 && R(0.78, -5.3).wave === 'sawtooth', 'the drive rule writes drive only from 3 up, never on a square, a square from -15 dB even/odd, a sine from 0.91', JSON.stringify([R(0.582, 2.7), R(0.706, -38), R(0.86, -5.6), R(0.776, 1.7), R(0.92, -3), R(0.78, -5.3)]));
   }
+  // (round 8, fourth pass: a square under a pad for part of the song, its median even/odd near a sawtooth's but its lowest
+  // tenth at -20 dB or under)
+  check(bassDriveOf({ h1: 0.729, evenOdd: -1.9, eoLow: -23.5, slope: -6.6 }).wave === 'square' && bassDriveOf({ h1: 0.828, evenOdd: -0.6, eoLow: -2.8, slope: -6.6 }).drive === 3 && bassDriveOf({ h1: 0.729, evenOdd: -1.9, slope: -6.6 }).wave === 'sawtooth', 'round 8: a square from the lowest tenth of its even/odd readings (a pad over part of it), a driven sawtooth keeps its drive');
   // a driven bass (decode-refine 10.2, round 6): the app's drive after its filter with Our sounds, never with
   // Simple kit; the balance scales the clip's volume, not the gain before the clip
   {
@@ -510,7 +513,33 @@ if (process.argv.includes('--app')) {
     const pred = d => { const e = [0, 0, 0, 0, 0]; for (const [r, st] of Object.entries(rows)) PART_LEVELS[`drums:${kit}:${r}${d ? `:d${d}` : ''}`].forEach((x, j) => { e[j] += x * (st.match(/x/g) || []).length; }); const t = e.reduce((a, b) => a + b, 0); return e.map(x => x / t); };
     const at = sh => { const t = drumsOnly(); balanceLevels(t, sh, 8); return t[0].settings.drive || 0; };
     const near = pred(0).map((x, j) => (j === 4 ? x * 1.25 : x)), nt = near.reduce((a, b) => a + b, 0);
-    check([1, 2, 3].every(d => PART_LEVELS[`drums:${kit}:bd:d${d}`]) && at(pred(1)) === 1 && at(pred(2)) === 2 && at(pred(0)) === 0 && at(near.map(x => x / nt)) === 0 && DRUM_DRIVE.margin === 0.3, 'the drums get the drive whose rows match the high band (1, 2), none when the clean kit matches or comes within the margin', JSON.stringify([at(pred(1)), at(pred(2)), at(pred(0)), at(near.map(x => x / nt))]));
+    check([1, 2, 3].every(d => PART_LEVELS[`drums:${kit}:bd:d${d}`]) && at(pred(1)) === 1 && at(pred(2)) === 2 && at(pred(0)) === 0 && at(near.map(x => x / nt)) === 0 && DRUM_DRIVE.margin === 0.5 && DRUM_DRIVE.full === 0.95, 'the drums get the drive whose rows match the high band (1, 2), none when the clean kit matches or comes within the margin', JSON.stringify([at(pred(1)), at(pred(2)), at(pred(0)), at(near.map(x => x / nt))]));
+  }
+  // (round 8, fourth pass: a drive that fills the high band only at the mid bands' cost is no drive: a clean kit whose
+  // original has 4 times the predicted high band (hats the grid misses, a bright part) gets a drive from the high band
+  // alone, and none once the whole fit must improve too)
+  {
+    const rows = { bd: 'x.....x...x.....', cp: '....x.......x...', hh: '..x...x.x.x...x.' }, kit = 'RolandTR909';
+    const e = [0, 0, 0, 0, 0]; for (const [r, st] of Object.entries(rows)) PART_LEVELS[`drums:${kit}:${r}`].forEach((x, j) => { e[j] += x * (st.match(/x/g) || []).length; });
+    e[4] *= 4; const tot = e.reduce((a, b) => a + b, 0);
+    const at = () => { const t = [{ id: 'drums', type: 'drums', settings: { kit }, patterns: { A: { rows } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }]; balanceLevels(t, e.map(x => x / tot), 8); return t[0].settings.drive || 0; };
+    const full = DRUM_DRIVE.full, now = at(); DRUM_DRIVE.full = 0; const off = at(); DRUM_DRIVE.full = full;
+    check(now === 0 && off > 0, 'round 8: a drive that brings the high band nearer but not the whole spectrum is not written', JSON.stringify({ now, off }));
+  }
+  // (round 8, fourth pass: power chords only in a section with some top; voiced up from POWER_RULE.anchor, not into the
+  // bass's band)
+  {
+    const pm = b => ({ ...Mk, key: { root: 4, mode: 'minor' }, bars: Mk.bars.map((x, i) => ({ ...x, chord: ['E', 'E', 'F', 'G'][i % 4], chordConf: 0.8, bright: b })) });
+    const ch = b => (writeFull(pm(b)).tracks.find(t => t.id === 'chords') || { patterns: {} }).patterns;
+    const lit = Object.values(ch(0.2)).map(p => p.code).join(' '), dark = Object.values(ch(0.03)).map(p => p.code).join(' ');
+    check(/E5/.test(lit) && lit.includes(`.mode("above").anchor("${POWER_RULE.anchor}").voicing()`) && !/[A-G][#b]?5\b/.test(dark.replace(/\.anchor\("[a-g]\d"\)/g, '')), 'round 8: power chords voiced up from the anchor, none in a dark section (a driven bass alone)', JSON.stringify([lit.slice(0, 90), dark.slice(0, 60)]));
+  }
+  // (round 8, fourth pass: a hat row on the backbeat where the clap row is silent is a snare read as a hat)
+  {
+    const mk = (hh, oh = '................') => Array.from({ length: 12 }, () => ({ drums: { bd: 'x...x...x...x...', cp: '................', hh, oh } }));
+    const a = mk('....x.......x...'), b = mk('x.x.x.x.x.x.x.x.'), c = mk('x.x.x.x.x.x.x.x.', '........x.......');
+    const ma = backbeatSnare(a), mb = backbeatSnare(b), mc = backbeatSnare(c);
+    check(ma.length === 1 && a[0].drums.cp === '....x.......x...' && a[0].drums.hh === '................' && !mb.length && mc.length === 1 && c[0].drums.cp === '........x.......' && c[0].drums.oh === '................', 'round 8: a hat on the backbeat (4 and 12, or 8 of a half-time bar) with no clap there is a snare; eighth hats are not', JSON.stringify([ma, mb, mc]));
   }
   check(writeFull({ ...Mk, shares: [0.5, 0.48, 0.02] }, { sounds: 'simple' }).tracks.find(t => t.id === 'bass') === undefined || /gain\(\.75\)/.test(JSON.stringify(writeFull({ ...Mk, shares: [0.9, 0.05, 0.05] }, { sounds: 'simple' }))), 'Simple kit keeps its levels');
 }

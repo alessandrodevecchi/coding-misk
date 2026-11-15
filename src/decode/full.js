@@ -126,6 +126,32 @@ export const noSteadyBeat = (ess, rule = PARTS_RULE) => (ess && Number.isFinite(
 export const noBassPart = (shares, drive, rule = PARTS_RULE) => !!(shares && drive && Number.isFinite(drive.h1) && shares[0] < rule.lowShare && drive.h1 < rule.h1);
 
 // harmony and bass per section (decode-refine D5); the numbers in one place
+// a snare read as a hat (round 8, fourth pass): a bright snare with a long reverb (a gated synthwave snare, an IDM
+// snare) rises in the hat band as much as in the snare band, so it fails the clap test and is written as a closed or open
+// hat on the backbeat. A hat row that plays the backbeat (steps 4 and 12, or step 8 of a half-time bar) on at least
+// SNARE_RULE.on of the bars with drums, where the clap row plays on at most SNARE_RULE.cp of them, and its other steps on
+// at most SNARE_RULE.rest of that (an accent, not a hat pattern) is a snare: those hits move to the clap row. On the
+// bench no song fires (its hats play eighths or offbeats); on the real set two: a retrowave snare on step 8 at 160
+// (read as an open hat) and an IDM snare on 4 and 12 (read as a closed hat). Changes the bars in place → the moves
+export const SNARE_RULE = { on: 0.75, cp: 0.25, rest: 0.5, sets: [[4, 12], [8]] };
+export function backbeatSnare(bars, rule = SNARE_RULE) {
+  const B = bars.filter(b => b.drums && Object.values(b.drums).some(r => r && r.includes('x')));
+  if (B.length < 8) return [];
+  const share = (r, j) => B.filter(b => (b.drums[r] || '')[j] === 'x').length / B.length, moves = [];
+  for (const r of ['hh', 'oh']) for (const set of rule.sets) {
+    const on = Math.min(...set.map(j => share(r, j)));
+    if (on < rule.on || set.some(j => share('cp', j) > rule.cp)) continue;
+    const rest = Math.max(...Array.from({ length: 16 }, (_, j) => j).filter(j => !set.includes(j)).map(j => share(r, j)));
+    if (rest > rule.rest * on) continue;
+    for (const b of B) {
+      const row = [...(b.drums[r] || '.'.repeat(16))], cp = [...(b.drums.cp || '.'.repeat(16))];
+      for (const j of set) if (row[j] === 'x') { row[j] = '.'; cp[j] = 'x'; }
+      b.drums[r] = row.join(''); b.drums.cp = cp.join('');
+    }
+    moves.push({ row: r, steps: set, on: Math.round(on * 100) / 100 });
+  }
+  return moves;
+}
 export const HARMONY_RULE = { clear: 0.8, clearBars: 2, range: 7, quietBass: 0.2 };
 // a bar misk-analyzer marked `third` (a quiet minor third over a major third the bass's harmonics explain) is minor when
 // the key holds that minor chord and not the major one (decode-refine D5: luci-rosse's Am stab under its distorted acid
@@ -252,6 +278,7 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   steadyQualities(m.bars, sections, HARMONY_RULE, m.key);
   bassRange(m.bars, sections);
   m.variations = variationsOf(m);
+  { const moved = backbeatSnare(m.bars); if (moved.length) m.snareFromHats = moved; }
   // 9. the drum machine by measure (decode-refine D3), on the hats that play alone (a hat with a kick or a clap carries
   // their sound): the hats' spectral shape against the app's machines measured from
   // their samples; "Our sounds" writes the nearest. (Distortion is not measured: neither the

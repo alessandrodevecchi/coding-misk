@@ -35,12 +35,14 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // share h1 and the even/odd ratio, each over its spread in the table; a share of sineShare or more is a sine or a
 // triangle, never a drive (round 7: 0.91, mid-gap between the highest driven reading and the lowest sine, 0.935);
 // spread, eoFloor, min: the distance's fixed scale (share, even/odd dB), the floor of the even/odd read, the lowest drive
-// written (round 7, review 2); bassWave: the cutoff the measured bass's wave is written through (round 6, C1: the app bass's
+// written (round 7, review 2); squareEo, squareLow: a square bass by the median even/odd ratio or by its lowest tenth
+// (round 8, fourth pass: a square under a pad for part of the song, when the profile reads a fundamental, h1 squareH1
+// or more: a triangle bass read with no fundamental share went square and lost 1.1 dB); bassWave: the cutoff the measured bass's wave is written through (round 6, C1: the app bass's
 // default, where the candidates were measured); a moving filter's resonance `lpq`; `table`, the drive the level table measured a driven bass
 // at. (Round 5 wrote a fixed `.distort(4.5).distortvol(0.5).crush(4.85)` when the even/odd ratio was under -3 dB: the
 // crusher matched a median-centroid score with broadband noise, +12 to +14 dB above 5.6 kHz, and the ratio read square,
 // triangle and sine basses as driven; review of 13 November.)
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, roomRange: [0.3, 0.9], holdShare: 0.8, fallback: 0.03, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.91, spread: [0.227, 6.44], eoFloor: -8, min: 3, squareEo: -15 }, bassWave: 700 };
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, roomRange: [0.3, 0.9], holdShare: 0.8, fallback: 0.03, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.91, spread: [0.227, 6.44], eoFloor: -8, min: 3, squareEo: -15, squareLow: -20, squareH1: 0.5 }, bassWave: 700 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -218,7 +220,7 @@ export function bassDriveOf(p) {
   if (!(p.slope < 0)) return null;
   if (p.h1 >= SOUND_RULE.drive.sineShare) return { drive: 0, near: 'sine', wave: 'sine' };
   const D = SOUND_RULE.drive;
-  if (p.evenOdd <= D.squareEo) return { drive: 0, near: 'square', wave: 'square' };
+  if (p.evenOdd <= D.squareEo || (p.eoLow <= D.squareLow && p.h1 >= D.squareH1)) return { drive: 0, near: 'square', wave: 'square' };
   const eo = Math.max(D.eoFloor, p.evenOdd);
   let best = null, bd = Infinity;
   for (const k of PROFILE_KEYS) { const c = BASS_PROFILES[k], d = ((p.h1 - c.h1) / D.spread[0]) ** 2 + ((eo - c.evenOdd) / D.spread[1]) ** 2; if (d < bd) { bd = d; best = k; } }
@@ -233,8 +235,9 @@ export function bassDriveOf(p) {
 // by 3 dB, which filled its high band without a drive: the decision flipped. Now the gains are fitted on the four lower
 // bands only, the drive read on the high band with those gains, and only then the whole balance runs with the drive's
 // rows: no decision on the bench, the owner's files or the real set moves with the held step's weight from 0.5 to 1 or
-// with the analysis of this round)
-export const DRUM_DRIVE = { drives: [1, 2, 3], margin: 0.3 };
+// with the analysis of this round. Fourth pass: margin 0.3 to 0.5, which no driven bench song is near (0.73 and up) and
+// three real tracks were (0.35 to 0.43, each with a worse band error driven); full, see the whole fit below)
+export const DRUM_DRIVE = { drives: [1, 2, 3], margin: 0.5, full: 0.95 };
 // the drum track's default gain (src/music.js DEFAULT.drums.gain), the level the part table measured the drums at
 const DRUMS_GAIN = 0.9;
 // the part levels (decode-refine D3): level B's drums, bass, chords and Lead gains scaled so the code's band shares come
@@ -348,8 +351,18 @@ export function balanceLevels(tracks, shares, bars, { bassMissing = false } = {}
     const lw = (i, ks) => { if (i === free.length) { const v = lowFit(ks); if (v < lv - 1e-6) { lv = v; lb = ks.slice(); } return; } for (const k of allowed(free[i])) { ks[i] = k; lw(i + 1, ks); } };
     lw(0, free.map(() => 1));
     const e0 = hiErr(lb); let be = e0;
-    for (const [d, X] of Object.entries(dr.Td)) { dr.T = X; const e = hiErr(lb); if (e < be - 1e-9) { be = e; drive = +d; } }
+    const errs = {};
+    for (const [d, X] of Object.entries(dr.Td)) { dr.T = X; const e = hiErr(lb); errs[d] = e; if (e < be - 1e-9) { be = e; drive = +d; } }
+    // (bench only: notes/r8-work's scripts read the decision's numbers through DRUM_DRIVE.trace; the app never sets it)
+    if (DRUM_DRIVE.trace) DRUM_DRIVE.trace({ e0, errs, lv, lb, shares, mix, parts, dr, free, allowed, T0 });
     dr.T = T0;
+    // (round 8, fourth pass: the drive must also explain the whole spectrum. The gains fitted on all five bands, the
+    // largest band error in log share, with the clean rows and with the drive's rows: the drive is kept only when its
+    // fit is at most DRUM_DRIVE.full of the clean one. A high band the code underfills for another reason, hats under
+    // the clap or the kick that the grid misses, or a bright bass, is filled by a drive only at the cost of the mid
+    // bands, so the whole fit does not improve: 5 of 7 clean kits the high band alone drove)
+    const fullFit = () => { let v0 = Infinity; const w = (i, ks) => { if (i === free.length) { const e = mix(ks), t = e.reduce((x, y) => x + y, 0) || 1, v = Math.max(...e.map((x, j) => Math.abs(Math.log((x / t || 1e-9) / (shares[j] || 1e-9))))); if (v < v0) v0 = v; return; } for (const k of allowed(free[i])) { ks[i] = k; w(i + 1, ks); } }; w(0, free.map(() => 1)); return v0; };
+    if (drive && be <= e0 - DRUM_DRIVE.margin && DRUM_DRIVE.full) { const f0 = fullFit(); dr.T = dr.Td[drive]; const fd = fullFit(); dr.T = T0; if (fd > DRUM_DRIVE.full * f0) drive = 0; }
     if (drive && be <= e0 - DRUM_DRIVE.margin) { dr.T = dr.Td[drive]; best = free.map(() => 1); [bv, b3] = worst(best); walk(0, free.map(() => 1)); } else drive = 0;
   }
   // (round 8: when no gains bring every band within SOUND_RULE.shares, the nearest gains are still taken when they bring
@@ -688,7 +701,7 @@ const KEY_CHORDS = { minor: [[0, 'min'], [3, 'maj'], [5, 'min'], [7, 'min'], [7,
 // POWER_RULE.home (a drums-only outro's noise reads roots all over the key; a passage in another key has no tonic), and with a second root on at least POWER_RULE.second of them (a riff moves; an acid bass
 // alone reads as its tonic's major chord, the same fifth harmonic, on every bar), is kept as power chords, a root and a
 // fifth: a distorted power chord reads major, its fifth harmonic a major third)
-export const POWER_RULE = { roots: 0.8, tonic: 0.5, home: 0.15, second: 0.15 };
+export const POWER_RULE = { roots: 0.8, tonic: 0.5, home: 0.15, second: 0.15, bright: 0.07, anchor: 'f3' };
 const SCALE_PCS = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11] };
 export const inKey = key => list => {
   if (!key || !list.length) return true;
@@ -747,14 +760,22 @@ export function writeFull(model, opts = {}) {
     const patterns = {}, ids = new Map(), clips = [];
     secs.forEach(sec => {
       const idx = range(sec.start, sec.start + sec.bars), on = steady(idx.map(i => heardOf(bars[i])), (opts.rule || EDIT_RULE).runBars);
-      const kept = keep(idx.filter((i, j) => on[j] && heardOf(bars[i])).map(i => valueOf(bars[i])));
+      const heard = idx.filter((i, j) => on[j] && heardOf(bars[i])), kept = keep(heard.map(i => valueOf(bars[i])));
       if (!kept) return;
+      // (round 8, fourth pass: power chords only where the section has some top, a mean brightness of POWER_RULE.bright
+      // or more: a driven bass alone reads its roots as chords too, and its section is dark, 0.03 to 0.05 on the bench's
+      // two driven-bass songs with no pad, 0.09 to 0.25 where a pad plays)
+      if (kept === 'power' && heard.reduce((a, i) => a + (bars[i].bright || 0), 0) / Math.max(1, heard.length) < POWER_RULE.bright) return;
       // (round 8: a section kept as power chords writes each chord's root with a fifth and no third)
       const val = kept === 'power' ? b => { const c = parseChord(valueOf(b)); return c ? `${NOTE_NAMES[c.root]}5` : null; } : valueOf;
       const byBar = {}; idx.forEach((i, j) => { byBar[i] = on[j] && heardOf(bars[i]) ? val(bars[i]) : null; });
       const loop = sectionLoop(byBar, idx, same ? { same } : {});
       if (!loop) return;
-      const bp = bassDriveOf(model.bassDrive) || { drive: 0, wave: null }, snd = soundsOf(idx.map(i => bars[i]), opts.sounds, bars.slice(0, end), bp.drive, bp.wave), c = code(loop, id === 'bass' ? snd.bass : snd.chords);
+      const bp = bassDriveOf(model.bassDrive) || { drive: 0, wave: null }, snd = soundsOf(idx.map(i => bars[i]), opts.sounds, bars.slice(0, end), bp.drive, bp.wave), c0 = code(loop, id === 'bass' ? snd.bass : snd.chords);
+      // (round 8, fourth pass: a power chord's voicing holds four notes over an octave and a fifth; under the default
+      // anchor, whose top note sits under it, its root falls lower than the triads' roots: it is voiced up from
+      // POWER_RULE.anchor, in the triads' register. The bench's numbers do not move with it)
+      const c = kept === 'power' ? c0.replace('.voicing()', `.mode("above").anchor("${POWER_RULE.anchor}").voicing()`) : c0;
       if (!ids.has(c)) { const p = pid(ids.size); ids.set(c, p); patterns[p] = { code: c }; }
       clips.push(...runs(on.map(x => (x ? ids.get(c) : null)), sec.start));
     });

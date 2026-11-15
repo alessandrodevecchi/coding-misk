@@ -95,7 +95,7 @@ export function bandEnergy(x, sr, a, z, bands = SHARE_BANDS, hop = 4096) {
 export const DRIVE_RULE = { window: 4096, size: 8192, steps: 256 };
 const powerAt = (p, hz, f, tol = 0.03) => { let m = 0; for (let k = Math.floor((f * (1 - tol)) / hz); k <= Math.ceil((f * (1 + tol)) / hz); k++) m = Math.max(m, p[k] || 0); return m; };
 // x: mono PCM at sr; notes: [{ t (seconds), midi }] for the steps with a bass note and no kick or clap; kicks: the kick
-// steps' times → { evenOdd, level, n, h1, slope } or null (round 6: the writer decides the drive from the profile against
+// steps' times → { evenOdd, eoLow, level, n, h1, slope } or null (round 6: the writer decides the drive from the profile against
 // the app's own basses, writer.js bassDriveOf; the even/odd threshold of round 5 is gone)
 export function bassDrive(x, sr, notes, kicks = [], rule = DRIVE_RULE) {
   if (notes.length < 8) return null;
@@ -122,7 +122,12 @@ export function bassDrive(x, sr, notes, kicks = [], rule = DRIVE_RULE) {
   const e = med(eo), b = med(lowB), k = med(lowK);
   if (e === null) return null;
   const r = (v, d) => (v === null ? null : Math.round(v * d) / d);
-  return { evenOdd: Math.round(e * 10) / 10, level: b && k ? Math.round(10 * Math.log10(b / k) * 10) / 10 : null, n: eo.length, h1: r(med(h1), 1000), slope: r(med(sl), 10) };
+  // (round 8, fourth pass: eoLow, the even/odd ratio's lowest tenth: a square bass under a pad for part of the song
+  // reads near -30 dB where the pad is silent and near 0 under it, so its median can sit with the sawtooths; the bench's
+  // two squares -23.5 and -36.4 (and a triangle, odd harmonics too, -33.3), every sawtooth and sine -12 or over, the 26
+  // real tracks -16.5 or over)
+  const lo = eo.slice().sort((a, b) => a - b)[Math.floor(eo.length * 0.1)];
+  return { evenOdd: Math.round(e * 10) / 10, eoLow: Math.round(lo * 10) / 10, level: b && k ? Math.round(10 * Math.log10(b / k) * 10) / 10 : null, n: eo.length, h1: r(med(h1), 1000), slope: r(med(sl), 10) };
 }
 // a chord's sustain: the energy of the 250-2000 Hz band in the bar's last eighth over its mean in the whole bar, in
 // 1024-sample frames (a held or reverberant chord near 1, a short one near 0)
