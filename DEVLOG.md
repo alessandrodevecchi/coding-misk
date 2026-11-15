@@ -3310,3 +3310,13 @@ Ramo `feat/58-oscilloscope-followups` da `feat/44-themed-checks` (2510dba). Ness
 - **Imparato:** il tempo di disegno su una tela 2D senza lettura misura solo i comandi, il lavoro va alla GPU; dopo qualche `getImageData` Chrome sposta la tela sulla CPU, quindi la misura con lettura è il percorso software.
 - **Controllo nel browser** `tools/check-oscilloscope.cjs`: il visual nel menu, il modulo non caricato con un altro visual e caricato quando lo scegli, ogni sovrapposizione e i due modi dalla scheda di Impostazioni (salvati, disegnati, schermi diversi), cursore e legame salvati, ricaricamento che tiene tutto, frammento 9:16 senza fotogrammi neri e con fotogrammi non vuoti; `--cost` per le misure. Riga in `AGENTS.md` e nella base di conoscenza. Il controllo dei fotogrammi neri fallisce senza il caricamento anticipato e passa con esso.
 
+
+## 2026-11-15: Oscilloscopio, sbavature da texture e pannello sul palco: spec (feat/58-oscilloscope-smudge, #58)
+
+Ramo `feat/58-oscilloscope-smudge` da `develop` (490c186). Solo spec, nessun codice dell'app.
+
+- **Perché:** nelle prove del proprietario le sbavature (Sbavato, Reticolo sbavato, Oscilloscopio reale) sembrano macchie tonde fatte male, e provare le impostazioni è lento perché sono in fondo a Impostazioni.
+- **Anteprima nelle note locali** (`notes/oscilloscope-sbavature/preview.html`, con screenshot): 15 candidate su uno schermo d'oscilloscopio disegnato, 12 texture CC0 (ambientCG e una impronta vettoriale CC0 da Wikimedia Commons) e 3 elementi disegnati da noi al posto di fonti che non possiamo distribuire (un'impronta CC BY-SA, pacchetti commerciali di polvere e graffi); più 3 vetri composti con il seme del brano. Fonti e licenze in `notes/oscilloscope-sbavature/src/FONTI.md`.
+- **Change OpenSpec `oscilloscope-smudge`:** maschere in `public/visuals/glass/` con manifest e `CREDITS.md` (solo CC0 o nostre, controllate da `check:oscilloscope`, al massimo 600 KB); vetro composto per brano da un piano con seme (velo di fondo, ditate vicino ai bordi, strisciate, a volte gocce o arco di panno, polvere); lo sporco si accende con la luce della stanza e di più vicino al raggio; parametri nuovi Sporco e Diffusione dal raggio; pulsante "Oscilloscopio" nella barra del palco con un pannello che scorre e applica le modifiche al fotogramma dopo, costruito con gli stessi controlli della scheda di Impostazioni.
+- **Stima:** circa 9,5 ore di agente. Domande aperte: quali elementi tenere, vetro per brano o unico, etichetta del pulsante, valore di serie dello Sporco.
+- **Imparato:** le texture PBR di ambientCG hanno la forma della macchia nella mappa Roughness o Opacity; convertita in maschera (grigio in alfa) basta una per ogni tinta e tema.
