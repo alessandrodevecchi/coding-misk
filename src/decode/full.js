@@ -9,6 +9,7 @@ import { sectionsOf } from './sections.js';
 import { variationsOf } from './writer.js';
 import { mixHatShape, mixHatBright, rankKits, bandEnergy, sustainOf, bassDrive, LEVEL_BANDS } from './kit-measure.js';
 import { KIT_MEASURES } from './kits.js';
+import { beatGrid, phaseOn } from './beat-this.js';
 
 export const MISK = 'misk-analyzer';
 // Essentia.js's tempo is taken when its confidence (RhythmExtractor2013 multifeature, 0 to about 5.3) is at least this
@@ -242,9 +243,37 @@ export function bassRange(bars, sections, rule = HARMONY_RULE) {
   }
 }
 
+// the learned beat tracker in level B (decode round 10, decode-beat-tracker; bench only: decode-bench.cjs --beat-this,
+// the app passes no tracker): Beat This! tracks the beats of the whole file (beat-this.js beatGrid: one tempo for the whole file, the beat phase, the
+// downbeats). It counts only when its beats are steady (`steady`) and lock to one grid (`lock`), and the tempo picked
+// above (misk-analyzer, Essentia.js, the vote) keeps its octave: the tracker reads some half-time grooves at half (a real
+// track at 160 read 80). Relations to the picked tempo: the same within `same`, half or double, or 3:2 (a drum and bass
+// song picked at 116 where the tracker says 174: its tempo, when `threeTwo`); anything else: as without it.
+// What it gives (see analyseFull): the tempo, misk-analyzer's line fit when that came out whole and within `keep` of
+// the tracker's, else the tracker's (whole within `whole`); the phase, misk-analyzer's onsets' unless the tracker's
+// beats lie at least `half` of a beat from it; the downbeat, the beat of four that holds at least `share` of the
+// tracker's downbeats.
+// (whole: the tracker's beats are rounded to 20 ms frames and read 124.02 for a song at 124; keep: it read a 30-second
+// song at 138 as 137.83 where the onsets fit 138 exactly; half: on two of the owner's files its beats sit a sixteenth
+// after the kicks, on a breakbeat song the onsets' phase sits half a beat off and the tracker's is right)
+export const BEAT_RULE = { use: true, same: 0.02, lock: 0.5, threeTwo: true, downbeat: 'tracker', share: 0.4, whole: 0.06, keep: 0.3, half: 0.375, move: 0.2 };
+// the whole tempo without the tracker (round 10): grid, how far the line fit may be from the whole tempo; ess, how far
+// RhythmExtractor2013's tempo may be from it
+export const WHOLE_RULE = { grid: 0.2, ess: 0.15 };
+export function trackerGrid(bt, pick, rule = BEAT_RULE) {
+  if (!rule.use || !bt || !bt.steady || !(bt.lock >= rule.lock)) return null;
+  const k = bt.bpm / pick, is = (x, tol) => Math.abs(k / x - 1) < tol;
+  if (is(1, rule.same)) return { bpm: bt.bpm, relation: 1 };
+  if (is(0.5, rule.same)) return { bpm: bt.bpm * 2, relation: 0.5 };
+  if (is(2, rule.same)) return { bpm: bt.bpm / 2, relation: 2 };
+  if (rule.threeTwo && (is(1.5, rule.same) || is(2 / 3, rule.same))) return { bpm: bt.bpm, relation: k > 1 ? 1.5 : 2 / 3, tempo: true };
+  return null;
+}
+
 // pcm: mono at `sr`; engine: null, or async () → an engine (engine-essentia.js) that may throw; tempo: a tapped tempo
-// { bpm, downbeat }; onProgress(fraction, stage). → the level B model
-export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, tempo = null, onProgress = () => {} } = {}) {
+// { bpm, downbeat }; beatTracker: null, or async () → a beat tracker (engine-beat-this.js) that may throw;
+// onProgress(fraction, stage). → the level B model
+export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, tempo = null, beatTracker = null, onProgress = () => {} } = {}) {
   const t0 = Date.now(), A = createAnalyzer(pcm, { sr }), duration = A.duration, engines = { tempo: MISK, key: MISK, chords: MISK }, notes = [];
   const pause = () => new Promise(r => setTimeout(r, 0));
   // 1. frames, a slice at a time (the progress moves; a cancel is the worker's end)
@@ -258,23 +287,83 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   let ess = null;
   if (E) { try { ess = E.rhythm(pcm); } catch (e) { notes.push(`Essentia.js tempo failed: ${e && e.message || e}`); } }
   await pause();
+  // 3b. the learned beat tracker, when it is downloaded (decode round 10)
+  let bt = null;
+  if (beatTracker && !(tempo && tempo.bpm > 0)) {
+    try {
+      const T = await beatTracker();
+      onProgress(0.34, 'beats');
+      const r = await T.track(pcm, sr, { onProgress: f => onProgress(0.34 + 0.05 * f, 'beats') });
+      bt = beatGrid(r, duration);
+      if (bt) bt.ms = r.ms;
+    } catch (e) { notes.push(`Beat tracker failed: ${e && e.message || e}`); }
+  }
   // 4. one beat grid for the whole file: the tempo picked, fitted on the onsets of the whole file, and its downbeat
   const pick = pickTempo(misk, ess, tempo);
   if (pick.from !== MISK) engines.tempo = pick.from;
   let bpm = pick.bpm, downbeat = misk.downbeat, phaseMoved = 0;
+  const m0 = {};
   if (pick.from === 'tapped') downbeat = tempo.downbeat ?? misk.downbeat;
   else {
     // the tempo made exact on the whole file (a comb), the beat phase from every onset, a line through the onsets, then
     // the downbeat (Essentia.js's own estimate is 0.1 to 0.9 BPM off on the test songs and its beats 10 to 60 ms late:
     // it sets the tempo's octave and region, misk-analyzer the grid the code plays on)
+    const tg = bt && trackerGrid(bt, bpm);
     const b0 = A.wholeTempo(bpm), g = A.fitGrid(b0, A.wholePhase(b0));
-    bpm = g.bpm;
-    // (round 9: the claps say where the beat is, clapShift)
-    const sh = clapShift(A.clapPositions(bpm, g.beatPhase));
-    if (sh) { g.beatPhase += (sh * 15) / bpm; phaseMoved = sh; }
-    downbeat = A.gridDownbeat(bpm, g.beatPhase);
+    if (tg) {
+      // (round 10: the tracker's grid, see BEAT_RULE) the tempo: misk-analyzer's line fit when it came out whole and
+      // within `keep` of the tracker's (its onsets place a steady track to the millisecond; the tracker read a 30-second
+      // song at 138 as 137.83), else the tracker's, taken whole within `whole`
+      const whole = x => Math.abs(x - Math.round(x)) < 1e-6;
+      // (and misk-analyzer's tempo stays when the tracker's lies further than `move` from it at the same octave: a gate
+      // measured on the real set, see the round 10 notes)
+      const tt = BEAT_RULE.whole && Math.abs(tg.bpm - Math.round(tg.bpm)) < BEAT_RULE.whole ? Math.round(tg.bpm) : tg.bpm;
+      bpm = (whole(g.bpm) && Math.abs(g.bpm - tg.bpm) < BEAT_RULE.keep) || (!tg.tempo && Math.abs(tt - g.bpm) > BEAT_RULE.move) ? g.bpm : tt;
+      const btBpm = bt.bpm * (bpm / tg.bpm), btPhase = phaseOn(bt.times, 60 / btBpm);
+      const P = 60 / bpm, btP = 60 / btBpm;
+      // the phase: misk-analyzer's onset phase at this tempo (the onsets place the grid to the millisecond; on two of the
+      // owner's files the tracker's beats sit a sixteenth after the kicks), unless the tracker's beats lie about half a
+      // beat away from it (`half`, a breakbeat song whose syncopated kick pulls the onsets' phase to the offbeat); at
+      // half or double tempo the tracker's phase only picks which of the onset grids' beats is the beat. Then the claps'
+      // check of round 9 as without the tracker
+      const own = g.bpm === bpm ? g.beatPhase : A.wholePhase(bpm), dist = (x, y, p) => { const r = ((((x - y) % p) + p) % p); return Math.min(r, p - r); };
+      let phase = own;
+      if (tg.relation === 1 || tg.tempo) { if (dist(btPhase, own, P) >= BEAT_RULE.half * P) phase = btPhase % P; }
+      const sh = clapShift(A.clapPositions(bpm, phase));
+      if (sh) { phase += (sh * 15) / bpm; phaseMoved = sh; }
+      // the downbeat: the tracker's when it marks one beat of four clearly (its downbeats on a single beat in `share` of
+      // the cases or more) and the tempo is its own, else misk-analyzer's on the new grid
+      let db = null;
+      if (BEAT_RULE.downbeat === 'tracker' && tg.relation === 1) {
+        // (the tracker's downbeats counted on the final grid: the beat of four that holds most of them)
+        const votes = [0, 0, 0, 0];
+        for (const d of bt.downbeatTimes) { const k = Math.round((d - phase) / P); if (Math.abs(d - (phase + k * P)) < 0.25 * P) votes[((k % 4) + 4) % 4]++; }
+        const n = votes.reduce((a, b) => a + b, 0), best = votes.indexOf(Math.max(...votes));
+        if (n && votes[best] >= BEAT_RULE.share * n) db = phase + best * P;
+      }
+      if (db !== null) { db = ((db % (4 * P)) + 4 * P) % (4 * P); if (db > 4 * P - 0.02) db = Math.max(0, db - 4 * P); }
+      downbeat = db !== null ? db : A.gridDownbeat(bpm, phase);
+      engines.grid = 'beat-this';
+      if (tg.tempo) engines.tempo = 'beat-this';
+    } else {
+      // (round 10: a line fit just off a whole tempo that RhythmExtractor2013 puts on that whole tempo is fitted again
+      // with the whole tempo allowed (WHOLE_RULE): a 6-minute real track fitted 111.17 where it plays at 111, and its
+      // grid drifted by half a second by the end)
+      const w = Math.round(g.bpm);
+      if (Math.abs(g.bpm - w) > 1e-6 && Math.abs(g.bpm - w) <= WHOLE_RULE.grid && ess && Math.abs(ess.bpm - w) <= WHOLE_RULE.ess) {
+        // (the reach inside the new fit is wider than the gate: its free line starts again and can land a little further)
+        const g2 = A.fitGrid(g.bpm, g.beatPhase, WHOLE_RULE.grid + 0.1);
+        if (Math.abs(g2.bpm - w) < 1e-6) { g.bpm = g2.bpm; g.beatPhase = g2.beatPhase; m0.wholeTempo = true; }
+      }
+      bpm = g.bpm;
+      // (round 9: the claps say where the beat is, clapShift)
+      const sh = clapShift(A.clapPositions(bpm, g.beatPhase));
+      if (sh) { g.beatPhase += (sh * 15) / bpm; phaseMoved = sh; }
+      downbeat = A.gridDownbeat(bpm, g.beatPhase);
+    }
+    if (bt) m0.beatTracker = { bpm: Math.round(bt.bpm * 1000) / 1000, lock: bt.lock, rate: bt.rate, cv: bt.cv, steady: bt.steady, downbeatShare: bt.downbeatShare, ms: bt.ms, used: tg ? tg.relation : 0 };
   }
-  const uncertain = ['essentia.js', 'tapped', 'picked'].includes(engines.tempo) ? false : !!misk.uncertain;
+  const uncertain = ['essentia.js', 'tapped', 'picked', 'beat-this'].includes(engines.tempo) || engines.grid ? false : !!misk.uncertain;
   const confidence = engines.tempo === 'essentia.js' ? Math.round(Math.min(1, ess.confidence / 5.32) * 100) / 100 : misk.confidence;
   A.setTempo({ bpm, downbeat, tapped: pick.from === 'tapped', uncertain, confidence, round: 3 });
   onProgress(0.4, 'bars');
@@ -282,6 +371,7 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   const barSec = 240 / bpm;
   for (let t = downbeat + 8 * barSec; t < duration + barSec; t += 8 * barSec) { A.barsRaw(Math.min(duration, t)); onProgress(0.4 + 0.3 * Math.min(1, t / duration), 'bars'); await pause(); }
   const m = A.model(duration), raw = A.barsRaw(duration);
+  Object.assign(m, m0);
   // (round 8: no steady beat, no drums: the hits misk-analyzer finds in a pad's swells or a voice are no drum part; the
   // flag is kept in the model)
   const noBeat = noSteadyBeat(ess);

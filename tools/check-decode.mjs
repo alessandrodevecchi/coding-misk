@@ -45,6 +45,7 @@ import { liveCodes, fullCodes, editStats } from './decode-edits.mjs';
 import { strudelInNode } from './mixer-checks.mjs';
 import { HELPERS as HELPERS_APP } from '../src/song/writer.js';
 import fs from 'node:fs';
+import path from 'node:path';
 
 let failed = 0, passed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (ok) passed++; else failed++; };
@@ -651,6 +652,37 @@ if (process.argv.includes('--app')) {
   const S = await strudelInNode(), evn = async c => (await S.evaluate(c)).queryArc(0, 4).filter(h => h.hasOnset()).length;
   const ev = [await evn(`${VOX_PRELUDE}$: s("bd*4")\n\n${hook}`), await evn('$: s("bd*4")'), await evn(`${VOX_PRELUDE}${hook.replace(/_\$:/g, '$:')}`)];
   check(ev[0] === ev[1] && ev[1] === 16 && ev[2] === 0, 'the copied code with the group evaluates in Strudel and plays only the parts; the group alone plays nothing', ev.join(','));
+}
+
+// the learned beat tracker (decode-beat-tracker, round 10; bench only, not offered in the app): the pure parts always;
+// the model itself when its files are in .cache/beat-this/ (git-ignored, downloaded by hand from the pinned URLs; skipped otherwise)
+{
+  const BT = await import('../src/decode/beat-this.js'), F = await import('../src/decode/full.js');
+  check(Object.values(BT.BEAT_THIS_FILES).every(f => /^https:\/\/huggingface\.co\/[^/]+\/[^/]+\/resolve\/[0-9a-f]{40}\//.test(f.url) && /^[0-9a-f]{64}$/.test(f.sha256) && f.bytes > 0 && f.name.endsWith('.onnx')), 'beat tracker: every file has a URL at a fixed revision, a SHA-256 pin and a size, and is ONNX');
+  check(JSON.stringify(BT.chunkStarts(5570)) === JSON.stringify([-6, 1482, 2970, 4076]) && JSON.stringify(BT.chunkStarts(1000)) === JSON.stringify([-6]), 'beat tracker: chunks as the reference code splits them (5570 frames: -6, 1482, 2970, 4076)', BT.chunkStarts(5570).join(','));
+  const lg = new Float32Array(200).fill(-5); for (const i of [10, 11, 60, 110]) lg[i] = 2; lg[160] = 3; lg[162] = 1;
+  check(JSON.stringify(BT.peaksOf(lg)) === JSON.stringify([0.21, 1.2, 2.2, 3.2]), 'beat tracker: peaks over 7 frames above 0, adjacent peaks merged, frames to seconds', BT.peaksOf(lg).join(','));
+  // a steady 111 BPM over 6 minutes with frame-rounded beats, fake beats between some of them, downbeats on the second beat of four
+  const P = 60 / 111, beats = [], downbeats = [];
+  for (let k = 0; k < 660; k++) { const t = Math.round((0.31 + k * P) * 50) / 50; beats.push(t); if (k % 4 === 1) downbeats.push(t); if (k % 7 === 3) beats.push(Math.round((t + 0.75 * P) * 50) / 50); }
+  beats.sort((a, b) => a - b);
+  const g = BT.beatGrid({ beats, downbeats }, 360);
+  check(g && Math.abs(g.bpm - 111) < 0.01 && Math.abs(g.beatPhase - 0.31) < 0.01 && Math.abs(g.downbeat - (0.31 + P)) < 0.01 && g.steady, 'beat tracker: a 6-minute grid at 111 BPM from frame-rounded beats with fake beats between them (tempo within 0.01, phase and downbeat within 10 ms)', g && `${g.bpm.toFixed(3)} BPM, phase ${g.beatPhase.toFixed(3)}, downbeat ${g.downbeat.toFixed(3)}`);
+  const sparse = BT.beatGrid({ beats: [0.5, 1.3, 9, 30, 31, 58, 59.6, 80, 95, 112], downbeats: [] }, 112);
+  check(!sparse || !sparse.steady, 'beat tracker: a pad with a beat now and then is not steady');
+  const rel = (b, pick) => F.trackerGrid({ bpm: b, steady: true, lock: 0.9 }, pick);
+  check(rel(124.02, 124).relation === 1 && rel(80, 160).bpm === 160 && rel(176, 88).bpm === 88 && rel(174, 116).tempo && rel(174, 116).bpm === 174 && rel(130, 100) === null && F.trackerGrid({ bpm: 124, steady: false, lock: 0.9 }, 124) === null, 'beat tracker: same, half, double and 3:2 relations to the picked tempo; the picked octave stays; no relation or unsteady beats: no grid');
+  const { BT_DIR, nodeBeatThis } = await import('./beat-this-node.mjs');
+  if (Object.values(BT.BEAT_THIS_FILES).every(f => fs.existsSync(path.join(BT_DIR, f.name)))) {
+    // a generated track at 124 BPM, analysed with and without the tracker
+    const pcm = P124;
+    if (pcm) {
+      const on = await F.analyseFull(pcm, { beatTracker: nodeBeatThis }), off = await F.analyseFull(pcm, {});
+      check(on.engines.grid === 'beat-this' && Math.abs(on.bpm - 124) < 0.01 && Math.abs(on.downbeat - off.downbeat) < 0.03 && on.beatTracker && on.beatTracker.used === 1, 'beat tracker: a generated track at 124 BPM gets the tracker\'s grid, the same tempo and downbeat as without it', `${on.bpm} BPM, downbeat ${on.downbeat} against ${off.downbeat}`);
+      const fail = await F.analyseFull(pcm, { beatTracker: async () => { throw new Error('no files'); } });
+      check(!fail.engines.grid && (fail.notes || []).some(x => /^Beat tracker failed/.test(x)) && Math.abs(fail.bpm - off.bpm) < 1e-9, 'beat tracker: a tracker that fails leaves a note and the grid of misk-analyzer');
+    }
+  } else console.log('skip  beat tracker: model files not in .cache/beat-this/');
 }
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

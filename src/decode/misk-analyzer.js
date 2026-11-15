@@ -589,7 +589,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   // the tempo and beat phase that put the onsets of the whole file on a 16th grid best: a weighted least-squares line
   // through the onsets near the grid (t = a + m·P/4), three passes with a narrower window; a whole tempo when it fits
   // almost as well. A tempo off by 0.05 BPM drifts by 0.1 s over four minutes: the line keeps the code on the beat.
-  function fitGrid(bpm, beatPhase) {
+  function fitGrid(bpm, beatPhase, wholeNear = FIT_RULE.whole) {
     const all = gridPoints(), t0 = all.length ? Math.min(...all.map(p => p.t)) : 0;
     let P = 60 / bpm, a = beatPhase, rms = Infinity, used = 0;
     // the line grows from the first 20 seconds of music to the whole file, so a small tempo error never puts a late onset
@@ -616,7 +616,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     if (!free) return { bpm, beatPhase, rms: null, n: 0 };
     ({ P, a, rms, n: used } = free);
     const whole = Math.round(60 / P);
-    if (Math.abs(whole - 60 / P) < FIT_RULE.whole) {
+    if (Math.abs(whole - 60 / P) < wholeNear) {
       const keep = { P, a };
       const w = fit(60 / whole);
       if (w && w.rms <= rms * 1.15 + 0.0005) ({ P, a, rms, n: used } = w); else ({ P, a } = keep);

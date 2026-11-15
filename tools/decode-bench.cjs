@@ -32,6 +32,13 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
   const KM = await import(path.join(src, 'src', 'decode', 'kit-measure.js')).catch(() => null);
   const PL = await import(path.join(src, 'src', 'decode', 'part-levels.js')).catch(() => null);
   const { nodeEssentia } = await import('./essentia-node.mjs');
+  // (decode round 10: --beat-this runs the learned beat tracker in level B, bench only (the app does not run it), its
+  // files in .cache/beat-this/; --beat-this small the small model; --beat-rule '{json}' changes level B's BEAT_RULE)
+  const FULL = await import(path.join(src, 'src', 'decode', 'full.js'));
+  const btOn = args.includes('--beat-this'), btModel = btOn && opt('--beat-this') && !opt('--beat-this').startsWith('--') ? opt('--beat-this') : 'model';
+  const beatTracker = btOn ? (await import('./beat-this-node.mjs')).nodeBeatThisOf(btModel) : null;
+  if (opt('--beat-rule') && FULL.BEAT_RULE) Object.assign(FULL.BEAT_RULE, JSON.parse(opt('--beat-rule')));
+  const BT_KEY = btOn ? `-bt-${btModel}-${JSON.stringify(FULL.BEAT_RULE || {})}` : '';
 
   // the files and their truth
   const truth = s => songs.soundTruth(s);
@@ -87,7 +94,7 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
     // on the same models)
     if (opt('--models')) { const g = path.join(CACHE, 'models', opt('--models'), `${x.id}.json`); if (fs.existsSync(g)) return JSON.parse(fs.readFileSync(g, 'utf8')).m; }
     if (fs.existsSync(f)) { const c = JSON.parse(fs.readFileSync(f, 'utf8')); if (c.key === key) return c.m; }
-    const m = await analyseFull(pcm(x.file), { engine: nodeEssentia });
+    const m = await analyseFull(pcm(x.file), { engine: nodeEssentia, beatTracker });
     fs.writeFileSync(f, JSON.stringify({ key, m }));
     return JSON.parse(JSON.stringify(m));
   }
