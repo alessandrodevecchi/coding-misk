@@ -1,6 +1,6 @@
 """Stems in the Decode bench (decode round 8, step 1), the Python half of tools/decode-stems.cjs.
 
-  python tools/decode-stems.py separate <audio file> <out dir>   # drums, bass, other, vocals (FLAC) and time.json
+  python tools/decode-stems.py separate <audio file> <out dir> [torch|mlx <mlx-demucs path>]   # drums, bass, other, vocals (FLAC), time.json
   python tools/decode-stems.py score <jobs.json>                  # one JSON line per file on stdout
 
 Scores (all at 22.05 kHz mono; the parts are the app's own tracks rendered alone, so their sum is the mix):
@@ -24,22 +24,33 @@ BANDS = {'low': (20, 150), 'mid': (150, 2000), 'high': (2000, 11000)}
 STEMS = ['drums', 'bass', 'other', 'vocals']
 
 
-def separate(src, out):
+def separate(src, out, engine='torch', mlx=None):
     import soundfile as sf
     os.makedirs(out, exist_ok=True)
     tmp = tempfile.mkdtemp(prefix='stems-')
     try:
-        t0 = time.time()
-        subprocess.run([sys.executable, '-m', 'demucs', '-n', 'htdemucs', '-d', 'cpu', '--flac', '-o', tmp, src], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        secs = time.time() - t0
-        d = os.path.join(tmp, 'htdemucs')
-        d = os.path.join(d, os.listdir(d)[0])
-        for s in STEMS:
-            shutil.move(os.path.join(d, s + '.flac'), os.path.join(out, s + '.flac'))
+        if engine == 'mlx':
+            # (the MLX port of the same model, Apple Silicon only: it does not resample, so the input goes to 44.1 kHz
+            # first; its WAV stems are kept as FLAC like the others)
+            wav = os.path.join(tmp, 'in.wav')
+            subprocess.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-i', src, '-ar', '44100', '-ac', '2', wav], check=True)
+            t0 = time.time()
+            subprocess.run([mlx, wav, '-o', os.path.join(tmp, 'out')], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            secs = time.time() - t0
+            for s in STEMS:
+                subprocess.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-i', os.path.join(tmp, 'out', s + '.wav'), '-c:a', 'flac', os.path.join(out, s + '.flac')], check=True)
+        else:
+            t0 = time.time()
+            subprocess.run([sys.executable, '-m', 'demucs', '-n', 'htdemucs', '-d', 'cpu', '--flac', '-o', tmp, src], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            secs = time.time() - t0
+            d = os.path.join(tmp, 'htdemucs')
+            d = os.path.join(d, os.listdir(d)[0])
+            for s in STEMS:
+                shutil.move(os.path.join(d, s + '.flac'), os.path.join(out, s + '.flac'))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     dur = sf.info(os.path.join(out, 'drums.flac')).duration
-    r = {'seconds': round(secs, 1), 'duration': round(dur, 1), 'ratio': round(secs / dur, 3)}
+    r = {'seconds': round(secs, 1), 'duration': round(dur, 1), 'ratio': round(secs / dur, 3), 'engine': engine}
     json.dump(r, open(os.path.join(out, 'time.json'), 'w'))
     print(json.dumps(r))
 
@@ -194,6 +205,6 @@ def score(jobs):
 
 if __name__ == '__main__':
     if sys.argv[1] == 'separate':
-        separate(sys.argv[2], sys.argv[3])
+        separate(sys.argv[2], sys.argv[3], *(sys.argv[4:6] if len(sys.argv) > 5 else []))
     elif sys.argv[1] == 'score':
         score(json.load(open(sys.argv[2])))

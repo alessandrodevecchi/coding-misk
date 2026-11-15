@@ -9,16 +9,22 @@
 // The separation runs in a Python 3.12 venv made with uv under .cache/decode/stems-venv (git-ignored):
 //   uv venv --python 3.12 .cache/decode/stems-venv && VIRTUAL_ENV=.cache/decode/stems-venv uv pip install \
 //     torch==2.5.1 torchaudio==2.5.1 demucs soundfile librosa
+// --engine mlx: the same model's port to Apple Silicon (MIT, converted weights; bench only), in a venv under
+// .cache/decode/mlx-venv (uv venv --python 3.12, then the port's package installed from its source repository; its
+// command line mlx-demucs in the venv's bin), its stems in .cache/decode/stems-mlx/: about a tenth
+// of the track's length against 0.3 of it on the CPU, the same quality on average (per song up to about 5 dB of SDR apart); the
+// default stays the reference build
 // Owner files: ids are anonymous (owner-1…, in file name order); their stems stay in the git-ignored cache; write --json
 // under the git-ignored notes/.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-stems.cjs [--parts] [--separate] [--score]
-//          [--set bench|owner] [--only id,id] [--json out.jsonl]
+//          [--set bench|owner] [--only id,id] [--engine torch|mlx] [--json out.jsonl]
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), { execFileSync } = require('node:child_process');
 const { exportSong, DIR: WAV, HOLDOUT_DIR, SET_DIRS } = require('./decode-export.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const args = process.argv.slice(2), opt = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : undefined; };
 const ROOT = path.join(__dirname, '..'), CACHE = path.join(ROOT, '.cache', 'decode');
-const PARTS = path.join(CACHE, 'parts'), STEMS = path.join(CACHE, 'stems'), PY = path.join(CACHE, 'stems-venv', 'bin', 'python');
+const ENGINE = opt('--engine') || 'torch', MLX = path.join(CACHE, 'mlx-venv', 'bin', 'mlx-demucs');
+const PARTS = path.join(CACHE, 'parts'), STEMS = path.join(CACHE, ENGINE === 'mlx' ? 'stems-mlx' : 'stems'), PY = path.join(CACHE, 'stems-venv', 'bin', 'python');
 const AUDIO = /\.(wav|mp3|m4a|aac|flac|ogg|opus|webm|mp4|mov)$/i;
 // a file's stems are kept by the hash of its first and last MB and its size (a whole-file hash of long videos is slow)
 const hashOf = f => { const fd = fs.openSync(f, 'r'), n = fs.fstatSync(fd).size, b = Buffer.alloc(Math.min(n, 1 << 20)), h = crypto.createHash('sha1');
@@ -60,10 +66,11 @@ const hashOf = f => { const fd = fs.openSync(f, 'r'), n = fs.fstatSync(fd).size,
   // 2. the stems
   if (args.includes('--separate')) {
     if (!fs.existsSync(PY)) throw new Error(`no venv at ${PY} (see the header)`);
+    if (ENGINE === 'mlx' && !fs.existsSync(MLX)) throw new Error(`no MLX port at ${MLX} (see the header)`);
     for (const x of files) {
       const dir = path.join(STEMS, hashOf(x.file));
       if (fs.existsSync(path.join(dir, 'time.json'))) continue;
-      const r = JSON.parse(execFileSync(PY, [path.join(__dirname, 'decode-stems.py'), 'separate', x.file, dir], { encoding: 'utf8', maxBuffer: 1 << 26 }).trim().split('\n').pop());
+      const r = JSON.parse(execFileSync(PY, [path.join(__dirname, 'decode-stems.py'), 'separate', x.file, dir, ...(ENGINE === 'mlx' ? ['mlx', MLX] : [])], { encoding: 'utf8', maxBuffer: 1 << 26 }).trim().split('\n').pop());
       console.log(`stems ${x.id}: ${r.seconds} s for ${r.duration} s of audio`);
     }
   }
