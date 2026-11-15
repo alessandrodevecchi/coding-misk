@@ -24,12 +24,28 @@ const agrees = (a, b) => a > 0 && b > 0 && RATIOS.some(r => Math.abs((a * r) / b
 // D7 settles the octave); else misk-analyzer's own. → { bpm, from }
 export function pickTempo(misk, ess, user = null) {
   if (user && user.bpm > 0) return { bpm: user.bpm, from: user.tapped ? 'tapped' : 'picked' };
+  let pick = { bpm: misk ? misk.bpm : 120, from: MISK };
   if (ess && ess.bpm > 0 && (ess.confidence >= ESSENTIA_CONFIDENT || (ess.confidence >= ESSENTIA_CONFIRMED && misk && agrees(ess.bpm, misk.bpm)))) {
     let bpm = ess.bpm;
     if (misk && misk.bpm > 0) for (const r of [2, 0.5, 1.5, 2 / 3]) if (Math.abs((bpm * r) / misk.bpm - 1) < 0.03) bpm *= r;
-    return { bpm, from: 'essentia.js' };
+    pick = { bpm, from: 'essentia.js' };
   }
-  return { bpm: misk ? misk.bpm : 120, from: MISK };
+  return threeAgree(pick, ess);
+}
+// the vote of three (decode round 8): when Essentia.js's three tempo estimates (RhythmExtractor2013, Percival and
+// Degara's beat interval) agree within 4 % and the tempo picked is not theirs, theirs wins; a picked tempo exactly
+// double or half of theirs stays unless RhythmExtractor2013 is very confident (a double-time hi-hat groove and a
+// half-time one look alike to the three). Bench: a boom bap song read at 180 goes to 90 (confidence 4.0) and the app's
+// own radio song at 176 stays (the three say 88 at 2.7); in a sample of 26 real tracks 5 move, all to the tempo a
+// learned beat tracker finds too.
+export const TEMPO_VOTE = { near: 0.04, octaveConfidence: 3.5 };
+export function threeAgree(pick, ess, rule = TEMPO_VOTE) {
+  if (!ess || !(ess.bpm > 0 && ess.percival > 0 && ess.degara > 0)) return pick;
+  const three = [ess.bpm, ess.percival, ess.degara].sort((a, b) => a - b), mid = three[1], near = (a, b) => Math.abs(a / b - 1) < rule.near;
+  if (!three.every(x => near(x, mid)) || near(pick.bpm, mid)) return pick;
+  const k = pick.bpm / mid;
+  if ((Math.abs(k - 2) < 0.08 || Math.abs(k - 0.5) < 0.02) && !(ess.confidence >= rule.octaveConfidence)) return pick;
+  return { bpm: ess.bpm, from: 'essentia.js', vote: true };
 }
 
 // a chord per bar from chords per interval (Essentia.js), `per` intervals a bar: the chord with the most strength
@@ -91,12 +107,12 @@ export function takeChord(b, c) {
   return b;
 }
 // the phantom parts (decode round 8): parts the analysis finds in a track that has none. noBeat: Essentia.js's tempo
-// confidence under this means no steady beat, and level B writes no drums (on the bench a pad-only song reads -0.11,
-// every song with drums and every real file 1.6 or more); lowShare and h1: the original's 20-150 Hz share of the energy
+// confidence under this means no steady beat, and level B writes no drums (on the bench a pad-only song reads -0.11;
+// every song with drums 1.6 or more, and in a sample of 33 real tracks 0.87 or more); lowShare and h1: the original's 20-150 Hz share of the energy
 // under lowShare and the decoded bass notes with almost no energy at their own fundamental (the bass profile's h1 under
 // h1) mean the notes are a pad's or a voice's low notes, and level B writes no bass (the pad-only song: 0.20 and 0.00;
 // the lowest share of a song with a bass 0.39, and a bass decoded an octave off keeps a share of 0.48 or more)
-export const PARTS_RULE = { noBeat: 1.0, lowShare: 0.3, h1: 0.1 };
+export const PARTS_RULE = { noBeat: 0.4, lowShare: 0.3, h1: 0.1 };
 // → whether a file has no steady beat (null when Essentia.js gave no tempo: unknown, so nothing changes)
 export const noSteadyBeat = (ess, rule = PARTS_RULE) => (ess && Number.isFinite(ess.confidence) ? ess.confidence < rule.noBeat : null);
 // → whether the decoded bass notes are no bass (the low band's share of the original, the bass profile)
@@ -255,7 +271,7 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   // (round 8: decoded bass notes that are no bass, a pad's low notes, are not a bass part)
   if (noBassPart(m.shares, m.bassDrive)) { for (const b of m.bars) if (b.bass) b.bass = b.bass.map(() => null); m.noBass = true; }
   // (Essentia.js's own tempo and confidence, to read why the engine was or was not taken)
-  if (ess) m.essentiaTempo = { bpm: Math.round(ess.bpm * 1000) / 1000, confidence: Math.round(ess.confidence * 1000) / 1000 };
+  if (ess) m.essentiaTempo = { bpm: Math.round(ess.bpm * 1000) / 1000, confidence: Math.round(ess.confidence * 1000) / 1000, ...(ess.percival ? { percival: Math.round(ess.percival * 100) / 100 } : {}), ...(ess.degara ? { degara: Math.round(ess.degara * 100) / 100 } : {}), ...(pick.vote ? { vote: true } : {}) };
   Object.assign(m, { level: 'B', engines, ms: Date.now() - t0, ...(notes.length ? { notes } : {}), ...(E ? { essentia: E.version } : {}) });
   onProgress(1, 'done');
   return m;
