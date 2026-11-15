@@ -12,7 +12,8 @@ import { VIEWS as SOUL_VIEWS, VIEW_NAMES as SOUL_VIEW_NAMES } from '../soul/data
 import { nextTagline } from '../video/fragments.js';
 import { DICE, REVERT, VIDEO_FILE, BIN, PLUS, LOCK } from '../icons.js';
 import { SV_KEY, SIZE_MODES, sizeOf as svSizeOf } from '../visuals/stage-video-rules.js';
-import { OSC_KEY, OVERLAYS as OSC_OVERLAYS, MODES as OSC_MODES, PARAMS as OSC_PARAMS, LINKS as OSC_LINKS, SHOWN as OSC_SHOWN, oscSettings } from '../visuals/oscilloscope-rules.js';
+import { OSC_KEY, oscSettings } from '../visuals/oscilloscope-rules.js';
+import { oscRows, oscHandle, oscSync, OSC_EVENT } from '../visuals/osc-controls.js';
 import { confirmInline } from '../library/songs-view.js';
 import { SHAPE_CAP, SHAPE_CAP_MIN, SHAPE_CAP_MAX, shapeCapOf, SHAPE_KEEPS, shapeKeepOf, LONG_SONG, LONG_SONG_MIN, LONG_SONG_MAX, longSongOf } from '../song/crescendo.js';
 import { shapeCounts } from '../song/shapes.js';
@@ -188,25 +189,17 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     </div>`;
   }
 
-  // the Oscilloscope look's card (oscilloscope-visual D7): overlay, mode, Oversample and the main parameters, each with
-  // its value and its link to the song; stored whole, the stage reads it each frame
+  // the Oscilloscope look's card (oscilloscope-visual D7): the rows shared with the stage panel (osc-controls.js,
+  // oscilloscope-smudge D8): overlay, mode, Oversample and every parameter with its link to the song
   function oscilloscopeCard() {
     const S = oscSettings(store.get(OSC_KEY, null));
-    const param = k => {
-      const [, lo, hi, step] = OSC_PARAMS.find(p => p[0] === k), v = S.values[k];
-      return row(t(`osc:${k}`), `<span class="osc-param"><input type="range" data-osc-val="${k}" min="${lo}" max="${hi}" step="${step}" value="${v}" data-no-knob><output>${v}</output>
-        <select data-osc-link="${k}" data-no-knob aria-label="${esc(t('oscLinkOf', { name: t(`osc:${k}`) }))}">${OSC_LINKS.map(l => opt(l, S.links[k], t(`oscLink:${l}`))).join('')}</select></span>`, t(`osc:${k}Hint`));
-    };
     return `<div class="card set-card" id="set-oscilloscope"><h3>${esc(t('setOsc'))}</h3>
       <p class="muted">${esc(t('setOscIntro'))}</p>
-      ${row(t('oscOverlay'), `<select data-osc-opt="overlay" data-no-knob>${OSC_OVERLAYS.map(k => opt(k, S.overlay, t(`oscOverlay:${k}`))).join('')}</select>`, t('oscOverlayHint'))}
-      ${row(t('oscMode'), seg('data-osc-mode', OSC_MODES.map(k => [k, t(`oscMode:${k}`)]), S.mode), t('oscModeHint'))}
-      ${row(t('oscOversample'), seg('data-osc-over', [['1', t('cwYes')], ['0', t('cwNo')]], S.oversample ? '1' : '0'), t('oscOversampleHint'))}
-      ${OSC_SHOWN.map(param).join('')}
-      <div class="actions"><button class="btn" id="set-osc-defaults">${esc(t('cwDefaults'))}</button></div>
+      ${oscRows(S, t)}
     </div>`;
   }
-  const setOsc = f => { const S = oscSettings(store.get(OSC_KEY, null)); f(S); store.set(OSC_KEY, S); };
+  // a change made on the stage panel shows in the card without drawing the page again
+  document.addEventListener(OSC_EVENT, e => { if (e.detail && e.detail.from !== 'card') oscSync(root.querySelector('#set-oscilloscope'), store); });
 
   // "Code over" (code-over-visual D13): the stage mode, side, width, opacity, the edited line, lit tokens, long lines
   function codeOverCard() {
@@ -399,9 +392,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       if (!f || !confirmTwice(`sv-remove-${f.id}`, t('svRemoveConfirm', { name: f.name }))) return;
       svMsg = ''; app.stageVideos.remove(f.id).then(() => render()); return;
     }
-    if (b.dataset.oscMode) { setOsc(S => { S.mode = b.dataset.oscMode; }); return render(); }
-    if (b.dataset.oscOver) { setOsc(S => { S.oversample = b.dataset.oscOver === '1'; }); return render(); }
-    if (b.id === 'set-osc-defaults') { store.remove(OSC_KEY); return render(); }
+    if (oscHandle(e, store, 'card')) { oscSync(root.querySelector('#set-oscilloscope'), store); return; }
     if (b.dataset.svSize) { if (b.dataset.svSize === 'fill') store.remove(SV_KEY); else store.set(SV_KEY, { size: b.dataset.svSize }); return render(); }
     if (b.dataset.phSetSave) { app.phrases.set({ save: b.dataset.phSetSave }); return render(); }
     if (b.dataset.phSetShare) { app.phrases.set({ share: b.dataset.phSetShare }); return render(); }
@@ -489,14 +480,12 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     }
   });
   // the oscilloscope's sliders: the stage follows while dragging, the card is not drawn again
-  root.addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.oscVal; if (!k) return; setOsc(S => { S.values[k] = +e.target.value; }); const o = e.target.nextElementSibling; if (o) o.textContent = e.target.value; });
+  root.addEventListener('input', e => { oscHandle(e, store, 'card'); });
   root.addEventListener('input', e => { if (e.target.id === 'set-volume') { app.setVolume(+e.target.value); e.target.nextElementSibling.textContent = `${e.target.value}%`; } });
   // the sections of the code widgets card left open
   root.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.swSec) { const open = new Set(store.get(SW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.swSec); else open.delete(d.dataset.swSec); store.set(SW_OPEN, [...open]); return; } if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
   root.addEventListener('change', e => {
-    { const d = e.target.dataset || {};
-      if (d.oscLink) { setOsc(S => { S.links[d.oscLink] = e.target.value; }); return; }
-      if (d.oscOpt) { setOsc(S => { S[d.oscOpt] = e.target.value; }); return; } }
+    if (oscHandle(e, store, 'card')) return;
     if (e.target.matches && e.target.matches('[data-ph-set-temp]')) { app.phrases.set({ temp: e.target.value }); return render(); }
     { const x = e.target, d = x.dataset || {};
       if (d.capSkip !== undefined && app.capsSkipNext) { app.capsSkipNext(x.checked); return; }

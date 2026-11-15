@@ -10,7 +10,7 @@
 ## 2. After the owner's answers (about 3 h)
 
 - [ ] 2.1 The open questions settled in the design.
-- [ ] 2.2 Every parameter in the card (Line and Screen saturation, Smoothing, Trigger), with a short help line each.
+- [x] 2.2 Every parameter in the card (Line and Screen saturation, Smoothing, Trigger), with a short help line each (done in `oscilloscope-smudge`, with the stage panel).
 - [x] 2.3 The look card in `src/guide.js` and the knowledge note (`docs/knowledge/`), `npm run knowledge`, `check:guide`, `check:knowledge`.
 - [ ] 2.4 The fast video: the module loaded before the first frame, the feed's wave (or the full buffer, question 3); a fragment and a 1080p video checked against the stage.
   - [x] 2.4a The module loaded before the first frame (`visuals.loadLook`, awaited before the render when a part shows the look and before the frame where a section brings it); a fragment with no frame drawn black, in `tools/check-oscilloscope.cjs` (4 black frames without it).

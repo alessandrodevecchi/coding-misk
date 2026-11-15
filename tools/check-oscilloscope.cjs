@@ -6,16 +6,23 @@
 //  - a reload keeps the look and the settings;
 //  - a 9:16 fragment with the look, exported from a page that never showed it, has a beam from its first frame (the
 //    module loaded before the first fast-video frame: no frame drawn black) and frames that are not empty;
+//  - the smudged glass (oscilloscope-smudge): the same song draws the same glass again, another song another glass,
+//    Smudge 0 draws none; a fragment with a smudged overlay from a fresh page has its masks before the first frame;
+//  - the stage panel (oscilloscope-smudge D8): the [Oscilloscope] button only with the look; the panel with every
+//    setting; a slider changes the stage on the next frames and the stored value, the Settings card shows it, a card
+//    change shows in the open panel; Escape and a click outside close it; the panel never draws into the stage canvas;
+//    full screen; 400 px (icon only, the panel inside the stage, scrolling); Italian; light and hardware themes;
 //  - with --cost: the look's frame time at 1080p and 4K (median and p95, with the load average), each overlay with the
-//    defaults and with Glow 1 on Real oscilloscope.
-// Usage: PORT=5420 PLAYWRIGHT_CORE=... node tools/check-oscilloscope.cjs [shots-dir] [--cost] [--no-video|--video-only]
+//    defaults, with Glow 1 on Real oscilloscope and with Smudge and Beam scatter 2 on Smudged graticule.
+// Usage: PORT=5420 PLAYWRIGHT_CORE=... node tools/check-oscilloscope.cjs [shots-dir] [--cost] [--no-video|--video-only|--panel-only]
 //   (dev server on PORT, default 5173; ffmpeg for the fragment)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const args = process.argv.slice(2), SHOTS = args.find(a => !a.startsWith('--')) || '';
-const COST = args.includes('--cost'), VIDEO = !args.includes('--no-video'), VIDEO_ONLY = args.includes('--video-only');
+const PANEL_ONLY = args.includes('--panel-only');
+const COST = args.includes('--cost'), VIDEO = !args.includes('--no-video') && !PANEL_ONLY, VIDEO_ONLY = args.includes('--video-only');
 const PORT = process.env.PORT || 5173, URL0 = `http://localhost:${PORT}/`;
 const KEY = 'coding-misk-oscilloscope', OVERLAYS = ['empty', 'graticule', 'smudged', 'smudged-graticule', 'real', 'vector'];
 let failed = 0;
@@ -25,8 +32,8 @@ const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? 
 const p95 = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(s.length * 0.95))] : NaN; };
 const shot = async (page, name) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await page.locator('#stagewrap').screenshot({ path: path.join(SHOTS, name) }); };
 
-async function open(browser, store = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 950 }, acceptDownloads: true });
+async function open(browser, store = {}, viewport = { width: 1400, height: 950 }) {
+  const ctx = await browser.newContext({ viewport, acceptDownloads: true });
   const page = await ctx.newPage(), errors = [], requests = [], logs = [], downloads = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('request', r => { if (/visuals\/oscilloscope\.js/.test(r.url())) requests.push(r.url()); });
@@ -55,11 +62,128 @@ async function settings(page, open = true) {
   if (on !== open) { await page.click('#open-settings'); await sleep(500); }
 }
 
+// the smudged glass per song (oscilloscope-smudge D3, D5) and the stage panel (D8)
+async function glassAndPanel(browser) {
+  const glassStore = { 'coding-misk-look': 'oscilloscope', [KEY]: { overlay: 'smudged', values: { smudge: 2, scatter: 0, ambient: 1, persistence: 0 }, links: { glow: 'static', hue: 'static' } } };
+  const s = await open(browser, glassStore), { page } = s;
+  // (a song may bring its own look: the Oscilloscope picked again after each song)
+  // (the glass follows the song that played last: each song started and stopped, so the beam lies flat)
+  const started = () => page.evaluate(() => document.querySelector('strudel-editor').editor.repl.scheduler.started);
+  const settle = async () => { await page.click('#play'); await sleep(1500); if (await started()) await page.click('#play'); await page.selectOption('#looks', 'oscilloscope'); let t = 0; while (!(await ready(page)) && t < 50) { await sleep(100); t++; } await page.locator('#stagewrap').scrollIntoViewIfNeeded(); await sleep(1200); };
+  // (stopped: a flat beam, the glass is what changes)
+  await page.locator('#track-pick').selectOption('luci-rosse'); await settle();
+  const a1 = await picture(page); await sleep(600); const a2 = await picture(page);
+  await page.locator('#track-pick').selectOption('kellerlicht'); await settle(); const b = await picture(page);
+  await page.locator('#track-pick').selectOption('luci-rosse'); await settle(); const a3 = await picture(page);
+  check(differ(a1, a2) < 1 && differ(a1, a3) < 1, 'the same song draws the same glass, on two frames and when it comes back', `${differ(a1, a2).toFixed(2)}, ${differ(a1, a3).toFixed(2)}`);
+  check(differ(a1, b) > 0.8, 'another song draws another glass', differ(a1, b).toFixed(2));
+  await shot(page, 'glass-luci-rosse.png');
+  await page.evaluate(k => { const S = JSON.parse(localStorage.getItem(k)); S.values.smudge = 0; localStorage.setItem(k, JSON.stringify(S)); }, KEY); await sleep(800);
+  const none = await picture(page);
+  await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ overlay: 'empty', values: { ambient: 1, persistence: 0 }, links: { glow: 'static', hue: 'static' } })), KEY); await sleep(800);
+  const empty = await picture(page);
+  check(differ(none, empty) < 1 && differ(a1, none) > 1.5, 'Smudge 0 draws no smudge', `${differ(none, empty).toFixed(2)} from Empty, ${differ(a1, none).toFixed(2)} from Smudge 2`);
+  check(!s.errors.length, 'no page errors with the glass', s.errors.join('; '));
+  await s.ctx.close();
+
+  // the panel
+  const p = await open(browser, { 'coding-misk-look': 'palco', [KEY]: { overlay: 'smudged-graticule' } }), page2 = p.page;
+  const visible = sel => page2.evaluate(q => { const e = document.querySelector(q); if (!e || e.hidden) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).display !== 'none'; }, sel);
+  check(!(await visible('#osc-btn')), 'the [Oscilloscope] button is hidden with another look');
+  await page2.locator('#track-pick').selectOption('kellerlicht'); await play(page2);
+  await page2.selectOption('#looks', 'oscilloscope'); await sleep(1500);
+  check(await visible('#osc-btn'), 'the [Oscilloscope] button shows with the look');
+  await page2.click('#osc-btn'); await sleep(300);
+  const st = await page2.evaluate(() => ({ exp: document.querySelector('#osc-btn').getAttribute('aria-expanded'), vals: [...document.querySelectorAll('#osc-panel [data-osc-val]')].map(i => i.dataset.oscVal), links: document.querySelectorAll('#osc-panel [data-osc-link]').length, ov: !!document.querySelector('#osc-panel [data-osc-opt="overlay"]'), mode: document.querySelectorAll('#osc-panel [data-osc-mode]').length, def: !!document.querySelector('#osc-panel [data-osc-defaults]') }));
+  check(await visible('#osc-panel') && st.exp === 'true' && st.vals.length === 14 && st.links === 14 && st.ov && st.mode === 2 && st.def, 'the button opens the panel with every setting', `${st.vals.length} sliders, ${st.links} links, expanded ${st.exp}`);
+  // inside the stage, scrolling
+  const box = await page2.evaluate(() => { const w = document.querySelector('#stagewrap').getBoundingClientRect(), r = document.querySelector('#osc-panel').getBoundingClientRect(), b = document.querySelector('#osc-panel-body'); return { inside: r.top >= w.top - 1 && r.bottom <= w.bottom + 1 && r.left >= w.left - 1 && r.right <= w.right + 1, scrolls: b.scrollHeight > b.clientHeight && getComputedStyle(b).overflowY === 'auto' }; });
+  check(box.inside && box.scrolls, 'the panel stays inside the stage and scrolls', JSON.stringify(box));
+  await shot(page2, 'panel-open.png');
+  // a slider: the stored value at once, the stage on the next frames, the card shows it
+  await page2.evaluate(() => { const S = JSON.parse(localStorage.getItem('coding-misk-oscilloscope')); S.overlay = 'real'; S.values = { ...(S.values || {}), persistence: 0, glow: 0, ambient: 0 }; S.links = { ...(S.links || {}), glow: 'static', ambient: 'static' }; localStorage.setItem('coding-misk-oscilloscope', JSON.stringify(S)); });
+  // (Ambient light lights the whole glass: a change the moving beam cannot hide)
+  await sleep(400); const before = await picture(page2);
+  const t0 = await page2.evaluate(() => new Promise(res => { const r = document.querySelector('#osc-panel [data-osc-val="ambient"]'); r.value = '1'; r.dispatchEvent(new Event('input', { bubbles: true })); const t = performance.now(); requestAnimationFrame(() => requestAnimationFrame(() => res(performance.now() - t))); }));
+  const after = await picture(page2);
+  const stored = await page2.evaluate(k => JSON.parse(localStorage.getItem(k)).values.ambient, KEY);
+  check(stored === 1 && after.mean > before.mean + 1, 'a panel slider is stored at once and the stage changes on the next frames', `stored ${stored}, mean ${before.mean.toFixed(1)} → ${after.mean.toFixed(1)} after ${t0.toFixed(0)} ms`);
+  const out = await page2.evaluate(() => { const r = document.querySelector('#osc-panel [data-osc-val="intensity"]'); r.value = '10'; r.dispatchEvent(new Event('input', { bubbles: true })); return r.nextElementSibling.textContent; });
+  check(out === '10', 'the panel shows the slider\'s value', out);
+  // the panel draws nothing into the stage canvas (videos and fragments are drawn from it): paused, open and closed alike
+  await page2.click('#play'); await sleep(1200);
+  const pOpen = await picture(page2);
+  await page2.keyboard.press('Escape'); await sleep(300);
+  check(!(await visible('#osc-panel')), 'Escape closes the panel');
+  const pShut = await picture(page2);
+  check(differ(pOpen, pShut) < 0.5, 'the panel never draws into the stage canvas', differ(pOpen, pShut).toFixed(2));
+  // a click outside closes it
+  await page2.click('#osc-btn'); await sleep(200);
+  await page2.mouse.click(30, 900); await sleep(300);
+  check(!(await visible('#osc-panel')), 'a click outside closes the panel');
+  // the card shows the panel's change; a card change shows in the open panel
+  await settings(page2, true);
+  const cardVal = await page2.evaluate(() => document.querySelector('#set-oscilloscope [data-osc-val="intensity"]').value);
+  check(cardVal === '10', 'the Settings card shows the value set in the panel', cardVal);
+  await page2.evaluate(() => { document.querySelector('#osc-btn').click(); });
+  await sleep(200);
+  await page2.evaluate(() => { const r = document.querySelector('#set-oscilloscope [data-osc-val="glow"]'); r.value = '0.8'; r.dispatchEvent(new Event('input', { bubbles: true })); const l = document.querySelector('#set-oscilloscope [data-osc-link="noise"]'); l.value = 'kick'; l.dispatchEvent(new Event('change', { bubbles: true })); });
+  await sleep(200);
+  const pv = await page2.evaluate(() => ({ glow: document.querySelector('#osc-panel [data-osc-val="glow"]').value, noise: document.querySelector('#osc-panel [data-osc-link="noise"]').value }));
+  check(pv.glow === '0.8' && pv.noise === 'kick', 'a change in the Settings card shows in the open panel', JSON.stringify(pv));
+  await settings(page2, false);
+  // Defaults from the panel
+  await page2.evaluate(() => { document.querySelector('#osc-panel [data-osc-defaults]').click(); });
+  await sleep(200);
+  const dv = await page2.evaluate(k => ({ stored: localStorage.getItem(k), v: document.querySelector('#osc-panel [data-osc-val="intensity"]').value }), KEY);
+  check(dv.stored === null && dv.v === '5', 'Defaults in the panel restores the starting values', JSON.stringify(dv));
+  // another look hides the button and the panel
+  await page2.selectOption('#looks', 'palco'); await sleep(400);
+  check(!(await visible('#osc-btn')) && !(await visible('#osc-panel')), 'another look hides the button and closes the panel');
+  await page2.selectOption('#looks', 'oscilloscope'); await sleep(800);
+  // full screen
+  await page2.click('#fs'); await sleep(800);
+  const fsOn = await page2.evaluate(() => document.fullscreenElement && document.fullscreenElement.id);
+  await page2.click('#osc-btn'); await sleep(300);
+  const fsBox = await page2.evaluate(() => { const r = document.querySelector('#osc-panel').getBoundingClientRect(), b = document.querySelector('#osc-panel-body'); return { inside: r.bottom <= innerHeight + 1 && r.right <= innerWidth + 1 && r.height > 0, scrolls: b.scrollHeight > b.clientHeight }; });
+  check(fsOn === 'stagewrap' && fsBox.inside, 'in full screen the panel shows inside the stage', JSON.stringify({ fs: fsOn, ...fsBox }));
+  await shot(page2, 'panel-fullscreen.png');
+  await page2.keyboard.press('Escape'); await sleep(300);
+  if (await page2.evaluate(() => !!document.fullscreenElement)) { await page2.evaluate(() => document.exitFullscreen()); await sleep(500); }
+  // Italian
+  await page2.click('[data-lang="it"]'); await sleep(600);
+  await page2.click('#osc-btn'); await sleep(300);
+  const it = await page2.evaluate(() => ({ btn: document.querySelector('#osc-btn span').textContent, head: document.querySelector('#osc-panel b').textContent, smudge: document.querySelector('#osc-panel [data-osc-val="smudge"]').closest('.set-row').querySelector('.lbl').textContent }));
+  check(it.btn === 'Oscilloscopio' && /oscilloscopio/i.test(it.head) && it.smudge === 'Sporco', 'Italian: the button, the panel and its rows', JSON.stringify(it));
+  await page2.keyboard.press('Escape');
+  await page2.click('[data-lang="en"]'); await sleep(400);
+  check(!p.errors.length, 'no page errors with the panel', p.errors.join('; '));
+  await p.ctx.close();
+
+  // 400 px: the button is an icon, the panel a sheet inside the stage; light and hardware themes
+  for (const [ui, width] of [['neon', 400], ['light', 1400], ['hw', 1400], ['light', 400]]) {
+    const q = await open(browser, { 'coding-misk-look': 'oscilloscope', 'coding-misk-ui': ui, [KEY]: { overlay: 'smudged-graticule' } }, { width, height: 860 }), pg = q.page;
+    await pg.evaluate(u => { const b = document.querySelector(`[data-uitheme="${u}"]`); if (b) b.click(); }, ui); await sleep(400);
+    await pg.locator('#stagewrap').scrollIntoViewIfNeeded(); await pg.click('#osc-btn'); await sleep(300);
+    const r = await pg.evaluate(() => {
+      const w = document.querySelector('#stagewrap').getBoundingClientRect(), p = document.querySelector('#osc-panel'), pr = p.getBoundingClientRect(), span = document.querySelector('#osc-btn span');
+      const lbl = p.querySelector('.set-row .lbl'), cs = getComputedStyle(lbl), bg = getComputedStyle(p).backgroundColor;
+      const tools = [...document.querySelectorAll('.hud-row > *')].filter(e => !e.hidden && e.getBoundingClientRect().width).every(e => { const b = e.getBoundingClientRect(); return b.left >= w.left - 1 && b.right <= w.right + 1; });
+      return { ui: document.documentElement.dataset.ui, tools, label: getComputedStyle(span).display !== 'none', inside: pr.top >= w.top - 1 && pr.bottom <= w.bottom + 1 && pr.left >= w.left - 1 && pr.right <= w.right + 1, color: cs.color, bg, overflowX: document.documentElement.scrollWidth > innerWidth };
+    });
+    const ok = r.inside && r.tools && !r.overflowX && (width <= 640 ? !r.label : r.label);
+    check(ok, `${ui} at ${width} px: the panel and every toolbar button inside the stage, ${width <= 640 ? 'the button an icon' : 'the button with its label'}, no sideways scroll`, JSON.stringify(r));
+    await shot(pg, `panel-${ui}-${width}.png`);
+    check(!q.errors.length, `no page errors (${ui}, ${width} px)`, q.errors.join('; '));
+    await q.ctx.close();
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
 
   // 1. the menu, the module loaded only when picked
-  if (!VIDEO_ONLY) {
+  if (!VIDEO_ONLY && !PANEL_ONLY) {
     const s = await open(browser, { 'coding-misk-look': 'palco' }), { page } = s;
     const listed = await page.evaluate(() => [...document.querySelectorAll('#looks option')].map(o => o.value));
     check(listed.includes('oscilloscope'), 'Oscilloscope is in the visual menu');
@@ -92,7 +216,11 @@ async function settings(page, open = true) {
     await page.selectOption('#set-oscilloscope [data-osc-opt="overlay"]', 'real'); await sleep(500);
     const modes = {};
     for (const m of ['xy', 'sweep']) {
-      await page.click(`#set-oscilloscope [data-osc-mode="${m}"]`); await sleep(1200);
+      // (the stage scrolled back into view: a stage out of sight is not drawn)
+      // (and waited for until it draws again: two pictures apart in time differ while a song plays)
+      await page.click(`#set-oscilloscope [data-osc-mode="${m}"]`); await page.locator('#stagewrap').scrollIntoViewIfNeeded(); await sleep(1200);
+      for (let i = 0, prev = await picture(page); i < 20; i++) { await sleep(250); const cur = await picture(page); if (differ(prev, cur) > 0.05) break; prev = cur; }
+      await sleep(600);
       const st = await page.evaluate(k => JSON.parse(localStorage.getItem(k) || '{}').mode, KEY), p = modes[m] = await picture(page);
       check(st === m && p.lit > 0.002, `mode ${m}: stored and the beam drawn`, `lit ${(p.lit * 100).toFixed(2)} %`);
       if (m === 'xy') await shot(page, 'osc-xy.png');
@@ -133,10 +261,12 @@ async function settings(page, open = true) {
         for (const ov of OVERLAYS) await measure(`${ov}, defaults`, { overlay: ov }, size);
         await measure('real, Glow 1', { overlay: 'real', values: { glow: 1 }, links: { glow: 'static' } }, size);
         await measure('real, XY, Glow 1', { overlay: 'real', mode: 'xy', values: { glow: 1 }, links: { glow: 'static' } }, size);
+        await measure('smudged-graticule, Smudge 2, Beam scatter 2', { overlay: 'smudged-graticule', values: { smudge: 2, scatter: 2 } }, size);
       }
       const cdp = await s.ctx.newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
       await measure('real, Glow 1, CPU slowed 4×', { overlay: 'real', values: { glow: 1 }, links: { glow: 'static' } }, { w: 1920, h: 1080 });
+      await measure('smudged-graticule, Smudge 2, Beam scatter 2, CPU slowed 4×', { overlay: 'smudged-graticule', values: { smudge: 2, scatter: 2 } }, { w: 1920, h: 1080 });
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       await page.evaluate(() => globalThis.codingMiskVisuals.setTarget(null));
       if (SHOTS) fs.writeFileSync(path.join(SHOTS, 'osc-cost.json'), JSON.stringify(rows, null, 2));
@@ -144,9 +274,13 @@ async function settings(page, open = true) {
     await s.ctx.close();
   }
 
-  // 5. a 9:16 fragment with the look, from a page that never showed it: a beam from the first frame
+  // 4b. the smudged glass per song, and the stage panel
+  if (!VIDEO_ONLY) await glassAndPanel(browser);
+
+  // 5. a 9:16 fragment with the look, from a page that never showed it: a beam from the first frame (with a smudged
+  // overlay: the glass's masks loaded before it too)
   if (VIDEO) {
-    const s = await open(browser, { 'coding-misk-look': 'palco', 'coding-misk-export-speed': 'fast', 'coding-misk-export-format': 'wav' }), { page } = s;
+    const s = await open(browser, { 'coding-misk-look': 'palco', 'coding-misk-export-speed': 'fast', 'coding-misk-export-format': 'wav', [KEY]: { overlay: 'smudged-graticule' } }), { page } = s;
     check(!(await ready(page)), 'the fragment\'s page has not loaded the module before the export');
     await page.evaluate(o => globalThis.codingMiskClips.fragments(o), { source: 'kellerlicht', quiet: true, render: 'normal', from: 30, to: 34, look: 'oscilloscope' });
     let d = null;
@@ -160,6 +294,8 @@ async function settings(page, open = true) {
       // (the first second carries the fragment's intro text over the stage: the frames after it)
       const later = [1.5, 2.5, 3.5].map(t => lit(band(t))), black = await page.evaluate(() => globalThis.codingMiskOscBlack || 0);
       check(black === 0, 'no frame of the fragment drawn black while the module loads (loaded before the first frame)', `${black} black frames`);
+      const bare = await page.evaluate(() => globalThis.codingMiskOscGlassMissing || 0);
+      check(bare === 0, 'no frame of the fragment drawn without its smudges (the masks loaded before the first frame)', `${bare} frames`);
       check(later.every(x => x > 0.004), 'the fragment\'s frames are not empty', later.map(x => `${(x * 100).toFixed(2)} %`).join(', '));
       check(s.logs.some(l => /loaded before the first frame/.test(l)), 'the export says the module was loaded first', s.logs.slice(-2).join(' | '));
       if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '2', '-i', f, '-frames:v', '1', path.join(SHOTS, 'osc-fragment.png')]); }

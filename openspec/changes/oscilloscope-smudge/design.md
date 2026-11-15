@@ -1,0 +1,144 @@
+# Design
+
+## Context
+
+See proposal.md. Pointers checked at `490c186` (`develop`):
+
+| What | Where |
+| --- | --- |
+| The overlays, cached in two canvases (under and over the beam) | `src/visuals/oscilloscope.js` `overlayOf` (smudges: the `smudged` branch, `seeded(4242)`) |
+| Settings model, parameters, links, defaults | `src/visuals/oscilloscope-rules.js` `PARAMS`, `OSC_DEFAULTS`, `SHOWN`, `oscSettings` |
+| The look's frame, the module loaded on first use | `src/visuals.js` `drawOscilloscope`, `oscLoad`, `loadLook` |
+| The song's seed for the stage | `src/main.js` stage object, `seed: () => (fv ? fv.seed : (song && song.id) || '')` |
+| Settings card, its handlers | `src/settings/settings.js` `oscilloscopeCard`, `setOsc` and the `data-osc-*` handlers |
+| Stage toolbar | `index.html` `.hud-row` (`#sv-allow`, `#code-over-btn`, `#sw-btn`, `#fs`), `src/style.css` `.chip`, `.sw-chip`, `.sv-chip` |
+| Credits of shipped media | `public/sounds/photos/CREDITS.md` |
+
+The owner's preview (local notes, `notes/oscilloscope-sbavature/`) holds the 15 candidates, their sources and licences, the masks made from them and three assembled examples. It also has the light model below, drawn with a canvas, and sliders for Smudge, Ambient light and Beam scatter.
+
+## Goals / Non-Goals
+
+**Goals:** smudges that read as grease, prints and dust on glass; a different glass for every song, repeatable; only files we may ship, with their credits; settings changed while watching the stage.
+
+**Non-Goals:** a texture editor, per-element settings, glass on other looks, WebGL.
+
+## Decisions
+
+### D1. Masks, not pictures
+
+A texture becomes a mask: grey levels to alpha, white colour, 512 × 512, WebP (PNG as a fallback is not needed: every supported browser decodes WebP). The colour comes from the drawing (Ambient light, the hue, Screen saturation), so one mask works for every hue and theme. `tools/make-glass-masks.sh` records how each mask is made from its source (crop, levels, inversion); the sources themselves are not committed (they are 1K PBR sets with files we do not need).
+
+### D2. The element set (the owner kept all 15, 15 November)
+
+From the preview, all CC0 (ambientCG, licence page https://docs.ambientcg.com/license/; Wikimedia Commons for the vector print) or drawn by the app:
+
+| Role | Elements |
+| --- | --- |
+| Haze base (one, cover) | SurfaceImperfections008, SurfaceImperfections003, Smear008, Smear003 |
+| Prints (near the edges) | Fingerprints002 and Fingerprints008 crops, Fingerprint-297594.svg (blurred), the app's ridged print |
+| Smears | Smear001 and Smear005 (whole), Smear007 (a small crop) |
+| Drops (sometimes, cropped) | SurfaceImperfections001 |
+| Debris (sometimes, cropped, small) | SurfaceImperfections013 |
+| Drawn by the app | dust, hairs and fine scratches; a cloth wipe arc; the ridged print |
+
+Fingerprints005 is left out (barely visible, not among the 15). The Commons file `Fingerprint picture.svg` (CC BY-SA 3.0) and commercial "dust and scratches" overlays are references only: the ridged print and the dust are the app's own drawings.
+
+### D3. The glass plan
+
+`glassPlan(seed, overlay)` in `oscilloscope-rules.js`, pure: a seeded random (string hash, then a small PRNG) gives a list of elements `{ mask | draw, x, y, size, angle, alpha, crop }` in screen units (0..1 of the screen area). Rules:
+
+- one haze base at alpha 0.35 to 0.65 (one of the four bases);
+- 2 to 4 prints, each centred within 6 % to 20 % of the screen from an edge (people touch the edges): the app's ridged print, a crop of Fingerprints002 or 008, or the vector print blurred;
+- 1 or 2 smears anywhere in the middle 60 %: Smear001 or Smear005 whole, or a crop of Smear007;
+- drops with probability 0.5, debris with 0.4, a wipe arc with 0.6, dust always;
+- Real oscilloscope: half the prints, one smear, no wipe arc, alphas × 0.6.
+
+Over 300 seeds every one of the 15 elements appears (`check:oscilloscope`).
+
+The plan does not depend on the size of the stage, so a 9:16 fragment and the 16:9 stage place the elements in the same places of the screen.
+
+### D4. Drawing and light
+
+- **The mask canvas.** The plan is drawn once into a mask canvas the size of the screen area, cached with the overlay by size, overlay and seed (the overlay key gets the seed).
+- **Room light.** The mask, filled with the glass tint (the hue at Screen saturation, light 80 %), drawn with `screen` at `0.22 × Ambient light × Smudge` into the cached glass over the beam.
+- **Beam scatter.** Each frame: the phosphor buffer blurred wide (about 22 px at 1080p), kept only where the mask is (`destination-in`), added with `lighter` at `0.9 × Beam scatter × Smudge`. It reuses the work canvas of Glow at a quarter size, so the cost is one more small blur and two copies. Measure at 1080p and 4K like the Cost section of `oscilloscope-visual`; if the scatter pass costs more than 2 ms on the software path at 1080p, draw it every other frame.
+- The old smudge code (`seeded(4242)`, the patches and arcs) goes.
+
+### D5. Seed and song change
+
+`drawOscilloscope` passes `seed: stage.seed()`; the glass is rebuilt when it changes. A radio song or a generated song without an id uses its session seed and position, as `stage.seed()` already returns.
+
+### D6. Loading the masks
+
+`oscilloscope.js` loads the masks it needs (from the manifest) the first time an overlay with smudges is drawn; until they arrive the glass has no smudges (a few frames). `loadLook('oscilloscope')` also awaits the masks when the look's stored overlay has smudges, so fast videos and fragments never start without them.
+
+### D7. Licences
+
+`public/visuals/glass/manifest.json`: `[{ file, role, source, sourceUrl, licence, made }]`, licence one of `CC0-1.0` or `own`. `CREDITS.md` lists each file with its source and licence (attribution is not required by CC0, we give it anyway). `check:oscilloscope` reads both: every file listed, every entry has a file, the licence allowed, the total size within 600 KB.
+
+### D8. The stage button and the panel
+
+- **Toolbar on a phone.** At 640 px or less the toolbar row wraps to a second row, right-aligned: before this change Fullscreen already ran past the stage's edge at 400 px (right edge 448 px on a 384 px stage), and one more button would have pushed Widgets out too.
+- **Button.** `#osc-btn`, a `.chip` with a small drawn icon (a sine in a rounded screen) and the label, `aria-expanded`, between Code over and Widgets. Shown only while the look on the stage is Oscilloscope (the look menu's value, the radio look and a section's look all count). Below 640 px the label hides, as `.sw-chip` does.
+- **Panel.** A popover inside `#stagewrap` (so it works in full screen), on the right about 340 px wide, scrolling inside. Its top is measured when it opens (and on resize and full screen) from the bottom of the toolbar's rows, so it never covers the toolbar: one row on a desktop, two on a phone. Below 640 px it spans the stage's width. Panel surface and text use the app tokens (neon, hardware, light). It is not part of the stage canvas, so recordings and exports never show it.
+- **Live.** Each control writes `coding-misk-oscilloscope` through the same `setOsc`; the frame reads the store each frame (as today), so the change shows on the next frame. Sliders update while dragging (`input`). The Settings card listens to the same store change and refreshes its values when it is open.
+- **Shared controls.** `src/visuals/osc-controls.js` renders the rows (Screen, Mode, Oversample, each parameter with slider, value and link, Defaults) and binds their events; the card and the panel both call it. With the panel, the card shows every parameter (`oscilloscope-visual` task 2.2), and `SHOWN` goes.
+
+### D9. Strings
+
+| Key | English | Italian |
+| --- | --- | --- |
+| `oscBtn` | Oscilloscope | Oscilloscopio |
+| `oscBtnTip` | Oscilloscope settings, applied at once (also in Settings → Oscilloscope) | Impostazioni dell'oscilloscopio, applicate subito (anche in Impostazioni → Oscilloscopio) |
+| `osc:smudge` | Smudge | Sporco |
+| `osc:smudgeHint` | How dirty the glass is: prints, smears and dust, different for each song. | Quanto è sporco il vetro: ditate, strisciate e polvere, diverse per ogni brano. |
+| `osc:scatter` | Beam scatter | Diffusione dal raggio |
+| `osc:scatterHint` | How much the grease catches the beam's light. | Quanto lo sporco raccoglie la luce del raggio. |
+| `oscPanelClose` | Close | Chiudi |
+
+The overlay names stay (Smudged, Smudged graticule; Sbavato, Reticolo sbavato).
+
+### D10. Guide and knowledge
+
+The Oscilloscope card in `src/guide.js`: *how* names the stage button and its panel; *know* says the glass changes with each song and stays the same in its videos, and that the textures are CC0 with credits in `public/visuals/glass/CREDITS.md`. `docs/knowledge/visuals.md`: the glass, the plan, the two parameters, the panel.
+
+## Cost (measured 15 November, task 6.2)
+
+`tools/check-oscilloscope.cjs --cost` and a run by Smudge and Beam scatter, kellerlicht playing, headless Chrome on the owner's Mac, the stage drawn into a 1920 × 1080 target. Main thread only: 0.2 ms median for Graticule and for Smudged graticule at Smudge 0, 1 and 2 (0.3 ms before the changes below). With the canvas read back (the software path, the worst case):
+
+| Smudged graticule, 1080p | Median |
+| --- | --- |
+| Smudge 0 | 18.0 ms |
+| Beam scatter 0 (room light only) | 18.1 ms |
+| defaults (Smudge 1, Beam scatter 1) | 22.1 ms |
+| Smudge 2, Beam scatter 2 | 21.7 ms |
+
+First measured at 21.6 and 24.9 ms: the room light (a full-size `screen` copy) and the scatter cost about 3.3 ms each. The room light is now baked into the cached glass over the beam (its key holds the seed, Smudge and whether the masks arrived), and the scatter's blur is made every other frame. At 4K with the read back, before those changes: 81 ms against 62 ms for Graticule. An 8-second 9:16 fragment with Smudged graticule exported in 4.3 s against 5.2 s with Palco (load average 5).
+
+## Cost estimate
+
+In agent hours (the owner's review rounds not counted):
+
+| Part | Hours |
+| --- | --- |
+| Masks, `make-glass-masks.sh`, manifest, `CREDITS.md` | 1 |
+| Glass plan (rules) and its Node checks | 1.5 |
+| Drawing: mask canvas, room light, beam scatter, old code removed, loading and fast video | 2 |
+| Shared controls, the stage button and panel (themes, full screen, phone), the card on the shared controls | 2.5 |
+| Strings, Guide card, knowledge note, AGENTS.md lines | 0.5 |
+| Browser checks, cost measurement, screenshots, DEVLOG | 2 |
+| **Total** | **9.5** |
+
+## Risks / Trade-offs
+
+- **Textures can look repetitive** when the same crop appears in two songs: the crops' offsets and angles are seeded, and the plan mixes three sources per role.
+- **Beam scatter costs a blur per frame.** Mitigated by the quarter-size canvas and the every-other-frame fallback (D4).
+- **Masks are a new kind of shipped file.** The manifest check keeps licences honest; the size budget keeps the look light.
+- **The panel covers part of the stage.** It is small, closes with Escape or a click outside, and the beam is centred so the right edge matters least.
+
+## Owner's answers (15 November)
+
+1. **Elements:** all 15 candidates are kept (D2).
+2. **Per song or one glass:** nothing needs saving, and a random glass each time would also be fine. Decision: keep the seeded plan from the song's seed (D3, D5): no storage, and a video or fragment shows the same glass as the stage.
+3. **Button label:** "Oscilloscope" / "Oscilloscopio", icon only on phones.
+4. **Default Smudge:** the preview's middle value, 1.
