@@ -40,7 +40,7 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // at. (Round 5 wrote a fixed `.distort(4.5).distortvol(0.5).crush(4.85)` when the even/odd ratio was under -3 dB: the
 // crusher matched a median-centroid score with broadband noise, +12 to +14 dB above 5.6 kHz, and the ratio read square,
 // triangle and sine basses as driven; review of 13 November.)
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, roomRange: [0.3, 0.9], levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.91, spread: [0.227, 6.44], eoFloor: -8, min: 3 }, bassWave: 700 };
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, roomRange: [0.3, 0.9], holdShare: 0.8, fallback: 0.03, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.91, spread: [0.227, 6.44], eoFloor: -8, min: 3 }, bassWave: 700 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -243,12 +243,14 @@ const levelKey = (id, code) => {
   if (id === 'lead') return `lead:${wave}`;
   return null;
 };
-// the share of a loop's steps that sound a note, from its first mini-notation string (1 for chords, held all bar)
+// the share of a loop's steps that sound a note, from its first mini-notation string (1 for chords, held all bar); a
+// held step (`_`, round 8) counts as SOUND_RULE.holdShare of a step: a held note fades under its attack's level (0.8:
+// at 1 the balance raised the drums on held-note songs, at 0.75 and under one real file loses its drum drive)
 export function stepShare(code) {
   const m = /\b(?:note|n)\("([^"]*)"\)/.exec(code);
   if (!m) return 1;
   let all = 0, on = 0;
-  for (const tok of m[1].replace(/[<>[\]]/g, ' ').split(/\s+/).filter(Boolean)) { const r = /^(.*?)(?:!(\d+))?$/.exec(tok), n = r[2] ? +r[2] : 1; all += n; if (r[1] !== '~') on += n; }
+  for (const tok of m[1].replace(/[<>[\]]/g, ' ').split(/\s+/).filter(Boolean)) { const r = /^(.*?)(?:!(\d+))?$/.exec(tok), n = r[2] ? +r[2] : 1; all += n; if (r[1] === HOLD) on += n * SOUND_RULE.holdShare; else if (r[1] !== '~') on += n; }
   return all ? on / all : 1;
 }
 // a three-band view of five level bands (the mid bands summed)
@@ -317,7 +319,9 @@ export function balanceLevels(tracks, shares, bars, { bassMissing = false } = {}
     for (const k of allowed(free[i])) { ks[i] = k; walk(i + 1, ks); }
   };
   walk(0, free.map(() => 1));
-  if (b3 > SOUND_RULE.shares) return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: null };
+  // (round 8: when no gains bring every band within SOUND_RULE.shares, the nearest gains are still taken when they bring
+  // the largest share difference down by SOUND_RULE.fallback or more; before, the levels stayed as written)
+  if (b3 > SOUND_RULE.shares && !(SOUND_RULE.fallback > 0 && b3 <= before - SOUND_RULE.fallback)) return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: null };
   // (task 10.6: the drums' drive by the high band: with the chosen gains, the original's high-band share against the
   // predicted one; when the original holds DRUM_DRIVE.ratio times more or above, the drive whose driven rows bring the
   // prediction nearest, if nearer than the clean kit)

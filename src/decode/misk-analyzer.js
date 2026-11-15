@@ -34,8 +34,9 @@ export const TOP_LINE = { floor: 0.02 };
 // step on and kept only with the same pitch within this many steps or in a second late window, and only when its late
 // level rises by `rise` over the step before's; agree: the two windows of a step hold one pitch within this many
 // semitones (0.6 before round 8: a square bass under a low-pass reads about a semitone apart in its two windows);
-// holdFloor: a step holds the note before only above this share of the bass's loudest step
-export const BASS_RULE = { loose: 0.35, late: 0.45, context: 2, rise: 1.15, agree: 1.0, holdFloor: 0.12 };
+// holdFloor: a step holds the note before only above this share of the bass's loudest step, and holdKeep: only while
+// its level stays at this share of the note's attack through the step (a short note's ringing tail is no hold)
+export const BASS_RULE = { loose: 0.35, late: 0.45, context: 2, rise: 1.15, agree: 1.0, holdFloor: 0.12, holdKeep: 0.6 };
 
 // ---------- FFT (radix 2, in place) ----------
 const ffts = new Map();
@@ -743,7 +744,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     const x = bassSignal(), out = [], L = step * decRate, tmax = Math.floor(decRate / 30);
     // one pitch window inside the first 85 % of the step, and a second one later when the step is long enough
     const w = Math.max(64, Math.min(200, Math.round(0.75 * L - tmax)));
-    let prev = null, cur = null;
+    let prev = null, cur = null, curLevel = 0;
     // (decode round 8: the steps a note still sounds on, its pitch heard again with no new attack: `out.hold`)
     const hold = new Array(STEPS).fill(false);
     const kickAt = j => onsets.kick.some(o => Math.abs(o.t - (start + j * step)) <= 0.03 && kickLike(o));
@@ -769,8 +770,8 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       const underKick = loose && quietBefore(out, before, j);
       const fresh = voiced && !kickOnly && (head > 1.4 * before || (prev !== null && Math.abs(midi - prev) >= 1 && head > 0.7 * before) || underKick);
       out.push(fresh ? midi : null);
-      if (fresh) cur = midi;
-      else if (cur !== null && agree(m1, m2) && Math.abs((m1 + m2) / 2 - cur) < BASS_RULE.agree && head > BASS_RULE.holdFloor * bassTop) hold[j] = true;
+      if (fresh) { cur = midi; curLevel = head; }
+      else if (cur !== null && agree(m1, m2) && Math.abs((m1 + m2) / 2 - cur) < BASS_RULE.agree && head > BASS_RULE.holdFloor * bassTop && head >= BASS_RULE.holdKeep * curLevel && tail >= BASS_RULE.holdKeep * curLevel) hold[j] = true;
       else cur = null;
       prev = m1 !== null ? Math.round(m1) : null;
       if (voiced && !kickOnly) heardPitches.add(midi);

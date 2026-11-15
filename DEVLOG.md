@@ -3486,3 +3486,11 @@ Ramo `feat/91-decode-round8`. Solo il livello B (`src/decode/full.js`), il tempo
 
 - `tools/decode-stems.cjs --engine mlx`: lo stesso modello di separazione nel suo port per Apple Silicon (codice MIT, pesi convertiti), in un venv a parte sotto `.cache/decode/mlx-venv`, stem in `.cache/decode/stems-mlx/`. Solo banco, mai nell'app. Su 7 canzoni del banco: circa un decimo della durata del brano contro 0,3 sulla CPU, circa 6 GB di memoria al picco contro 2; qualità uguale in media (SDR batteria 19,8 contro 19,4 dB, basso 13,1 contro 12,8), ma per canzone fino a circa 5 dB di differenza, quindi il default resta il modello di riferimento. Il port non ricampiona: l'ingresso va portato a 44,1 kHz prima (lo fa il tool).
 - Nuovo set di 26 brani reali (in `notes/`, id anonimi): accordo dei motori di tempo, stem e numeri del banco senza verità, solo in `notes/`.
+
+## 2026-11-15: Decode giro 8: regressioni del passaggio precedente (`#91`)
+
+- **Boombap al tempo giusto (90):** il bilanciamento dei livelli non trovava guadagni con tutte le bande entro 0,10 e lasciava i livelli scritti (accordi troppo forti). Ora prende comunque i guadagni più vicini se riducono la differenza più grande di almeno 0,03. Boombap: errore di banda 3,42 → 2,09 dB (era 2,13 a 180), ritmo basso 0,29 → 0,43. Cambia solo boombap sul banco.
+- **Square e drumdrive (ritmo basso crollato):** le tenute coprivano le code delle note brevi. Una tenuta ora vale solo se il livello resta al 60 % dell'attacco per tutto lo step. Square ritmo basso 0,07 → 0,28, drumdrive 0,06 → 0,27; held-sub e dub tengono le loro tenute.
+- **Trap e held-sub (errore di banda):** la previsione del livello contava un passo tenuto come un passo pieno; ora vale 0,8 (a 0,75 e sotto un file del proprietario perde il drive della batteria, una regola già fragile). Trap 3,42 → 2,88 dB (base 2,46), held-sub 2,97 → 2,46 (base 2,81).
+- **real-10 (140 → 105) e real-18 (166 → 111):** il nuovo tempo è quello di tutti i motori e del tracciatore appreso; resta da migliorare il basso scritto a quel tempo (real-10 2,7 → 6,2 dB).
+- **Banco finale contro la base del giro:** errore di banda tuning 2,29 → 2,22, validazione 3,77 → 3,15, fresh 2,19 → 2,09, proprietario 4,10 → 4,16 dB; 26 brani reali: mediana 3,62 → 3,87 dB, ritmo e croma meglio. `ANALYSIS_VERSION` 14 → 15.
