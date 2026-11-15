@@ -865,7 +865,9 @@ ready.then(async () => {
     if (mode === 'track' && ed && !isPlaying()) ed.setCode(compiled.codeAt ? codeFor(compiled, 0) : compiled.code);
     cardsReady();
     if (!custom.length) return;
-    await globalThis.samples('/samples/strudel.json');
+    // (the editor exists before Strudel's prebake defines samples(): wait for it, as the dirt-samples load above does)
+    const load = await whenSamples();
+    await load('/samples/strudel.json');
     renderTrackPanel(); renderSounds(); syncAll();
   } catch (e) { console.warn('campioni personalizzati non disponibili', e); composeReady = true; growComposeAway(); cardsReady(); }
 });
