@@ -6018,6 +6018,8 @@ if (!store.get('coding-misk-guide-v', 0)) {
   store.set('coding-misk-guide-v', 1);
 }
 { const tb = store.get('coding-misk-tab', 'componi'); if (TABS.includes(tb)) showTab(tb); }
+// the work area is built and its tab shown: it appears now, in place (light-start D3)
+document.documentElement.dataset.ready = '1';
 updateShare();
 // the soul scene (#46): the radio's song on air (with the director's plan), or the song playing elsewhere
 const soul = createSoulScene({

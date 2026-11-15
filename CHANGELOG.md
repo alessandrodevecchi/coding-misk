@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - Code: Instrument name option (Random per song, `$:`, name at line start) and Names from option (instrument or track), in Compose's code options, the radio's Custom section and the Decode tab's Options.
+- `tools/check-light-start.cjs`: browser check of a light start (no Sounds photo at startup, layout shift under 0.1 at desktop and phone width).
 - Decode: in Full, a Lead track writes the top line as a loop per section, with mute and solo; a sung melody starts muted.
 - Decode: All, Audio and Video filters in the library list, with the count of each, remembered and followed by Autoplay, Previous and Next.
 - Stage: Video look in the look menu and the arrows, showing a muted video with every render style, Code over, the widgets and the captions over it.
@@ -97,6 +98,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Startup: the photos of the Sounds tab load only when the tab opens, and only for the rows on screen.
+- Startup: the header, the stage and the work area keep their place after the first paint (no layout jump).
 - Guide: the Decode card describes the Lead track in Full, the tempo checked again after 8 bars with a kick in Live, Essentia.js for the top line and the video picture with the Video visual.
 - Guide: the Settings card says what the backup holds of Decode and the "Include all Decode analyses" choice.
 - Guide: the "Video on the stage" card says that the fast video and fragments offer Video as a chosen visual.
