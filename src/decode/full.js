@@ -42,7 +42,7 @@ export function pickTempo(misk, ess, user = null) {
 // only for a move that is no octave (a 3:2 reading: one real file at 107 where the three say 161); a pick at half of
 // the three moves up from confidence `halfConfidence` when the three agree as read (one real file at 64, the three at
 // 128 with confidence 2.2), a pick at double only above `octaveConfidence` as before (the app's radio song at 176)
-export const TEMPO_VOTE = { near: 0.04, octaveConfidence: 3.5, halfConfidence: 2.0, fold: true };
+export const TEMPO_VOTE = { near: 0.04, octaveConfidence: 3.5, halfConfidence: 2.0, fold: true, middle: 0.015 };
 export function threeAgree(pick, ess, rule = TEMPO_VOTE) {
   if (!ess || !(ess.bpm > 0 && ess.percival > 0 && ess.degara > 0)) return pick;
   const fold = x => { if (!rule.fold) return x; for (const r of [2, 0.5]) if (Math.abs((x * r) / ess.bpm - 1) < rule.near) return x * r; return x; };
@@ -52,7 +52,48 @@ export function threeAgree(pick, ess, rule = TEMPO_VOTE) {
   if (Math.abs(k - 2) < 0.08 && !(ess.confidence >= rule.octaveConfidence)) return pick;
   const raw = [ess.bpm, ess.percival, ess.degara].every(x => near(x, mid));
   if (Math.abs(k - 0.5) < 0.02 && !(raw && ess.confidence >= (rule.halfConfidence ?? rule.octaveConfidence))) return pick;
-  return { bpm: ess.bpm, from: 'essentia.js', vote: true };
+  // (round 9: the middle of the three when RhythmExtractor2013's own lies further from it than `middle`, the reach of the
+  // fine grid's search (1.5 %): one real file read 184.6 where the other two say 179.8 and 178.2 doubled, and the fine
+  // grid kept the 3 % error; a learned beat tracker says 180. Within the reach its own stays: the middle moved a 6-minute
+  // file from 111.0 to 111.2 and its grid drifted)
+  return { bpm: rule.middle && Math.abs(ess.bpm / mid - 1) > rule.middle ? mid : ess.bpm, from: 'essentia.js', vote: true };
+}
+
+// the beat phase checked on the claps (decode round 9): a clap plays on a beat (two and four, or three in a half-time
+// groove). When at least PHASE_RULE.share of the file's claps (and PHASE_RULE.min of them) sit on one other 16th of the
+// beat, the grid is a 16th, an eighth or three 16ths off: a rolling bass on the offbeats read as kicks put the beat
+// there. Bench: three songs off (a driven 606 and a driven 505 under rolling basses, an eighth; a driven techno kit, a
+// 16th), their claps 73 to 100 % on one wrong position; every song and real track on the right beat at most 44 %.
+// counts: claps per 16th position inside the beat (0 on the beat) → the 16ths to move the phase by, 0 for none
+export const PHASE_RULE = { share: 0.6, min: 16 };
+export function clapShift(counts, rule = PHASE_RULE) {
+  const n = counts.reduce((a, b) => a + b, 0);
+  if (n < rule.min) return 0;
+  for (let p = 1; p < 4; p++) if (counts[p] >= rule.share * n) return p;
+  return 0;
+}
+
+// the mode of a key whose tonic has no third (decode round 9): over the bars whose chord root is the key's root, the
+// chroma without the bass notes' upper harmonics (misk-analyzer's chromaEx) holds both thirds under MODE_RULE.third of
+// the root (the riff below reads 0.12 and 0.21; the files that keep their mode read a third of 0.26 or more) (a power-chord riff, a drone: a distorted note's fifth harmonic reads as a major third, so the chord reads
+// major), on at least MODE_RULE.bars bars. The mode is then the scale's: the bass notes and the chord roots (a root
+// counting MODE_RULE.root notes) on the minor degrees (3, 8 and 10 semitones up) against the major ones (4, 9, 11); it
+// changes when one side has at least MODE_RULE.ratio times the other and MODE_RULE.min in all. Bench: a driven techno
+// song read G major goes to G minor (207 against 4; its truth, A minor, is still missed); real tracks: a midtempo riff read E major goes to E minor (the
+// key a label gives and the one its separated harmonic parts give); no other file fires. → the key (the same object when
+// nothing changes)
+export const MODE_RULE = { third: 0.25, bars: 8, root: 4, ratio: 2, min: 20 };
+export function thirdlessMode(key, bars, raw, rule = MODE_RULE) {
+  if (!key || !raw) return key;
+  const r = key.root;
+  let n = 0, s0 = 0, s3 = 0, s4 = 0;
+  bars.forEach((b, i) => { const c = parseChord(b.chord), v = raw[i] && raw[i].chromaEx; if (!c || c.root !== r || !v) return; n++; s0 += v[r]; s3 += v[(r + 3) % 12]; s4 += v[(r + 4) % 12]; });
+  if (n < rule.bars || !(s0 > 0) || s3 >= rule.third * s0 || s4 >= rule.third * s0) return key;
+  let mi = 0, ma = 0;
+  const deg = (x, w) => { const d = (((x - r) % 12) + 12) % 12; if (d === 3 || d === 8 || d === 10) mi += w; if (d === 4 || d === 9 || d === 11) ma += w; };
+  for (const b of bars) { for (const x of b.bass || []) if (x !== null && x !== undefined) deg(x, 1); const c = parseChord(b.chord); if (c) deg(c.root, rule.root); }
+  const mode = mi >= rule.min && mi >= rule.ratio * ma ? 'minor' : ma >= rule.min && ma >= rule.ratio * mi ? 'major' : key.mode;
+  return mode === key.mode ? key : { ...key, mode };
 }
 
 // a chord per bar from chords per interval (Essentia.js), `per` intervals a bar: the chord with the most strength
@@ -152,7 +193,7 @@ export function backbeatSnare(bars, rule = SNARE_RULE) {
   }
   return moves;
 }
-export const HARMONY_RULE = { clear: 0.8, clearBars: 2, range: 7, quietBass: 0.2 };
+export const HARMONY_RULE = { clear: 0.8, clearBars: 2, range: 7, quietBass: 0.2, rootNotes: 2, rootShare: 0.6 };
 // a bar misk-analyzer marked `third` (a quiet minor third over a major third the bass's harmonics explain) is minor when
 // the key holds that minor chord and not the major one (decode-refine D5: luci-rosse's Am stab under its distorted acid
 // bass read as A by both engines). Changes the bars in place
@@ -185,7 +226,11 @@ export function steadyQualities(bars, sections, rule = HARMONY_RULE, key = null)
 export function bassRange(bars, sections, rule = HARMONY_RULE) {
   for (const sec of sections) {
     const list = bars.slice(sec.start, sec.start + sec.bars), top = Math.max(0, ...list.map(b => (b.level ? b.level.bass || 0 : 0)));
-    for (const b of list) if (b.level && top > 0 && (b.level.bass || 0) < rule.quietBass * top && b.bass) b.bass = b.bass.map(() => null);
+    // (round 9: a quiet bar keeps notes that sit on its chord's root, at least `rootNotes` of them and most of its notes: a
+    // bass of a few short notes reads a low mean level, and a test song's bar of three A1 notes under Am at 0.15 of the
+    // section's loudest lost them all; a voice or a lead that YIN follows does not stay on the chord's root)
+    const onRoot = b => { const c = parseChord(b.chord), xs = (b.bass || []).filter(x => x !== null && x !== undefined); if (!c || xs.length < rule.rootNotes) return false; return xs.filter(x => ((x % 12) + 12) % 12 === c.root).length >= Math.max(rule.rootNotes, rule.rootShare * xs.length); };
+    for (const b of list) if (b.level && top > 0 && (b.level.bass || 0) < rule.quietBass * top && b.bass && !onRoot(b)) b.bass = b.bass.map(() => null);
     const notes = list.flatMap(b => (b.bass || []).filter(x => x !== null && x !== undefined)).sort((x, y) => x - y);
     if (!notes.length) continue;
     // (the range: the 2·range+2 notes, a 15-semitone span, that hold the most notes, the nearest to the median on a tie; a riff that jumps
@@ -216,7 +261,7 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   // 4. one beat grid for the whole file: the tempo picked, fitted on the onsets of the whole file, and its downbeat
   const pick = pickTempo(misk, ess, tempo);
   if (pick.from !== MISK) engines.tempo = pick.from;
-  let bpm = pick.bpm, downbeat = misk.downbeat;
+  let bpm = pick.bpm, downbeat = misk.downbeat, phaseMoved = 0;
   if (pick.from === 'tapped') downbeat = tempo.downbeat ?? misk.downbeat;
   else {
     // the tempo made exact on the whole file (a comb), the beat phase from every onset, a line through the onsets, then
@@ -224,6 +269,9 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
     // it sets the tempo's octave and region, misk-analyzer the grid the code plays on)
     const b0 = A.wholeTempo(bpm), g = A.fitGrid(b0, A.wholePhase(b0));
     bpm = g.bpm;
+    // (round 9: the claps say where the beat is, clapShift)
+    const sh = clapShift(A.clapPositions(bpm, g.beatPhase));
+    if (sh) { g.beatPhase += (sh * 15) / bpm; phaseMoved = sh; }
     downbeat = A.gridDownbeat(bpm, g.beatPhase);
   }
   const uncertain = ['essentia.js', 'tapped', 'picked'].includes(engines.tempo) ? false : !!misk.uncertain;
@@ -258,6 +306,8 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   }
   // misk-analyzer's own key, its mode settled the same way over the whole file
   if (engines.key === MISK && m.key) m.key = { ...settleMode(m.key, m.bars), conf: m.key.conf };
+  // (round 9: a tonic with no third, the mode from the scale)
+  if (m.key) { const k = thirdlessMode(m.key, m.bars, raw); if (k !== m.key) { m.key = k; m.keyMode = 'scale'; } }
   // 6b. the top line (decode-refine D2): Essentia.js's predominant melody, else misk-analyzer's YIN on the 200-2000 Hz
   // band; one note per 16th step, snapped to the key's scale within 40 cents
   onProgress(0.93, 'melody');
@@ -305,6 +355,7 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   // (round 8: decoded bass notes that are no bass, a pad's low notes, are not a bass part)
   if (noBassPart(m.shares, m.bassDrive)) { for (const b of m.bars) if (b.bass) b.bass = b.bass.map(() => null); m.noBass = true; }
   // (Essentia.js's own tempo and confidence, to read why the engine was or was not taken)
+  if (phaseMoved) m.phaseMoved = phaseMoved;
   if (ess) m.essentiaTempo = { bpm: Math.round(ess.bpm * 1000) / 1000, confidence: Math.round(ess.confidence * 1000) / 1000, ...(ess.percival ? { percival: Math.round(ess.percival * 100) / 100 } : {}), ...(ess.degara ? { degara: Math.round(ess.degara * 100) / 100 } : {}), ...(pick.vote ? { vote: true } : {}) };
   Object.assign(m, { level: 'B', engines, ms: Date.now() - t0, ...(notes.length ? { notes } : {}), ...(E ? { essentia: E.version } : {}) });
   onProgress(1, 'done');

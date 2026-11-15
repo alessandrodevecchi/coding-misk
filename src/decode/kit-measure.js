@@ -49,10 +49,17 @@ const corr = (a, b) => { const n = Math.min(a.length, b.length); let d = 0, x = 
 // the drum machines nearest to a track's hats in `table` (src/decode/kits.js), best first → [{ kit, r }]: by the shape's
 // correlation; machines within KIT_RULE.tie of the best are ordered by how near their hat's brightness is (the centroid
 // above 2 kHz, `bright`), the measure the shape leaves out
-export const KIT_RULE = { tie: 0.02 };
+// (decode round 9: top, a machine whose hat falls off above 11 kHz by more than this (log10 units of energy, 10 dB each)
+// beyond the track's hats is left out: the shape's tilt is taken out, so a hat sampled with nothing over 11 kHz, the
+// 505's (-5.5, about 55 dB down), still correlated best with the hats of seven real tracks, and their code had no
+// energy at all in the 11-16 kHz octave, 21 to 28 dB under the original; the tracks' own hats read -1.4 to +0.4)
+export const KIT_RULE = { tie: 0.02, top: 1.5 };
+// a hat shape's top: the mean of its last six bands (11.3 to 16 kHz) minus the six before (8 to 11.3 kHz)
+export const hatTop = s => { if (!s || s.length < 12) return 0; const m = (a, b) => s.slice(a, b).reduce((x, y) => x + y, 0) / (b - a), n = s.length; return m(n - 6, n) - m(n - 12, n - 6); };
 export function rankKits(shape, table, bright = null) {
   if (!shape) return [];
-  const list = Object.entries(table).filter(([, v]) => v.hatShape).map(([kit, v]) => ({ kit, r: Math.round(corr(shape, v.hatShape) * 1000) / 1000, b: v.hatBright })).sort((a, b) => b.r - a.r);
+  const all = Object.entries(table).filter(([, v]) => v.hatShape), lit = all.filter(([, v]) => hatTop(v.hatShape) >= hatTop(shape) - KIT_RULE.top);
+  const list = (lit.length ? lit : all).map(([kit, v]) => ({ kit, r: Math.round(corr(shape, v.hatShape) * 1000) / 1000, b: v.hatBright })).sort((a, b) => b.r - a.r);
   if (!bright || !list.length) return list.map(({ kit, r }) => ({ kit, r }));
   const top = list[0].r, near = list.filter(x => x.r >= top - KIT_RULE.tie && x.b), rest = list.filter(x => !near.includes(x));
   near.sort((a, b) => Math.abs(Math.log(bright / a.b)) - Math.abs(Math.log(bright / b.b)));

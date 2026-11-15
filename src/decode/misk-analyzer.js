@@ -15,7 +15,11 @@ export const LOCK_SECONDS = 8;
 // drums on dense mixes (decode-refine D4): the every-beat rule, a peak of the kick band's flux of at least `flux` times
 // its threshold on each of the bar's four beats, each a rise of the low band of at least `beat` times the track's
 // kick scale
-export const KICK_RULE = { flux: 0.45, beat: 0.25 };
+// harm (decode round 9): a kick-band onset whose 150-700 Hz energy, 15 to 100 ms after it, is at least this share of its
+// 40-130 Hz energy is a bass note's attack, not a kick: a bass note carries its harmonics up there, a kick almost none
+// (bench, true kicks: median 0.03 to 0.17, 90th percentile at most 0.31 on the clean square kit's; the onsets that the
+// pitch test took for kicks and are none, mostly bass notes: median 0.3 to 5)
+export const KICK_RULE = { flux: 0.45, beat: 0.25, harm: 0.4, strong: 0.6 };
 // a clap (D4): its snare-band rise at least `snare` times the track's strong ones, its darkness (snare band over hat
 // band) at least `local` times the hats' of the last `seconds` seconds, and noise in the snare band (spectral flatness
 // at least `flat`; measured: claps 0.36 to 0.67, a lead's note on a kick 0.11 to 0.22)
@@ -27,6 +31,10 @@ export const HAT_RULE = { median: 0.5, bars: 4 };
 export const quietBefore = (out, before, j) => { const at = k => (k >= 0 ? out[k] : before[before.length + k]) ?? null; return at(j - 1) === null && at(j - 2) === null; };
 // level A's relock (D4): the tempo and the beat phase checked again on the first bars with kicks, this many
 export const RELOCK_BARS = 8;
+// level B's grid (fitGrid): a whole tempo within `whole` BPM of the line fitted through the onsets is tried, and kept when
+// it fits almost as well (round 9: 0.25 was tried, it put one real track back on 111 but moved two others onto a worse
+// downbeat, band error +1 and +2 dB: kept at 0.08)
+export const FIT_RULE = { whole: 0.08 };
 // the top line by YIN (D2): a step's band level must reach `floor` of the band's peak
 export const TOP_LINE = { floor: 0.02 };
 // the bass (D5): YIN's looser threshold for a bass that the usual one does not hear (a detuned unison)
@@ -38,8 +46,10 @@ export const TOP_LINE = { floor: 0.02 };
 // its level stays at this share of the note's attack through the step (a short note's ringing tail is no hold);
 // again: a step that would hold the note before is the same note struck again when its level rises to this many times
 // the end of the step before (decode round 8: a held note only decays; a rolling or acid line repeats its pitch with an
-// attack. 1.2 on the bench and the real set's bass stems: recall up, the held sub keeps most of its holds)
-export const BASS_RULE = { loose: 0.35, late: 0.45, context: 2, rise: 1.15, agree: 1.0, holdFloor: 0.12, holdKeep: 0.6, again: 1.2 };
+// attack. 1.2 on the bench and the real set's bass stems: recall up, the held sub keeps most of its holds; round 9: 1.15,
+// an acid line's repeated note rose 1.17 and was read as held: Luci Rosse's first drop recall 0.50 to 0.63, one note more
+// on the held sub and two on the trap 808, of 50 and 51)
+export const BASS_RULE = { loose: 0.35, late: 0.45, context: 2, rise: 1.15, agree: 1.0, holdFloor: 0.12, holdKeep: 0.6, again: 1.15 };
 
 // ---------- FFT (radix 2, in place) ----------
 const ffts = new Map();
@@ -260,9 +270,25 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       const after = o.f + Math.round(0.09 * fr);
       let peak = 0; for (let k = o.f - 1; k <= o.f + 2; k++) if (k >= 0 && k < done1) peak = Math.max(peak, energy.kick[k]);
       v = after < done1 && peak > 0 && energy.kick[after] / peak < 0.45;
+      // (round 9: a hit with no pitch read twice that dies fast is a kick only without a bass note's harmonics,
+      // KICK_RULE.harm, unless its low band rises as the track's strong kicks do (KICK_RULE.strong of their 90th
+      // percentile): an 808 kick with its bass note on the same step carries the harmonics too, and rises twice as much)
+      if (v && KICK_RULE.harm > 0 && harmOf(o) >= KICK_RULE.harm && kickPeak(o) < KICK_RULE.strong * kickScale()) v = false;
     }
     if (o.f < done1 - Math.round(0.1 * fr)) kickMemo.set(o.f, v);
     return v;
+  };
+  // the 90th percentile of the kick band's rises at its onsets so far (made again when the onsets grow by a tenth)
+  let kScale = { n: 0, v: 1 };
+  const kickScale = () => { const n = onsets.kick.length; if (n > kScale.n * 1.1 + 8) kScale = { n, v: quantile(onsets.kick.map(kickPeak), 0.9) || 1 }; return kScale.v; };
+  // the 150-700 Hz energy over the 40-130 Hz energy, 15 to 100 ms after an onset (KICK_RULE.harm)
+  const HN = 4096, hw = hann(Math.round(0.085 * sr));
+  const harmOf = o => {
+    const fft = fftOf(HN), re = new Float64Array(HN), im = new Float64Array(HN), a = Math.round((o.t + 0.015) * sr);
+    for (let i = 0; i < hw.length && i < HN; i++) { const k = a + i; re[i] = k >= 0 && k < pcm.length ? pcm[k] * hw[i] : 0; }
+    fft(re, im);
+    const hz = sr / HN, band = (lo, hi) => { let e = 0; for (let k = Math.ceil(lo / hz); k <= Math.floor(hi / hz); k++) e += re[k] * re[k] + im[k] * im[k]; return e; };
+    return band(150, 700) / (band(40, 130) + 1e-12);
   };
   // the rise of a band's amplitude at an onset: its peak just after over its quietest frame just before
   const rise = (band, o) => { const e = energy[band]; let p = 0, q = Infinity; for (let k = o.f - 1; k <= o.f + 2; k++) if (k >= 0 && k < done1) p = Math.max(p, e[k]); for (let k = o.f - 4; k <= o.f - 1; k++) if (k >= 0) q = Math.min(q, e[k]); return Math.max(0, Math.sqrt(p) - Math.sqrt(q === Infinity ? 0 : q)); };
@@ -590,7 +616,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     if (!free) return { bpm, beatPhase, rms: null, n: 0 };
     ({ P, a, rms, n: used } = free);
     const whole = Math.round(60 / P);
-    if (Math.abs(whole - 60 / P) < 0.08) {
+    if (Math.abs(whole - 60 / P) < FIT_RULE.whole) {
       const keep = { P, a };
       const w = fit(60 / whole);
       if (w && w.rms <= rms * 1.15 + 0.0005) ({ P, a, rms, n: used } = w); else ({ P, a } = keep);
@@ -610,6 +636,14 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   // the beat phase (seconds) from every onset of the file: kicks weigh most, then snares and claps, then hats (an
   // intro of offbeat hats alone cannot shift the beat by half)
   const wholePhase = bpm => { advance(duration); findOnsets(); return phaseOf(60 / bpm, 0, duration, true); };
+  // the claps of the whole file per 16th position inside the beat of a grid (0 on the beat, 2 halfway to the next),
+  // within 35 % of a 16th of it (decode round 9: the beat phase check of level B) → [n0, n1, n2, n3]
+  const clapPositions = (bpm, beatPhase) => {
+    advance(duration); findOnsets();
+    const q = 15 / bpm, out = [0, 0, 0, 0];
+    for (const o of onsets.snare) { const k = Math.round((o.t - beatPhase) / q); if (Math.abs(o.t - (beatPhase + k * q)) < 0.35 * q && isClap(o)) out[((k % 4) + 4) % 4]++; }
+    return out;
+  };
   // the downbeat of a beat grid over the whole file (the beat of four where kicks and chord changes fall)
   const gridDownbeat = (bpm, beatPhase) => { advance(duration); findOnsets(); return downbeatOf(beatPhase, 60 / bpm, t1(firstSound())); };
 
@@ -873,7 +907,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     m.sections = [{ start: 0, bars: list.length, kind: 'verse' }];
     return m;
   }
-  return { duration, advance, lock, model, setTempo, resetTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), barsRaw: t => bars(t), topLineYin };
+  return { duration, advance, lock, model, setTempo, resetTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, clapPositions, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), kickLike: o => kickLike(o), kickPeak: o => kickPeak(o), barsRaw: t => bars(t), topLineYin };
 }
 
 // level A's horizon (D8): the playhead plus the look ahead; values 'off', '2s', '4s', '2bars', '4bars'

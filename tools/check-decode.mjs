@@ -27,9 +27,9 @@ import { measureApp, measureSynth, measureFull, measureTimelines } from './decod
 import { SOUND_RULE as SR8, DRUM_DRIVE } from '../src/decode/writer.js';
 import { PART_LEVELS } from '../src/decode/part-levels.js';
 import { BASS_RULE } from '../src/decode/misk-analyzer.js';
-import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE } from '../src/decode/writer.js';
-import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive } from '../src/decode/kit-measure.js';
+import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare, clapShift, thirdlessMode } from '../src/decode/full.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit } from '../src/decode/writer.js';
+import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive, hatTop } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
 import { followSong, crescendoSong } from '../src/song/crescendo.js';
@@ -248,7 +248,7 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   // the tempo's engine (D7): confident alone, or confirmed by misk-analyzer from 2.0; never a disagreeing weak tempo
   check(pickTempo({ bpm: 124 }, { bpm: 123.8, confidence: 2.49 }).from === 'essentia.js' && pickTempo({ bpm: 124 }, { bpm: 61.9, confidence: 2.2 }).bpm === 123.8 && pickTempo({ bpm: 124 }, { bpm: 97, confidence: 2.49 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, { bpm: 123.8, confidence: 1.9 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, { bpm: 97, confidence: 2.6 }).from === 'essentia.js', 'level B tempo: Essentia.js confident (2.5), or from 2.0 when misk-analyzer agrees (any octave); a weak disagreeing tempo stays misk-analyzer\'s');
   check(Math.abs(stepShare('note("a1 _ _ ~")') - (1 + 2 * SR8.holdShare) / 4) < 1e-9 && SR8.holdShare === 0.8 && SR8.fallback === 0.03, 'round 8: a held step counts as 0.8 of a sounding step in the level prediction; the balance takes the nearest gains when they bring the share difference down by 0.03 or more');
-  check(pickTempo({ bpm: 180 }, { bpm: 90, confidence: 4.05, percival: 89.9, degara: 89.1 }).bpm === 90 && pickTempo({ bpm: 176 }, { bpm: 88, confidence: 2.7, percival: 88, degara: 87.6 }).bpm === 176 && pickTempo({ bpm: 140 }, { bpm: 105, confidence: 1.1, percival: 104.9, degara: 105.5 }).bpm === 105 && Math.abs(pickTempo({ bpm: 174 }, { bpm: 115.8, confidence: 2.4, percival: 86.9, degara: 114.8 }).bpm - 174) < 1 && threeAgree({ bpm: 120, from: 'x' }, { bpm: 90 }).bpm === 120, 'round 8 tempo vote: the three Essentia.js estimates agreeing win, a double or half only above confidence 3.5; no vote when they disagree or one is missing');
+  check(pickTempo({ bpm: 180 }, { bpm: 90, confidence: 4.05, percival: 89.9, degara: 89.1 }).bpm === 90 && Math.abs(pickTempo({ bpm: 120 }, { bpm: 184.57, confidence: 1.49, percival: 89.88, degara: 89.1 }).bpm - 179.76) < 0.01 && pickTempo({ bpm: 176 }, { bpm: 88, confidence: 2.7, percival: 88, degara: 87.6 }).bpm === 176 && pickTempo({ bpm: 140 }, { bpm: 105, confidence: 1.1, percival: 104.9, degara: 105.5 }).bpm === 105 && Math.abs(pickTempo({ bpm: 174 }, { bpm: 115.8, confidence: 2.4, percival: 86.9, degara: 114.8 }).bpm - 174) < 1 && threeAgree({ bpm: 120, from: 'x' }, { bpm: 90 }).bpm === 120, 'round 8 tempo vote: the three Essentia.js estimates agreeing win (round 9: their middle one when RhythmExtractor2013 is over 1.5 % from it), a double or half only above confidence 3.5; no vote when they disagree or one is missing');
   check(Math.abs(pickTempo({ bpm: 64 }, { bpm: 128.8, confidence: 2.25, percival: 128, degara: 129.2 }).bpm - 128.8) < 0.1 && Math.abs(pickTempo({ bpm: 106.6 }, { bpm: 161.5, confidence: 3.0, percival: 80.1, degara: 161.5 }).bpm - 161.5) < 0.1 && Math.abs(pickTempo({ bpm: 80 }, { bpm: 162.2, confidence: 3.25, percival: 80.1, degara: 161 }).bpm - 81.1) < 0.1 && pickTempo({ bpm: 176 }, { bpm: 88, confidence: 2.7, percival: 88, degara: 87.6 }).bpm === 176, 'round 8 tempo vote, third pass: a pick at half of three agreeing estimates moves up from confidence 2.0; an estimate an octave off still agrees for a 3:2 move, never for an octave move');
   check(noSteadyBeat({ bpm: 135.6, confidence: -0.11 }) === true && noSteadyBeat({ bpm: 135, confidence: 0.87 }) === false && noSteadyBeat(null) === null && PARTS_RULE.noBeat === 0.4, 'round 8: no steady beat under Essentia.js confidence 0.4 (a pad-only song -0.11, every bench file with drums 1.6 or more, real tracks 0.87 or more); unknown without Essentia.js');
   check(noBassPart([0.2, 0.55, 0.18, 0.06, 0.01], { h1: 0 }) && !noBassPart([0.48, 0.4, 0.1, 0.01, 0.01], { h1: 0 }) && !noBassPart([0.2, 0.55, 0.18, 0.06, 0.01], { h1: 0.6 }) && !noBassPart(null, { h1: 0 }) && !noBassPart([0.2], null), 'round 8: decoded bass notes are no bass only with a low 20-150 Hz share and no energy at their fundamental (a bass an octave off keeps a share of 0.48)');
@@ -409,9 +409,10 @@ if (process.argv.includes('--app')) {
   steadyQualities(t, [{ start: 0, bars: 4 }], undefined, { root: 9, mode: 'minor' });
   check(t.every(b => b.chord === 'Am'), 'a tie goes to the key\'s quality', t.map(b => b.chord).join(' '));
   const notes = n => Array.from({ length: 16 }, (_, j) => (j % 4 === 0 ? n : null));
-  const bb = [bar('Am', 0.9, notes(33)), bar('Am', 0.9, notes(45)), bar('Am', 0.9, notes(64)), bar('Am', 0.9, notes(33), 0.1), bar('Am', 0.9, notes(21))];
-  bassRange(bb, [{ start: 0, bars: 5 }]);
+  const bb = [bar('Am', 0.9, notes(33)), bar('Am', 0.9, notes(45)), bar('Am', 0.9, notes(64)), bar('Am', 0.9, notes(36), 0.1), bar('Am', 0.9, notes(21)), bar('Am', 0.9, notes(33), 0.1)];
+  bassRange(bb, [{ start: 0, bars: 6 }]);
   check(bb[0].bass[0] === 33 && bb[1].bass[0] === 45 && bb[2].bass[0] === 40 && bb[3].bass.every(x => x === null) && bb[4].bass[0] === 33, 'the bass keeps one octave range per section (a riff\'s octave jump stays, a note far off moves by octaves) and a quiet bass bar has no notes', bb.map(b => b.bass[0]).join(','));
+  check(bb[5].bass[0] === 33, 'round 9: a quiet bass bar keeps notes on its chord\'s root (a bass of a few short notes)', String(bb[5].bass[0]));
   const qm = [{ chord: 'A', third: true }, { chord: 'C', third: true }, { chord: 'A' }];
   quietMinors(qm, { root: 9, mode: 'minor' });
   check(qm.map(b => b.chord).join() === 'Am,C,A', 'a quiet minor third turns a chord minor only where the key holds that minor chord', qm.map(b => b.chord).join());
@@ -504,7 +505,7 @@ if (process.argv.includes('--app')) {
     const r = balanceLevels(t, [0.6, 0.38, 0.02], 8), code = t[1].patterns.A.code;
     check(r && r.gains && /\.gain\(\.6\)$/.test(code) && (r.gains.bass === 1 || !/distortvol\(0\.5\)/.test(code)), 'the balance moves a driven bass by its clip\'s volume and keeps the gain before the clip', JSON.stringify({ r, code: code.slice(-70) }));
   }
-  check(BASS_RULE.again === 1.2 && BASS_RULE.holdKeep === 0.6, 'round 8: a step that would hold the note before is the note struck again when its level rises 1.2 times over the step before');
+  check(BASS_RULE.again === 1.15 && BASS_RULE.holdKeep === 0.6, 'round 8 (round 9: 1.15): a step that would hold the note before is the note struck again when its level rises 1.15 times over the step before');
   // the drums' drive (task 10.6, round 8): drives 1, 2 and 3 in the level table; a drive only when it brings the
   // high band's prediction nearer than the clean kit by DRUM_DRIVE.margin, so a file near the edge keeps its decision
   {
@@ -540,6 +541,23 @@ if (process.argv.includes('--app')) {
     const a = mk('....x.......x...'), b = mk('x.x.x.x.x.x.x.x.'), c = mk('x.x.x.x.x.x.x.x.', '........x.......');
     const ma = backbeatSnare(a), mb = backbeatSnare(b), mc = backbeatSnare(c);
     check(ma.length === 1 && a[0].drums.cp === '....x.......x...' && a[0].drums.hh === '................' && !mb.length && mc.length === 1 && c[0].drums.cp === '........x.......' && c[0].drums.oh === '................', 'round 8: a hat on the backbeat (4 and 12, or 8 of a half-time bar) with no clap there is a snare; eighth hats are not', JSON.stringify([ma, mb, mc]));
+  }
+  // (round 9: the beat phase from the claps, a tonic with no third, a hat with no top, a power chord with no riff, sounds by fit)
+  {
+    check(clapShift([0, 0, 64, 0]) === 2 && clapShift([0, 0, 0, 57]) === 3 && clapShift([60, 0, 28, 32]) === 0 && clapShift([0, 0, 10, 0]) === 0, 'round 9: claps on one other 16th of the beat move the phase there (60 % of at least 16), else nothing');
+    const cx = (m3, M3) => { const v = Array(12).fill(0); v[4] = 1; v[7] = m3; v[8] = M3; return { chromaEx: v }; };
+    const kb = Array.from({ length: 10 }, () => ({ chord: 'E', bass: [40, null, 38, null, 36, null, 40, null, null, null, null, null, null, null, null, null] }));
+    const k1 = thirdlessMode({ root: 4, mode: 'major' }, kb, kb.map(() => cx(0.1, 0.1))), k2 = thirdlessMode({ root: 4, mode: 'major' }, kb, kb.map(() => cx(0.1, 0.6)));
+    check(k1.mode === 'minor' && k2.mode === 'major', 'round 9: a tonic with neither third takes its mode from the bass and the roots (D and C over E: minor); a heard major third stays', `${k1.mode} ${k2.mode}`);
+    const lit = Array.from({ length: 36 }, (_, i) => (i < 30 ? 0 : -0.5)), dead = Array.from({ length: 36 }, (_, i) => (i < 30 ? 0.2 : -5));
+    const rk = rankKits(dead, { Lit: { hatShape: lit, hatBright: 8000 }, Dead: { hatShape: dead, hatBright: 8000 } }, null), rl = rankKits(lit, { Lit: { hatShape: lit, hatBright: 8000 }, Dead: { hatShape: dead, hatBright: 8000 } }, null);
+    check(hatTop(dead) < -4 && rk[0].kit === 'Dead' && rl.length === 1 && rl[0].kit === 'Lit', 'round 9: a machine whose hat has no top over 11 kHz is left out when the track\'s hats have one', JSON.stringify([rk, rl]));
+    const pm = (drums, bassOn) => ({ bpm: 120, downbeat: 0, barSeconds: 2, key: { root: 4, mode: 'minor' }, sections: [{ start: 0, bars: 8, kind: 'verse' }], ending: 8, shares: null, bars: Array.from({ length: 8 }, (_, i) => ({ chord: ['E', 'F', 'E', 'G'][i % 4], chordConf: 0.8, level: { drums: drums ? 1 : 0, bass: 1, chords: 0.8, other: 0.5 }, bright: 0.2, drums: drums ? { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.', oh: '................' } : { bd: '................', cp: '................', hh: '................', oh: '................' }, bass: bassOn ? [40, null, null, null, 40, null, null, null, 40, null, null, null, 40, null, null, null] : Array(16).fill(null) })) });
+    const withRiff = writeFull(pm(true, true), { sounds: 'simple' }), alone = writeFull(pm(false, false), { sounds: 'simple' });
+    check(/E5/.test(JSON.stringify(withRiff)) && !alone.tracks.some(t => t.id === 'chords'), 'round 9: power chords only where drums or bass play on half the section\'s bars', alone.tracks.map(t => t.id).join(','));
+    const ft = [{ id: 'chords', type: 'code', patterns: { A: { code: 'chord("D").voicing().s("triangle").lpf(1600).gain(.3)' } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
+    const fit = soundsByFit(ft, [0.05, 0.3, 0.3, 0.3, 0.05], 8);
+    check(fit && fit.w !== 'triangle' && !/triangle/.test(ft[0].patterns.A.code), 'round 9: chords whose original fills 1-2 kHz leave the triangle for the wave the balance fits best', JSON.stringify(fit));
   }
   check(writeFull({ ...Mk, shares: [0.5, 0.48, 0.02] }, { sounds: 'simple' }).tracks.find(t => t.id === 'bass') === undefined || /gain\(\.75\)/.test(JSON.stringify(writeFull({ ...Mk, shares: [0.9, 0.05, 0.05] }, { sounds: 'simple' }))), 'Simple kit keeps its levels');
 }

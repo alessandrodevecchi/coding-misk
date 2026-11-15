@@ -13,7 +13,7 @@
 // --src <dir>: the decoder of another checkout (its src/decode/full.js and writer.js), for a baseline of another branch.
 // The owner's files: their ids and numbers are printed only; write --json under the git-ignored notes/.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-bench.cjs [--set tuning|validation|fresh|all|every|variation|owner]
-//          [--only id,id] [--src dir] [--tag name] [--sweep] [--knobs a,b] [--json out.jsonl] [--models-only] [--oracle-drums] [--rerender tag]   (dev server on PORT; ffmpeg)
+//          [--only id,id] [--src dir] [--tag name] [--sweep] [--knobs a,b] [--json out.jsonl] [--models-only] [--oracle-drums] [--rerender tag] [--models tag]   (dev server on PORT; ffmpeg)
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { exportSong, appSong, APP_SONGS, DIR: WAV, HOLDOUT_DIR, SET_DIRS } = require('./decode-export.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -83,6 +83,9 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
   const pcmOf = new Map(), pcm = f => { if (!pcmOf.has(f)) pcmOf.set(f, S.readAudio(f)); return pcmOf.get(f); };
   async function model(x) {
     const st = fs.statSync(x.file), key = `${st.size}-${Math.round(st.mtimeMs)}-${SRC_HASH}`, f = path.join(mdir, `${x.id}.json`);
+    // (--models <tag>: the analyses cached under that tag as they are, whatever the decoder now: a writer change measured
+    // on the same models)
+    if (opt('--models')) { const g = path.join(CACHE, 'models', opt('--models'), `${x.id}.json`); if (fs.existsSync(g)) return JSON.parse(fs.readFileSync(g, 'utf8')).m; }
     if (fs.existsSync(f)) { const c = JSON.parse(fs.readFileSync(f, 'utf8')); if (c.key === key) return c.m; }
     const m = await analyseFull(pcm(x.file), { engine: nodeEssentia });
     fs.writeFileSync(f, JSON.stringify({ key, m }));
