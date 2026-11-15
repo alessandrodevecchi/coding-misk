@@ -35,8 +35,11 @@ export const TOP_LINE = { floor: 0.02 };
 // level rises by `rise` over the step before's; agree: the two windows of a step hold one pitch within this many
 // semitones (0.6 before round 8: a square bass under a low-pass reads about a semitone apart in its two windows);
 // holdFloor: a step holds the note before only above this share of the bass's loudest step, and holdKeep: only while
-// its level stays at this share of the note's attack through the step (a short note's ringing tail is no hold)
-export const BASS_RULE = { loose: 0.35, late: 0.45, context: 2, rise: 1.15, agree: 1.0, holdFloor: 0.12, holdKeep: 0.6 };
+// its level stays at this share of the note's attack through the step (a short note's ringing tail is no hold);
+// again: a step that would hold the note before is the same note struck again when its level rises to this many times
+// the end of the step before (decode round 8: a held note only decays; a rolling or acid line repeats its pitch with an
+// attack. 1.2 on the bench and the real set's bass stems: recall up, the held sub keeps most of its holds)
+export const BASS_RULE = { loose: 0.35, late: 0.45, context: 2, rise: 1.15, agree: 1.0, holdFloor: 0.12, holdKeep: 0.6, again: 1.2 };
 
 // ---------- FFT (radix 2, in place) ----------
 const ffts = new Map();
@@ -769,9 +772,11 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       // bass note and hides its attack; a kick's own tail is a clean sine the usual threshold hears, and never a note)
       const underKick = loose && quietBefore(out, before, j);
       const fresh = voiced && !kickOnly && (head > 1.4 * before || (prev !== null && Math.abs(midi - prev) >= 1 && head > 0.7 * before) || underKick);
-      out.push(fresh ? midi : null);
-      if (fresh) { cur = midi; curLevel = head; }
-      else if (cur !== null && agree(m1, m2) && Math.abs((m1 + m2) / 2 - cur) < BASS_RULE.agree && head > BASS_RULE.holdFloor * bassTop && head >= BASS_RULE.holdKeep * curLevel && tail >= BASS_RULE.holdKeep * curLevel) hold[j] = true;
+      const held = !fresh && cur !== null && agree(m1, m2) && Math.abs((m1 + m2) / 2 - cur) < BASS_RULE.agree && head > BASS_RULE.holdFloor * bassTop && head >= BASS_RULE.holdKeep * curLevel && tail >= BASS_RULE.holdKeep * curLevel;
+      const again = held && head >= BASS_RULE.again * before;
+      out.push(fresh || again ? midi : null);
+      if (fresh || again) { cur = midi; curLevel = head; }
+      else if (held) hold[j] = true;
       else cur = null;
       prev = m1 !== null ? Math.round(m1) : null;
       if (voiced && !kickOnly) heardPitches.add(midi);

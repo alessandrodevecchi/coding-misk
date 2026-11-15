@@ -38,13 +38,20 @@ export function pickTempo(misk, ess, user = null) {
 // half-time one look alike to the three). Bench: a boom bap song read at 180 goes to 90 (confidence 4.0) and the app's
 // own radio song at 176 stays (the three say 88 at 2.7); in a sample of 26 real tracks 5 move, all to the tempo a
 // learned beat tracker finds too.
-export const TEMPO_VOTE = { near: 0.04, octaveConfidence: 3.5 };
+// (round 8, third pass: the three agree also when Percival or Degara reads an octave of RhythmExtractor2013's tempo, but
+// only for a move that is no octave (a 3:2 reading: one real file at 107 where the three say 161); a pick at half of
+// the three moves up from confidence `halfConfidence` when the three agree as read (one real file at 64, the three at
+// 128 with confidence 2.2), a pick at double only above `octaveConfidence` as before (the app's radio song at 176)
+export const TEMPO_VOTE = { near: 0.04, octaveConfidence: 3.5, halfConfidence: 2.0, fold: true };
 export function threeAgree(pick, ess, rule = TEMPO_VOTE) {
   if (!ess || !(ess.bpm > 0 && ess.percival > 0 && ess.degara > 0)) return pick;
-  const three = [ess.bpm, ess.percival, ess.degara].sort((a, b) => a - b), mid = three[1], near = (a, b) => Math.abs(a / b - 1) < rule.near;
+  const fold = x => { if (!rule.fold) return x; for (const r of [2, 0.5]) if (Math.abs((x * r) / ess.bpm - 1) < rule.near) return x * r; return x; };
+  const three = [ess.bpm, fold(ess.percival), fold(ess.degara)].sort((a, b) => a - b), mid = three[1], near = (a, b) => Math.abs(a / b - 1) < rule.near;
   if (!three.every(x => near(x, mid)) || near(pick.bpm, mid)) return pick;
   const k = pick.bpm / mid;
-  if ((Math.abs(k - 2) < 0.08 || Math.abs(k - 0.5) < 0.02) && !(ess.confidence >= rule.octaveConfidence)) return pick;
+  if (Math.abs(k - 2) < 0.08 && !(ess.confidence >= rule.octaveConfidence)) return pick;
+  const raw = [ess.bpm, ess.percival, ess.degara].every(x => near(x, mid));
+  if (Math.abs(k - 0.5) < 0.02 && !(raw && ess.confidence >= (rule.halfConfidence ?? rule.octaveConfidence))) return pick;
   return { bpm: ess.bpm, from: 'essentia.js', vote: true };
 }
 

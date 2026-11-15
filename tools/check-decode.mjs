@@ -24,7 +24,9 @@ import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
-import { SOUND_RULE as SR8 } from '../src/decode/writer.js';
+import { SOUND_RULE as SR8, DRUM_DRIVE } from '../src/decode/writer.js';
+import { PART_LEVELS } from '../src/decode/part-levels.js';
+import { BASS_RULE } from '../src/decode/misk-analyzer.js';
 import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
 import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf } from '../src/decode/writer.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive } from '../src/decode/kit-measure.js';
@@ -247,6 +249,7 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(pickTempo({ bpm: 124 }, { bpm: 123.8, confidence: 2.49 }).from === 'essentia.js' && pickTempo({ bpm: 124 }, { bpm: 61.9, confidence: 2.2 }).bpm === 123.8 && pickTempo({ bpm: 124 }, { bpm: 97, confidence: 2.49 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, { bpm: 123.8, confidence: 1.9 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, { bpm: 97, confidence: 2.6 }).from === 'essentia.js', 'level B tempo: Essentia.js confident (2.5), or from 2.0 when misk-analyzer agrees (any octave); a weak disagreeing tempo stays misk-analyzer\'s');
   check(Math.abs(stepShare('note("a1 _ _ ~")') - (1 + 2 * SR8.holdShare) / 4) < 1e-9 && SR8.holdShare === 0.8 && SR8.fallback === 0.03, 'round 8: a held step counts as 0.8 of a sounding step in the level prediction; the balance takes the nearest gains when they bring the share difference down by 0.03 or more');
   check(pickTempo({ bpm: 180 }, { bpm: 90, confidence: 4.05, percival: 89.9, degara: 89.1 }).bpm === 90 && pickTempo({ bpm: 176 }, { bpm: 88, confidence: 2.7, percival: 88, degara: 87.6 }).bpm === 176 && pickTempo({ bpm: 140 }, { bpm: 105, confidence: 1.1, percival: 104.9, degara: 105.5 }).bpm === 105 && Math.abs(pickTempo({ bpm: 174 }, { bpm: 115.8, confidence: 2.4, percival: 86.9, degara: 114.8 }).bpm - 174) < 1 && threeAgree({ bpm: 120, from: 'x' }, { bpm: 90 }).bpm === 120, 'round 8 tempo vote: the three Essentia.js estimates agreeing win, a double or half only above confidence 3.5; no vote when they disagree or one is missing');
+  check(Math.abs(pickTempo({ bpm: 64 }, { bpm: 128.8, confidence: 2.25, percival: 128, degara: 129.2 }).bpm - 128.8) < 0.1 && Math.abs(pickTempo({ bpm: 106.6 }, { bpm: 161.5, confidence: 3.0, percival: 80.1, degara: 161.5 }).bpm - 161.5) < 0.1 && Math.abs(pickTempo({ bpm: 80 }, { bpm: 162.2, confidence: 3.25, percival: 80.1, degara: 161 }).bpm - 81.1) < 0.1 && pickTempo({ bpm: 176 }, { bpm: 88, confidence: 2.7, percival: 88, degara: 87.6 }).bpm === 176, 'round 8 tempo vote, third pass: a pick at half of three agreeing estimates moves up from confidence 2.0; an estimate an octave off still agrees for a 3:2 move, never for an octave move');
   check(noSteadyBeat({ bpm: 135.6, confidence: -0.11 }) === true && noSteadyBeat({ bpm: 135, confidence: 0.87 }) === false && noSteadyBeat(null) === null && PARTS_RULE.noBeat === 0.4, 'round 8: no steady beat under Essentia.js confidence 0.4 (a pad-only song -0.11, every bench file with drums 1.6 or more, real tracks 0.87 or more); unknown without Essentia.js');
   check(noBassPart([0.2, 0.55, 0.18, 0.06, 0.01], { h1: 0 }) && !noBassPart([0.48, 0.4, 0.1, 0.01, 0.01], { h1: 0 }) && !noBassPart([0.2, 0.55, 0.18, 0.06, 0.01], { h1: 0.6 }) && !noBassPart(null, { h1: 0 }) && !noBassPart([0.2], null), 'round 8: decoded bass notes are no bass only with a low 20-150 Hz share and no energy at their fundamental (a bass an octave off keeps a share of 0.48)');
   check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
@@ -277,6 +280,7 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(Object.keys(vd.patterns).length === 2 && vd.clips.some(c => c.start === 7 && c.bars === 1), 'the variant plays on its bars as a clip of its own', JSON.stringify(vd.clips.slice(0, 4)));
   // chords that are noise of the drums (out of the key) are no chord part
   check(inKey({ root: 9, mode: 'minor' })(['Am', 'F', 'C', 'G', 'E']) && !inKey({ root: 9, mode: 'minor' })(['G', 'Bb', 'Cm', 'Bb', 'Gm', 'F#']), 'a section\'s chords mostly out of the key are not a chord part');
+  check(inKey({ root: 4, mode: 'minor' })(['E', 'E', 'F', 'E', 'G', 'F', 'E', 'Bb']) === 'power' && inKey({ root: 4, mode: 'minor' })(['Em', 'C', 'D', 'Em']) === true && !inKey({ root: 9, mode: 'minor' })(['G', 'Bb', 'C', 'Bb', 'G', 'D']), 'round 8: chords with roots in the key and its flat second but thirds out of it are power chords; roots away from the tonic stay out');
   check(pickTempo({ bpm: 174 }, { bpm: 87.2, confidence: 3.5 }).bpm === 174.4 && pickTempo({ bpm: 124 }, { bpm: 123.9, confidence: 1 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, null, { bpm: 62, tapped: false }).from === 'picked', 'level B tempo: Essentia.js when confident (in misk-analyzer\'s octave), else misk-analyzer\'s, a picked or tapped tempo first');
   check(barChords([{ chord: 'A#m', strength: 0.9 }])[0].chord === 'Bbm' && settleMode({ root: 0, mode: 'major' }, [{ chord: 'Am' }, { chord: 'F' }, { chord: 'C' }, { chord: 'G' }, { chord: 'Am' }]).mode === 'minor', 'chord names in the app\'s spelling; the key\'s mode settled by the tonic chord on phrase starts');
   // "Follow the song" (D18) and Open in Compose (D15): the song as the tab plays it and as Compose grows it, the same code
@@ -482,9 +486,11 @@ if (process.argv.includes('--app')) {
     const da = bassDriveOf(a), db = bassDriveOf(b);
     check(a && b && b.h1 > a.h1 && db.drive > da.drive && bassDriveOf(null) === null && bassDriveOf({ h1: 0.97, evenOdd: -4, slope: -10 }).drive === 0 && bassDriveOf({ h1: 0, evenOdd: 3, slope: 8 }) === null && bassDrive(clean, sr, notes.slice(0, 4)) === null, 'a clipped bass gets a higher fundamental share and a larger drive than a plain sawtooth, a sine-like share none, too few notes no measure', JSON.stringify({ clean: a && [a.h1, a.evenOdd, da], driven: b && [b.h1, b.evenOdd, db] }));
     // (round 7: the drive rule on the bench's readings: a clean sawtooth at 0.58 (the drive-2 row is gone), a clean square
-    // alone at -38 dB even/odd (clamped at -8: square, no drive), a driven sawtooth at 4.5, a sine at 0.92; fixed scale)
+    // alone at -38 dB even/odd (square, no drive), a driven sawtooth at 4.5, a sine at 0.92; fixed scale. Round 8, the table
+    // without the pad: a square by its even/odd from -15 dB down, the drive from the sawtooth rows at cutoff 700; a
+    // driven bass read at 0.78 and -5.3 dB, which the pad's square row took, is a driven sawtooth)
     const R = (h1, evenOdd) => bassDriveOf({ h1, evenOdd, slope: -5 });
-    check(R(0.582, 2.7).drive === 0 && R(0.706, -38).near === 'square:0' && R(0.706, -38).drive === 0 && R(0.86, -5.6).drive === 4.5 && R(0.776, 1.7).drive === 3 && R(0.92, -3).wave === 'sine' && R(0.42, 2.8).drive === 0, 'the drive rule writes drive only from 3 up, never on a square, with a clamped even/odd and a sine from 0.91', JSON.stringify([R(0.582, 2.7), R(0.706, -38), R(0.86, -5.6), R(0.776, 1.7), R(0.92, -3)]));
+    check(R(0.582, 2.7).drive === 0 && R(0.706, -38).wave === 'square' && R(0.706, -38).drive === 0 && R(0.86, -5.6).drive === 4.5 && R(0.776, 1.7).drive === 3 && R(0.92, -3).wave === 'sine' && R(0.42, 2.8).drive === 0 && R(0.42, 2.8).wave === 'sawtooth' && R(0.78, -5.3).drive === 4.5 && R(0.78, -5.3).wave === 'sawtooth', 'the drive rule writes drive only from 3 up, never on a square, a square from -15 dB even/odd, a sine from 0.91', JSON.stringify([R(0.582, 2.7), R(0.706, -38), R(0.86, -5.6), R(0.776, 1.7), R(0.92, -3), R(0.78, -5.3)]));
   }
   // a driven bass (decode-refine 10.2, round 6): the app's drive after its filter with Our sounds, never with
   // Simple kit; the balance scales the clip's volume, not the gain before the clip
@@ -494,6 +500,17 @@ if (process.argv.includes('--app')) {
     const t = [{ id: 'drums', type: 'drums', settings: { kit: 'RolandTR909' }, patterns: { A: { rows: { bd: 'x...x...x...x...', hh: '..x...x...x...x.' } } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }, { id: 'bass', type: 'code', patterns: { A: { code: `note("a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~")${dr}` } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
     const r = balanceLevels(t, [0.6, 0.38, 0.02], 8), code = t[1].patterns.A.code;
     check(r && r.gains && /\.gain\(\.6\)$/.test(code) && (r.gains.bass === 1 || !/distortvol\(0\.5\)/.test(code)), 'the balance moves a driven bass by its clip\'s volume and keeps the gain before the clip', JSON.stringify({ r, code: code.slice(-70) }));
+  }
+  check(BASS_RULE.again === 1.2 && BASS_RULE.holdKeep === 0.6, 'round 8: a step that would hold the note before is the note struck again when its level rises 1.2 times over the step before');
+  // the drums' drive (task 10.6, round 8): drives 1, 2 and 3 in the level table; a drive only when it brings the
+  // high band's prediction nearer than the clean kit by DRUM_DRIVE.margin, so a file near the edge keeps its decision
+  {
+    const rows = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' }, kit = 'RolandTR909';
+    const drumsOnly = () => [{ id: 'drums', type: 'drums', settings: { kit }, patterns: { A: { rows } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
+    const pred = d => { const e = [0, 0, 0, 0, 0]; for (const [r, st] of Object.entries(rows)) PART_LEVELS[`drums:${kit}:${r}${d ? `:d${d}` : ''}`].forEach((x, j) => { e[j] += x * (st.match(/x/g) || []).length; }); const t = e.reduce((a, b) => a + b, 0); return e.map(x => x / t); };
+    const at = sh => { const t = drumsOnly(); balanceLevels(t, sh, 8); return t[0].settings.drive || 0; };
+    const near = pred(0).map((x, j) => (j === 4 ? x * 1.25 : x)), nt = near.reduce((a, b) => a + b, 0);
+    check([1, 2, 3].every(d => PART_LEVELS[`drums:${kit}:bd:d${d}`]) && at(pred(1)) === 1 && at(pred(2)) === 2 && at(pred(0)) === 0 && at(near.map(x => x / nt)) === 0 && DRUM_DRIVE.margin === 0.3, 'the drums get the drive whose rows match the high band (1, 2), none when the clean kit matches or comes within the margin', JSON.stringify([at(pred(1)), at(pred(2)), at(pred(0)), at(near.map(x => x / nt))]));
   }
   check(writeFull({ ...Mk, shares: [0.5, 0.48, 0.02] }, { sounds: 'simple' }).tracks.find(t => t.id === 'bass') === undefined || /gain\(\.75\)/.test(JSON.stringify(writeFull({ ...Mk, shares: [0.9, 0.05, 0.05] }, { sounds: 'simple' }))), 'Simple kit keeps its levels');
 }

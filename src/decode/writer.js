@@ -40,7 +40,7 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // at. (Round 5 wrote a fixed `.distort(4.5).distortvol(0.5).crush(4.85)` when the even/odd ratio was under -3 dB: the
 // crusher matched a median-centroid score with broadband noise, +12 to +14 dB above 5.6 kHz, and the ratio read square,
 // triangle and sine basses as driven; review of 13 November.)
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, roomRange: [0.3, 0.9], holdShare: 0.8, fallback: 0.03, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.91, spread: [0.227, 6.44], eoFloor: -8, min: 3 }, bassWave: 700 };
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, roomRange: [0.3, 0.9], holdShare: 0.8, fallback: 0.03, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.91, spread: [0.227, 6.44], eoFloor: -8, min: 3, squareEo: -15 }, bassWave: 700 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -206,21 +206,35 @@ export function soundsOf(bars, preset = 'ours', whole = bars, drive = 0, wave = 
 // row; a nearest row under SOUND_RULE.drive.min writes no drive)
 // (round 6, C1: also the candidate's wave; a profile whose harmonics rise with their number is not a bass note at its
 // decoded pitch, a wrong octave or another part, and gives nothing)
-const PROFILE_KEYS = Object.keys(BASS_PROFILES).filter(k => !/^(sine|triangle):/.test(k) && BASS_PROFILES[k].drive !== 1 && !(BASS_PROFILES[k].wave === 'square' && BASS_PROFILES[k].drive > 0));
+// (decode round 8: the table is measured without the pad, on a cutoff grid. A clean square there reads -31 to -40 dB
+// even/odd, as the bench's square song does, and the sine and triangle a share of 0.97 to 1.0; but a clean sawtooth reads
+// a share of 0.47 to 0.62, where the bench's sawtooth songs read 0.27 to 0.63 under their pads, so the clean rows of
+// the table are no guide to a mix's sawtooth cutoff or its supersaw. The writer takes from it what holds in a mix: a
+// square by its even/odd ratio, SOUND_RULE.drive.squareEo or under, and the drive of a sawtooth from the rows at the
+// bass's written cutoff, SOUND_RULE.bassWave; the supersaw and the other cutoffs stay in the table, unused)
+const PROFILE_KEYS = Object.keys(BASS_PROFILES).filter(k => BASS_PROFILES[k].wave === 'sawtooth' && BASS_PROFILES[k].cut === SOUND_RULE.bassWave && BASS_PROFILES[k].drive !== 1);
 export function bassDriveOf(p) {
   if (!p || p.h1 === null || p.h1 === undefined) return null;
   if (!(p.slope < 0)) return null;
   if (p.h1 >= SOUND_RULE.drive.sineShare) return { drive: 0, near: 'sine', wave: 'sine' };
-  const D = SOUND_RULE.drive, eo = Math.max(D.eoFloor, p.evenOdd);
+  const D = SOUND_RULE.drive;
+  if (p.evenOdd <= D.squareEo) return { drive: 0, near: 'square', wave: 'square' };
+  const eo = Math.max(D.eoFloor, p.evenOdd);
   let best = null, bd = Infinity;
   for (const k of PROFILE_KEYS) { const c = BASS_PROFILES[k], d = ((p.h1 - c.h1) / D.spread[0]) ** 2 + ((eo - c.evenOdd) / D.spread[1]) ** 2; if (d < bd) { bd = d; best = k; } }
   const drive = BASS_PROFILES[best].drive;
-  return { drive: drive >= D.min ? drive : 0, near: best, wave: BASS_PROFILES[best].wave };
+  return { drive: drive >= D.min ? drive : 0, near: best, wave: 'sawtooth' };
 }
 
-// the drums' drive by measure (task 10.6): drives, the drum track's drives the level table measures; ratio, the
-// original's high band (2-16 kHz) share against the clean kit's predicted share from which the drums are driven
-export const DRUM_DRIVE = { drives: [2], ratio: 2 };
+// the drums' drive by measure (task 10.6): drives, the drum track's drives the level table measures; margin, how much
+// nearer (in natural log of the share) the best driven kit must bring the high band's (2-16 kHz) prediction than the
+// clean kit. (Round 8: the drive was read with the gains of the balance, a ratio of 2 and drive 2 only; the balance's
+// gains move in 1.5 dB steps, and a small change elsewhere (the held step's weight 0.8 to 0.75) raised one file's drums
+// by 3 dB, which filled its high band without a drive: the decision flipped. Now the gains are fitted on the four lower
+// bands only, the drive read on the high band with those gains, and only then the whole balance runs with the drive's
+// rows: no decision on the bench, the owner's files or the real set moves with the held step's weight from 0.5 to 1 or
+// with the analysis of this round)
+export const DRUM_DRIVE = { drives: [1, 2, 3], margin: 0.3 };
 // the drum track's default gain (src/music.js DEFAULT.drums.gain), the level the part table measured the drums at
 const DRUMS_GAIN = 0.9;
 // the part levels (decode-refine D3): level B's drums, bass, chords and Lead gains scaled so the code's band shares come
@@ -244,8 +258,9 @@ const levelKey = (id, code) => {
   return null;
 };
 // the share of a loop's steps that sound a note, from its first mini-notation string (1 for chords, held all bar); a
-// held step (`_`, round 8) counts as SOUND_RULE.holdShare of a step: a held note fades under its attack's level (0.8:
-// at 1 the balance raised the drums on held-note songs, at 0.75 and under one real file loses its drum drive)
+// held step (`_`, round 8) counts as SOUND_RULE.holdShare of a step: a held note fades under its attack's level (0.8,
+// measured through the app on a sine, a sawtooth and a square: 0.74 to 0.77 for notes held four steps, 0.85 to 0.86 for
+// a note held a whole bar; at 1 the balance raised the drums on held-note songs)
 export function stepShare(code) {
   const m = /\b(?:note|n)\("([^"]*)"\)/.exec(code);
   if (!m) return 1;
@@ -319,22 +334,28 @@ export function balanceLevels(tracks, shares, bars, { bassMissing = false } = {}
     for (const k of allowed(free[i])) { ks[i] = k; walk(i + 1, ks); }
   };
   walk(0, free.map(() => 1));
+  // (task 10.6, round 8: the drums' drive. The gains fitted on the four lower bands only (the kick, the bass, the
+  // chords), the original's high band against the prediction with those gains, clean and with each drive's rows; the
+  // nearest drive, if nearer than the clean kit by DRUM_DRIVE.margin, then the whole balance with its rows)
+  let drive = 0;
+  const dr = nb === 5 ? parts.find(p => p.drums && Object.keys(p.Td || {}).length) : null;
+  if (dr) {
+    const H = nb - 1, T0 = dr.T, mix = ks => { const e = Array(nb).fill(0); parts.forEach((p, i) => { for (let j = 0; j < nb; j++) e[j] += p.T[j] * (p.g * ks[i]) ** 2; }); return e; };
+    const ts = shares.slice(0, H).reduce((x, y) => x + y, 0) || 1;
+    const lowFit = ks => { const e = mix(ks), t = e.slice(0, H).reduce((x, y) => x + y, 0) || 1; return Math.max(...e.slice(0, H).map((v, j) => Math.abs(v / t - shares[j] / ts))); };
+    const hiErr = ks => { const e = mix(ks), t = e.reduce((x, y) => x + y, 0) || 1; return Math.abs(Math.log(shares[H] / (e[H] / t || 1e-9))); };
+    let lb = free.map(() => 1), lv = lowFit(lb);
+    const lw = (i, ks) => { if (i === free.length) { const v = lowFit(ks); if (v < lv - 1e-6) { lv = v; lb = ks.slice(); } return; } for (const k of allowed(free[i])) { ks[i] = k; lw(i + 1, ks); } };
+    lw(0, free.map(() => 1));
+    const e0 = hiErr(lb); let be = e0;
+    for (const [d, X] of Object.entries(dr.Td)) { dr.T = X; const e = hiErr(lb); if (e < be - 1e-9) { be = e; drive = +d; } }
+    dr.T = T0;
+    if (drive && be <= e0 - DRUM_DRIVE.margin) { dr.T = dr.Td[drive]; best = free.map(() => 1); [bv, b3] = worst(best); walk(0, free.map(() => 1)); } else drive = 0;
+  }
   // (round 8: when no gains bring every band within SOUND_RULE.shares, the nearest gains are still taken when they bring
   // the largest share difference down by SOUND_RULE.fallback or more; before, the levels stayed as written)
   if (b3 > SOUND_RULE.shares && !(SOUND_RULE.fallback > 0 && b3 <= before - SOUND_RULE.fallback)) return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: null };
-  // (task 10.6: the drums' drive by the high band: with the chosen gains, the original's high-band share against the
-  // predicted one; when the original holds DRUM_DRIVE.ratio times more or above, the drive whose driven rows bring the
-  // prediction nearest, if nearer than the clean kit)
-  if (nb === 5) {
-    const dr = parts.find(p => p.drums && Object.keys(p.Td || {}).length), H = nb - 1;
-    const pred = T0 => { const e = Array(nb).fill(0); parts.forEach((p, i) => { const TT = p === dr && T0 ? T0 : p.T; for (let j = 0; j < nb; j++) e[j] += TT[j] * (p.g * best[i]) ** 2; }); const s = e.reduce((a, b) => a + b, 0) || 1; return e[H] / s; };
-    const clean = pred(null), err = x => Math.abs(Math.log(shares[H] / x));
-    if (dr && clean > 0 && shares[H] / clean >= DRUM_DRIVE.ratio) {
-      let bd = null, be = err(clean);
-      for (const [d, X] of Object.entries(dr.Td)) { const e = err(pred(X)); if (e < be - 1e-9) { be = e; bd = +d; } }
-      if (bd) dr.t.settings.drive = bd;
-    }
-  }
+  if (drive) dr.t.settings.drive = drive;
   free.forEach((p, i) => { const k = best[i]; if (k === 1) return; if (p.drums) { p.t.settings.gain = Math.round(p.g * k * 100) / 100; return; } for (const pat of Object.values(p.t.patterns)) if (pat.code) pat.code = p.vol ? pat.code.replace(/\.distortvol\(([\d.]+)\)/, (_, x) => `.distortvol(${Math.round(+x * k * 100) / 100})`) : pat.code.replace(/\.gain\(([\d.]+)\)(?!.*\.gain\()/, (_, x) => `.gain(${Math.round(+x * k * 100) / 100})`); });
   return { before: Math.round(before * 1000) / 1000, after: Math.round(b3 * 1000) / 1000, gains: Object.fromEntries(free.map((p, i) => [p.t.id, Math.round(best[i] * 100) / 100])) };
 }
@@ -661,11 +682,24 @@ export function variationsOf(model) {
 // the chords of a key: its diatonic triads (and the major dominant of a minor key); a section whose chords fall mostly
 // outside the key is noise of the drums in the chord band (a drums-only outro reads as Bb, Gm, F#…), not a part
 const KEY_CHORDS = { minor: [[0, 'min'], [3, 'maj'], [5, 'min'], [7, 'min'], [7, 'maj'], [8, 'maj'], [10, 'maj']], major: [[0, 'maj'], [2, 'min'], [4, 'min'], [5, 'maj'], [7, 'maj'], [9, 'min']] };
+// (round 8, third pass: a section whose chords fail the key test on their qualities but whose roots lie in the key's
+// scale or a semitone over its tonic (the flat second of a phrygian riff, F over E) on at least POWER_RULE.roots of its
+// bars, on the tonic or that flat second on at least POWER_RULE.tonic of them and on the tonic itself on at least
+// POWER_RULE.home (a drums-only outro's noise reads roots all over the key; a passage in another key has no tonic), and with a second root on at least POWER_RULE.second of them (a riff moves; an acid bass
+// alone reads as its tonic's major chord, the same fifth harmonic, on every bar), is kept as power chords, a root and a
+// fifth: a distorted power chord reads major, its fifth harmonic a major third)
+export const POWER_RULE = { roots: 0.8, tonic: 0.5, home: 0.15, second: 0.15 };
+const SCALE_PCS = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11] };
 export const inKey = key => list => {
   if (!key || !list.length) return true;
-  const set = new Set(KEY_CHORDS[key.mode === 'major' ? 'major' : 'minor'].map(([d, q]) => `${(key.root + d) % 12}${q}`));
+  const mode = key.mode === 'major' ? 'major' : 'minor', set = new Set(KEY_CHORDS[mode].map(([d, q]) => `${(key.root + d) % 12}${q}`));
   const ok = list.filter(c => { const p = parseChord(c); return p && set.has(`${p.root}${p.quality}`); }).length;
-  return ok / list.length >= 0.6;
+  if (ok / list.length >= 0.6) return true;
+  const roots = new Set([...SCALE_PCS[mode], 1].map(d => (key.root + d) % 12));
+  const share = set => list.filter(c => { const p = parseChord(c); return p && set.has(p.root); }).length / list.length;
+  const counts = Array(12).fill(0); for (const c of list) { const p = parseChord(c); if (p) counts[p.root]++; }
+  const second = counts.slice().sort((a, b) => b - a)[1] / list.length;
+  return POWER_RULE.roots > 0 && share(roots) >= POWER_RULE.roots && share(new Set([key.root, (key.root + 1) % 12])) >= POWER_RULE.tonic && share(new Set([key.root])) >= POWER_RULE.home && second >= POWER_RULE.second ? 'power' : false;
 };
 // the song of a level B model (D9): the model's sections with their kinds as names, a drums track with each section's
 // main grid and its variants as clips, bass and chords code tracks with one loop per section; a part plays where it is
@@ -713,8 +747,11 @@ export function writeFull(model, opts = {}) {
     const patterns = {}, ids = new Map(), clips = [];
     secs.forEach(sec => {
       const idx = range(sec.start, sec.start + sec.bars), on = steady(idx.map(i => heardOf(bars[i])), (opts.rule || EDIT_RULE).runBars);
-      if (!keep(idx.filter((i, j) => on[j] && heardOf(bars[i])).map(i => valueOf(bars[i])))) return;
-      const byBar = {}; idx.forEach((i, j) => { byBar[i] = on[j] && heardOf(bars[i]) ? valueOf(bars[i]) : null; });
+      const kept = keep(idx.filter((i, j) => on[j] && heardOf(bars[i])).map(i => valueOf(bars[i])));
+      if (!kept) return;
+      // (round 8: a section kept as power chords writes each chord's root with a fifth and no third)
+      const val = kept === 'power' ? b => { const c = parseChord(valueOf(b)); return c ? `${NOTE_NAMES[c.root]}5` : null; } : valueOf;
+      const byBar = {}; idx.forEach((i, j) => { byBar[i] = on[j] && heardOf(bars[i]) ? val(bars[i]) : null; });
       const loop = sectionLoop(byBar, idx, same ? { same } : {});
       if (!loop) return;
       const bp = bassDriveOf(model.bassDrive) || { drive: 0, wave: null }, snd = soundsOf(idx.map(i => bars[i]), opts.sounds, bars.slice(0, end), bp.drive, bp.wave), c = code(loop, id === 'bass' ? snd.bass : snd.chords);

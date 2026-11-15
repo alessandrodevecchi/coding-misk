@@ -60,7 +60,7 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
     ...Object.fromEntries([['crush', 'crush'], ['distortvol', 'vol'], ['distort', 'distort'], ['lpq', 'lpq'], ['sineShare', 'sineShare']].filter(([, f]) => f in SR.drive).map(([k, f]) => [k, field(SR.drive, f)])),
     // (round 6: the cut's Lead level, the level under which a part is not written, the missing-bass guard)
     ...('leadKeep' in SR ? { leadKeep: field(SR, 'leadKeep'), bassMissing: field(SR, 'bassMissing') } : {}),
-    ...(W.DRUM_DRIVE ? { drumRatio: field(W.DRUM_DRIVE, 'ratio') } : {}),
+    ...(W.DRUM_DRIVE ? { drumMargin: field(W.DRUM_DRIVE, 'margin') } : {}),
     ...('bassBar' in SR ? { bassBar: field(SR, 'bassBar') } : {}), ...('bassWave' in SR ? { bassWave: field(SR, 'bassWave') } : {}),
     cutHpf: field(SR.cut, 0), cutLpf: field(SR.cut, 1), leadOver: field(SR, 'leadOver'), move: field(SR, 'move'), sustain: field(SR, 'sustain'), room: field(SR, 'room'), shares: field(SR, 'shares'), near: field(SR, 'near'),
     // the drive rule's threshold: level B's `driven` read again from the cached measure (no new analysis)
@@ -77,7 +77,7 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
   // the analysis of a file, cached while the file and the decoder do not change (the decoder: every file of src/decode/
   // but the writer and the tables it reads, which run on each variant)
   const ddir = path.join(src, 'src', 'decode'), h = crypto.createHash('sha1');
-  for (const f of fs.readdirSync(ddir).filter(f => f.endsWith('.js') && !['writer.js', 'part-levels.js'].includes(f)).sort()) h.update(fs.readFileSync(path.join(ddir, f)));
+  for (const f of fs.readdirSync(ddir).filter(f => f.endsWith('.js') && !['writer.js', 'part-levels.js', 'bass-profiles.js'].includes(f)).sort()) h.update(fs.readFileSync(path.join(ddir, f)));
   const SRC_HASH = h.digest('hex').slice(0, 10);
   const mdir = path.join(CACHE, 'models', tag); fs.mkdirSync(mdir, { recursive: true });
   const pcmOf = new Map(), pcm = f => { if (!pcmOf.has(f)) pcmOf.set(f, S.readAudio(f)); return pcmOf.get(f); };

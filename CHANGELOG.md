@@ -99,6 +99,11 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Decode: in Full, the drums get a drive of 1, 2 or 3 when the high band calls for it, decided apart from the drums' level.
+- Decode: in Full, a bass note repeated with a new attack is written again instead of held.
+- Decode: in Full, a driven bass is no longer written as a clean square, and a square bass is told by its odd harmonics.
+- Decode: in Full, chords whose roots fit the key but whose thirds do not are written as power chords.
+- Decode: in Full, the tempo follows three agreeing estimates at double the tempo found, or at 3:2 of it.
 - Decode: in Full, each part's level is predicted from the drum rows and the steps the code plays, in five bands, and a part that already balances keeps its written level.
 - Guide: the Decode card describes the Lead track in Full, the tempo checked again after 8 bars with a kick in Live, Essentia.js for the top line and the video picture with the Video visual.
 - Guide: the Settings card says what the backup holds of Decode and the "Include all Decode analyses" choice.
