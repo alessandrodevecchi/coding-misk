@@ -18,7 +18,7 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // sounds by measure (decode-refine D3): the bass band's brightness range over a bar that makes a moving filter (Hz;
 // measured: luci-rosse and the acid song about 470, the radio seed's resonant supersaw 370, plain basses 120 to 260)
 // sustain: the chords' mean energy left in the last eighth of their bar (amplitude ratio, 0.6 is about -4 dB) from which
-// they get a room of `room`; levels: the gain steps the balance tries for each part (multipliers, 1.5 dB apart) and the
+// they get a room of `room` (round 8: a room from roomRange[0] to roomRange[1] along the sustain); levels: the gain steps the balance tries for each part (multipliers, 1.5 dB apart) and the
 // highest gain it writes
 // cut: the chords' high-pass and low-pass (Hz) when a Lead plays over at least leadOver of their bars, the song has
 // drums and the balance kept the Lead within leadKeep dB of its written level (round 6, review P5: the cut fired on a
@@ -40,7 +40,7 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // at. (Round 5 wrote a fixed `.distort(4.5).distortvol(0.5).crush(4.85)` when the even/odd ratio was under -3 dB: the
 // crusher matched a median-centroid score with broadband noise, +12 to +14 dB above 5.6 kHz, and the ratio read square,
 // triangle and sine basses as driven; review of 13 November.)
-export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.91, spread: [0.227, 6.44], eoFloor: -8, min: 3 }, bassWave: 700 };
+export const SOUND_RULE = { move: 350, sustain: 0.6, room: 0.4, roomRange: [0.3, 0.9], levels: Array.from({ length: 17 }, (_, i) => 2 ** ((i - 10) / 4)), maxGain: 1, shares: 0.1, near: 0.05, cut: [1200, 4000], leadOver: 0.5, leadKeep: 6, bassMissing: 1 / 3, bassBar: 0.2, drive: { vol: 0.5, lpq: 4, table: 4.5, sineShare: 0.91, spread: [0.227, 6.44], eoFloor: -8, min: 3 }, bassWave: 700 };
 // the edit rule (decode-refine D7), tuned on the owner's test files: lineBars, bars at least between two edits of one
 // line; anyBars, between two edits of any line; drumSteps, the steps a drum grid must change by (or a row that enters
 // or leaves); bassShare, the share of note steps a bass loop must change by (or another root on its first bar);
@@ -128,12 +128,14 @@ const loopOpts = id => (id === 'chords' ? { grow: true } : { same: sameBass });
 const sameBassB = (a, b) => { if (!a || !b) return false; let n = 0, ok = 0; for (let j = 0; j < a.length; j++) { if (a[j] === null && b[j] === null) continue; n++; if (a[j] === b[j]) ok++; } return n === 0 || ok / n >= 0.75; };
 
 // a bar of bass notes in mini-notation: the coarsest grid (16, 8 or 4 steps) that holds every note, runs with "!"
+export const HOLD = '_';
 export function stepsMini(notes, name = noteName) {
   let n = STEPS;
   for (const g of [4, 8]) if (notes.every((x, j) => j % (STEPS / g) === 0 || x === null)) { n = g; break; }
-  const toks = Array.from({ length: n }, (_, k) => { const x = notes[k * (STEPS / n)]; return x === null || x === undefined ? '~' : name(x); });
+  // (a hold, decode round 8, stays `_` and is never folded into `!`: each `_` makes the event before one step longer)
+  const toks = Array.from({ length: n }, (_, k) => { const x = notes[k * (STEPS / n)]; return x === null || x === undefined ? '~' : x === HOLD ? HOLD : name(x); });
   const out = [];
-  for (const tk of toks) { const last = out[out.length - 1]; if (last && last.t === tk) last.n++; else out.push({ t: tk, n: 1 }); }
+  for (const tk of toks) { const last = out[out.length - 1]; if (last && last.t === tk && tk !== HOLD) last.n++; else out.push({ t: tk, n: 1 }); }
   return out.map(x => (x.n > 1 ? `${x.t}!${x.n}` : x.t)).join(' ');
 }
 const seqOf = list => (list.length === 1 ? list[0] : `<${list.join(' ')}>`);
@@ -183,7 +185,10 @@ export function soundsOf(bars, preset = 'ours', whole = bars, drive = 0, wave = 
   // (decode-refine D3: chords that are still sounding at the end of their bar, a held or reverberant pad, get a room;
   // the Lead's wave and filter follow the brightness as the chords' do, one step brighter)
   const held = bars.filter(b => b.sustain !== undefined), sustain = held.length ? held.reduce((a, b) => a + b.sustain, 0) / held.length : 0;
-  const room = sustain >= SOUND_RULE.sustain ? `.room(${SOUND_RULE.room})` : '';
+  // (decode round 8: the room follows the sustain, from `roomRange[0]` for chords that stop to `roomRange[1]` for chords
+  // that ring to the end of the bar; it was 0.4 from a sustain of 0.6 and none under it, and a held pad with a long
+  // reverb measured 0.4 came out dry)
+  const room = held.length ? `.room(${Math.round(Math.min(SOUND_RULE.roomRange[1], SOUND_RULE.roomRange[0] + (SOUND_RULE.roomRange[1] - SOUND_RULE.roomRange[0]) * sustain) * 10) / 10})` : '';
   const leadWave = bright > 0.45 ? 'sawtooth' : bright > 0.25 ? 'square' : 'triangle', leadCut = Math.round((1200 + 3600 * Math.min(1, bright * 1.5)) / 100) * 100;
   return { kit, bass: bassSound, chords: `.s("${chordWave}").lpf(${chordCut})${room}.gain(.3)`, lead: `.s("${leadWave}").lpf(${leadCut}).gain(.25)`, why: `bright ${bright.toFixed(2)} low ${low.toFixed(2)} sustain ${sustain.toFixed(2)}` };
 }
@@ -714,7 +719,8 @@ export function writeFull(model, opts = {}) {
     });
     if (clips.length) tracks.push({ id, name, type: 'code', settings: { visual }, patterns, clips });
   };
-  part('bass', 'Bass', 'bass', heardBass, b => b.bass.map(x => (x === null || x === undefined ? null : x)), bassCode, sameBassB);
+  // (decode round 8: a step the note before still sounds on is a hold, `_` in the code, so a held note is written long)
+  part('bass', 'Bass', 'bass', heardBass, b => b.bass.map((x, j, a) => (x === null || x === undefined ? null : x)).map((x, j, a) => (x === null && b.bassHold && b.bassHold[j] ? HOLD : x)).map((x, j, a) => (x === HOLD && !a.slice(0, j).some(y => y !== null && y !== HOLD) ? null : x)), bassCode, sameBassB);
   part('chords', 'Chords', 'pad', chordsHeard, b => b.chord, chordCode, undefined, inKey(model.key));
   // the Lead (decode-refine D2): the top line as one loop per section where it is voiced on at least LEAD_RULE.voiced
   // of the section's steps; a sung melody (the top line lines' kind `vox`) muted by default (`hush`)

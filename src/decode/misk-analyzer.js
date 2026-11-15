@@ -30,7 +30,12 @@ export const RELOCK_BARS = 8;
 // the top line by YIN (D2): a step's band level must reach `floor` of the band's peak
 export const TOP_LINE = { floor: 0.02 };
 // the bass (D5): YIN's looser threshold for a bass that the usual one does not hear (a detuned unison)
-export const BASS_RULE = { loose: 0.35 };
+// loose: YIN's threshold right after a kick; late and context: a note on a kick's step is read from this share of the
+// step on and kept only with the same pitch within this many steps or in a second late window, and only when its late
+// level rises by `rise` over the step before's; agree: the two windows of a step hold one pitch within this many
+// semitones (0.6 before round 8: a square bass under a low-pass reads about a semitone apart in its two windows);
+// holdFloor: a step holds the note before only above this share of the bass's loudest step
+export const BASS_RULE = { loose: 0.35, late: 0.45, context: 2, rise: 1.15, agree: 1.0, holdFloor: 0.12 };
 
 // ---------- FFT (radix 2, in place) ----------
 const ffts = new Map();
@@ -710,7 +715,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       else if (ex && best.T.quality === 'maj' && quiet) third = true;
       chord = chordName(best.T.root, best.T.quality); chordConf = Math.round(Math.min(1, best.s) * 100) / 100;
     }
-    return { start: Math.round(start * 1000) / 1000, chord, chordConf, ...(third ? { third: true } : {}), bass, drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, bassLo, bassHi, top: topOf(start, end, bass) };
+    return { start: Math.round(start * 1000) / 1000, chord, chordConf, ...(third ? { third: true } : {}), bass: [...bass], ...(bass.hold && bass.hold.some(Boolean) ? { bassHold: bass.hold.map(x => (x ? 1 : 0)) } : {}), drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, bassLo, bassHi, top: topOf(start, end, bass) };
   }
   // the top line of a bar (decode-refine D6): `up`, the median over its frames of the share of the tonal peaks'
   // energy between 400 and 2000 Hz (no harmonic of a bass note) in all of the frame's tonal energy (60 to 2100 Hz). A
@@ -738,7 +743,9 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     const x = bassSignal(), out = [], L = step * decRate, tmax = Math.floor(decRate / 30);
     // one pitch window inside the first 85 % of the step, and a second one later when the step is long enough
     const w = Math.max(64, Math.min(200, Math.round(0.75 * L - tmax)));
-    let prev = null;
+    let prev = null, cur = null;
+    // (decode round 8: the steps a note still sounds on, its pitch heard again with no new attack: `out.hold`)
+    const hold = new Array(STEPS).fill(false);
     const kickAt = j => onsets.kick.some(o => Math.abs(o.t - (start + j * step)) <= 0.03 && kickLike(o));
     for (let j = 0; j < STEPS; j++) {
       const s0 = (start + j * step) * decRate;
@@ -748,7 +755,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       // tail is periodic enough only for a looser threshold, decode-refine D5; elsewhere it found notes in a pad)
       const late = s0 + 0.1 * L + w / 2, twice = th => { const a = yin(x, Math.round(s0 + 0.1 * L), decRate, { w, threshold: th, fmin: 30, fmax: 260 }), b = late + w + tmax < s0 + 0.95 * L ? yin(x, Math.round(late), decRate, { w, threshold: th, fmin: 30, fmax: 260 }) : a; return [a ? midiOf(a.f0) : null, b ? midiOf(b.f0) : null]; };
       let [m1, m2] = twice(0.2);
-      const agree = (a, b) => a !== null && b !== null && Math.abs(a - b) < 0.6;
+      const agree = (a, b) => a !== null && b !== null && Math.abs(a - b) < BASS_RULE.agree;
       // (at the looser threshold one window alone may hold the pitch: the other sits in the kick's tail)
       let loose = false;
       if (!agree(m1, m2) && head > 0.12 * bassTop && kickAt(j - 1)) { const [l1, l2] = twice(BASS_RULE.loose); if (agree(l1, l2)) [m1, m2] = [l1, l2]; else if ((l1 === null) !== (l2 === null)) m1 = m2 = l1 ?? l2; loose = agree(m1, m2); }
@@ -762,9 +769,34 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       const underKick = loose && quietBefore(out, before, j);
       const fresh = voiced && !kickOnly && (head > 1.4 * before || (prev !== null && Math.abs(midi - prev) >= 1 && head > 0.7 * before) || underKick);
       out.push(fresh ? midi : null);
+      if (fresh) cur = midi;
+      else if (cur !== null && agree(m1, m2) && Math.abs((m1 + m2) / 2 - cur) < BASS_RULE.agree && head > BASS_RULE.holdFloor * bassTop) hold[j] = true;
+      else cur = null;
       prev = m1 !== null ? Math.round(m1) : null;
       if (voiced && !kickOnly) heardPitches.add(midi);
     }
+    // (decode round 8: a bass note on a kick's step. The kick hides the note's attack and its first window's pitch, so
+    // the step reads as a kick alone. The step's late part, after the kick's click, holds the bass's pitch when the
+    // note is there; it is a note only when the line confirms it: the same pitch as a note within BASS_RULE.context
+    // steps before or after, at a level the bass reaches. A kick's own tail has its own pitch and is not taken)
+    for (let j = 0; j < STEPS; j++) {
+      if (out[j] !== null || !kickAt(j)) continue;
+      const s0 = (start + j * step) * decRate, a = Math.round(s0 + BASS_RULE.late * L);
+      const late = rmsOf(x, a, s0 + 0.95 * L), lateBefore = rmsOf(x, a - L, s0 - 0.05 * L);
+      // (a new note: the bass's late level rises over the step before's; a held note under a kick only decays)
+      if (late < 0.12 * bassTop || late < BASS_RULE.rise * lateBefore) continue;
+      const p = yin(x, a, decRate, { w, threshold: BASS_RULE.loose, fmin: 30, fmax: 260 });
+      if (!p) continue;
+      const midi = Math.round(midiOf(p.f0)), ctx = [];
+      for (let k = 1; k <= BASS_RULE.context; k++) { ctx.push(j - k >= 0 ? out[j - k] : before[before.length - (k - j)], out[j + k]); }
+      // (the line confirms it: the same pitch within `context` steps, or a second late window with the same pitch)
+      const b2 = a + Math.round(0.25 * L) + w <= s0 + 1.2 * L ? yin(x, a + Math.round(0.25 * L), decRate, { w, threshold: BASS_RULE.loose, fmin: 30, fmax: 260 }) : null;
+      const steady = b2 && Math.abs(midiOf(b2.f0) - midiOf(p.f0)) < 0.6;
+      if (steady || ctx.some(c => c !== null && c !== undefined && Math.abs(c - midi) < 0.6)) { out[j] = midi; heardPitches.add(midi); hold[j] = false; }
+    }
+    // (a hold only right after a note or a hold: a note added on a kick's step starts a note, not a hold)
+    for (let j = 0; j < STEPS; j++) if (hold[j] && !(j > 0 && (out[j - 1] !== null || hold[j - 1]))) hold[j] = false;
+    out.hold = hold;
     return out;
   }
   // the top line by YIN (decode-refine D2, level B without Essentia.js): the 200-2000 Hz band, decimated by 4, one pitch
