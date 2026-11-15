@@ -5,6 +5,7 @@
 // which touch Strudel's Pattern and analysers in a page (and stub the methods in Node and on the render page).
 import { hashString } from '../endless/random.js';
 import { roll as paintRoll } from '../visuals/widget-painters.js';
+import { LINE, MUTED_LINE } from '../song/line-names.js';
 
 export const CW_KEY = 'coding-misk-code-widgets';
 // the six inline widgets of @strudel/codemirror, in the order the Settings card shows them
@@ -210,8 +211,8 @@ export function lanesOf(code) {
   }
   return out;
 }
-const PATTERN = /^\s*[_S]?\$:/;
-const MUTED = /^\s*_\$:/;
+const PATTERN = LINE;
+const MUTED = MUTED_LINE;
 // a line that plays at a bar: not muted, and its section lane (`.mask(sectionN)`) on at that bar
 export function playsAt(line, lanes, bar) {
   if (MUTED.test(line)) return false;

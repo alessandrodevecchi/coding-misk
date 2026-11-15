@@ -6,6 +6,7 @@
 import { buildSteps } from '../song/build.js';
 import { typingPlan, settleOthers, chainLines } from '../song/typing.js';
 import { barSeconds } from './typing-load.js';
+import { LINE, LABEL_SPACE, MUTED_LINE } from '../song/line-names.js';
 
 // D8 limits, the Balanced level (owner, lines-ahead-balanced D1, 2026-10-28): lines ahead in the code at once, bars of
 // look-ahead (`section: true` would also stop it at the next section change), muted lines shown at which no line is typed
@@ -13,8 +14,8 @@ import { barSeconds } from './typing-load.js';
 export const AHEAD = { atOnce: 2, bars: 32, muted: 8, margin: 2, section: false };
 // (browser checks and screenshots may widen them for a page: globalThis.codingMiskAhead, read when a plan is made)
 
-const PATTERN = /^\s*[_S]?\$:/;
-const norm = l => l.replace(/^\s*[_S]?\$:\s*/, '').replace(/\s+/g, '');
+const PATTERN = LINE;
+const norm = l => l.replace(LABEL_SPACE, '').replace(/\s+/g, '');
 const GATE_ANY = /\.mask\((\w+)\)\.(?:velocity\(\1\)|postgain\(\1\.mul\((?:-?[\d.]+|"<?[\d.! ]+>?")\)\))/;
 
 // codeWith(bar, keep, { plan, info, wrap }): the code of the moment (live-code.js); G: the first bar of the written
@@ -100,7 +101,7 @@ export function* planWrittenSteps(codeWith, build, G, shownLine = x => x, { grow
     let spare = S.spare;
     if (spare <= AH.margin || active(s).length >= AH.atOnce) continue;
     // (the measure was made before any line ahead: those in the code at this step add to its muted lines)
-    const muted = chainLines(S.code).filter(l => /^\s*_\$:/.test(l)).length + active(s).length;
+    const muted = chainLines(S.code).filter(l => MUTED_LINE.test(l)).length + active(s).length;
     if (muted >= AH.muted) continue;
     const shownKeys = new Set(S.info.map(x => `${x.header}\u0000${x.key}`)), limit = Math.min(AH.section ? nextChange(s) : Infinity, s + AH.bars);
     const cands = [];

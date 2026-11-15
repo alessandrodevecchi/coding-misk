@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import { crescendoSong } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules } from '../src/live/profiles.js';
+import { LINE } from '../src/song/line-names.js';
 import { liveCode } from '../src/live/live-code.js';
 import { buildSteps, deriveBuild } from '../src/song/build.js';
 import { useFns } from '../src/song/writer.js';
@@ -34,7 +35,7 @@ for (const id of ids) {
     const shown = L.codeAt(at);
     // the shown code's pattern lines and their ranges
     const ranges = []; let pos = 0;
-    for (const l of chainLines(shown)) { if (/^\s*[_S]?\$:/.test(l)) ranges.push({ a: pos, b: pos + l.length, l }); pos += l.length + 1; }
+    for (const l of chainLines(shown)) { if (LINE.test(l)) ranges.push({ a: pos, b: pos + l.length, l }); pos += l.length + 1; }
     const lineOf = h => { for (const x of (h.context && h.context.locations) || []) { const r = ranges.find(r => x.start >= r.a && x.start < r.b); if (r) return r; } return null; };
     globalThis.miskBuses = L.buses; useFns(L.fns);
     let full, alone;

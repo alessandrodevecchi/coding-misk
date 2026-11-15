@@ -22,6 +22,7 @@ function lineDiff(a, b, blanks = true) {
 }
 
 import { stripWidgets } from '../live/widgets.js';
+import { isLine } from './line-names.js';
 
 export function typingFrames(from, to) {
   const ops = lineDiff(from.split('\n'), to.split('\n')), parts = [];
@@ -107,7 +108,7 @@ function lcsLen(x, y) {
 // are of a different kind (a comment and code, a pattern and a constant)
 const words = s => s.match(/[A-Za-z_][\w$]*|\d*\.?\d+|~/g) || [];
 // a pattern line ("$:", muted or not), a comment, or the first word
-const lead = s => { const t = s.trim(); return t.startsWith('//') ? '//' : /^[_S]?\$:/.test(t) ? '$:' : (t.match(/^[\w$.]+/) || [t])[0]; };
+const lead = s => { const t = s.trim(); return t.startsWith('//') ? '//' : isLine(t) ? '$:' : (t.match(/^[\w$.]+/) || [t])[0]; };
 export function lineLike(a, b) {
   if (lead(a) !== lead(b)) return 0;
   const x = words(a), y = words(b);

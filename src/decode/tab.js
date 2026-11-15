@@ -19,22 +19,27 @@ import { followSong } from '../song/crescendo.js';
 import { compileSong } from '../song/compile.js';
 import { FUNCTION_PRESETS } from '../song/writer.js';
 import { COMMENT_PRESETS } from '../song/comments.js';
+import { isLine, lineNamesOf, nameLines, LINE_NAME_MODES, LINE_NAME_STYLES } from '../song/line-names.js';
 
 const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const VIEWS = ['now', 'compact', 'track', 'sections'];
 // the Options of a decoded track (D13): the Live coder's defaults (comments: title only; every technical function)
-export const DEFAULT_OPTIONS = { comments: 'none', functions: 'compact', view: 'now' };
+// names (line-names, owner 12 November): Random per track, drawn from the file's fingerprint; named after the instrument
+export const DEFAULT_OPTIONS = { comments: 'none', functions: 'compact', view: 'now', names: 'random', nameStyle: 'instrument' };
 export const DEFAULT_SETTINGS = () => ({ level: 'A', look: LOOK_AHEAD_DEFAULT, sounds: 'ours', options: { ...DEFAULT_OPTIONS }, mix: defaultMix(['code']) });
 // the overrides of the Live coder profile a decoded song plays with: narrator off (it would talk over the original), the
-// growth "Follow the song" (D18, level B and Open in Compose), the Options of the tab
-export function decodeOverrides(options = DEFAULT_OPTIONS) {
+// growth "Follow the song" (D18, level B and Open in Compose), the Options of the tab. seed: the file's fingerprint, which
+// draws Random line names (line-names), so a track always shows the same form, and Open in Compose keeps it (the
+// form drawn is written into the song's configuration, not Random again from the new song's id)
+export function decodeOverrides(options = DEFAULT_OPTIONS, seed = '') {
   const o = { ...DEFAULT_OPTIONS, ...(options || {}) };
-  return { narrator: false, growth: 'follow', ...(COMMENT_PRESETS[o.comments] || {}), ...(FUNCTION_PRESETS[o.functions] || {}), view: VIEWS.includes(o.view) ? o.view : 'now' };
+  const names = lineNamesOf(LINE_NAME_MODES.includes(o.names) ? o.names : 'random', { id: `decode:${seed}` });
+  return { narrator: false, growth: 'follow', ...(COMMENT_PRESETS[o.comments] || {}), ...(FUNCTION_PRESETS[o.functions] || {}), view: VIEWS.includes(o.view) ? o.view : 'now', names, nameStyle: LINE_NAME_STYLES.includes(o.nameStyle) ? o.nameStyle : 'instrument' };
 }
-export const decodeControls = (options = DEFAULT_OPTIONS) => resolveProfile('switch', decodeOverrides(options));
+export const decodeControls = (options = DEFAULT_OPTIONS, seed = '') => resolveProfile('switch', decodeOverrides(options, seed));
 // the configuration of a decoded song opened in Compose (D15): the Live coder profile with the tab's overrides, so the
 // song grows the same and shows the same code
-export const composeConfig = options => ({ profile: 'switch', live: true, options: cleanOverrides(decodeOverrides(options), PROFILES.switch) });
+export const composeConfig = (options, seed = '') => ({ profile: 'switch', live: true, options: cleanOverrides(decodeOverrides(options, seed), PROFILES.switch) });
 // the bus (orbit) of each track of a song, from its compiled code: { trackId: orbit }
 export function orbitsOf(song) {
   const out = {}, byName = new Map((song.tracks || []).map(t => [t.name || t.id, t.id]));
@@ -615,21 +620,23 @@ export function createDecodeTab({ root, app }) {
   const peakOf = an => { if (!an) return 0; const d = new Float32Array(an.fftSize); an.getFloatTimeDomainData(d); let p = 0; for (const v of d) p = Math.max(p, Math.abs(v)); return p; };
 
   // ---------- the code of a bar (D9, D13) ----------
-  const ctl = () => decodeControls(cur && cur.settings.options);
+  const ctl = () => decodeControls(cur && cur.settings.options, seedOf());
+  // the top lines' group takes names too when the parts do (line-names: `vox:`, `melody2:`)
+  const named = c => { const C = ctl(); return C.names === 'names' ? nameLines(c, { style: C.nameStyle }) : c; };
   function playableAt(bar) {
     const last = model ? model.bars.length - 1 : -1, at = Math.min(bar, last);
     const key = `${modelSeq}|${at}|${JSON.stringify([cur.title, cur.artist, cur.attribution, cur.settings.sounds, cur.settings.options])}`;
     if (codeMemo.has(key)) return codeMemo.get(key);
     const song = momentSong(model || { bars: [], bpm: 120 }, at, { id: 'decoded', title: cur.title, artist: cur.artist, attribution: cur.attribution, sounds: cur.settings.sounds });
     const C = ctl(), lc = liveCode({ ...song, build: [], crescendo: { growth: 0 } }, C, { lang: app.lang, files: app.files, cols: app.cols, widgets: app.widgets });
-    const shown = withVox(lc.codeAt(0), model && at >= 0 ? voxGroup(model, at, { seed: seedOf(), level: 'A' }) : ''), meta = decodeMeta(model || { duration: cur.duration, downbeat: 0, barSeconds: 2, bpm: 120 });
+    const shown = named(withVox(lc.codeAt(0), model && at >= 0 ? voxGroup(model, at, { seed: seedOf(), level: 'A' }) : '')), meta = decodeMeta(model || { duration: cur.duration, downbeat: 0, barSeconds: 2, bpm: 120 });
     const sg = {
       id: `decode:${cur.fp ? cur.fp.key : 'x'}`, title: cur.title, kind: 'decode', code: shown, meta, codeAt: null, codeKeep: null,
       run: c => { const s = withoutVox(c); return lc.run ? lc.run(s) : s; },
       standalone: c => copyOut(c, lc),
       buses: lc.buses, fns: lc.fns, build: null, ctl: C, doc: null, decode: true,
     };
-    const out = { at, code: shown, sg, lines: shown.split('\n').filter(l => /^\s*[_S]?\$:/.test(l)).length };
+    const out = { at, code: shown, sg, lines: shown.split('\n').filter(isLine).length };
     if (codeMemo.size > 400) codeMemo.clear();
     codeMemo.set(key, out);
     return out;
@@ -652,7 +659,7 @@ export function createDecodeTab({ root, app }) {
     if (bMemo && bMemo.key === key) return bMemo.sg;
     // (a sung melody's Lead is muted in the mix, not in its code: Open in Compose keeps it muted with `_$:`)
     const song = songB(), heard = { ...song, tracks: song.tracks.map(({ hush, ...x }) => x) }, C = ctl(), lc = liveCode(followSong(heard), C, { lang: app.lang, files: app.files, cols: app.cols, widgets: app.widgets });
-    const codeAt = (bar, keep) => withVox(lc.codeAt(Math.max(0, bar), keep), voxGroup(modelB, Math.max(0, bar), { seed: seedOf(), level: 'B' }));
+    const codeAt = (bar, keep) => named(withVox(lc.codeAt(Math.max(0, bar), keep), voxGroup(modelB, Math.max(0, bar), { seed: seedOf(), level: 'B' })));
     const first = lc.codeAt(0), head = first.split('\n').filter(l => /^\/\/ coding-misk|^setcpm\(/.test(l)).join('\n');
     const sg = {
       id: `decode:${cur.fp ? cur.fp.key : 'x'}:B`, title: cur.title, kind: 'decode', code: codeAt(0), meta: decodeMeta(modelB), codeAt, codeKeep: null,
@@ -771,7 +778,7 @@ export function createDecodeTab({ root, app }) {
   function openCompose() {
     if (!cur || cur.videoOnly) return;
     if (!modelB) { runFull('compose'); return; }
-    const song = { ...songB(`u-${Date.now()}`), config: composeConfig(cur.settings.options) };
+    const song = { ...songB(`u-${Date.now()}`), config: composeConfig(cur.settings.options, seedOf()) };
     stop();
     app.openInCompose(song);
   }
@@ -891,6 +898,8 @@ export function createDecodeTab({ root, app }) {
       <div class="dc-opts">
         <div class="ctrl"><label class="lbl" for="dc-comments">${esc(t('commentsLbl'))}</label><select id="dc-comments" data-no-knob>${['all', 'essential', 'none'].map(k => `<option value="${k}"${o.comments === k ? ' selected' : ''}>${esc(t(`comments:${k}`))}</option>`).join('')}</select></div>
         <div class="ctrl"><label class="lbl" for="dc-fns">${esc(t('fnsLbl'))}</label><select id="dc-fns" data-no-knob>${['full', 'short', 'mixer', 'compact'].map(k => `<option value="${k}"${o.functions === k ? ' selected' : ''}>${esc(t(`fns:${k}`))}</option>`).join('')}</select></div>
+        <div class="ctrl" title="${esc(t('namesHint'))}"><label class="lbl" for="dc-names">${esc(t('namesLbl'))}</label><select id="dc-names" data-no-knob>${LINE_NAME_MODES.map(k => `<option value="${k}"${(o.names || 'random') === k ? ' selected' : ''}>${esc(t(`names:${k}`))}</option>`).join('')}</select></div>
+        <div class="ctrl" title="${esc(t('nameStyleHint'))}"><label class="lbl" for="dc-name-style">${esc(t('nameStyleLbl'))}</label><select id="dc-name-style" data-no-knob>${LINE_NAME_STYLES.map(k => `<option value="${k}"${(o.nameStyle || 'instrument') === k ? ' selected' : ''}>${esc(t(`nameStyle:${k}`))}</option>`).join('')}</select></div>
         <div class="ctrl"><label class="lbl" for="dc-view">${esc(t('liveCodeView'))}</label><select id="dc-view" data-no-knob>${[['now', 'liveCodeNow'], ['compact', 'liveCodeCompact'], ['track', 'liveCodeTrack'], ['sections', 'liveCodeSections']].map(([k, l]) => `<option value="${k}"${o.view === k ? ' selected' : ''}>${esc(t(l))}</option>`).join('')}</select></div>
       </div></details>`;
   function render() {
@@ -1016,6 +1025,8 @@ export function createDecodeTab({ root, app }) {
     if (el.id === 'dc-look') { cur.settings.look = LOOK_AHEAD.includes(el.value) ? el.value : LOOK_AHEAD_DEFAULT; saveSoon(); return; }
     if (el.id === 'dc-comments') { cur.settings.options.comments = el.value; optionChanged(); return; }
     if (el.id === 'dc-fns') { cur.settings.options.functions = el.value; optionChanged(); return; }
+    if (el.id === 'dc-names') { cur.settings.options.names = LINE_NAME_MODES.includes(el.value) ? el.value : 'random'; optionChanged(); return; }
+    if (el.id === 'dc-name-style') { cur.settings.options.nameStyle = LINE_NAME_STYLES.includes(el.value) ? el.value : 'instrument'; optionChanged(); return; }
     if (el.id === 'dc-view') { cur.settings.options.view = el.value; optionChanged(); return; }
   });
   root.addEventListener('input', e => {

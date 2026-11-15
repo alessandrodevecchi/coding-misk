@@ -133,14 +133,14 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
     s = await stNow();
     check(s.playing && s.playLevel === 'B' && /Full/.test(await page.innerText('#src')), 'Play after Full: the track plays in Full from the start', `${s.playLevel} · bar ${s.bar && s.bar.toFixed(1)}`);
     let code = await edCode();
-    check(!/\/\/ vox: …/.test(code) && /^_\$: melody\("/m.test(code) && !/^\$: melody/m.test(code), 'outside the hook the melody lines are muted', code.split('\n').filter(l => /melody|vox/.test(l)).join(' / '));
+    check(!/\/\/ vox: …/.test(code) && /^_(?:\$|[a-z][A-Za-z0-9]*): melody\("/m.test(code) && !/^(?:\$|[a-z][A-Za-z0-9]*): melody/m.test(code), 'outside the hook the melody lines are muted', code.split('\n').filter(l => /melody|vox/.test(l)).join(' / '));
     await page.evaluate(f => globalThis.codingMiskDecode.seek(f), s.modelB.downbeat + 9 * (240 / 124));
     await sleep(2500);
     code = await edCode();
     const ev = await evaluated();
-    check(/^\$: melody\("[a-z ]+"\)/m.test(code) && !/melody|vox/.test(ev), 'in the hook the melody lines play (`$:`), and the evaluated code has none of them', code.split('\n').filter(l => /melody|vox/.test(l)).join(' / '));
+    check(/^(?:\$|[a-z][A-Za-z0-9]*): melody\("[a-z ]+"\)/m.test(code) && !/melody|vox/.test(ev), 'in the hook the melody lines play (`$:`), and the evaluated code has none of them', code.split('\n').filter(l => /melody|vox/.test(l)).join(' / '));
     const copy = await page.evaluate(() => globalThis.codingMiskCopy());
-    check(/^const vox = \(\) => silence, melody = \(\) => silence/.test(copy) && /\$: melody\(/.test(copy) && copy.indexOf('// ========== melody') > copy.indexOf('$:'), 'Copy keeps the group after the code the player plays, with vox and melody defined as silence', copy.split('\n')[0]);
+    check(/^const vox = \(\) => silence, melody = \(\) => silence/.test(copy) && /(?:\$|[a-z][A-Za-z0-9]*): melody\(/.test(copy) && copy.indexOf('// ========== melody') > copy.search(/^[_S]?(?:\$|[a-z][A-Za-z0-9]*):/m), 'Copy keeps the group after the code the player plays, with vox and melody defined as silence', copy.split('\n')[0]);
     await page.click('#dc-stop'); await sleep(400);
   }
 
@@ -610,7 +610,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   check(/Night Run/.test(src) && /Live/.test(src), 'the code column\'s source line names the track and "Live"', src);
   await sleep(4000);
   let code = await shown();
-  check(code.startsWith('// coding-misk · cover of "Night Run" by Some Band') && !/\/\/ vox: …/.test(code) && /\$: s\("[^"]*bd/.test(code) && !/vox|melody/.test(await evaluated()), 'the code column shows the cover line and the drums; no old vocals comment; the evaluated code has no top line line', code.split('\n').length + ' lines');
+  check(code.startsWith('// coding-misk · cover of "Night Run" by Some Band') && !/\/\/ vox: …/.test(code) && /(?:\$|[a-z][A-Za-z0-9]*): s\("[^"]*bd/.test(code) && !/vox|melody/.test(await evaluated()), 'the code column shows the cover line and the drums; no old vocals comment; the evaluated code has no top line line', code.split('\n').length + ' lines');
   const pb = await page.innerText('#pb-title'), pbPos = await page.innerText('#pb-pos'), pbBar = await page.innerText('#pb-bar');
   check(/Night Run/.test(pb) && /\/ 1:5/.test(pbPos) && /bar \d+ \/ \d+/.test(pbBar) && await page.$eval('#pb-prev', b => b.disabled) && await page.$eval('#pb-next', b => b.disabled), 'the player bar: title, time, bar counter; previous and next disabled', `${pb} · ${pbPos} · ${pbBar}`);
   const lit = await page.evaluate(() => document.querySelectorAll('#edhost .cm-content [style*="outline"]').length);
@@ -651,7 +651,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
   check(s.settings.mix.slider === 0 && s.gains.code === 0 && s.levels.orig > 0.01, 'solo the original: the slider on Original');
   await page.click('[data-dc-solo="orig"]'); await sleep(300);
   const after = await evaluated();
-  check(before.split('\n')[0] === after.split('\n')[0] && !/_\$: s\("bd\*4/.test(after.slice(0, 400)) === !/_\$: s\("bd\*4/.test(before.slice(0, 400)), 'mute and solo never change the code text');
+  check(before.split('\n')[0] === after.split('\n')[0] && !/_(?:\$|[a-z][A-Za-z0-9]*): s\("bd\*4/.test(after.slice(0, 400)) === !/_(?:\$|[a-z][A-Za-z0-9]*): s\("bd\*4/.test(before.slice(0, 400)), 'mute and solo never change the code text');
   await page.click('[data-dc-mute="code"]'); await sleep(500);
   s = await st();
   check(s.settings.mix.slider === 0.5, 'unmute the code with the slider on Original: the slider moves to the middle');
@@ -695,7 +695,7 @@ const ff = args => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
     for (let i = 0; i < 160 && at === null; i++) {
       await sleep(100);
       const [ev, cur] = await Promise.all([evaluated(), stNow()]);
-      if (/^_\$: s\("bd/m.test(ev) && cur.bar > 28) at = cur.bar;
+      if (/^_(?:\$|[a-z][A-Za-z0-9]*): s\("bd/m.test(ev) && cur.bar > 28) at = cur.bar;
     }
     lands[look] = at === null ? null : Math.round(at) + 1;
   }

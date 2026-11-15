@@ -79,6 +79,7 @@ import { createStageFolders } from './visuals/stage-video-folders.js';
 import { OSC_KEY } from './visuals/oscilloscope-rules.js';
 import { SV_KEY, sizeOf as svSizeOf, fallbackLookOf, folderSignature, seededPick, trackTime, loopTime, decodeSize } from './visuals/stage-video-rules.js';
 import { createVideoFrames } from './video/stage-video-frames.js';
+import { MUTED_LINE, lineNamesOf, writeLineNames, nameHints } from './song/line-names.js';
 import { passSizes } from './visuals/render-styles.js';
 import { createVideo } from './video/video.js';
 import { fileName, OUT_KEY, outKindOf, outText, VIDEO_DEFAULTS, QUALITIES, layoutAreas, codeColsOf, TIMELINE_LAYOUTS, lookFor, F_FORMATS, F_SHOWS, F_ASPECTS, F_CODE, F_FILES, fragmentOpts, fragmentSize, fragmentAreas, V_DEFAULTS } from './video/layout.js';
@@ -589,7 +590,9 @@ function playable(tr, fixed = null) {
   const codeAt = live ? live.codeAt : null, run = live ? live.run : null, standalone = live ? live.standalone : null;
   // a song grown like a live coder can start with its waypoints when it plays without a live build (live-coder-growth)
   const plain = tr.kind === 'composed' && !codeAt && tr.normal === 'waypoints' ? waypointSong(tr) : tr;
-  const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? compileSong(plain) : tr.code;
+  // line names (line-names): the song as written takes the form of its setting too (the live code names its own lines)
+  const named = c => (tr.kind === 'composed' ? writeLineNames(c, lineNamesOf(C && C.names, tr), { hints: nameHints(tr), style: C && C.nameStyle === 'track' ? 'track' : 'instrument' }) : c);
+  const code = codeAt ? codeAt(0) : tr.kind === 'composed' ? named(compileSong(plain)) : tr.code;
   // the code of the moment has no sections table: the map comes from the code per section
   const meta = parseSong(now ? compileSong(stateAt(build, 0).song) : code);
   if (tr.kind === 'composed') {
@@ -600,7 +603,7 @@ function playable(tr, fixed = null) {
   // doc: the song itself (sections and tracks), for its soul (#46)
   // (whole: the song with every track, so the voice instrument's quiet sections stay the same)
   const only = (song, keep) => (keep ? { ...song, tracks: song.tracks.filter(keep), whole: song } : song);
-  const codeKeep = tr.kind === 'composed' && !codeAt ? keep => compileSong(only(plain, keep)) : null;
+  const codeKeep = tr.kind === 'composed' && !codeAt ? keep => named(compileSong(only(plain, keep))) : null;
   return { id: tr.id, title: tr.title, kind: tr.kind, look: tr.look, code, meta, codeAt, codeKeep, run, standalone, paste: live ? live.paste : null, earlier: live ? live.earlier : null, buses: live && live.buses, fns: live && live.fns, build, ctl: build ? C : null, doc: tr.kind === 'composed' ? build || plain : null };
 }
 
@@ -965,7 +968,7 @@ function markMuted() {
       try {
         let ln = doc.lineAt(view.posAtDOM(el)).number;
         while (ln > 1 && /^\s+\./.test(doc.line(ln).text)) ln--;
-        muted = /^\s*_\$:/.test(doc.line(ln).text);
+        muted = MUTED_LINE.test(doc.line(ln).text);
       } catch (e) {}
     }
     el.classList.toggle('cw-muted', muted);
@@ -2500,7 +2503,7 @@ function renderArranger() {
   // the growth shape belongs to the natural growth (Live coder); the Crescendo growth shows its Opening only
   // (varied-openings D9)
   $('#live-shape').hidden = !crescendo || (C.growth !== 'natural' && C.growth !== 'crescendo');
-  $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments; $('#live-fns').value = C.functions;
+  $('#live-code').value = C.view; $('#live-gen').value = C.gen; $('#live-comments').value = C.comments; $('#live-names').value = C.names || 'random'; $('#live-name-style').value = C.nameStyle || 'instrument'; $('#live-fns').value = C.functions;
   // (voice and spoken: "V:N code" and "V:T code" in Options, voice-track-tuning D11)
   for (const k of ['tracks', 'notes', 'steps', 'voice', 'spoken']) $(`#live-c-${k}`).setAttribute('aria-pressed', C[k] !== false);
   for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).setAttribute('aria-pressed', !!C[k]);
@@ -2937,6 +2940,9 @@ for (const k of ['opening', 'pace', 'development']) $(`#live-${k}`).addEventList
 $('#live-code').addEventListener('change', e => { setControl('view', e.target.value); liveChanged(); });
 // a comments preset sets its options (code-writing)
 $('#live-comments').addEventListener('change', e => { if (COMMENT_PRESETS[e.target.value]) for (const [k, v] of Object.entries(COMMENT_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });
+// line names (line-names): Random per song, `$:` or the instrument's name
+$('#live-names').addEventListener('change', e => { setControl('names', e.target.value); liveChanged(); });
+$('#live-name-style').addEventListener('change', e => { setControl('nameStyle', e.target.value); liveChanged(); });
 for (const k of ['tracks', 'notes', 'steps', 'voice', 'spoken']) $(`#live-c-${k}`).addEventListener('click', () => { setControl(k, ctlOf(T)[k] === false); liveChanged(); });
 $('#live-fns').addEventListener('change', e => { if (FUNCTION_PRESETS[e.target.value]) for (const [k, v] of Object.entries(FUNCTION_PRESETS[e.target.value])) setControl(k, v); liveChanged(); });
 for (const k of FUNCTION_OPTIONS) $(`#live-f-${k}`).addEventListener('click', () => { setControl(k, !ctlOf(T)[k]); liveChanged(); });

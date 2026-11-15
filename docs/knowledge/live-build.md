@@ -64,7 +64,7 @@ The Ideas example in the Live coder profile. Shape drawn: opening `full-kick`, p
 The pattern lines that the step at bar 32 rewrites, before:
 
 ```js
-$: chord("Am").anchor("c4").voicing()
+pad: chord("Am").anchor("c4").voicing()
   .s("supersaw").attack(.4).release(1.2)
   .room(.85).degradeBy(0.5)
 ```
@@ -72,7 +72,7 @@ $: chord("Am").anchor("c4").voicing()
 After:
 
 ```js
-$: chord("Am").anchor("c4").voicing()
+pad: chord("Am").anchor("c4").voicing()
   .s("supersaw").attack(.4).release(1.2)
   .room(.85).degradeBy(0.5).seg(16)
 ```

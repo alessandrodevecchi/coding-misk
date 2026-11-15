@@ -5,7 +5,10 @@
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { crescendoSong } from '../src/song/crescendo.js';
-import { resolveProfile, growthRules } from '../src/live/profiles.js';
+import { resolveProfile as resolveAny, growthRules } from '../src/live/profiles.js';
+// (line-names: the code here is checked as written with `$:`; tools/check-line-names.mjs checks that the code with
+// names is the same code with other labels, and plays the same)
+const resolveProfile = (id, over = {}, x) => resolveAny(id, { names: 'dollar', ...over }, x);
 import { liveCode } from '../src/live/live-code.js';
 import { buildSteps, deriveBuild } from '../src/song/build.js';
 import { applyComments, commentPreset, COMMENT_PRESETS } from '../src/song/comments.js';

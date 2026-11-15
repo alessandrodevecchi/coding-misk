@@ -21,6 +21,7 @@ import { applyComments } from './comments.js';
 import { idiomatic } from './idiom.js';
 import { compose, KIND_OF_TYPE } from '../material/index.js';
 import { KEYS } from '../music.js';
+import { isLine, isAlone, isMuted, LABEL_SPACE } from './line-names.js';
 
 // raised when an intended change to the rules changes the steps of a checked song (tools/check-crescendo.mjs)
 // 2 (idea-model): the Live coder's natural growth grows ideas (presets included) through simpler forms of themselves
@@ -557,12 +558,12 @@ function heard(code) {
   const layers = [];
   let cur = null;
   for (const l of code.split('\n')) {
-    if (/^[_S]?\$:/.test(l)) { cur = { solo: l[0] === 'S', muted: l[0] === '_', text: l.replace(/\s*\/\/.*$/, '') }; layers.push(cur); continue; }
+    if (isLine(l)) { cur = { solo: isAlone(l), muted: isMuted(l), text: l.replace(/\s*\/\/.*$/, '') }; layers.push(cur); continue; }
     if (cur && /^\s+\S/.test(l) && !/^\s*\/\//.test(l)) { cur.text += l.trim().replace(/\s*\/\/.*$/, ''); continue; }
     cur = null;
   }
   const solo = layers.some(x => x.solo && !x.muted);
-  return layers.filter(x => !x.muted && (!solo || x.solo)).map(x => x.text.replace(/^[_S]?\$:\s*/, '')).join('\n');
+  return layers.filter(x => !x.muted && (!solo || x.solo)).map(x => x.text.replace(LABEL_SPACE, '')).join('\n');
 }
 function relaxGaps({ song, dest, plans, seq, gaps, R, hold, secBar, cap, shape, clipR, paceBars, paced, free = false }) {
   const first = { tracks: dest.map((t, i) => { const c = clipR(t); return { ...clone(t), clips: [{ start: 0, bars: 1, pattern: c.pattern, ...(c.set ? { set: clone(c.set) } : {}) }], patterns: { ...clone(t.patterns || {}), ...clone(plans[i].patterns) }, mute: true }; }) };
@@ -738,7 +739,8 @@ function searchShapes(song, opts, stats) {
   // default comments are display only, so they never change the growth; the code with them is the longer one to type)
   // (and without Sections, code-lanes: the growth measures the code it was tuned on, so the builds and their shapes
   // stay as they were; the edits at each clip change are small and checked by the typing checks)
-  const C = resolveProfile('switch', { duration: rules.free ? 'free' : 'fitted', tracks: true, fnLanes: false });
+  // (line-names: and with `$:`, so both forms of the code grow the same song)
+  const C = resolveProfile('switch', { duration: rules.free ? 'free' : 'fitted', tracks: true, fnLanes: false, names: 'dollar' });
   // one candidate grown and measured → null (a less detailed variant that grows the same: skipped), { plain } (a growth
   // without a shape: returned as it is) or { out, n, load, secs, k }
   const grow = c => {

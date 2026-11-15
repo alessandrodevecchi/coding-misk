@@ -517,7 +517,7 @@ export function writeFull(model, opts = {}) {
       if (!ids.has(c)) { const p = pid(ids.size); ids.set(c, p); patterns[p] = { code: c }; }
       clips.push({ start: sec.start, bars: sec.bars, pattern: ids.get(c) });
     });
-    if (clips.length) tracks.push({ id: 'lead', name: 'Lead', type: 'code', settings: { visual: 'hook' }, patterns, clips, ...(kind === 'vox' ? { hush: true } : {}) });
+    if (clips.length) tracks.push({ id: 'lead', name: 'Lead', lineName: 'lead', type: 'code', settings: { visual: 'hook' }, patterns, clips, ...(kind === 'vox' ? { hush: true } : {}) });
   }
   const song = songShell(model, opts, end, tracks);
   const key = formatKey(model.key), bpm = song.sections[0].bpm;

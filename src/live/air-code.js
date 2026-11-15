@@ -9,6 +9,7 @@ import { liveCode } from './live-code.js';
 import { resolveProfile } from './profiles.js';
 import { pasteRule } from './typing-load.js';
 import { buildSteps } from '../song/build.js';
+import { toDollar, isLine } from '../song/line-names.js';
 
 // the orbits of a song that is not on air: its own orbits moved up, past the voice instrument (13, 14) and the
 // narrator (15 and up)
@@ -75,11 +76,13 @@ export function apart(code, tag) {
 // a line played alone (S$:, a growth's opening) silences every other line of the code evaluated: in a song that is
 // not on air it is played alone within its own song only (its other lines muted, _$:), never against the song on air
 export function localSolo(code) {
+  // (line-names: a song not on air is written with `$:`, so its names never meet the names of the song on air)
+  code = toDollar(code);
   if (!/^\s*S\$:/m.test(code)) return code;
   return code.replace(/^(\s*)(S?)\$:/gm, (_, sp, solo) => `${sp}${solo ? '' : '_'}$:`);
 }
 // a code with something that plays (a line besides the silence liveCode adds to an empty code)
-const plays = c => /^\s*[_S]?\$:(?!\s*silence\s*$)/m.test(c);
+const plays = c => c.split('\n').some(l => isLine(l) && !/^\s*\$:\s*silence\s*$/.test(l));
 
 // W: the window song; songs: [{ n, prefix, start, song (the song as the radio holds it, its own bars), ctl (its
 // controls), show: 'air' | 'visible' | 'hidden', title }] in stream order, one with show 'air'.

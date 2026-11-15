@@ -449,7 +449,8 @@ function barSecondsAt(song, bar) {
 // hurry: how many times a person's pace still fits; head: the boundary's edit only (no late)
 const typingFrom = (...a) => timed('typing', () => typingFromNow(...a));
 function typingFromNow(N, B, q, E, C, { hurry = 1, head = false } = {}) {
-  const L = liveCode(N, C, { cols: () => 80 }), seed = N.id || '';
+  // (line-names: measured on `$:`, so the steering decides the same in both forms of the code)
+  const L = liveCode(N, { ...C, names: 'dollar' }, { cols: () => 80 }), seed = N.id || '';
   const bars = [...new Set(buildSteps(L.build).map(s => s.at))].sort((a, b) => a - b);
   const codes = new Map(), code = b => { if (!codes.has(b)) codes.set(b, L.codeAt(b)); return codes.get(b); };
   const need = (from, to) => { const c = code(to), was = settleOthers(code(from), c, to); return was === c ? 0 : typingPlan(was, c, { style: 'human', lean: true, seed }).natural; };

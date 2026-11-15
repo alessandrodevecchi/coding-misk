@@ -9,6 +9,7 @@
 import * as paint from '../visuals/widget-painters.js';
 import { widgetFrame, widgetSize, paintWidget } from '../widgets/app-widgets.js';
 import { rollThinHeight } from '../live/widgets.js';
+import { LINE } from '../song/line-names.js';
 
 const CALL = /\._(scope|pianoroll|punchcard|spectrum|spiral|pitchwheel|hitgrid|tonecloud)\(/;
 const NOTE = ['pianoroll', 'punchcard', 'spiral', 'pitchwheel'];
@@ -22,7 +23,7 @@ function chains(code) {
     else out.push({ text: l, a: pos, b: pos + l.length });
     pos += l.length + 1;
   }
-  return out.filter(c => /^\s*[_S]?\$:/.test(c.text));
+  return out.filter(c => LINE.test(c.text));
 }
 // the lines of a code with a widget call: [{ a, b, key, type }]
 export function widgetLines(code) {

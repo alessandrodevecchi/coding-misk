@@ -10,8 +10,9 @@
 import { DRUM_INSTS } from './hitgrid.js';
 import { lanesOf, playsAt } from '../live/widgets.js';
 import { instrumentOfLine } from '../video/widget-frames.js';
+import { LINE, MUTED_LINE } from '../song/line-names.js';
 
-const PATTERN = /^\s*[_S]?\$:/, MUTED = /^\s*_\$:/;
+const PATTERN = LINE, MUTED = MUTED_LINE;
 // the pattern lines of a code (a line with the lines of its chain after it) and where each begins
 function chains(code) {
   const out = []; let pos = 0;

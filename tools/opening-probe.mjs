@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { sessionItems } from '../src/endless/items.js';
 import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
+import { toDollar } from '../src/song/line-names.js';
 import { validateRecipe } from '../src/endless/recipe.js';
 import * as shapes from '../src/song/shapes.js';
 import { loadStyles } from './styles-dir.mjs';
@@ -49,7 +50,7 @@ const how = { transition: 'artist', harmony: 'artist' };
 function firstLine(song, C) {
   const L = liveCode(song, C, { cols: () => 80 });
   for (let b = 0; b < 40; b++) {
-    const line = (L.codeAt(b) || '').split('\n').map(l => l.trim().replace(/^S\$:/, '$:')).find(l => /^\$:/.test(l) && !/^\$:\s*silence/.test(l));
+    const line = toDollar(L.codeAt(b) || '').split('\n').map(l => l.trim().replace(/^S\$:/, '$:')).find(l => /^\$:/.test(l) && !/^\$:\s*silence/.test(l));
     if (line) return line;
   }
   return null;

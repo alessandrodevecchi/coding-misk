@@ -1,6 +1,7 @@
 import { t, tx } from './i18n.js';
 // the idea writer (idea-model): it reads the tables below only when it writes code, so the two modules can import each other
 import { writeIdea, expandIdea, ideaRows, seqForm, beatForm, slotTokens, altForm, stepItem, noteHead, arpForm, drumRow, topTokens as ideaTokens, STEP_FUNCTIONS } from './song/ideas.js';
+import { LINE, LABEL_SPACE } from './song/line-names.js';
 
 export const f = n => String(Math.round(n * 100) / 100).replace(/^0\./, '.');
 const num = n => String(Math.round(n * 100) / 100);
@@ -593,7 +594,7 @@ export function ideaCode(state, type, shared = {}) {
   const out = [];
   let open = false;
   for (const l of sceneLayers(state, { only: type, shared })) {
-    if (/^[_S]?\$:/.test(l)) { out.push(l.replace(/^[_S]?\$:\s*/, '').replace(/\.bank\(.*$/, '')); open = true; }
+    if (LINE.test(l)) { out.push(l.replace(LABEL_SPACE, '').replace(/\.bank\(.*$/, '')); open = true; }
     else if (open && /^\s+\./.test(l) && !/^\s+\.s\(/.test(l)) out[out.length - 1] += `\n${l}`;
     else open = false;
   }

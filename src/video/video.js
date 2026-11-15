@@ -11,6 +11,7 @@ import { hashString } from '../endless/random.js';
 import { appRoles, MUTED_TEXT, overRoles } from '../code-themes/themes.js';
 import { drawCodeOver, codeOverWidgets, litSpans, codeOverSettings, codeOverAreas } from './code-over.js';
 import { drawCaptions } from '../captions/captions.js';
+import { LINE, MUTED_LINE } from '../song/line-names.js';
 
 const KEY = 'coding-misk-video';
 const LIVE_KEY = 'coding-misk-live-preset';
@@ -166,7 +167,7 @@ export function createVideo({ getCodeOver = () => null, getCodeTheme = () => nul
       const lv = (visuals && visuals.levels) || {}, cyc = lastCyc;
       let layer = null;
       const layerOf = [];
-      lines.forEach((ln, i) => { if (/^[_S]?\$:/.test(ln)) layer = { start: i, muted: ln.startsWith('_') }; else if (!/^\s+\S/.test(ln)) layer = null; layerOf[i] = layer; });
+      lines.forEach((ln, i) => { if (LINE.test(ln)) layer = { start: i, muted: MUTED_LINE.test(ln) }; else if (!/^\s+\S/.test(ln)) layer = null; layerOf[i] = layer; });
       const idOf = new Map();
       lines.forEach((ln, i) => { const m = ln.match(/\.analyze\("([^"]+)"\)/), L = layerOf[i]; if (m && L) idOf.set(L.start, m[1]); });
       rows.forEach((r, k) => {
@@ -185,7 +186,7 @@ export function createVideo({ getCodeOver = () => null, getCodeTheme = () => nul
     }
     // the text of muted lines (`_$:` and the indented lines below) dimmed, as in the panel (code-themes Q7)
     const dimmed = new Set();
-    if (C.dim) { let on = false; lines.forEach((ln, i) => { const m = /^\s*(_?)\$:/.exec(ln); if (m) on = m[1] === '_'; else if (!/^\s+\S/.test(ln)) on = false; if (on) dimmed.add(i); }); }
+    if (C.dim) { let on = false; lines.forEach((ln, i) => { if (LINE.test(ln)) on = MUTED_LINE.test(ln); else if (!/^\s+\S/.test(ln)) on = false; if (on) dimmed.add(i); }); }
     rows.forEach((r, k) => {
       const y = y0 + at(k) * lh; if (y < A.y + head - lh || y > A.y + A.h + lh) return;
       if (dimmed.has(r.li)) g.globalAlpha = (A.a ?? 1) * MUTED_TEXT;
@@ -230,7 +231,7 @@ export function createVideo({ getCodeOver = () => null, getCodeTheme = () => nul
         const row = rows.reduce((a, r, k) => (r.li === li ? k : a), -1);
         if (row < 0) continue;
         const dy = extra.get(row) || 0;
-        items.push({ row, dy, w, h, canvas, muted: !!G.dim && /^\s*_\$:/.test(lines[start]) });
+        items.push({ row, dy, w, h, canvas, muted: !!G.dim && MUTED_LINE.test(lines[start]) });
         extra.set(row, dy + h + fs * .4);
       }
     });

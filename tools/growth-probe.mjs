@@ -19,6 +19,7 @@ import path from 'node:path';
 import { setSpokenContext } from '../src/song/spoken.js';
 import { crescendoSong, songSeconds } from '../src/song/crescendo.js';
 import { resolveProfile, growthRules } from '../src/live/profiles.js';
+import { LINE, MUTED_LINE, LABEL_SPACE } from '../src/song/line-names.js';
 import { liveCode } from '../src/live/live-code.js';
 import { buildSteps } from '../src/song/build.js';
 import { typingPlan, settleOthers, chainLines, lineLike } from '../src/song/typing.js';
@@ -105,10 +106,10 @@ function reusedLines(build, C) {
   const L = liveCode(build, C, { cols: () => 80 }), seed = build.id || '', G = build.crescendo && build.crescendo.growth !== undefined ? build.crescendo.growth : Infinity;
   const bars = [...new Set(buildSteps(L.build).map(x => x.at))].filter(b => b >= 1).sort((x, y) => x - y), memo = new Map();
   const codeAt = b => { if (!memo.has(b)) memo.set(b, L.codeAt(b)); return memo.get(b); };
-  const body = l => l.replace(/^\s*[_S]?\$:\s*/, '').replace(/\s+/g, ' ').trim(), isPat = l => /^\s*[_S]?\$:/.test(l);
+  const body = l => l.replace(LABEL_SPACE, '').replace(/\s+/g, ' ').trim(), isPat = l => LINE.test(l);
   const sb = b => secondsAt(L.build, b), shown = new Set(), list = [], earlier = [];
   let prev = 0, lines = 0, rushedSteps = 0, mostMuted = 0;
-  for (const b of [0, ...bars]) mostMuted = Math.max(mostMuted, chainLines(codeAt(b)).filter(l => /^\s*_\$:/.test(l)).length);
+  for (const b of [0, ...bars]) mostMuted = Math.max(mostMuted, chainLines(codeAt(b)).filter(l => MUTED_LINE.test(l)).length);
   for (const l of chainLines(codeAt(0)).filter(isPat)) { shown.add(body(l)); earlier.push(l); }
   for (const at of bars) {
     const code = codeAt(at), was = settleOthers(codeAt(prev), code, at);

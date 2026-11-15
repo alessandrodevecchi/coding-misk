@@ -4,6 +4,7 @@
 // page's stage mode, the real-time video, the fast video, fragments and the live output. Pure: the areas, the rows and
 // the drawing are checked in Node with a recording context (tools/check-code-over.mjs).
 import { appWidgetCalls, widgetFrame, widgetSize, paintWidget, widgetPalette } from '../widgets/app-widgets.js';
+import { LINE, MUTED_LINE } from '../song/line-names.js';
 
 export const CO_KEY = 'coding-misk-code-over';
 // stage: the page's stage mode (cv1: optional, off by default); side and width of the code in 16:9 (cv2: the mockups'
@@ -45,7 +46,7 @@ export function codeOverAreas(w, h, S = CO_DEFAULTS, tall = h > w * 1.05) {
 }
 
 // ---------- lines ----------
-const PATTERN = /^\s*[_S]?\$:/;
+const PATTERN = LINE;
 const CONT = /^\s+(\.|\/\/ \.|\/\*)/;
 // for each line: the line where its pattern chain starts (or -1), and whether it is muted (`_$:` and its continuation
 // lines) or a comment
@@ -53,7 +54,7 @@ export function lineKinds(lines) {
   const out = []; let start = -1;
   lines.forEach((l, i) => {
     if (PATTERN.test(l)) start = i; else if (!CONT.test(l)) start = -1;
-    out.push({ start, muted: start >= 0 && /^\s*_\$:/.test(lines[start]), comment: /^\s*\/\//.test(l) });
+    out.push({ start, muted: start >= 0 && MUTED_LINE.test(lines[start]), comment: /^\s*\/\//.test(l) });
   });
   return out;
 }
