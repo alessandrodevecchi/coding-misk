@@ -11,7 +11,7 @@
 
 const SIZE = 4096;
 // the power spectrum of x[from, from + n) with a Hann window, zero-padded to SIZE points
-function spectrum(x, from, n, size = SIZE) {
+export function spectrum(x, from, n, size = SIZE) {
   const re = new Float64Array(size), im = new Float64Array(size);
   for (let i = 0; i < n && i < size; i++) if (from + i >= 0 && from + i < x.length) re[i] = x[from + i] * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / n));
   for (let i = 1, j = 0; i < size; i++) { let bit = size >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }

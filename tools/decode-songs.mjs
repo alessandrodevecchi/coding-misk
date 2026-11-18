@@ -218,6 +218,54 @@ export const FRESH_SONGS = [
   ]),
 ];
 
+// decode round 11 (G): six songs built for the hit-density defect, where the original's mids hit fast and Decode wrote
+// one held chord a bar. Code tracks, so each part's hits are known from the song's own haps (tools/decode-hits.mjs);
+// exported by `tools/decode-export.cjs --hits` into .cache/decode/hits/. All in A minor on Am F C G.
+const ct = (id, visual, code, clips) => ({ id, name: id, type: 'code', settings: { visual }, patterns: Object.fromEntries(Object.entries(code).map(([k, c]) => [k, { code: c }])), clips: clips.map(([section, pattern = 'A']) => ({ section, pattern })) });
+const PROG = '<Am F C G>', STAB = '.s("sawtooth").lpf(2400).attack(.003).decay(.09).sustain(0).release(.05).gain(.42)';
+const HELD = '.s("sawtooth").lpf(1800).attack(.04).release(.25).room(.3).gain(.3)';
+// a distorted bass on one note, every 16th, its envelope falling between hits as a picked synth bass does
+const DIST16 = 'note("a1*16").s("sawtooth").lpf(1100).lpq(4).decay(.09).sustain(.25).distort(3).distortvol(.5)';
+const HDRUMS = { A: { rows: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' } }, H: { rows: { hh: 'x.x.x.x.x.x.x.x.' } } };
+export const HIT_SONGS = [
+  // chord stabs: 8ths in the first main section, a 16th rhythm in the second, over four-on-the-floor drums and a bass
+  song('hit-stabs-124', 'hit-stabs-124', [gsec('Eights', 16, 124, 'A', 'epica'), gsec('Sixteens', 16, 124, 'A', 'epica')], [
+    tr('drums', 'drums', { kit: 'RolandTR909' }, HDRUMS, [['Eights'], ['Sixteens']]),
+    tr('bass', 'bass', { wave: 'sawtooth', cutoff: 700 }, { A: { preset: 'offbeat' } }, [['Eights'], ['Sixteens']]),
+    ct('chords', 'pad', { A: `chord("${PROG}").voicing().struct("x*8")${STAB}`, B: `chord("${PROG}").voicing().struct("x ~ x x ~ x ~ x x ~ x ~ x x ~ x")${STAB}` }, [['Eights'], ['Sixteens', 'B']]),
+  ]),
+  // the same progression held as a pad: the chords must stay held
+  song('hit-pad-124', 'hit-pad-124', [gsec('Main', 32, 124, 'A', 'epica')], [
+    tr('drums', 'drums', { kit: 'RolandTR909' }, HDRUMS, [['Main']]),
+    tr('bass', 'bass', { wave: 'sawtooth', cutoff: 700 }, { A: { preset: 'offbeat' } }, [['Main']]),
+    ct('chords', 'pad', { A: `chord("${PROG}").voicing()${HELD}` }, [['Main']]),
+  ]),
+  // a distorted bass every 16th on one note, no chords
+  song('hit-dist16-130', 'hit-dist16-130', [gsec('Intro', 4, 130, 'A', 'drone'), gsec('Main', 28, 130, 'A', 'drone')], [
+    tr('drums', 'drums', { kit: 'RolandTR909' }, HDRUMS, [['Intro', 'H'], ['Main']]),
+    ct('bass', 'bass', { A: `${DIST16}.gain(.8)` }, [['Main']]),
+  ]),
+  // a distorted bass under a sung-like lead (vibrato, a vowel), no chords: the chords must stay empty
+  song('hit-voice-120', 'hit-voice-120', [gsec('Main', 32, 120, 'A', 'drone')], [
+    tr('drums', 'drums', { kit: 'RolandTR909' }, HDRUMS, [['Main']]),
+    ct('bass', 'bass', { A: 'note("<a1 a1 f1 g1>").struct("x*8").s("sawtooth").lpf(900).lpq(4).decay(.15).sustain(.4).distort(3).distortvol(.5).gain(.8)' }, [['Main']]),
+    ct('lead', 'hook', { A: 'note("<[a4 ~ ~ c5 ~ ~ b4 ~ a4 ~ ~ ~ g4 ~ ~ ~] [e4 ~ ~ ~ g4 ~ a4 ~ c5 ~ ~ ~ b4 ~ ~ ~]>").s("triangle").vib(5.5).vibmod(.3).vowel("a").lpf(3200).attack(.04).release(.2).gain(.5)' }, [['Main']]),
+  ]),
+  // drums and bass all along, a held pad that enters at bar 16
+  song('hit-padlate-128', 'hit-padlate-128', [gsec('Groove', 16, 128, 'A', 'epica'), gsec('Pad', 16, 128, 'A', 'epica')], [
+    tr('drums', 'drums', { kit: 'RolandTR909' }, HDRUMS, [['Groove'], ['Pad']]),
+    tr('bass', 'bass', { wave: 'sawtooth', cutoff: 700 }, { A: { preset: 'rolling' } }, [['Groove'], ['Pad']]),
+    ct('chords', 'pad', { A: `chord("${PROG}").voicing()${HELD}` }, [['Pad']]),
+  ]),
+  // two equal drops (drums, a 16th distorted bass, chord stabs) around a break of a held pad
+  song('hit-drops-126', 'hit-drops-126', [gsec('Intro', 8, 126, 'A', 'epica'), gsec('Drop', 16, 126, 'A', 'epica'), gsec('Break', 8, 126, 'A', 'epica'), gsec('Drop 2', 16, 126, 'A', 'epica')], [
+    tr('drums', 'drums', { kit: 'RolandTR909' }, HDRUMS, [['Intro', 'H'], ['Drop'], ['Drop 2']]),
+    ct('bass', 'bass', { A: `${DIST16.replace('note("a1*16")', 'note("<a1 f1 c2 g1>").struct("x*16")')}.gain(.75)` }, [['Drop'], ['Drop 2']]),
+    ct('chords', 'pad', { A: `chord("${PROG}").voicing().struct("x ~ ~ x ~ ~ x ~ ~ ~ x ~ x ~ ~ ~")${STAB}`, P: `chord("${PROG}").voicing()${HELD}` }, [['Intro', 'P'], ['Drop'], ['Break', 'P'], ['Drop 2']]),
+  ]),
+];
+export const HITS = HIT_SONGS.map(s => s.id);
+
 // The split of every bench song (decode-refine group 10, phase 1). TUNING songs may be used to choose a value of the
 // decoder; VALIDATION songs are never used to choose a value: they only verify a value chosen on the tuning songs.
 // The old bench (TEST_SONGS and the app songs) was already used to tune groups 7 to 10, so it is tuning; the held-out

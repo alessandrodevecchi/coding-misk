@@ -10,6 +10,7 @@ import { variationsOf } from './writer.js';
 import { mixHatShape, mixHatBright, rankKits, bandEnergy, sustainOf, bassDrive, LEVEL_BANDS } from './kit-measure.js';
 import { KIT_MEASURES } from './kits.js';
 import { beatGrid, phaseOn } from './beat-this.js';
+import { chordHits, bassAttack, bassPcs } from './hit-measure.js';
 
 export const MISK = 'misk-analyzer';
 // Essentia.js's tempo is taken when its confidence (RhythmExtractor2013 multifeature, 0 to about 5.3) is at least this
@@ -442,6 +443,19 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
     if (tot > 0) m.shares = e.map(v => Math.round((v / tot) * 1000) / 1000);
     m.bars.forEach((b, i) => { if (b.chord) { const a = (m.downbeat + i * m.barSeconds) * sr; b.sustain = sustainOf(pcm, sr, a, a + m.barSeconds * sr); } });
   }
+  // 10b. how the chords are played (decode round 11, decode-hit-rhythm): per bar with a chord, its tones' hits, how held
+  // they are and their share of the band (hit-measure.js chordHits), on the tones the bar's bass does not ring at
+  onProgress(0.97, 'sections');
+  await pause();
+  m.bars.forEach((b, i) => {
+    const c = b.chord && parseChord(b.chord);
+    if (!c) return;
+    const r = chordHits(pcm, sr, Math.round((m.downbeat + i * m.barSeconds) * sr), m.barSeconds * sr, [c.root, (c.root + (c.quality === 'min' ? 3 : 4)) % 12, (c.root + 7) % 12], bassPcs(b.bass || []));
+    b.chordHits = r.hits; b.chordHeld = r.held; b.chordTonal = r.tonal;
+  });
+  // (and per bar with bass notes, the bass's attacks in the 300-1500 Hz band: hit-measure.js bassAttack, read by the
+  // writer's bassFilled)
+  m.bars.forEach((b, i) => { if ((b.bass || []).filter(x => x !== null && x !== undefined).length >= 2) b.bassAttack = bassAttack(pcm, sr, Math.round((m.downbeat + i * m.barSeconds) * sr), m.barSeconds * sr); });
   // (round 8: decoded bass notes that are no bass, a pad's low notes, are not a bass part)
   if (noBassPart(m.shares, m.bassDrive)) { for (const b of m.bars) if (b.bass) b.bass = b.bass.map(() => null); m.noBass = true; }
   // (Essentia.js's own tempo and confidence, to read why the engine was or was not taken)

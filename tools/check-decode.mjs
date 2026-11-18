@@ -28,7 +28,8 @@ import { SOUND_RULE as SR8, DRUM_DRIVE } from '../src/decode/writer.js';
 import { PART_LEVELS } from '../src/decode/part-levels.js';
 import { BASS_RULE } from '../src/decode/misk-analyzer.js';
 import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare, clapShift, thirdlessMode } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit } from '../src/decode/writer.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts } from '../src/decode/writer.js';
+import { chordHits } from '../src/decode/hit-measure.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive, hatTop } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
@@ -256,7 +257,7 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
   // the same model shape as level A for the same bars (analysis spec: One song model)
   const A = createAnalyzer(pcm).model(30), B = runs['Essentia.js'];
-  check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !['lead', 'leadVoiced', 'third', 'sustain'].includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !['lead', 'leadVoiced', 'third', 'sustain'].includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line and the chords\' sustain, decode-refine D2 and D3)');
+  { const extra = ['lead', 'leadVoiced', 'third', 'sustain', 'chordHits', 'chordHeld', 'chordTonal', 'bassAttack']; check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !extra.includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !extra.includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line, the chords\' sustain and, round 11, how the chords and the bass are played)'); }
   // level A never calls Essentia.js: the worker loads it only for "analyse all"
   const wsrc = fs.readFileSync('src/decode/worker.js', 'utf8'), msrc = fs.readFileSync('src/decode/misk-analyzer.js', 'utf8');
   check(!/essentia/i.test(msrc.replace(/\/\/.*$/gm, '')) && /async function all[\s\S]*import\('\.\/engine-essentia\.js'\)/.test(wsrc) && !/^import .*(engine-essentia|full)/m.test(wsrc), 'level A uses misk-analyzer only: Essentia.js is imported only by level B, inside the worker');
@@ -535,6 +536,40 @@ if (process.argv.includes('--app')) {
     const ch = b => (writeFull(pm(b)).tracks.find(t => t.id === 'chords') || { patterns: {} }).patterns;
     const lit = Object.values(ch(0.2)).map(p => p.code).join(' '), dark = Object.values(ch(0.03)).map(p => p.code).join(' ');
     check(/E5/.test(lit) && lit.includes(`.mode("above").anchor("${POWER_RULE.anchor}").voicing()`) && !/[A-G][#b]?5\b/.test(dark.replace(/\.anchor\("[a-g]\d"\)/g, '')), 'round 8: power chords voiced up from the anchor, none in a dark section (a driven bass alone)', JSON.stringify([lit.slice(0, 90), dark.slice(0, 60)]));
+  }
+  // (round 11, decode-hit-rhythm A: chords that hit with gaps are written with their rhythm, a held pad stays held)
+  {
+    const mk = (hitsS, held, tonal = 0.3) => ({ ...Mk, sections: [{ start: 0, bars: 8, kind: 'verse' }], ending: 8, bars: Array.from({ length: 8 }, (_, i) => ({ ...Mk.bars[0], chord: ['Am', 'F', 'C', 'G'][i % 4], chordHits: hitsS, chordHeld: held, chordTonal: tonal })) });
+    const ch = m => Object.values((writeFull(m).tracks.find(t => t.id === 'chords') || { patterns: {} }).patterns).map(p => p.code).join(' ');
+    const stab = ch(mk('x.x.x.x.x.x.x.x.', 0.16)), six = ch(mk('x.xx.x.xx.x.xx.x', 0.2)), pad = ch(mk('x...............', 0.66));
+    check(stab.includes('.voicing().struct("x x x x x x x x")') && six.includes('.struct("x ~ x x ~ x ~ x x ~ x ~ x x ~ x")') && /voicing\(\)/.test(pad) && !/struct/.test(pad), 'round 11: stabs on eighths and a sixteenth rhythm are written with their struct, a held pad without', JSON.stringify([stab.slice(0, 80), six.slice(0, 80), pad.slice(0, 60)]));
+    check(chordRhythm(['x.x.x.x.x.x.x.x.', 'x.x.x.x.x.x.x.x.', 'x...x...x.x.x.x.']) === 'x x x x x x x x' && chordRhythm(['x...............']) === null, 'round 11: the chords\' rhythm is the steps hit in half the bars, on eight steps when every hit is on an even one');
+    check(Math.abs(stepShare('chord("<Am F>").voicing().struct("x ~ x ~").s("sawtooth")') - 0.5) < 1e-9 && stepShare('chord("Am").voicing().s("sawtooth")') === 1, 'round 11: chords with a rhythm sound on their struct\'s hits in the balance');
+    // (B) a section whose chord tones hold almost none of the band writes no chords
+    check(!/struct/.test(ch(mk('x.x.x.x.x.x.x.x.', 0.16, 0.05))), 'round 11: no rhythm where the chord\'s own tones do not stand out of the band (a detuned pad under loud drums)');
+  }
+  // (round 11, decode-hit-rhythm C: a repeated bass under the kick)
+  {
+    const r = Array(16).fill(0).map((_, j) => (j % 4 === 0 ? 99 : 50)), lv = Array(16).fill(0).map((_, j) => (j % 4 === 0 ? 1 : 0.24)), lt = Array(16).fill(0.2);
+    const bar = { drums: { bd: 'x...x...x...x...' }, bass: Array.from({ length: 16 }, (_, j) => (j % 4 >= 2 ? 33 : null)), bassAttack: { rise: r, level: lv, late: lt } };
+    const clean = { drums: { bd: 'x...x...x...x...' }, bass: Array.from({ length: 16 }, (_, j) => (j % 4 === 2 ? 33 : null)), bassAttack: { rise: Array(16).fill(0).map((_, j) => (j % 4 === 2 ? 99 : 0.3)), level: lv, late: Array(16).fill(0.01) } };
+    const f = bassFilled(bar), g = bassFilled(clean);
+    check(f.every(x => x === 33) && g.filter(x => x !== null).length === 4, 'round 11: a distorted bass that attacks on every sixteenth is written on every step, the kick\'s too; an offbeat bass keeps its four notes', JSON.stringify([f, g]));
+  }
+  // (round 11, decode-hit-rhythm D: twin sections take the same parts)
+  {
+    const lv = { drums: 0.7, bass: 0.6, chords: 0.5, other: 0.6 }, secs = [{ start: 0, bars: 8, kind: 'drop' }, { start: 8, bars: 8, kind: 'drop' }], bars = Array.from({ length: 16 }, () => ({ level: lv, bright: 0.19 }));
+    const tracks = [{ id: 'drums', type: 'drums', settings: {}, patterns: { A: { rows: { bd: 'x...x...x...x...', hh: '..x...x...x...x.' } }, B: { rows: { hh: '..x...x...x...x.' } } }, clips: [{ start: 0, bars: 8, pattern: 'A' }, { start: 8, bars: 8, pattern: 'B' }] },
+      { id: 'bass', type: 'code', patterns: { A: { code: 'note("a1!16")' } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
+    const pairs = twinParts(tracks, secs, bars);
+    check(pairs.length === 1 && tracks[0].clips[1].pattern === 'A' && !tracks[0].patterns.B && tracks[1].clips.length === 2 && tracks[1].clips[1].start === 8, 'round 11: the second of two equal drops gets the kick and the bass of the first', JSON.stringify([pairs, tracks[0].clips, tracks[1].clips]));
+  }
+  // (round 11, decode-hit-rhythm A: the measure on a synthetic bar: an A minor triad struck on eighths, then held)
+  {
+    const sr = 44100, bl = Math.round(sr * 240 / 124), x = new Float32Array(bl + sr), fs = [220, 261.63, 329.63, 440, 523.25, 659.25];
+    const make = stab => { x.fill(0); for (let i = 0; i < bl; i++) { const t = i / sr, ph = (i % (bl / 8)) / sr, env = stab ? Math.exp(-ph / 0.04) : 1; let v = 0; for (const f of fs) v += Math.sin(2 * Math.PI * f * t); x[i + sr / 2] = 0.1 * env * v; } return chordHits(x, sr, sr / 2, bl, [9, 0, 4]); };
+    const s1 = make(true), s2 = make(false);
+    check(s1.hits === 'x.x.x.x.x.x.x.x.' && s1.held < CHORD_RULE.held && s2.n <= 1 && s2.held > 0.5, 'round 11: chordHits reads stabs on eighths and a held chord', JSON.stringify([s1, s2]));
   }
   // (round 8, fourth pass: a hat row on the backbeat where the clap row is silent is a snare read as a hat)
   {

@@ -7,6 +7,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- `tools/decode-hits.mjs`: hit density per band and per part for the Decode bench, with six songs built for repeated chords and basses (`tools/decode-export.cjs --hits`, `tools/decode-bench.cjs --set hits`).
 - `tools/decode-kits.mjs`: the app's drum machines measured from their hat samples into `src/decode/kits.js`; `--holdout` checks the choice on held-out songs.
 - `tools/decode-levels.cjs`: the sounds Decode writes, measured through the app into `src/decode/part-levels.js`.
 - `tools/decode-similarity.cjs --holdout`: the held-out songs' similarity, printed only.
@@ -99,6 +100,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Decode: in Full, chords that hit with clear, repeating gaps are written with their rhythm (`.struct("…")` after the voicing).
+- Decode: in Full, a bass note struck again where the analysis heard one held note or none, under the kick too, is written again.
+- Decode: in Full, two sections that sound alike get the same parts: a section that lost its kick or its bass takes them from its twin.
+- Decode: stored Full analyses are made again (analysis version 20).
 - Decode: in Full, the drums get a drive of 1, 2 or 3 when the high band calls for it, decided apart from the drums' level.
 - Decode: in Full, a bass note repeated with a new attack is written again instead of held.
 - Decode: in Full, a driven bass is no longer written as a clean square, and a square bass is told by its odd harmonics.

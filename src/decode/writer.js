@@ -19,7 +19,8 @@ export const SOUND_PRESETS = ['ours', 'simple'];
 // measured: luci-rosse and the acid song about 470, the radio seed's resonant supersaw 370, plain basses 120 to 260)
 // sustain: the chords' mean energy left in the last eighth of their bar (amplitude ratio, 0.6 is about -4 dB) from which
 // they get a room of `room` (round 8: a room from roomRange[0] to roomRange[1] along the sustain); levels: the gain steps the balance tries for each part (multipliers, 1.5 dB apart) and the
-// highest gain it writes
+// highest gain it writes (decode round 11, E: a ceiling of 0.5 on the chords' gain was tried and dropped: the balance
+// then moved the drums and the bass instead, one real track 2.9 to 4.8 dB band error)
 // cut: the chords' high-pass and low-pass (Hz) when a Lead plays over at least leadOver of their bars, the song has
 // drums and the balance kept the Lead within leadKeep dB of its written level (round 6, review P5: the cut fired on a
 // pad-only song whose Lead the balance had turned down by 16 dB)
@@ -266,6 +267,9 @@ const levelKey = (id, code) => {
 // a note held a whole bar; at 1 the balance raised the drums on held-note songs)
 export function stepShare(code) {
   const m = /\b(?:note|n)\("([^"]*)"\)/.exec(code);
+  // (round 11: chords with a rhythm sound on their struct's hits, each one step of the struct)
+  const st = !m && /\.struct\("([^"]*)"\)/.exec(code);
+  if (st) { const t = st[1].split(/\s+/).filter(Boolean); return t.length ? t.filter(x => x === 'x').length / t.length : 1; }
   if (!m) return 1;
   let all = 0, on = 0;
   for (const tok of m[1].replace(/[<>[\]]/g, ' ').split(/\s+/).filter(Boolean)) { const r = /^(.*?)(?:!(\d+))?$/.exec(tok), n = r[2] ? +r[2] : 1; all += n; if (r[1] === HOLD) on += n * SOUND_RULE.holdShare; else if (r[1] !== '~') on += n; }
@@ -724,6 +728,27 @@ export function variationsOf(model) {
   return out;
 }
 
+// the repeated bass (decode round 11, decode-hit-rhythm C; full.js bassAttack per bar: the 300-1500 Hz band's rise at
+// each step's start, its level, and its level in the step's second half). In a bar with at least `notes` notes whose
+// note steps off the kick rise by `attack` or more (a bass with an attack in that band, a distorted or bright one: a
+// clean sub reads 0.1-0.6 between its notes), an empty or held step off the kick that rises by `attack` to `level` of the
+// notes' level is the bass struck again; a kick's step, whose click hides the attack, is a note when the notes on both
+// sides are and its second half holds `late` of theirs, where theirs is at least `lateFloor` of the bar's top (a clean
+// rolling bass reads 0.01 there and never fills its kick steps). The pitch: the nearest note before it in the bar, else after
+export const BASS_FILL = { notes: 4, attack: 2, level: 0.6, late: 0.6, lateFloor: 0.04 };
+export function bassFilled(b, rule = BASS_FILL) {
+  const out = (b.bass || []).map(x => (x === undefined ? null : x)), A = b.bassAttack;
+  if (!A || !(rule.attack > 0) || out.filter(x => x !== null).length < rule.notes) return out;
+  const kick = j => ((b.drums || {}).bd || '')[j] === 'x', ref = out.map((x, j) => j).filter(j => out[j] !== null && !kick(j));
+  if (!ref.length) return out;
+  const med = v => { const s = v.slice().sort((p, q) => p - q); return s[Math.floor(s.length / 2)]; };
+  if (med(ref.map(j => A.rise[j])) < rule.attack) return out;
+  const lv = med(ref.map(j => A.level[j])), lt = med(ref.map(j => A.late[j])), n = out.length;
+  const pitch = j => { for (let k = j - 1; k >= 0; k--) if (out[k] !== null) return out[k]; for (let k = j + 1; k < n; k++) if (out[k] !== null) return out[k]; return null; };
+  for (let j = 0; j < n; j++) if (out[j] === null && !kick(j) && A.rise[j] >= rule.attack && A.level[j] >= rule.level * lv) out[j] = pitch(j);
+  if (lt >= rule.lateFloor) for (let j = 0; j < n; j++) if (out[j] === null && kick(j) && (j === 0 || out[j - 1] !== null) && (j === n - 1 || out[j + 1] !== null) && A.late[j] >= rule.late * lt) out[j] = pitch(j);
+  return out;
+}
 // the chords of a key: its diatonic triads (and the major dominant of a minor key); a section whose chords fall mostly
 // outside the key is noise of the drums in the chord band (a drums-only outro reads as Bb, Gm, F#…), not a part
 const KEY_CHORDS = { minor: [[0, 'min'], [3, 'maj'], [5, 'min'], [7, 'min'], [7, 'maj'], [8, 'maj'], [10, 'maj']], major: [[0, 'maj'], [2, 'min'], [4, 'min'], [5, 'maj'], [7, 'maj'], [9, 'min']] };
@@ -734,6 +759,32 @@ const KEY_CHORDS = { minor: [[0, 'min'], [3, 'maj'], [5, 'min'], [7, 'min'], [7,
 // alone reads as its tonic's major chord, the same fifth harmonic, on every bar), is kept as power chords, a root and a
 // fifth: a distorted power chord reads major, its fifth harmonic a major third)
 export const POWER_RULE = { roots: 0.8, tonic: 0.5, home: 0.15, second: 0.15, bright: 0.07, anchor: 'f3', riff: 0.5 };
+// how the chords are played (decode round 11, decode-hit-rhythm; full.js measures chordHits, chordHeld, chordTonal per
+// bar): a section whose chord bars average a tonal share of `tonal` or more (the chord's own tones stand out of the band:
+// the bench's sawtooth stabs 0.12-0.22 and pads 0.28-0.59, the real tracks' chords 0.1-0.35; the app's detuned supersaw
+// pads under loud drums read 0.01-0.06, where the measure says nothing), under `held` and with `hits` hits a bar or more
+// where no bass note starts is written with its rhythm, the steps hit in at least `step` of its bars (stabs read held
+// 0.15-0.22, pads 0.61-0.72); block, the bars of a rhythm; steady, how well the bars' hits come back on the rhythm's steps (their mean overlap; stabs 0.7 and over, a detuned
+// pad's beating 0 to 0.05, the real tracks 0 to 0.74; at 0.5 a supersaw pad under an arpeggio and some real tracks took a
+// rhythm, chords F1 on the bench 0.55 to 0.54; at 0.6 two real tracks did, and their hits per bar moved away from the
+// original's, 5.03 to 5.07 and 4.33 to 4.48).
+// (Tried and dropped, decode round 11 B: no chords in a section whose tonal share averages under 0.045, which left out
+// the bench's supersaw pads, chords recall 0.55 to 0.27; and no power chords on the bass's own roots without hits of
+// their own off the drums, which left out the true chords of two bench songs, chords F1 0.54 to 0.51)
+export const CHORD_RULE = { tonal: 0.1, held: 0.4, hits: 3, steady: 0.65, step: 0.5, block: 4 };
+// a bar's chord hits on steps where no bass note starts (a bass's attack rings in the chord's tones too)
+const offBass = b => [...(b.chordHits || '')].filter((c, j) => c === 'x' && ((b.bass || [])[j] === null || (b.bass || [])[j] === undefined)).length;
+// the rhythm of a section's chord bars: the steps hit in at least CHORD_RULE.step of them (else the commonest bar's),
+// in mini-notation on eight steps when every hit is on an even step → "x ~ x ~ …" or null
+export function chordRhythm(list, rule = CHORD_RULE) {
+  const grids = list.filter(g => typeof g === 'string' && g.length === STEPS);
+  if (!grids.length) return null;
+  let g = Array.from({ length: STEPS }, (_, j) => (grids.filter(x => x[j] === 'x').length >= rule.step * grids.length ? 'x' : '.')).join('');
+  if (hits(g) < rule.hits) { const n = new Map(); for (const x of grids) n.set(x, (n.get(x) || 0) + 1); g = [...n].sort((a, b) => b[1] - a[1])[0][0]; }
+  if (hits(g) < rule.hits) return null;
+  const even = [...g].every((c, j) => c !== 'x' || j % 2 === 0), toks = [...g].filter((_, j) => !even || j % 2 === 0).map(c => (c === 'x' ? 'x' : '~'));
+  return toks.join(' ');
+}
 const SCALE_PCS = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11] };
 export const inKey = key => list => {
   if (!key || !list.length) return true;
@@ -746,6 +797,46 @@ export const inKey = key => list => {
   const second = counts.slice().sort((a, b) => b - a)[1] / list.length;
   return POWER_RULE.roots > 0 && share(roots) >= POWER_RULE.roots && share(new Set([key.root, (key.root + 1) % 12])) >= POWER_RULE.tonic && share(new Set([key.root])) >= POWER_RULE.home && second >= POWER_RULE.second ? 'power' : false;
 };
+// twin sections (decode round 11, decode-hit-rhythm D): two sections of the same kind, each at least TWIN_RULE.bars long,
+// whose mean levels per part (the model's drums, bass, chords and other) lie within TWIN_RULE.level of each other and
+// whose brightness within TWIN_RULE.bright (relative) are the same music; each decided its parts alone, and a second drop
+// could lose its kick or its bass. In twins, the drums' main pattern with a kick replaces one without, and a bass or
+// chords part written in one twin and not in the other is written there with the twin's main pattern. Changes the
+// tracks in place → the pairs [[k, l]]
+export const TWIN_RULE = { bars: 8, level: 0.1, bright: 0.15 };
+export function twinParts(tracks, secs, bars, rule = TWIN_RULE) {
+  if (!(rule.bars > 0)) return [];
+  const mean = (s, f) => { let a = 0, n = 0; for (let i = s.start; i < s.start + s.bars && i < bars.length; i++) { a += f(bars[i]) || 0; n++; } return n ? a / n : 0; };
+  const feat = secs.map(s => ({ lv: ['drums', 'bass', 'chords', 'other'].map(k => mean(s, b => b.level && b.level[k])), br: mean(s, b => b.bright) }));
+  const pairs = [];
+  for (let k = 0; k < secs.length; k++) for (let l = k + 1; l < secs.length; l++) {
+    const a = secs[k], b = secs[l], fa = feat[k], fb = feat[l];
+    if (a.kind !== b.kind || a.bars < rule.bars || b.bars < rule.bars) continue;
+    if (fa.lv.some((x, j) => Math.abs(x - fb.lv[j]) > rule.level) || Math.abs(fa.br - fb.br) > rule.bright * Math.max(fa.br, fb.br)) continue;
+    pairs.push([k, l]);
+  }
+  const inSec = (c, s) => c.start >= s.start && c.start < s.start + s.bars;
+  // the pattern of a track covering most bars of a section, or null
+  const mainOf = (t, s) => { const n = new Map(); for (const c of t.clips) if (inSec(c, s)) n.set(c.pattern, (n.get(c.pattern) || 0) + c.bars); return n.size ? [...n].sort((x, y) => y[1] - x[1])[0][0] : null; };
+  for (const [k, l] of pairs) {
+    for (const t of tracks) {
+      if (t.hush) continue;
+      const pk = mainOf(t, secs[k]), pl = mainOf(t, secs[l]);
+      if (t.type === 'drums') {
+        const kick = p => !!(p && t.patterns[p] && /x/.test((t.patterns[p].rows || {}).bd || ''));
+        const [from, to, sec] = kick(pk) && !kick(pl) ? [pk, pl, secs[l]] : kick(pl) && !kick(pk) ? [pl, pk, secs[k]] : [];
+        if (from && to) for (const c of t.clips) if (inSec(c, sec) && c.pattern === to) c.pattern = from;
+        continue;
+      }
+      if (t.id !== 'bass' && t.id !== 'chords') continue;
+      for (const [p, sec] of [[pk, secs[l]], [pl, secs[k]]]) if (p && !t.clips.some(c => inSec(c, sec))) t.clips.push({ start: sec.start, bars: sec.bars, pattern: p });
+      t.clips.sort((x, y) => x.start - y.start);
+    }
+  }
+  // (a pattern no clip plays any more is left out)
+  for (const t of tracks) for (const p of Object.keys(t.patterns)) if (!t.clips.some(c => c.pattern === p)) delete t.patterns[p];
+  return pairs;
+}
 // the song of a level B model (D9): the model's sections with their kinds as names, a drums track with each section's
 // main grid and its variants as clips, bass and chords code tracks with one loop per section; a part plays where it is
 // heard (runs shorter than EDIT_RULE.runBars merged, decode-refine D7); sounds by measure per section (D10); the song ends at the
@@ -812,13 +903,38 @@ export function writeFull(model, opts = {}) {
       // anchor, whose top note sits under it, its root falls lower than the triads' roots: it is voiced up from
       // POWER_RULE.anchor, in the triads' register. The bench's numbers do not move with it)
       const c = kept === 'power' ? c0.replace('.voicing()', `.mode("above").anchor("${POWER_RULE.anchor}").voicing()`) : c0;
-      if (!ids.has(c)) { const p = pid(ids.size); ids.set(c, p); patterns[p] = { code: c }; }
-      clips.push(...runs(on.map(x => (x ? ids.get(c) : null)), sec.start));
+      // (round 11, decode-hit-rhythm A: chords that hit with gaps are written with their rhythm, per block of
+      // CHORD_RULE.block bars from the section's start when the section as a whole is, so a section whose stabs change
+      // rhythm halfway gets both; a block with fewer than two bars heard takes the section's)
+      let codeOf = () => c;
+      if (id === 'chords') {
+        const rhythmOf = list => {
+          const ms = list.filter(i => bars[i].chordHits);
+          if (!ms.length) return undefined;
+          const held = ms.reduce((a, i) => a + bars[i].chordHeld, 0) / ms.length, nh = ms.reduce((a, i) => a + offBass(bars[i]), 0) / ms.length;
+          const tonal = ms.reduce((a, i) => a + (bars[i].chordTonal || 0), 0) / ms.length;
+          if (!(tonal >= CHORD_RULE.tonal && held < CHORD_RULE.held && nh >= CHORD_RULE.hits)) return null;
+          // (a rhythm that comes back: the bars' hits against the steps hit in half of them, their mean overlap; a
+          // detuned pad's beating reads hits at random, 0 to 0.05)
+          const grid = Array.from({ length: STEPS }, (_, j) => ms.filter(i => bars[i].chordHits[j] === 'x').length >= CHORD_RULE.step * ms.length);
+          const steady = ms.reduce((a, i) => { let n = 0, u = 0; for (let j = 0; j < STEPS; j++) { const x = bars[i].chordHits[j] === 'x'; if (x && grid[j]) n++; if (x || grid[j]) u++; } return a + (u ? n / u : 1); }, 0) / ms.length;
+          return steady >= CHORD_RULE.steady ? chordRhythm(ms.map(i => bars[i].chordHits)) : null;
+        };
+        const whole = rhythmOf(heard), withR = r => (r ? c.replace('.voicing()', `.voicing().struct("${r}")`) : c);
+        const blockOf = j => Math.floor(j / CHORD_RULE.block), per = new Map();
+        idx.forEach((i, j) => { const k = blockOf(j); if (!per.has(k)) per.set(k, []); if (heard.includes(i)) per.get(k).push(i); });
+        const rs = new Map([...per].map(([k, list]) => { const r = whole && list.length >= 2 ? rhythmOf(list) : undefined; return [k, r === undefined ? whole : r]; }));
+        codeOf = j => withR(rs.get(blockOf(j)) ?? null);
+      }
+      const codes = idx.map((_, j) => codeOf(j));
+      for (const x of codes) if (!ids.has(x)) { const p = pid(ids.size); ids.set(x, p); patterns[p] = { code: x }; }
+      clips.push(...runs(on.map((x, j) => (x ? ids.get(codes[j]) : null)), sec.start));
     });
     if (clips.length) tracks.push({ id, name, type: 'code', settings: { visual }, patterns, clips });
   };
   // (decode round 8: a step the note before still sounds on is a hold, `_` in the code, so a held note is written long)
-  part('bass', 'Bass', 'bass', heardBass, b => b.bass.map((x, j, a) => (x === null || x === undefined ? null : x)).map((x, j, a) => (x === null && b.bassHold && b.bassHold[j] ? HOLD : x)).map((x, j, a) => (x === HOLD && !a.slice(0, j).some(y => y !== null && y !== HOLD) ? null : x)), bassCode, sameBassB);
+  // (round 11, decode-hit-rhythm C: the steps where the bass attacks again, bassFilled, before the holds)
+  part('bass', 'Bass', 'bass', heardBass, b => bassFilled(b).map((x, j, a) => (x === null || x === undefined ? null : x)).map((x, j, a) => (x === null && b.bassHold && b.bassHold[j] ? HOLD : x)).map((x, j, a) => (x === HOLD && !a.slice(0, j).some(y => y !== null && y !== HOLD) ? null : x)), bassCode, sameBassB);
   part('chords', 'Chords', 'pad', chordsHeard, b => b.chord, chordCode, undefined, inKey(model.key));
   // the Lead (decode-refine D2): the top line as one loop per section where it is voiced on at least LEAD_RULE.voiced
   // of the section's steps; a sung melody (the top line lines' kind `vox`) muted by default (`hush`)
@@ -836,6 +952,7 @@ export function writeFull(model, opts = {}) {
     });
     if (clips.length) tracks.push({ id: 'lead', name: 'Lead', type: 'code', settings: { visual: 'hook' }, patterns, clips, ...(kind === 'vox' ? { hush: true } : {}) });
   }
+  twinParts(tracks, secs, bars);
   if (opts.sounds !== 'simple') {
     // (round 6: bass notes on more than SOUND_RULE.bassMissing of the bars and no bass track: the drums keep their level)
     const noted = bars.slice(0, end).filter(b => (b.bass || []).some(x => x !== null && x !== undefined)).length;

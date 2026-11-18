@@ -26,9 +26,14 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
 (async () => {
   const src = path.resolve(opt('--src') || ROOT), tag = opt('--tag') || (src === ROOT ? 'branch' : path.basename(src));
   const S = await import('./decode-similarity.mjs');
+  // (decode round 11, G: the hit density of the bands and the parts, tools/decode-hits.mjs)
+  const HD = await import('./decode-hits.mjs');
   const songs = await import('./decode-songs.mjs');
   const { analyseFull } = await import(path.join(src, 'src', 'decode', 'full.js'));
   const W = await import(path.join(src, 'src', 'decode', 'writer.js'));
+  // (decode round 11: --rules '{"CHORD_RULE":{…}}' changes the writer's exported rule objects for the run, to measure a
+  // fix on and off on the same models)
+  if (opt('--rules')) for (const [k, v] of Object.entries(JSON.parse(opt('--rules')))) { if (!W[k]) throw new Error(`no rule ${k}`); Object.assign(W[k], v); }
   const KM = await import(path.join(src, 'src', 'decode', 'kit-measure.js')).catch(() => null);
   const PL = await import(path.join(src, 'src', 'decode', 'part-levels.js')).catch(() => null);
   const { nodeEssentia } = await import('./essentia-node.mjs');
@@ -43,17 +48,19 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
   // the files and their truth
   const truth = s => songs.soundTruth(s);
   const all = [
-    ...songs.TEST_SONGS.map(s => ({ id: s.id, file: path.join(WAV, `${s.id}.wav`), truth: truth(s) })),
-    ...APP_SONGS.map(x => ({ id: x.id, file: path.join(WAV, `${x.id}.wav`), truth: truth(appSong(x)) })),
-    ...songs.HOLDOUT_SONGS.map(s => ({ id: s.id, file: path.join(HOLDOUT_DIR, `${s.id}.wav`), truth: truth(s) })),
-    ...songs.GENRE_SONGS.map(s => ({ id: s.id, file: path.join(SET_DIRS.genre, `${s.id}.wav`), truth: truth(s) })),
-    ...songs.FRESH_SONGS.map(s => ({ id: s.id, file: path.join(SET_DIRS.fresh, `${s.id}.wav`), truth: truth(s) })),
-  ].map(x => ({ ...x, set: songs.TUNING.includes(x.id) ? 'tuning' : songs.VALIDATION.includes(x.id) ? 'validation' : songs.FRESH.includes(x.id) ? 'fresh' : '?' }));
+    ...songs.TEST_SONGS.map(s => ({ id: s.id, file: path.join(WAV, `${s.id}.wav`), truth: truth(s), song: s })),
+    ...APP_SONGS.map(x => ({ id: x.id, file: path.join(WAV, `${x.id}.wav`), truth: truth(appSong(x)), song: appSong(x) })),
+    ...songs.HOLDOUT_SONGS.map(s => ({ id: s.id, file: path.join(HOLDOUT_DIR, `${s.id}.wav`), truth: truth(s), song: s })),
+    ...songs.GENRE_SONGS.map(s => ({ id: s.id, file: path.join(SET_DIRS.genre, `${s.id}.wav`), truth: truth(s), song: s })),
+    ...songs.FRESH_SONGS.map(s => ({ id: s.id, file: path.join(SET_DIRS.fresh, `${s.id}.wav`), truth: truth(s), song: s })),
+    // (decode round 11: the hit-density songs, their own set)
+    ...(songs.HIT_SONGS || []).map(s => ({ id: s.id, file: path.join(SET_DIRS.hits || '', `${s.id}.wav`), truth: truth(s), song: s })),
+  ].map(x => ({ ...x, set: songs.TUNING.includes(x.id) ? 'tuning' : songs.VALIDATION.includes(x.id) ? 'validation' : songs.FRESH.includes(x.id) ? 'fresh' : (songs.HITS || []).includes(x.id) ? 'hits' : '?' }));
   const set = opt('--set') || 'all', only = opt('--only') ? opt('--only').split(',') : null;
   let files;
   if (set === 'variation') files = songs.VARIATION_SONGS.map(s => ({ id: s.id, file: path.join(SET_DIRS.variation, `${s.id}.wav`), truth: truth(s), set: 'variation' }));
   else if (set === 'owner') { const dir = process.env.DECODE_OWNER_DIR; files = fs.readdirSync(dir).filter(f => AUDIO.test(f) && !f.startsWith('.')).sort().map(f => ({ id: `owner-${slug(f.replace(AUDIO, ''))}`, file: path.join(dir, f), truth: null, set: 'owner' })); }
-  else files = all.filter(x => (set === 'all' && x.set !== 'fresh') || set === 'every' || x.set === set);
+  else files = all.filter(x => (set === 'all' && x.set !== 'fresh' && x.set !== 'hits') || (set === 'every' && x.set !== 'hits') || x.set === set);
   files = files.filter(x => (!only || only.includes(x.id)) && fs.existsSync(x.file));
 
   // the constants of group 10 the sweep moves: [get, set] on the rule objects, or an edit of the written song
@@ -104,7 +111,12 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
   const rdir = path.join(CACHE, 'render'); fs.mkdirSync(rdir, { recursive: true });
   async function render(song) {
     // (--rerender <tag>: export again under that tag, to measure how much two exports of one song differ)
-    const h = crypto.createHash('sha1').update(JSON.stringify(song)).digest('hex').slice(0, 16), wav = path.join(rdir, `${h}${opt('--rerender') ? `.${opt('--rerender')}` : ''}.wav`);
+    const h = crypto.createHash('sha1').update(JSON.stringify(song)).digest('hex').slice(0, 16), name = `${h}${opt('--rerender') ? `.${opt('--rerender')}` : ''}`;
+    // (decode round 11: a render is kept as mono FLAC, a quarter of the WAV's size, the rate the measures read; an
+    // older WAV render, here or in DECODE_RENDER_EXTRA (another checkout's render folder), is used as it is)
+    const flac = path.join(rdir, `${name}.flac`);
+    for (const d of [rdir, ...(process.env.DECODE_RENDER_EXTRA || '').split(':').filter(Boolean)]) { const w = path.join(d, `${name}.wav`); if (fs.existsSync(w)) return { h, wav: w }; }
+    const wav = flac;
     if (!fs.existsSync(wav)) {
       if (!page) {
         const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -116,7 +128,8 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
       // (a download the browser cancels under load is tried once more)
       const part = `${wav}.${process.pid}.part.wav`;
       try { await exportSong(page, song, part); } catch (e) { console.error(`export failed (${e.message.split('\n')[0]}), trying again`); await exportSong(page, song, part); }
-      fs.renameSync(part, wav);
+      require('node:child_process').execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', part, '-ac', '1', '-c:a', 'flac', `${wav}.part.flac`]);
+      fs.renameSync(`${wav}.part.flac`, wav); fs.unlinkSync(part);
     }
     return { h, wav };
   }
@@ -174,6 +187,10 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
         leadTruth: x.truth ? (x.truth.leadBars || []).length > 0 : null,
         tempoOK: x.truth && x.truth.bpm ? Math.abs(m.bpm - x.truth.bpm) < 1 : null,
       });
+      // (decode round 11, G: hits per bar and how held each band is, original against code; and each part's onsets
+      // against the song's own where the song is known)
+      { const fo = featO.get(x.id), fc = featC.get(h); if (fo && fc) row.density = HD.density(fo, fc, { ...grid, bars: c.bars }); }
+      if (x.song) { try { row.parts = await HD.partScore(x.song, song, m.downbeat); } catch (e) { row.partsError = e.message.split('\n')[0]; } }
       row.sharesOK = shareDiff <= 0.1;
       row.brightOK = c.brightness !== null && c.brightness >= 0.75 && c.brightness <= 1.33;
       row.kitOK = row.kitTruth ? row.kit === row.kitTruth : null;
@@ -182,7 +199,7 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
       row.driveOK = row.bassDriveTruth === null || row.driven === null ? null : row.driven === row.bassDriveTruth > 0;
       if (W.bassDriveOf) { const dd = W.bassDriveOf(bd); Object.assign(row, { h1: bd ? bd.h1 : null, slope: bd ? bd.slope : null, driveAmount: dd ? dd.drive : null, driveNear: dd ? dd.near : null }); }
       if (out) out.write(JSON.stringify(row) + '\n');
-      console.log(`${tag} ${v.name.padEnd(16)} ${x.set.slice(0, 5)} ${x.id.padEnd(26)} kit ${String(row.kit).padEnd(12)}${row.kitOK === false ? '✗' : ' '} drive ${row.evenOdd} ${row.driven ? 'D' : '-'}${row.driveOK === false ? '✗' : ' '} cut ${row.cut ? 'y' : '-'} · rhythm ${sc.rhythmLow}/${sc.rhythmMid}/${sc.rhythmHigh} chroma ${sc.chroma}/${sc.bassChroma} band ${c.bandError} dB bright ${c.brightness}${row.brightOK ? '' : '✗'} shares ${shareDiff}${row.sharesOK ? '' : '✗'} arc ${sc.arc}`);
+      console.log(`${tag} ${v.name.padEnd(16)} ${x.set.slice(0, 5)} ${x.id.padEnd(26)} kit ${String(row.kit).padEnd(12)}${row.kitOK === false ? '✗' : ' '} drive ${row.evenOdd} ${row.driven ? 'D' : '-'}${row.driveOK === false ? '✗' : ' '} cut ${row.cut ? 'y' : '-'} · rhythm ${sc.rhythmLow}/${sc.rhythmMid}/${sc.rhythmHigh} chroma ${sc.chroma}/${sc.bassChroma} band ${c.bandError} dB bright ${c.brightness}${row.brightOK ? '' : '✗'} shares ${shareDiff}${row.sharesOK ? '' : '✗'} arc ${sc.arc}${row.density ? ` · hits err ${row.density.hitErr} (low/mid/high ${row.density.low.hitErr}/${row.density.mid.hitErr}/${row.density.high.hitErr}) held ${row.density.heldErr}` : ''}${row.parts && row.parts.chords ? ` · chords recall ${row.parts.chords.recall} per bar ${row.parts.chords.truthPerBar}→${row.parts.chords.codePerBar}` : ''}`);
     }
   }
   if (out) out.end();

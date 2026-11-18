@@ -70,9 +70,10 @@ async function exportHoldout(page, { force = false, log = () => {} } = {}) {
 }
 // decode-refine group 10, phase 1: the genre songs (GENRE_SONGS, into .cache/decode/genre/) and the variation sweep's
 // songs (VARIATION_SONGS, into .cache/decode/variation/) → { id: file }
-const SET_DIRS = { genre: path.join(ROOT, '.cache', 'decode', 'genre'), variation: path.join(ROOT, '.cache', 'decode', 'variation'), fresh: path.join(ROOT, '.cache', 'decode', 'fresh') };
+// (decode round 11: --hits, the hit-density songs, HIT_SONGS, into .cache/decode/hits/)
+const SET_DIRS = { genre: path.join(ROOT, '.cache', 'decode', 'genre'), variation: path.join(ROOT, '.cache', 'decode', 'variation'), fresh: path.join(ROOT, '.cache', 'decode', 'fresh'), hits: path.join(ROOT, '.cache', 'decode', 'hits') };
 async function exportSet(page, name, { force = false, log = () => {} } = {}) {
-  const S = await import('./decode-songs.mjs'), list = name === 'genre' ? S.GENRE_SONGS : name === 'fresh' ? S.FRESH_SONGS : S.VARIATION_SONGS;
+  const S = await import('./decode-songs.mjs'), list = name === 'genre' ? S.GENRE_SONGS : name === 'fresh' ? S.FRESH_SONGS : name === 'hits' ? S.HIT_SONGS : S.VARIATION_SONGS;
   fs.mkdirSync(SET_DIRS[name], { recursive: true });
   const out = {};
   for (const s of list) {
@@ -93,7 +94,7 @@ if (require.main === module) {
     page.on('pageerror', e => console.error('pageerror', e.message));
     await page.goto(`http://localhost:${process.env.PORT || 5173}/`); await sleep(2500);
     const opts = { force: process.argv.includes('--force'), log: console.log };
-    const files = process.argv.includes('--holdout') ? await exportHoldout(page, opts) : process.argv.includes('--genre') ? await exportSet(page, 'genre', opts) : process.argv.includes('--variation') ? await exportSet(page, 'variation', opts) : process.argv.includes('--fresh') ? await exportSet(page, 'fresh', opts) : await exportTestSongs(page, opts);
+    const files = process.argv.includes('--holdout') ? await exportHoldout(page, opts) : process.argv.includes('--genre') ? await exportSet(page, 'genre', opts) : process.argv.includes('--variation') ? await exportSet(page, 'variation', opts) : process.argv.includes('--fresh') ? await exportSet(page, 'fresh', opts) : process.argv.includes('--hits') ? await exportSet(page, 'hits', opts) : await exportTestSongs(page, opts);
     for (const [id, f] of Object.entries(files)) console.log(`${id}: ${f} (${Math.round(fs.statSync(f).size / 1024)} KB)`);
     await browser.close();
   })().catch(e => { console.error(e); process.exit(1); });
