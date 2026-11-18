@@ -37,7 +37,7 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
   const KM = await import(path.join(src, 'src', 'decode', 'kit-measure.js')).catch(() => null);
   const PL = await import(path.join(src, 'src', 'decode', 'part-levels.js')).catch(() => null);
   const { nodeEssentia } = await import('./essentia-node.mjs');
-  // (decode round 10: --beat-this runs the learned beat tracker in level B, bench only (the app does not run it), its
+  // (decode round 10: --beat-this runs the learned beat tracker in level B, in the app it is an opt-in Settings option (decode round 12), its
   // files in .cache/beat-this/; --beat-this small the small model; --beat-rule '{json}' changes level B's BEAT_RULE)
   const FULL = await import(path.join(src, 'src', 'decode', 'full.js'));
   const btOn = args.includes('--beat-this'), btModel = btOn && opt('--beat-this') && !opt('--beat-this').startsWith('--') ? opt('--beat-this') : 'model';
