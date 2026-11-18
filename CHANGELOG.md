@@ -9,6 +9,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 - Code: Instrument name option (Random per song, `$:`, name at line start) and Names from option (instrument or track), in Compose's code options, the radio's Custom section and the Decode tab's Options.
 - `tools/check-light-start.cjs`: browser check of a light start (no Sounds photo at startup, layout shift under 0.1 at desktop and phone width).
+- `tools/decode-hits.mjs`: hit density per band and per part for the Decode bench, with six songs built for repeated chords and basses (`tools/decode-export.cjs --hits`, `tools/decode-bench.cjs --set hits`).
+- `tools/decode-kits.mjs`: the app's drum machines measured from their hat samples into `src/decode/kits.js`; `--holdout` checks the choice on held-out songs.
+- `tools/decode-levels.cjs`: the sounds Decode writes, measured through the app into `src/decode/part-levels.js`.
+- `tools/decode-similarity.cjs --holdout`: the held-out songs' similarity, printed only.
 - Decode: in Full, a Lead track writes the top line as a loop per section, with mute and solo; a sung melody starts muted.
 - Decode: All, Audio and Video filters in the library list, with the count of each, remembered and followed by Autoplay, Previous and Next.
 - Stage: Video look in the look menu and the arrows, showing a muted video with every render style, Code over, the widgets and the captions over it.
@@ -100,6 +104,16 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 - Startup: the photos of the Sounds tab load only when the tab opens, and only for the rows on screen.
 - Startup: the header, the stage and the work area keep their place after the first paint (no layout jump).
+- Decode: in Full, chords that hit with clear, repeating gaps are written with their rhythm (`.struct("…")` after the voicing).
+- Decode: in Full, a bass note struck again where the analysis heard one held note or none, under the kick too, is written again.
+- Decode: in Full, two sections that sound alike get the same parts: a section that lost its kick or its bass takes them from its twin.
+- Decode: stored Full analyses are made again (analysis version 20).
+- Decode: in Full, the drums get a drive of 1, 2 or 3 when the high band calls for it, decided apart from the drums' level.
+- Decode: in Full, a bass note repeated with a new attack is written again instead of held.
+- Decode: in Full, a driven bass is no longer written as a clean square, and a square bass is told by its odd harmonics.
+- Decode: in Full, chords whose roots fit the key but whose thirds do not are written as power chords.
+- Decode: in Full, the tempo follows three agreeing estimates at double the tempo found, or at 3:2 of it.
+- Decode: in Full, each part's level is predicted from the drum rows and the steps the code plays, in five bands, and a part that already balances keeps its written level.
 - Guide: the Decode card describes the Lead track in Full, the tempo checked again after 8 bars with a kick in Live, Essentia.js for the top line and the video picture with the Video visual.
 - Guide: the Settings card says what the backup holds of Decode and the "Include all Decode analyses" choice.
 - Guide: the "Video on the stage" card says that the fast video and fragments offer Video as a chosen visual.
@@ -116,6 +130,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Decode: in Full, a chord keeps the quality most bars of its section give its root.
 - Decode: in Full, the bass stays in one octave range per section and plays nothing where the bass is quiet.
 - Decode: a detuned bass under a kick is heard.
+- Decode: in Full, "Our sounds" picks the drum machine whose hats sound nearest to the track's.
+- Decode: in Full, chords that ring on get a room, the Lead's sound follows the track's brightness, and each part's level follows the original's balance of low, mid and high.
+- Decode: a bass whose filter moves over the bar is written as a sawtooth with a moving resonant filter.
 - Decode: the code changes less often, in Live and in Full: a line waits a few bars between edits and changes only for a real musical difference.
 - Decode: the space bar only plays and pauses.
 - Decode: stored analyses are made again once, with a note in the tab.

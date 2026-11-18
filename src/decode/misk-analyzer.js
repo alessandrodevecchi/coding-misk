@@ -15,7 +15,11 @@ export const LOCK_SECONDS = 8;
 // drums on dense mixes (decode-refine D4): the every-beat rule, a peak of the kick band's flux of at least `flux` times
 // its threshold on each of the bar's four beats, each a rise of the low band of at least `beat` times the track's
 // kick scale
-export const KICK_RULE = { flux: 0.45, beat: 0.25 };
+// harm (decode round 9): a kick-band onset whose 150-700 Hz energy, 15 to 100 ms after it, is at least this share of its
+// 40-130 Hz energy is a bass note's attack, not a kick: a bass note carries its harmonics up there, a kick almost none
+// (bench, true kicks: median 0.03 to 0.17, 90th percentile at most 0.31 on the clean square kit's; the onsets that the
+// pitch test took for kicks and are none, mostly bass notes: median 0.3 to 5)
+export const KICK_RULE = { flux: 0.45, beat: 0.25, harm: 0.4, strong: 0.6 };
 // a clap (D4): its snare-band rise at least `snare` times the track's strong ones, its darkness (snare band over hat
 // band) at least `local` times the hats' of the last `seconds` seconds, and noise in the snare band (spectral flatness
 // at least `flat`; measured: claps 0.36 to 0.67, a lead's note on a kick 0.11 to 0.22)
@@ -27,10 +31,25 @@ export const HAT_RULE = { median: 0.5, bars: 4 };
 export const quietBefore = (out, before, j) => { const at = k => (k >= 0 ? out[k] : before[before.length + k]) ?? null; return at(j - 1) === null && at(j - 2) === null; };
 // level A's relock (D4): the tempo and the beat phase checked again on the first bars with kicks, this many
 export const RELOCK_BARS = 8;
+// level B's grid (fitGrid): a whole tempo within `whole` BPM of the line fitted through the onsets is tried, and kept when
+// it fits almost as well (round 9: 0.25 was tried, it put one real track back on 111 but moved two others onto a worse
+// downbeat, band error +1 and +2 dB: kept at 0.08)
+export const FIT_RULE = { whole: 0.08 };
 // the top line by YIN (D2): a step's band level must reach `floor` of the band's peak
 export const TOP_LINE = { floor: 0.02 };
 // the bass (D5): YIN's looser threshold for a bass that the usual one does not hear (a detuned unison)
-export const BASS_RULE = { loose: 0.35 };
+// loose: YIN's threshold right after a kick; late and context: a note on a kick's step is read from this share of the
+// step on and kept only with the same pitch within this many steps or in a second late window, and only when its late
+// level rises by `rise` over the step before's; agree: the two windows of a step hold one pitch within this many
+// semitones (0.6 before round 8: a square bass under a low-pass reads about a semitone apart in its two windows);
+// holdFloor: a step holds the note before only above this share of the bass's loudest step, and holdKeep: only while
+// its level stays at this share of the note's attack through the step (a short note's ringing tail is no hold);
+// again: a step that would hold the note before is the same note struck again when its level rises to this many times
+// the end of the step before (decode round 8: a held note only decays; a rolling or acid line repeats its pitch with an
+// attack. 1.2 on the bench and the real set's bass stems: recall up, the held sub keeps most of its holds; round 9: 1.15,
+// an acid line's repeated note rose 1.17 and was read as held: Luci Rosse's first drop recall 0.50 to 0.63, one note more
+// on the held sub and two on the trap 808, of 50 and 51)
+export const BASS_RULE = { loose: 0.35, late: 0.45, context: 2, rise: 1.15, agree: 1.0, holdFloor: 0.12, holdKeep: 0.6, again: 1.15 };
 
 // ---------- FFT (radix 2, in place) ----------
 const ffts = new Map();
@@ -126,6 +145,8 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   const cent = new Float32Array(nf1);
   // the spectral flatness of the snare band per frame (a clap is noise; a lead's note in the same band is tonal)
   const flatS = new Float32Array(nf1);
+  // the centroid of the bass band (40 to 1500 Hz) per frame: an acid line's filter moves it over the bar (D3)
+  const bcent = new Float32Array(nf1);
   const chroma = new Float32Array(nf2 * 12), chromaE = new Float32Array(nf2);
   // the tonal peaks of each frame (frequency, magnitude), for a bar's chroma without the bass's upper harmonics
   const peaks = new Array(nf2);
@@ -152,7 +173,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       for (let i = 0; i < N1; i++) { re1[i] = pcm[o + i] * w1[i]; im1[i] = 0; }
       fft(re1, im1);
       const lg = new Float64Array(half + 1);
-      let tot = 0, cw = 0, fl = 0, fa = 0, fn = 0;
+      let tot = 0, cw = 0, fl = 0, fa = 0, fn = 0, bt = 0, bw = 0;
       const bandE = { kick: 0, hat: 0, snare: 0, low: 0, mid: 0, high: 0 }, bandF = { kick: 0, snare: 0, hat: 0, air: 0 };
       for (let k = 1; k <= half; k++) {
         const m = Math.hypot(re1[k], im1[k]), p = m * m;
@@ -161,12 +182,14 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
         const d = lg[k] - prevLog[k], up = d > 0 ? d : 0;
         for (const b of ['kick', 'hat', 'snare', 'low', 'mid', 'high']) { const [a, z] = B1[b]; if (k >= a && k <= z) bandE[b] += p; }
         if (k >= B1.snare[0] && k <= B1.snare[1]) { fl += Math.log(p + 1e-12); fa += p; fn++; }
+        if (k * hz1 >= 40 && k * hz1 <= 1500) { bt += p; bw += p * k * hz1; }
         for (const b of ['kick', 'snare', 'hat', 'air']) { const [a, z] = B1[b]; if (k >= a && k <= z) bandF[b] += up; }
       }
       for (const b of ['kick', 'snare', 'hat', 'air']) { const [a, z] = B1[b]; flux[b][done1] = bandF[b] / (z - a + 1); }
       for (const b of ['kick', 'hat', 'snare', 'low', 'mid', 'high']) energy[b][done1] = bandE[b];
       energy.total[done1] = tot; cent[done1] = tot ? cw / tot : 0;
       flatS[done1] = fn && fa > 0 ? Math.exp(fl / fn) / (fa / fn) : 0;
+      bcent[done1] = bt ? bw / bt : 0;
       prevLog = lg;
     }
   }
@@ -247,9 +270,25 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       const after = o.f + Math.round(0.09 * fr);
       let peak = 0; for (let k = o.f - 1; k <= o.f + 2; k++) if (k >= 0 && k < done1) peak = Math.max(peak, energy.kick[k]);
       v = after < done1 && peak > 0 && energy.kick[after] / peak < 0.45;
+      // (round 9: a hit with no pitch read twice that dies fast is a kick only without a bass note's harmonics,
+      // KICK_RULE.harm, unless its low band rises as the track's strong kicks do (KICK_RULE.strong of their 90th
+      // percentile): an 808 kick with its bass note on the same step carries the harmonics too, and rises twice as much)
+      if (v && KICK_RULE.harm > 0 && harmOf(o) >= KICK_RULE.harm && kickPeak(o) < KICK_RULE.strong * kickScale()) v = false;
     }
     if (o.f < done1 - Math.round(0.1 * fr)) kickMemo.set(o.f, v);
     return v;
+  };
+  // the 90th percentile of the kick band's rises at its onsets so far (made again when the onsets grow by a tenth)
+  let kScale = { n: 0, v: 1 };
+  const kickScale = () => { const n = onsets.kick.length; if (n > kScale.n * 1.1 + 8) kScale = { n, v: quantile(onsets.kick.map(kickPeak), 0.9) || 1 }; return kScale.v; };
+  // the 150-700 Hz energy over the 40-130 Hz energy, 15 to 100 ms after an onset (KICK_RULE.harm)
+  const HN = 4096, hw = hann(Math.round(0.085 * sr));
+  const harmOf = o => {
+    const fft = fftOf(HN), re = new Float64Array(HN), im = new Float64Array(HN), a = Math.round((o.t + 0.015) * sr);
+    for (let i = 0; i < hw.length && i < HN; i++) { const k = a + i; re[i] = k >= 0 && k < pcm.length ? pcm[k] * hw[i] : 0; }
+    fft(re, im);
+    const hz = sr / HN, band = (lo, hi) => { let e = 0; for (let k = Math.ceil(lo / hz); k <= Math.floor(hi / hz); k++) e += re[k] * re[k] + im[k] * im[k]; return e; };
+    return band(150, 700) / (band(40, 130) + 1e-12);
   };
   // the rise of a band's amplitude at an onset: its peak just after over its quietest frame just before
   const rise = (band, o) => { const e = energy[band]; let p = 0, q = Infinity; for (let k = o.f - 1; k <= o.f + 2; k++) if (k >= 0 && k < done1) p = Math.max(p, e[k]); for (let k = o.f - 4; k <= o.f - 1; k++) if (k >= 0) q = Math.min(q, e[k]); return Math.max(0, Math.sqrt(p) - Math.sqrt(q === Infinity ? 0 : q)); };
@@ -550,7 +589,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   // the tempo and beat phase that put the onsets of the whole file on a 16th grid best: a weighted least-squares line
   // through the onsets near the grid (t = a + m·P/4), three passes with a narrower window; a whole tempo when it fits
   // almost as well. A tempo off by 0.05 BPM drifts by 0.1 s over four minutes: the line keeps the code on the beat.
-  function fitGrid(bpm, beatPhase) {
+  function fitGrid(bpm, beatPhase, wholeNear = FIT_RULE.whole) {
     const all = gridPoints(), t0 = all.length ? Math.min(...all.map(p => p.t)) : 0;
     let P = 60 / bpm, a = beatPhase, rms = Infinity, used = 0;
     // the line grows from the first 20 seconds of music to the whole file, so a small tempo error never puts a late onset
@@ -577,7 +616,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     if (!free) return { bpm, beatPhase, rms: null, n: 0 };
     ({ P, a, rms, n: used } = free);
     const whole = Math.round(60 / P);
-    if (Math.abs(whole - 60 / P) < 0.08) {
+    if (Math.abs(whole - 60 / P) < wholeNear) {
       const keep = { P, a };
       const w = fit(60 / whole);
       if (w && w.rms <= rms * 1.15 + 0.0005) ({ P, a, rms, n: used } = w); else ({ P, a } = keep);
@@ -597,6 +636,14 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
   // the beat phase (seconds) from every onset of the file: kicks weigh most, then snares and claps, then hats (an
   // intro of offbeat hats alone cannot shift the beat by half)
   const wholePhase = bpm => { advance(duration); findOnsets(); return phaseOf(60 / bpm, 0, duration, true); };
+  // the claps of the whole file per 16th position inside the beat of a grid (0 on the beat, 2 halfway to the next),
+  // within 35 % of a 16th of it (decode round 9: the beat phase check of level B) → [n0, n1, n2, n3]
+  const clapPositions = (bpm, beatPhase) => {
+    advance(duration); findOnsets();
+    const q = 15 / bpm, out = [0, 0, 0, 0];
+    for (const o of onsets.snare) { const k = Math.round((o.t - beatPhase) / q); if (Math.abs(o.t - (beatPhase + k * q)) < 0.35 * q && isClap(o)) out[((k % 4) + 4) % 4]++; }
+    return out;
+  };
   // the downbeat of a beat grid over the whole file (the beat of four where kicks and chord changes fall)
   const gridDownbeat = (bpm, beatPhase) => { advance(duration); findOnsets(); return downbeatOf(beatPhase, 60 / bpm, t1(firstSound())); };
 
@@ -672,6 +719,9 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     let lowS = 0, lowN = 0; for (let f = fa; f < fz; f++) if (!kickNear.has(f)) { lowS += energy.low[f]; lowN++; }
     const raw = { drums: DRUM_ROWS.reduce((a, r) => a + Math.max(...strengths[r]) * (r === 'oh' ? 0.5 : 1), 0), bass: lowN ? lowS / lowN : 0, chords: mean(energy.mid, fa, fz), other: mean(energy.high, fa, fz) };
     const tot = mean(energy.total, fa, fz);
+    // the bass band's brightness over the bar, outside the kicks: its 10th and 90th percentile (D3: a moving filter)
+    const bc = []; for (let f = fa; f < fz; f++) if (!kickNear.has(f) && bcent[f] > 0) bc.push(bcent[f]);
+    const bassLo = Math.round(quantile(bc, 0.1)), bassHi = Math.round(quantile(bc, 0.9));
     const bright = Math.min(1, mean(cent, fa, fz) / 6000), low = tot ? Math.min(1, mean(energy.low, fa, fz) / tot) : 0;
     // chord: the bar's chroma against 24 templates, the bass note's pitch class as a small prior
     // the bar's chroma; a bass note's 5th, 7th, 9th, 10th, 11th and 13th harmonics are left out (a low bass's 5th
@@ -703,7 +753,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       else if (ex && best.T.quality === 'maj' && quiet) third = true;
       chord = chordName(best.T.root, best.T.quality); chordConf = Math.round(Math.min(1, best.s) * 100) / 100;
     }
-    return { start: Math.round(start * 1000) / 1000, chord, chordConf, ...(third ? { third: true } : {}), bass, drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, top: topOf(start, end, bass) };
+    return { start: Math.round(start * 1000) / 1000, chord, chordConf, ...(third ? { third: true } : {}), bass: [...bass], ...(bass.hold && bass.hold.some(Boolean) ? { bassHold: bass.hold.map(x => (x ? 1 : 0)) } : {}), drums, raw, chroma: Array.from(full, x => Math.round(x * 10) / 10), chromaEx: Array.from(v, x => Math.round(x * 10) / 10), bright: Math.round(bright * 100) / 100, low: Math.round(low * 100) / 100, bassLo, bassHi, top: topOf(start, end, bass) };
   }
   // the top line of a bar (decode-refine D6): `up`, the median over its frames of the share of the tonal peaks'
   // energy between 400 and 2000 Hz (no harmonic of a bass note) in all of the frame's tonal energy (60 to 2100 Hz). A
@@ -731,7 +781,9 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     const x = bassSignal(), out = [], L = step * decRate, tmax = Math.floor(decRate / 30);
     // one pitch window inside the first 85 % of the step, and a second one later when the step is long enough
     const w = Math.max(64, Math.min(200, Math.round(0.75 * L - tmax)));
-    let prev = null;
+    let prev = null, cur = null, curLevel = 0;
+    // (decode round 8: the steps a note still sounds on, its pitch heard again with no new attack: `out.hold`)
+    const hold = new Array(STEPS).fill(false);
     const kickAt = j => onsets.kick.some(o => Math.abs(o.t - (start + j * step)) <= 0.03 && kickLike(o));
     for (let j = 0; j < STEPS; j++) {
       const s0 = (start + j * step) * decRate;
@@ -741,7 +793,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       // tail is periodic enough only for a looser threshold, decode-refine D5; elsewhere it found notes in a pad)
       const late = s0 + 0.1 * L + w / 2, twice = th => { const a = yin(x, Math.round(s0 + 0.1 * L), decRate, { w, threshold: th, fmin: 30, fmax: 260 }), b = late + w + tmax < s0 + 0.95 * L ? yin(x, Math.round(late), decRate, { w, threshold: th, fmin: 30, fmax: 260 }) : a; return [a ? midiOf(a.f0) : null, b ? midiOf(b.f0) : null]; };
       let [m1, m2] = twice(0.2);
-      const agree = (a, b) => a !== null && b !== null && Math.abs(a - b) < 0.6;
+      const agree = (a, b) => a !== null && b !== null && Math.abs(a - b) < BASS_RULE.agree;
       // (at the looser threshold one window alone may hold the pitch: the other sits in the kick's tail)
       let loose = false;
       if (!agree(m1, m2) && head > 0.12 * bassTop && kickAt(j - 1)) { const [l1, l2] = twice(BASS_RULE.loose); if (agree(l1, l2)) [m1, m2] = [l1, l2]; else if ((l1 === null) !== (l2 === null)) m1 = m2 = l1 ?? l2; loose = agree(m1, m2); }
@@ -754,10 +806,37 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
       // bass note and hides its attack; a kick's own tail is a clean sine the usual threshold hears, and never a note)
       const underKick = loose && quietBefore(out, before, j);
       const fresh = voiced && !kickOnly && (head > 1.4 * before || (prev !== null && Math.abs(midi - prev) >= 1 && head > 0.7 * before) || underKick);
-      out.push(fresh ? midi : null);
+      const held = !fresh && cur !== null && agree(m1, m2) && Math.abs((m1 + m2) / 2 - cur) < BASS_RULE.agree && head > BASS_RULE.holdFloor * bassTop && head >= BASS_RULE.holdKeep * curLevel && tail >= BASS_RULE.holdKeep * curLevel;
+      const again = held && head >= BASS_RULE.again * before;
+      out.push(fresh || again ? midi : null);
+      if (fresh || again) { cur = midi; curLevel = head; }
+      else if (held) hold[j] = true;
+      else cur = null;
       prev = m1 !== null ? Math.round(m1) : null;
       if (voiced && !kickOnly) heardPitches.add(midi);
     }
+    // (decode round 8: a bass note on a kick's step. The kick hides the note's attack and its first window's pitch, so
+    // the step reads as a kick alone. The step's late part, after the kick's click, holds the bass's pitch when the
+    // note is there; it is a note only when the line confirms it: the same pitch as a note within BASS_RULE.context
+    // steps before or after, at a level the bass reaches. A kick's own tail has its own pitch and is not taken)
+    for (let j = 0; j < STEPS; j++) {
+      if (out[j] !== null || !kickAt(j)) continue;
+      const s0 = (start + j * step) * decRate, a = Math.round(s0 + BASS_RULE.late * L);
+      const late = rmsOf(x, a, s0 + 0.95 * L), lateBefore = rmsOf(x, a - L, s0 - 0.05 * L);
+      // (a new note: the bass's late level rises over the step before's; a held note under a kick only decays)
+      if (late < 0.12 * bassTop || late < BASS_RULE.rise * lateBefore) continue;
+      const p = yin(x, a, decRate, { w, threshold: BASS_RULE.loose, fmin: 30, fmax: 260 });
+      if (!p) continue;
+      const midi = Math.round(midiOf(p.f0)), ctx = [];
+      for (let k = 1; k <= BASS_RULE.context; k++) { ctx.push(j - k >= 0 ? out[j - k] : before[before.length - (k - j)], out[j + k]); }
+      // (the line confirms it: the same pitch within `context` steps, or a second late window with the same pitch)
+      const b2 = a + Math.round(0.25 * L) + w <= s0 + 1.2 * L ? yin(x, a + Math.round(0.25 * L), decRate, { w, threshold: BASS_RULE.loose, fmin: 30, fmax: 260 }) : null;
+      const steady = b2 && Math.abs(midiOf(b2.f0) - midiOf(p.f0)) < 0.6;
+      if (steady || ctx.some(c => c !== null && c !== undefined && Math.abs(c - midi) < 0.6)) { out[j] = midi; heardPitches.add(midi); hold[j] = false; }
+    }
+    // (a hold only right after a note or a hold: a note added on a kick's step starts a note, not a hold)
+    for (let j = 0; j < STEPS; j++) if (hold[j] && !(j > 0 && (out[j - 1] !== null || hold[j - 1]))) hold[j] = false;
+    out.hold = hold;
     return out;
   }
   // the top line by YIN (decode-refine D2, level B without Essentia.js): the 200-2000 Hz band, decimated by 4, one pitch
@@ -828,7 +907,7 @@ export function createAnalyzer(pcm, { sr = ANALYSIS_RATE } = {}) {
     m.sections = [{ start: 0, bars: list.length, kind: 'verse' }];
     return m;
   }
-  return { duration, advance, lock, model, setTempo, resetTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), barsRaw: t => bars(t), topLineYin };
+  return { duration, advance, lock, model, setTempo, resetTempo, fitGrid, gridDownbeat, wholeTempo, wholePhase, clapPositions, get locked() { return lockS; }, onsets: () => { advance(duration); findOnsets(); return onsets; }, tempoOf: (a, z) => tempoOf(Math.round(a * fr), Math.round(z * fr)), rise: (band, o) => rise(band, o), kickLike: o => kickLike(o), kickPeak: o => kickPeak(o), barsRaw: t => bars(t), topLineYin };
 }
 
 // level A's horizon (D8): the playhead plus the look ahead; values 'off', '2s', '4s', '2bars', '4bars'

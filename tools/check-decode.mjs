@@ -24,8 +24,14 @@ import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
 import { renderSong, clicks, RATE } from './decode-audio.mjs';
 import { measureApp, measureSynth, measureFull, measureTimelines } from './decode-measure.mjs';
-import { analyseFull, pickTempo, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode } from '../src/decode/writer.js';
+import { SOUND_RULE as SR8, DRUM_DRIVE } from '../src/decode/writer.js';
+import { PART_LEVELS } from '../src/decode/part-levels.js';
+import { BASS_RULE } from '../src/decode/misk-analyzer.js';
+import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare, clapShift, thirdlessMode } from '../src/decode/full.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts } from '../src/decode/writer.js';
+import { chordHits } from '../src/decode/hit-measure.js';
+import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive, hatTop } from '../src/decode/kit-measure.js';
+import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
 import { followSong, crescendoSong } from '../src/song/crescendo.js';
 import { growthRules } from '../src/live/profiles.js';
@@ -40,6 +46,7 @@ import { liveCodes, fullCodes, editStats } from './decode-edits.mjs';
 import { strudelInNode } from './mixer-checks.mjs';
 import { HELPERS as HELPERS_APP } from '../src/song/writer.js';
 import fs from 'node:fs';
+import path from 'node:path';
 
 let failed = 0, passed = 0;
 const check = (ok, name, extra = '') => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`); if (ok) passed++; else failed++; };
@@ -242,10 +249,15 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(Object.values(runs['Essentia.js'].engines).every(x => x === 'essentia.js'), 'with Essentia.js: tempo, key and chords from it', `${JSON.stringify(runs['Essentia.js'].engines)} · Essentia.js tempo ${JSON.stringify(runs['Essentia.js'].essentiaTempo)}`);
   // the tempo's engine (D7): confident alone, or confirmed by misk-analyzer from 2.0; never a disagreeing weak tempo
   check(pickTempo({ bpm: 124 }, { bpm: 123.8, confidence: 2.49 }).from === 'essentia.js' && pickTempo({ bpm: 124 }, { bpm: 61.9, confidence: 2.2 }).bpm === 123.8 && pickTempo({ bpm: 124 }, { bpm: 97, confidence: 2.49 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, { bpm: 123.8, confidence: 1.9 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, { bpm: 97, confidence: 2.6 }).from === 'essentia.js', 'level B tempo: Essentia.js confident (2.5), or from 2.0 when misk-analyzer agrees (any octave); a weak disagreeing tempo stays misk-analyzer\'s');
+  check(Math.abs(stepShare('note("a1 _ _ ~")') - (1 + 2 * SR8.holdShare) / 4) < 1e-9 && SR8.holdShare === 0.8 && SR8.fallback === 0.03, 'round 8: a held step counts as 0.8 of a sounding step in the level prediction; the balance takes the nearest gains when they bring the share difference down by 0.03 or more');
+  check(pickTempo({ bpm: 180 }, { bpm: 90, confidence: 4.05, percival: 89.9, degara: 89.1 }).bpm === 90 && Math.abs(pickTempo({ bpm: 120 }, { bpm: 184.57, confidence: 1.49, percival: 89.88, degara: 89.1 }).bpm - 179.76) < 0.01 && pickTempo({ bpm: 176 }, { bpm: 88, confidence: 2.7, percival: 88, degara: 87.6 }).bpm === 176 && pickTempo({ bpm: 140 }, { bpm: 105, confidence: 1.1, percival: 104.9, degara: 105.5 }).bpm === 105 && Math.abs(pickTempo({ bpm: 174 }, { bpm: 115.8, confidence: 2.4, percival: 86.9, degara: 114.8 }).bpm - 174) < 1 && threeAgree({ bpm: 120, from: 'x' }, { bpm: 90 }).bpm === 120, 'round 8 tempo vote: the three Essentia.js estimates agreeing win (round 9: their middle one when RhythmExtractor2013 is over 1.5 % from it), a double or half only above confidence 3.5; no vote when they disagree or one is missing');
+  check(Math.abs(pickTempo({ bpm: 64 }, { bpm: 128.8, confidence: 2.25, percival: 128, degara: 129.2 }).bpm - 128.8) < 0.1 && Math.abs(pickTempo({ bpm: 106.6 }, { bpm: 161.5, confidence: 3.0, percival: 80.1, degara: 161.5 }).bpm - 161.5) < 0.1 && Math.abs(pickTempo({ bpm: 80 }, { bpm: 162.2, confidence: 3.25, percival: 80.1, degara: 161 }).bpm - 81.1) < 0.1 && pickTempo({ bpm: 176 }, { bpm: 88, confidence: 2.7, percival: 88, degara: 87.6 }).bpm === 176, 'round 8 tempo vote, third pass: a pick at half of three agreeing estimates moves up from confidence 2.0; an estimate an octave off still agrees for a 3:2 move, never for an octave move');
+  check(noSteadyBeat({ bpm: 135.6, confidence: -0.11 }) === true && noSteadyBeat({ bpm: 135, confidence: 0.87 }) === false && noSteadyBeat(null) === null && PARTS_RULE.noBeat === 0.4, 'round 8: no steady beat under Essentia.js confidence 0.4 (a pad-only song -0.11, every bench file with drums 1.6 or more, real tracks 0.87 or more); unknown without Essentia.js');
+  check(noBassPart([0.2, 0.55, 0.18, 0.06, 0.01], { h1: 0 }) && !noBassPart([0.48, 0.4, 0.1, 0.01, 0.01], { h1: 0 }) && !noBassPart([0.2, 0.55, 0.18, 0.06, 0.01], { h1: 0.6 }) && !noBassPart(null, { h1: 0 }) && !noBassPart([0.2], null), 'round 8: decoded bass notes are no bass only with a low 20-150 Hz share and no energy at their fundamental (a bass an octave off keeps a share of 0.48)');
   check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
   // the same model shape as level A for the same bars (analysis spec: One song model)
   const A = createAnalyzer(pcm).model(30), B = runs['Essentia.js'];
-  check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !['lead', 'leadVoiced', 'third'].includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !['lead', 'leadVoiced', 'third'].includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line, decode-refine D2)');
+  { const extra = ['lead', 'leadVoiced', 'third', 'sustain', 'chordHits', 'chordHeld', 'chordTonal', 'bassAttack']; check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !extra.includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !extra.includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line, the chords\' sustain and, round 11, how the chords and the bass are played)'); }
   // level A never calls Essentia.js: the worker loads it only for "analyse all"
   const wsrc = fs.readFileSync('src/decode/worker.js', 'utf8'), msrc = fs.readFileSync('src/decode/misk-analyzer.js', 'utf8');
   check(!/essentia/i.test(msrc.replace(/\/\/.*$/gm, '')) && /async function all[\s\S]*import\('\.\/engine-essentia\.js'\)/.test(wsrc) && !/^import .*(engine-essentia|full)/m.test(wsrc), 'level A uses misk-analyzer only: Essentia.js is imported only by level B, inside the worker');
@@ -270,6 +282,7 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(Object.keys(vd.patterns).length === 2 && vd.clips.some(c => c.start === 7 && c.bars === 1), 'the variant plays on its bars as a clip of its own', JSON.stringify(vd.clips.slice(0, 4)));
   // chords that are noise of the drums (out of the key) are no chord part
   check(inKey({ root: 9, mode: 'minor' })(['Am', 'F', 'C', 'G', 'E']) && !inKey({ root: 9, mode: 'minor' })(['G', 'Bb', 'Cm', 'Bb', 'Gm', 'F#']), 'a section\'s chords mostly out of the key are not a chord part');
+  check(inKey({ root: 4, mode: 'minor' })(['E', 'E', 'F', 'E', 'G', 'F', 'E', 'Bb']) === 'power' && inKey({ root: 4, mode: 'minor' })(['Em', 'C', 'D', 'Em']) === true && !inKey({ root: 9, mode: 'minor' })(['G', 'Bb', 'C', 'Bb', 'G', 'D']), 'round 8: chords with roots in the key and its flat second but thirds out of it are power chords; roots away from the tonic stay out');
   check(pickTempo({ bpm: 174 }, { bpm: 87.2, confidence: 3.5 }).bpm === 174.4 && pickTempo({ bpm: 124 }, { bpm: 123.9, confidence: 1 }).from === 'misk-analyzer' && pickTempo({ bpm: 124 }, null, { bpm: 62, tapped: false }).from === 'picked', 'level B tempo: Essentia.js when confident (in misk-analyzer\'s octave), else misk-analyzer\'s, a picked or tapped tempo first');
   check(barChords([{ chord: 'A#m', strength: 0.9 }])[0].chord === 'Bbm' && settleMode({ root: 0, mode: 'major' }, [{ chord: 'Am' }, { chord: 'F' }, { chord: 'C' }, { chord: 'G' }, { chord: 'Am' }]).mode === 'minor', 'chord names in the app\'s spelling; the key\'s mode settled by the tonic chord on phrase starts');
   // "Follow the song" (D18) and Open in Compose (D15): the song as the tab plays it and as Compose grows it, the same code
@@ -398,9 +411,10 @@ if (process.argv.includes('--app')) {
   steadyQualities(t, [{ start: 0, bars: 4 }], undefined, { root: 9, mode: 'minor' });
   check(t.every(b => b.chord === 'Am'), 'a tie goes to the key\'s quality', t.map(b => b.chord).join(' '));
   const notes = n => Array.from({ length: 16 }, (_, j) => (j % 4 === 0 ? n : null));
-  const bb = [bar('Am', 0.9, notes(33)), bar('Am', 0.9, notes(45)), bar('Am', 0.9, notes(64)), bar('Am', 0.9, notes(33), 0.1), bar('Am', 0.9, notes(21))];
-  bassRange(bb, [{ start: 0, bars: 5 }]);
+  const bb = [bar('Am', 0.9, notes(33)), bar('Am', 0.9, notes(45)), bar('Am', 0.9, notes(64)), bar('Am', 0.9, notes(36), 0.1), bar('Am', 0.9, notes(21)), bar('Am', 0.9, notes(33), 0.1)];
+  bassRange(bb, [{ start: 0, bars: 6 }]);
   check(bb[0].bass[0] === 33 && bb[1].bass[0] === 45 && bb[2].bass[0] === 40 && bb[3].bass.every(x => x === null) && bb[4].bass[0] === 33, 'the bass keeps one octave range per section (a riff\'s octave jump stays, a note far off moves by octaves) and a quiet bass bar has no notes', bb.map(b => b.bass[0]).join(','));
+  check(bb[5].bass[0] === 33, 'round 9: a quiet bass bar keeps notes on its chord\'s root (a bass of a few short notes)', String(bb[5].bass[0]));
   const qm = [{ chord: 'A', third: true }, { chord: 'C', third: true }, { chord: 'A' }];
   quietMinors(qm, { root: 9, mode: 'minor' });
   check(qm.map(b => b.chord).join() === 'Am,C,A', 'a quiet minor third turns a chord minor only where the key holds that minor chord', qm.map(b => b.chord).join());
@@ -431,6 +445,157 @@ if (process.argv.includes('--app')) {
   check(vl && vl.hush === true && /_\$:/.test(compileSong(vs)), 'a sung melody\'s Lead is muted by default, also in the song Open in Compose saves', vl ? JSON.stringify({ hush: vl.hush }) : 'no lead');
   const mx = mixApply(defaultMix(['drums']), { type: 'tracks', codeIds: ['drums', 'lead'], muted: ['lead'] }), lt = mx.tracks.find(t => t.id === 'lead');
   check(lt.mute && lt.by === 'user', 'the mix starts a muted Lead muted by the user, so the slider does not unmute it');
+}
+// decode-refine group 10 (D3): the drum machine by measure, the acid bass's moving filter, Simple kit unchanged
+{
+  check(Object.keys(KIT_MEASURES).length >= 20 && KIT_MEASURES.RolandTR909 && KIT_MEASURES.RolandTR808.hatBright > KIT_MEASURES.RolandTR909.hatBright, 'the drum machines measured from their samples (src/decode/kits.js)', `${Object.keys(KIT_MEASURES).length} kits`);
+  const K = KIT_MEASURES, noisy = v => v.map((x, i) => Math.round((x + (i % 3 - 1) * 0.05) * 100) / 100);
+  check(nearestKit(noisy(K.RolandTR808.hatShape), K) === 'RolandTR808' && nearestKit(noisy(K.RolandTR707.hatShape), K) === 'RolandTR707' && nearestKit(null, K) === null, 'the drum machine whose hat shape is nearest wins');
+  const near = rankKits(K.RolandTR909.hatShape, { A: { hatShape: K.RolandTR909.hatShape, hatBright: 9000 }, B: { hatShape: K.RolandTR909.hatShape.map((x, i) => (i === 3 ? x + 0.05 : x)), hatBright: 6500 } }, 6400);
+  check(near[0].kit === 'B', 'two machines within the tie of the shape are told apart by the hats\' brightness', JSON.stringify(near));
+  const flat = Array.from({ length: 2048 }, (_, k) => (k + 1) ** -2);
+  check(hatShapeOf(flat, 44100).every(x => Math.abs(x) < 0.1), 'a hat shape leaves out the spectrum\'s tilt');
+  const base = { bright: 0.2, low: 0.6, bassLo: 100, bassHi: 300 }, acid = { ...base, bassLo: 80, bassHi: 700 };
+  check(/sawtooth.*sine\.range\(.*lpq\(8\)/.test(soundsOf([acid, acid], 'ours').bass) && !/lpq/.test(soundsOf([base, base], 'ours').bass), 'a bass whose brightness moves over the bar gets a sawtooth with a moving resonant filter', soundsOf([acid, acid], 'ours').bass);
+  check(soundsOf([acid], 'simple').bass === soundsOf([base], 'simple').bass && soundsOf([acid], 'simple').kit === 'RolandTR909', 'Simple kit keeps one set of sounds');
+  const Mk = { bpm: 124, barSeconds: 240 / 124, downbeat: 0, key: { root: 9, mode: 'minor' }, sections: [{ start: 0, bars: 4, kind: 'verse' }], ending: 4, drumSound: { kit: 'RolandTR808' }, bars: Array.from({ length: 4 }, () => ({ ...base, chord: 'Am', chordConf: 0.9, level: { drums: 1, bass: 1, chords: 1, other: 0 }, bass: Array(16).fill(null), drums: { bd: 'x...x...x...x...', cp: E, hh: '..x...x...x...x.', oh: E } })) };
+  check(writeFull(Mk, { sounds: 'ours' }).tracks[0].settings.kit === 'RolandTR808' && writeFull(Mk, { sounds: 'simple' }).tracks[0].settings.kit === 'RolandTR909', 'level B writes the measured drum machine with Our sounds, the fixed one with Simple kit');
+  // chords that ring on get a room; the Lead's sound follows the brightness
+  { const rm = x => +((soundsOf([{ ...base, sustain: x }], 'ours').chords.match(/\.room\(([\d.]+)\)/) || [])[1] || 0); check(rm(1) === 0.9 && rm(0.8) > rm(0.4) && rm(0.4) > rm(0) && rm(0) === 0.3, 'chords get a room along their sustain: 0.3 for chords that stop, up to 0.9 for chords that ring to the end of the bar (round 8)', [rm(0), rm(0.4), rm(0.8), rm(1)].join(' ')); }
+  check(soundsOf([{ ...base, bright: 0.6 }], 'ours').lead !== soundsOf([{ ...base, bright: 0.1 }], 'ours').lead, 'the Lead\'s sound follows the brightness');
+  // the part levels: the balance moves the gains toward the original's band shares, and leaves them when it cannot
+  const tr = () => [{ id: 'drums', type: 'drums', settings: { kit: 'RolandTR909' }, patterns: { A: { rows: { bd: 'x...x...x...x...', hh: '..x...x...x...x.' } } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }, { id: 'bass', type: 'code', patterns: { A: { code: 'note("a1").s("sine").lpf(400).gain(.75)' } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }, { id: 'chords', type: 'code', patterns: { A: { code: 'chord("Am").voicing().s("triangle").lpf(1200).gain(.3)' } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
+  const t1 = tr(), r1 = balanceLevels(t1, [0.5, 0.48, 0.02], 8), t2 = tr(), r2 = balanceLevels(t2, [0.05, 0.05, 0.9], 8);
+  check(r1 && r1.after <= 0.1 && r1.after <= r1.before && JSON.stringify(t1) !== JSON.stringify(tr()) && r2 && r2.gains === null && JSON.stringify(t2) === JSON.stringify(tr()), 'the part levels come near the original\'s band shares, and stay as written when no gains can reach them', JSON.stringify({ r1, r2 }));
+  // the prediction counts the steps a loop sounds and the hits a drum row plays (decode-refine D3, third round)
+  check(stepShare('note("<[~!8 d1 d2 ~!6] [a1 ~ a1 ~]>").s("sine")') === 4 / 20 && stepShare('chord("<Am F>").voicing()') === 1, 'a loop\'s share of sounding steps', stepShare('note("<[~!8 d1 d2 ~!6] [a1 ~ a1 ~]>")'));
+  { const dense = tr(), sparse = tr(); sparse[0].patterns.A.rows = { bd: 'x...............' }; const rd = balanceLevels(dense, [0.5, 0.48, 0.02], 8), rs = balanceLevels(sparse, [0.5, 0.48, 0.02], 8); check(rd && rs && rd.before !== rs.before, 'the drums\' predicted level follows the hits their rows play', JSON.stringify({ rd, rs })); }
+  // the chords under a Lead lose their body (decode-refine D3, fourth round): over most of their bars only, never under a
+  // muted Lead
+  {
+    const pad = (bars) => ({ id: 'chords', type: 'code', patterns: { A: { code: 'chord("<Am F>").voicing().s("triangle").lpf(1100).room(0.4).gain(.3)' } }, clips: [{ start: 0, bars, pattern: 'A' }] });
+    const lead = (bars, hush) => ({ id: 'lead', type: 'code', patterns: { A: { code: 'n("0 2 4").scale("A3:minor").s("triangle").lpf(1600).gain(.25)' } }, clips: [{ start: 0, bars, pattern: 'A' }], ...(hush ? { hush: true } : {}) });
+    // (round 6: only in a song with drums, and only when the balance kept the Lead within SOUND_RULE.leadKeep dB)
+    const dr = () => ({ id: 'drums', type: 'drums', settings: {}, patterns: { A: { rows: { bd: 'x...x...x...x...' } } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] });
+    const over = [pad(8), lead(6), dr()], under = [pad(8), lead(3), dr()], muted = [pad(8), lead(8, true), dr()], noDrums = [pad(8), lead(6)], quiet = [pad(8), lead(6), dr()];
+    check(cutUnderLead(over, { lead: 1 }) && /\.hpf\(1200\)\.lpf\(4000\)\.room/.test(over[0].patterns.A.code) && !cutUnderLead(under) && !/hpf/.test(under[0].patterns.A.code) && !cutUnderLead(muted) && !cutUnderLead([pad(8), dr()]) && !cutUnderLead(noDrums) && !cutUnderLead(quiet, { lead: 0.16 }) && !/hpf/.test(quiet[0].patterns.A.code), 'chords under a Lead on most of their bars lose their body, not under a short, muted or turned-down Lead, nor without drums', over[0].patterns.A.code);
+  }
+  // the bass's drive (decode-refine 10.1, fifth round): a clipped sawtooth (odd harmonics) is driven, a plain one is not
+  {
+    const sr = 44100, notes = Array.from({ length: 32 }, (_, i) => ({ t: 0.05 + i * 0.12, midi: 33 })), f0 = 55;
+    const saw = t => 2 * ((t * f0) % 1) - 1, clean = Float32Array.from({ length: 4.2 * sr }, (_, i) => 0.3 * saw(i / sr)), driven = clean.map(x => Math.tanh(20 * x) * 0.5);
+    const a = bassDrive(clean, sr, notes), b = bassDrive(driven, sr, notes);
+    // (round 6: the profile, the fundamental's share rising with the clip, and the drive of the nearest app bass)
+    const da = bassDriveOf(a), db = bassDriveOf(b);
+    check(a && b && b.h1 > a.h1 && db.drive > da.drive && bassDriveOf(null) === null && bassDriveOf({ h1: 0.97, evenOdd: -4, slope: -10 }).drive === 0 && bassDriveOf({ h1: 0, evenOdd: 3, slope: 8 }) === null && bassDrive(clean, sr, notes.slice(0, 4)) === null, 'a clipped bass gets a higher fundamental share and a larger drive than a plain sawtooth, a sine-like share none, too few notes no measure', JSON.stringify({ clean: a && [a.h1, a.evenOdd, da], driven: b && [b.h1, b.evenOdd, db] }));
+    // (round 7: the drive rule on the bench's readings: a clean sawtooth at 0.58 (the drive-2 row is gone), a clean square
+    // alone at -38 dB even/odd (square, no drive), a driven sawtooth at 4.5, a sine at 0.92; fixed scale. Round 8, the table
+    // without the pad: a square by its even/odd from -15 dB down, the drive from the sawtooth rows at cutoff 700; a
+    // driven bass read at 0.78 and -5.3 dB, which the pad's square row took, is a driven sawtooth)
+    const R = (h1, evenOdd) => bassDriveOf({ h1, evenOdd, slope: -5 });
+    check(R(0.582, 2.7).drive === 0 && R(0.706, -38).wave === 'square' && R(0.706, -38).drive === 0 && R(0.86, -5.6).drive === 4.5 && R(0.776, 1.7).drive === 3 && R(0.92, -3).wave === 'sine' && R(0.42, 2.8).drive === 0 && R(0.42, 2.8).wave === 'sawtooth' && R(0.78, -5.3).drive === 4.5 && R(0.78, -5.3).wave === 'sawtooth', 'the drive rule writes drive only from 3 up, never on a square, a square from -15 dB even/odd, a sine from 0.91', JSON.stringify([R(0.582, 2.7), R(0.706, -38), R(0.86, -5.6), R(0.776, 1.7), R(0.92, -3), R(0.78, -5.3)]));
+  }
+  // (round 8, fourth pass: a square under a pad for part of the song, its median even/odd near a sawtooth's but its lowest
+  // tenth at -20 dB or under)
+  check(bassDriveOf({ h1: 0.729, evenOdd: -1.9, eoLow: -23.5, slope: -6.6 }).wave === 'square' && bassDriveOf({ h1: 0.828, evenOdd: -0.6, eoLow: -2.8, slope: -6.6 }).drive === 3 && bassDriveOf({ h1: 0.729, evenOdd: -1.9, slope: -6.6 }).wave === 'sawtooth', 'round 8: a square from the lowest tenth of its even/odd readings (a pad over part of it), a driven sawtooth keeps its drive');
+  // a driven bass (decode-refine 10.2, round 6): the app's drive after its filter with Our sounds, never with
+  // Simple kit; the balance scales the clip's volume, not the gain before the clip
+  {
+    const dr = soundsOf([acid, acid], 'ours', [acid, acid], 4.5).bass, pl = soundsOf([base], 'ours', [base], 2).bass;
+    check(/lpq\(4\)\.distort\(4\.5\)\.distortvol\(0\.5\)\.gain\(\.6\)$/.test(dr) && /\.distort\(2\)\.distortvol/.test(pl) && !/crush/.test(dr) && !/distort/.test(soundsOf([acid], 'ours').bass) && soundsOf([acid], 'simple', [acid], 4.5).bass === soundsOf([acid], 'simple').bass, 'a driven bass gets the app\'s drive at its measured amount after its filter, no crusher, a clean one none, Simple kit unchanged', dr);
+    const t = [{ id: 'drums', type: 'drums', settings: { kit: 'RolandTR909' }, patterns: { A: { rows: { bd: 'x...x...x...x...', hh: '..x...x...x...x.' } } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }, { id: 'bass', type: 'code', patterns: { A: { code: `note("a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~ a1 ~")${dr}` } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
+    const r = balanceLevels(t, [0.6, 0.38, 0.02], 8), code = t[1].patterns.A.code;
+    check(r && r.gains && /\.gain\(\.6\)$/.test(code) && (r.gains.bass === 1 || !/distortvol\(0\.5\)/.test(code)), 'the balance moves a driven bass by its clip\'s volume and keeps the gain before the clip', JSON.stringify({ r, code: code.slice(-70) }));
+  }
+  check(BASS_RULE.again === 1.15 && BASS_RULE.holdKeep === 0.6, 'round 8 (round 9: 1.15): a step that would hold the note before is the note struck again when its level rises 1.15 times over the step before');
+  // the drums' drive (task 10.6, round 8): drives 1, 2 and 3 in the level table; a drive only when it brings the
+  // high band's prediction nearer than the clean kit by DRUM_DRIVE.margin, so a file near the edge keeps its decision
+  {
+    const rows = { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.' }, kit = 'RolandTR909';
+    const drumsOnly = () => [{ id: 'drums', type: 'drums', settings: { kit }, patterns: { A: { rows } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
+    const pred = d => { const e = [0, 0, 0, 0, 0]; for (const [r, st] of Object.entries(rows)) PART_LEVELS[`drums:${kit}:${r}${d ? `:d${d}` : ''}`].forEach((x, j) => { e[j] += x * (st.match(/x/g) || []).length; }); const t = e.reduce((a, b) => a + b, 0); return e.map(x => x / t); };
+    const at = sh => { const t = drumsOnly(); balanceLevels(t, sh, 8); return t[0].settings.drive || 0; };
+    const near = pred(0).map((x, j) => (j === 4 ? x * 1.25 : x)), nt = near.reduce((a, b) => a + b, 0);
+    check([1, 2, 3].every(d => PART_LEVELS[`drums:${kit}:bd:d${d}`]) && at(pred(1)) === 1 && at(pred(2)) === 2 && at(pred(0)) === 0 && at(near.map(x => x / nt)) === 0 && DRUM_DRIVE.margin === 0.5 && DRUM_DRIVE.full === 0.95, 'the drums get the drive whose rows match the high band (1, 2), none when the clean kit matches or comes within the margin', JSON.stringify([at(pred(1)), at(pred(2)), at(pred(0)), at(near.map(x => x / nt))]));
+  }
+  // (round 8, fourth pass: a drive that fills the high band only at the mid bands' cost is no drive: a clean kit whose
+  // original has 4 times the predicted high band (hats the grid misses, a bright part) gets a drive from the high band
+  // alone, and none once the whole fit must improve too)
+  {
+    const rows = { bd: 'x.....x...x.....', cp: '....x.......x...', hh: '..x...x.x.x...x.' }, kit = 'RolandTR909';
+    const e = [0, 0, 0, 0, 0]; for (const [r, st] of Object.entries(rows)) PART_LEVELS[`drums:${kit}:${r}`].forEach((x, j) => { e[j] += x * (st.match(/x/g) || []).length; });
+    e[4] *= 4; const tot = e.reduce((a, b) => a + b, 0);
+    const at = () => { const t = [{ id: 'drums', type: 'drums', settings: { kit }, patterns: { A: { rows } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }]; balanceLevels(t, e.map(x => x / tot), 8); return t[0].settings.drive || 0; };
+    const full = DRUM_DRIVE.full, now = at(); DRUM_DRIVE.full = 0; const off = at(); DRUM_DRIVE.full = full;
+    check(now === 0 && off > 0, 'round 8: a drive that brings the high band nearer but not the whole spectrum is not written', JSON.stringify({ now, off }));
+  }
+  // (round 8, fourth pass: power chords only in a section with some top; voiced up from POWER_RULE.anchor, not into the
+  // bass's band)
+  {
+    const pm = b => ({ ...Mk, key: { root: 4, mode: 'minor' }, bars: Mk.bars.map((x, i) => ({ ...x, chord: ['E', 'E', 'F', 'G'][i % 4], chordConf: 0.8, bright: b })) });
+    const ch = b => (writeFull(pm(b)).tracks.find(t => t.id === 'chords') || { patterns: {} }).patterns;
+    const lit = Object.values(ch(0.2)).map(p => p.code).join(' '), dark = Object.values(ch(0.03)).map(p => p.code).join(' ');
+    check(/E5/.test(lit) && lit.includes(`.mode("above").anchor("${POWER_RULE.anchor}").voicing()`) && !/[A-G][#b]?5\b/.test(dark.replace(/\.anchor\("[a-g]\d"\)/g, '')), 'round 8: power chords voiced up from the anchor, none in a dark section (a driven bass alone)', JSON.stringify([lit.slice(0, 90), dark.slice(0, 60)]));
+  }
+  // (round 11, decode-hit-rhythm A: chords that hit with gaps are written with their rhythm, a held pad stays held)
+  {
+    const mk = (hitsS, held, tonal = 0.3) => ({ ...Mk, sections: [{ start: 0, bars: 8, kind: 'verse' }], ending: 8, bars: Array.from({ length: 8 }, (_, i) => ({ ...Mk.bars[0], chord: ['Am', 'F', 'C', 'G'][i % 4], chordHits: hitsS, chordHeld: held, chordTonal: tonal })) });
+    const ch = m => Object.values((writeFull(m).tracks.find(t => t.id === 'chords') || { patterns: {} }).patterns).map(p => p.code).join(' ');
+    const stab = ch(mk('x.x.x.x.x.x.x.x.', 0.16)), six = ch(mk('x.xx.x.xx.x.xx.x', 0.2)), pad = ch(mk('x...............', 0.66));
+    check(stab.includes('.voicing().struct("x x x x x x x x")') && six.includes('.struct("x ~ x x ~ x ~ x x ~ x ~ x x ~ x")') && /voicing\(\)/.test(pad) && !/struct/.test(pad), 'round 11: stabs on eighths and a sixteenth rhythm are written with their struct, a held pad without', JSON.stringify([stab.slice(0, 80), six.slice(0, 80), pad.slice(0, 60)]));
+    check(chordRhythm(['x.x.x.x.x.x.x.x.', 'x.x.x.x.x.x.x.x.', 'x...x...x.x.x.x.']) === 'x x x x x x x x' && chordRhythm(['x...............']) === null, 'round 11: the chords\' rhythm is the steps hit in half the bars, on eight steps when every hit is on an even one');
+    check(Math.abs(stepShare('chord("<Am F>").voicing().struct("x ~ x ~").s("sawtooth")') - 0.5) < 1e-9 && stepShare('chord("Am").voicing().s("sawtooth")') === 1, 'round 11: chords with a rhythm sound on their struct\'s hits in the balance');
+    // (B) a section whose chord tones hold almost none of the band writes no chords
+    check(!/struct/.test(ch(mk('x.x.x.x.x.x.x.x.', 0.16, 0.05))), 'round 11: no rhythm where the chord\'s own tones do not stand out of the band (a detuned pad under loud drums)');
+  }
+  // (round 11, decode-hit-rhythm C: a repeated bass under the kick)
+  {
+    const r = Array(16).fill(0).map((_, j) => (j % 4 === 0 ? 99 : 50)), lv = Array(16).fill(0).map((_, j) => (j % 4 === 0 ? 1 : 0.24)), lt = Array(16).fill(0.2);
+    const bar = { drums: { bd: 'x...x...x...x...' }, bass: Array.from({ length: 16 }, (_, j) => (j % 4 >= 2 ? 33 : null)), bassAttack: { rise: r, level: lv, late: lt } };
+    const clean = { drums: { bd: 'x...x...x...x...' }, bass: Array.from({ length: 16 }, (_, j) => (j % 4 === 2 ? 33 : null)), bassAttack: { rise: Array(16).fill(0).map((_, j) => (j % 4 === 2 ? 99 : 0.3)), level: lv, late: Array(16).fill(0.01) } };
+    const f = bassFilled(bar), g = bassFilled(clean);
+    check(f.every(x => x === 33) && g.filter(x => x !== null).length === 4, 'round 11: a distorted bass that attacks on every sixteenth is written on every step, the kick\'s too; an offbeat bass keeps its four notes', JSON.stringify([f, g]));
+  }
+  // (round 11, decode-hit-rhythm D: twin sections take the same parts)
+  {
+    const lv = { drums: 0.7, bass: 0.6, chords: 0.5, other: 0.6 }, secs = [{ start: 0, bars: 8, kind: 'drop' }, { start: 8, bars: 8, kind: 'drop' }], bars = Array.from({ length: 16 }, () => ({ level: lv, bright: 0.19 }));
+    const tracks = [{ id: 'drums', type: 'drums', settings: {}, patterns: { A: { rows: { bd: 'x...x...x...x...', hh: '..x...x...x...x.' } }, B: { rows: { hh: '..x...x...x...x.' } } }, clips: [{ start: 0, bars: 8, pattern: 'A' }, { start: 8, bars: 8, pattern: 'B' }] },
+      { id: 'bass', type: 'code', patterns: { A: { code: 'note("a1!16")' } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
+    const pairs = twinParts(tracks, secs, bars);
+    check(pairs.length === 1 && tracks[0].clips[1].pattern === 'A' && !tracks[0].patterns.B && tracks[1].clips.length === 2 && tracks[1].clips[1].start === 8, 'round 11: the second of two equal drops gets the kick and the bass of the first', JSON.stringify([pairs, tracks[0].clips, tracks[1].clips]));
+  }
+  // (round 11, decode-hit-rhythm A: the measure on a synthetic bar: an A minor triad struck on eighths, then held)
+  {
+    const sr = 44100, bl = Math.round(sr * 240 / 124), x = new Float32Array(bl + sr), fs = [220, 261.63, 329.63, 440, 523.25, 659.25];
+    const make = stab => { x.fill(0); for (let i = 0; i < bl; i++) { const t = i / sr, ph = (i % (bl / 8)) / sr, env = stab ? Math.exp(-ph / 0.04) : 1; let v = 0; for (const f of fs) v += Math.sin(2 * Math.PI * f * t); x[i + sr / 2] = 0.1 * env * v; } return chordHits(x, sr, sr / 2, bl, [9, 0, 4]); };
+    const s1 = make(true), s2 = make(false);
+    check(s1.hits === 'x.x.x.x.x.x.x.x.' && s1.held < CHORD_RULE.held && s2.n <= 1 && s2.held > 0.5, 'round 11: chordHits reads stabs on eighths and a held chord', JSON.stringify([s1, s2]));
+  }
+  // (round 8, fourth pass: a hat row on the backbeat where the clap row is silent is a snare read as a hat)
+  {
+    const mk = (hh, oh = '................') => Array.from({ length: 12 }, () => ({ drums: { bd: 'x...x...x...x...', cp: '................', hh, oh } }));
+    const a = mk('....x.......x...'), b = mk('x.x.x.x.x.x.x.x.'), c = mk('x.x.x.x.x.x.x.x.', '........x.......');
+    const ma = backbeatSnare(a), mb = backbeatSnare(b), mc = backbeatSnare(c);
+    check(ma.length === 1 && a[0].drums.cp === '....x.......x...' && a[0].drums.hh === '................' && !mb.length && mc.length === 1 && c[0].drums.cp === '........x.......' && c[0].drums.oh === '................', 'round 8: a hat on the backbeat (4 and 12, or 8 of a half-time bar) with no clap there is a snare; eighth hats are not', JSON.stringify([ma, mb, mc]));
+  }
+  // (round 9: the beat phase from the claps, a tonic with no third, a hat with no top, a power chord with no riff, sounds by fit)
+  {
+    check(clapShift([0, 0, 64, 0]) === 2 && clapShift([0, 0, 0, 57]) === 3 && clapShift([60, 0, 28, 32]) === 0 && clapShift([0, 0, 10, 0]) === 0, 'round 9: claps on one other 16th of the beat move the phase there (60 % of at least 16), else nothing');
+    const cx = (m3, M3) => { const v = Array(12).fill(0); v[4] = 1; v[7] = m3; v[8] = M3; return { chromaEx: v }; };
+    const kb = Array.from({ length: 10 }, () => ({ chord: 'E', bass: [40, null, 38, null, 36, null, 40, null, null, null, null, null, null, null, null, null] }));
+    const k1 = thirdlessMode({ root: 4, mode: 'major' }, kb, kb.map(() => cx(0.1, 0.1))), k2 = thirdlessMode({ root: 4, mode: 'major' }, kb, kb.map(() => cx(0.1, 0.6)));
+    check(k1.mode === 'minor' && k2.mode === 'major', 'round 9: a tonic with neither third takes its mode from the bass and the roots (D and C over E: minor); a heard major third stays', `${k1.mode} ${k2.mode}`);
+    const lit = Array.from({ length: 36 }, (_, i) => (i < 30 ? 0 : -0.5)), dead = Array.from({ length: 36 }, (_, i) => (i < 30 ? 0.2 : -5));
+    const rk = rankKits(dead, { Lit: { hatShape: lit, hatBright: 8000 }, Dead: { hatShape: dead, hatBright: 8000 } }, null), rl = rankKits(lit, { Lit: { hatShape: lit, hatBright: 8000 }, Dead: { hatShape: dead, hatBright: 8000 } }, null);
+    check(hatTop(dead) < -4 && rk[0].kit === 'Dead' && rl.length === 1 && rl[0].kit === 'Lit', 'round 9: a machine whose hat has no top over 11 kHz is left out when the track\'s hats have one', JSON.stringify([rk, rl]));
+    const pm = (drums, bassOn) => ({ bpm: 120, downbeat: 0, barSeconds: 2, key: { root: 4, mode: 'minor' }, sections: [{ start: 0, bars: 8, kind: 'verse' }], ending: 8, shares: null, bars: Array.from({ length: 8 }, (_, i) => ({ chord: ['E', 'F', 'E', 'G'][i % 4], chordConf: 0.8, level: { drums: drums ? 1 : 0, bass: 1, chords: 0.8, other: 0.5 }, bright: 0.2, drums: drums ? { bd: 'x...x...x...x...', cp: '....x.......x...', hh: '..x...x...x...x.', oh: '................' } : { bd: '................', cp: '................', hh: '................', oh: '................' }, bass: bassOn ? [40, null, null, null, 40, null, null, null, 40, null, null, null, 40, null, null, null] : Array(16).fill(null) })) });
+    const withRiff = writeFull(pm(true, true), { sounds: 'simple' }), alone = writeFull(pm(false, false), { sounds: 'simple' });
+    check(/E5/.test(JSON.stringify(withRiff)) && !alone.tracks.some(t => t.id === 'chords'), 'round 9: power chords only where drums or bass play on half the section\'s bars', alone.tracks.map(t => t.id).join(','));
+    const ft = [{ id: 'chords', type: 'code', patterns: { A: { code: 'chord("D").voicing().s("triangle").lpf(1600).gain(.3)' } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
+    const fit = soundsByFit(ft, [0.05, 0.3, 0.3, 0.3, 0.05], 8);
+    check(fit && fit.w !== 'triangle' && !/triangle/.test(ft[0].patterns.A.code), 'round 9: chords whose original fills 1-2 kHz leave the triangle for the wave the balance fits best', JSON.stringify(fit));
+  }
+  check(writeFull({ ...Mk, shares: [0.5, 0.48, 0.02] }, { sounds: 'simple' }).tracks.find(t => t.id === 'bass') === undefined || /gain\(\.75\)/.test(JSON.stringify(writeFull({ ...Mk, shares: [0.9, 0.05, 0.05] }, { sounds: 'simple' }))), 'Simple kit keeps its levels');
 }
 // a tapped or stored tempo is never moved by the relock (decode-refine D4)
 {
@@ -522,6 +687,37 @@ if (process.argv.includes('--app')) {
   const S = await strudelInNode(), evn = async c => (await S.evaluate(c)).queryArc(0, 4).filter(h => h.hasOnset()).length;
   const ev = [await evn(`${VOX_PRELUDE}$: s("bd*4")\n\n${hook}`), await evn('$: s("bd*4")'), await evn(`${VOX_PRELUDE}${hook.replace(/_\$:/g, '$:')}`)];
   check(ev[0] === ev[1] && ev[1] === 16 && ev[2] === 0, 'the copied code with the group evaluates in Strudel and plays only the parts; the group alone plays nothing', ev.join(','));
+}
+
+// the learned beat tracker (decode-beat-tracker, round 10; bench only, not offered in the app): the pure parts always;
+// the model itself when its files are in .cache/beat-this/ (git-ignored, downloaded by hand from the pinned URLs; skipped otherwise)
+{
+  const BT = await import('../src/decode/beat-this.js'), F = await import('../src/decode/full.js');
+  check(Object.values(BT.BEAT_THIS_FILES).every(f => /^https:\/\/huggingface\.co\/[^/]+\/[^/]+\/resolve\/[0-9a-f]{40}\//.test(f.url) && /^[0-9a-f]{64}$/.test(f.sha256) && f.bytes > 0 && f.name.endsWith('.onnx')), 'beat tracker: every file has a URL at a fixed revision, a SHA-256 pin and a size, and is ONNX');
+  check(JSON.stringify(BT.chunkStarts(5570)) === JSON.stringify([-6, 1482, 2970, 4076]) && JSON.stringify(BT.chunkStarts(1000)) === JSON.stringify([-6]), 'beat tracker: chunks as the reference code splits them (5570 frames: -6, 1482, 2970, 4076)', BT.chunkStarts(5570).join(','));
+  const lg = new Float32Array(200).fill(-5); for (const i of [10, 11, 60, 110]) lg[i] = 2; lg[160] = 3; lg[162] = 1;
+  check(JSON.stringify(BT.peaksOf(lg)) === JSON.stringify([0.21, 1.2, 2.2, 3.2]), 'beat tracker: peaks over 7 frames above 0, adjacent peaks merged, frames to seconds', BT.peaksOf(lg).join(','));
+  // a steady 111 BPM over 6 minutes with frame-rounded beats, fake beats between some of them, downbeats on the second beat of four
+  const P = 60 / 111, beats = [], downbeats = [];
+  for (let k = 0; k < 660; k++) { const t = Math.round((0.31 + k * P) * 50) / 50; beats.push(t); if (k % 4 === 1) downbeats.push(t); if (k % 7 === 3) beats.push(Math.round((t + 0.75 * P) * 50) / 50); }
+  beats.sort((a, b) => a - b);
+  const g = BT.beatGrid({ beats, downbeats }, 360);
+  check(g && Math.abs(g.bpm - 111) < 0.01 && Math.abs(g.beatPhase - 0.31) < 0.01 && Math.abs(g.downbeat - (0.31 + P)) < 0.01 && g.steady, 'beat tracker: a 6-minute grid at 111 BPM from frame-rounded beats with fake beats between them (tempo within 0.01, phase and downbeat within 10 ms)', g && `${g.bpm.toFixed(3)} BPM, phase ${g.beatPhase.toFixed(3)}, downbeat ${g.downbeat.toFixed(3)}`);
+  const sparse = BT.beatGrid({ beats: [0.5, 1.3, 9, 30, 31, 58, 59.6, 80, 95, 112], downbeats: [] }, 112);
+  check(!sparse || !sparse.steady, 'beat tracker: a pad with a beat now and then is not steady');
+  const rel = (b, pick) => F.trackerGrid({ bpm: b, steady: true, lock: 0.9 }, pick);
+  check(rel(124.02, 124).relation === 1 && rel(80, 160).bpm === 160 && rel(176, 88).bpm === 88 && rel(174, 116).tempo && rel(174, 116).bpm === 174 && rel(130, 100) === null && F.trackerGrid({ bpm: 124, steady: false, lock: 0.9 }, 124) === null, 'beat tracker: same, half, double and 3:2 relations to the picked tempo; the picked octave stays; no relation or unsteady beats: no grid');
+  const { BT_DIR, nodeBeatThis } = await import('./beat-this-node.mjs');
+  if (Object.values(BT.BEAT_THIS_FILES).every(f => fs.existsSync(path.join(BT_DIR, f.name)))) {
+    // a generated track at 124 BPM, analysed with and without the tracker
+    const pcm = P124;
+    if (pcm) {
+      const on = await F.analyseFull(pcm, { beatTracker: nodeBeatThis }), off = await F.analyseFull(pcm, {});
+      check(on.engines.grid === 'beat-this' && Math.abs(on.bpm - 124) < 0.01 && Math.abs(on.downbeat - off.downbeat) < 0.03 && on.beatTracker && on.beatTracker.used === 1, 'beat tracker: a generated track at 124 BPM gets the tracker\'s grid, the same tempo and downbeat as without it', `${on.bpm} BPM, downbeat ${on.downbeat} against ${off.downbeat}`);
+      const fail = await F.analyseFull(pcm, { beatTracker: async () => { throw new Error('no files'); } });
+      check(!fail.engines.grid && (fail.notes || []).some(x => /^Beat tracker failed/.test(x)) && Math.abs(fail.bpm - off.bpm) < 1e-9, 'beat tracker: a tracker that fails leaves a note and the grid of misk-analyzer');
+    }
+  } else console.log('skip  beat tracker: model files not in .cache/beat-this/');
 }
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

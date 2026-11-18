@@ -8,15 +8,17 @@
 // DECODE_OWNER_DIR=<folder>: also every audio file in it, printed only (no snapshot, no file outside the git-ignored
 // .cache/decode/sim/).
 // --no-essentia: level B with misk-analyzer alone (printed only).
+// --holdout: the held-out songs of decode-refine 10.1 (tools/decode-songs.mjs HOLDOUT_SONGS, exported when missing)
+// instead of the bench, printed only: they verify a rule chosen on the bench and never tune one.
 // --ab <dir> (decode-refine 6.4, the owner's listening round): each file decoded with and without Essentia.js, both
 // songs exported and written to <dir> as MP3 named A and B in random order, the key (which is which) and the two
 // analyses side by side in <dir>/key.md; meant for a git-ignored folder under notes/. Also prints Essentia.js's
 // download size. Compares nothing.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/decode-similarity.cjs [--write] [--only id,id] [--no-essentia]
-//          [--ab <dir>]   (dev server on PORT; needs ffmpeg)
+//          [--ab <dir>] [--holdout]   (dev server on PORT; needs ffmpeg)
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), zlib = require('node:zlib');
 const { execFileSync } = require('node:child_process');
-const { exportTestSongs, exportSong, DIR: WAV } = require('./decode-export.cjs');
+const { exportTestSongs, exportHoldout, exportSong, DIR: WAV } = require('./decode-export.cjs');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const args = process.argv.slice(2), opt = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : undefined; };
 const AUDIO = /\.(wav|mp3|m4a|aac|flac|ogg|opus|webm|mp4|mov)$/i;
@@ -37,9 +39,10 @@ const slug = s => s.normalize('NFKD').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$
   fs.mkdirSync(S.SIM_DIR, { recursive: true });
 
   // the files: the bench (exported when missing), then the owner's
-  await exportTestSongs(page, { log: console.log });
+  const holdout = args.includes('--holdout');
+  const held = holdout ? await exportHoldout(page, { log: console.log }) : (await exportTestSongs(page, { log: console.log }), null);
   const only = opt('--only') ? opt('--only').split(',') : null;
-  const bench = [...TEST_SONGS.map(s => s.id), ...APP_SONGS.map(x => x.id)].filter(id => !only || only.includes(id)).map(id => ({ id, file: path.join(WAV, `${id}.wav`), owner: false }));
+  const bench = held ? Object.entries(held).filter(([id]) => !only || only.includes(id)).map(([id, file]) => ({ id, file, owner: true, held: true })) : [...TEST_SONGS.map(s => s.id), ...APP_SONGS.map(x => x.id)].filter(id => !only || only.includes(id)).map(id => ({ id, file: path.join(WAV, `${id}.wav`), owner: false }));
   const ownerDir = process.env.DECODE_OWNER_DIR;
   const owner = ownerDir ? fs.readdirSync(ownerDir).filter(f => AUDIO.test(f) && !f.startsWith('.')).sort().map(f => ({ id: `owner-${slug(f.replace(AUDIO, ''))}`, title: f.replace(AUDIO, ''), file: path.join(ownerDir, f), owner: true })) : [];
   const files = [...bench, ...owner];
@@ -47,7 +50,7 @@ const slug = s => s.normalize('NFKD').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$
   // level B of a file and its export, kept in .cache/decode/sim/ while the song does not change
   const pcmOf = new Map(), pcm = f => { if (!pcmOf.has(f)) pcmOf.set(f, S.readAudio(f)); return pcmOf.get(f); };
   async function decoded(x, essentia) {
-    const dir = path.join(S.SIM_DIR, x.owner ? 'owner' : 'bench'), tag = `${x.id}.${essentia ? 'ess' : 'own'}`;
+    const dir = path.join(S.SIM_DIR, x.held ? 'holdout' : x.owner ? 'owner' : 'bench'), tag = `${x.id}.${essentia ? 'ess' : 'own'}`;
     fs.mkdirSync(dir, { recursive: true });
     const B = await S.levelB(pcm(x.file), { id: x.id, title: x.title || x.id, essentia }), wav = path.join(dir, `${tag}.wav`), js = path.join(dir, `${tag}.song.json`);
     const same = fs.existsSync(js) && fs.existsSync(wav) && fs.readFileSync(js, 'utf8') === JSON.stringify(B.song);
@@ -87,7 +90,7 @@ const slug = s => s.normalize('NFKD').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$
     const B = await decoded(x, essentia);
     codes[x.id] = { B, code: S.readAudio(B.wav) };
     const c = S.compare(featOf(x.file), S.features(codes[x.id].code), B.grid);
-    lines.push(`${x.owner ? 'owner ' : 'bench '}${S.line(x.id, c)}`);
+    lines.push(`${x.held ? 'held  ' : x.owner ? 'owner ' : 'bench '}${S.line(x.id, c)}`);
     if (!x.owner) res[x.id] = S.score(c);
   }
   const floor = {};
@@ -101,6 +104,7 @@ const slug = s => s.normalize('NFKD').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$
   console.log(lines.join('\n'));
   await browser.close();
   if (!essentia) { console.log('\n(level B without Essentia.js: printed only)'); return; }
+  if (holdout) { console.log('\n(held-out songs: printed only)'); return; }
   const snap = S.readSnapshot();
   if (args.includes('--write')) {
     S.writeSnapshot({ format: 1, margin: S.MARGIN, files: { ...(only && snap ? snap.files : {}), ...res }, floor: { ...(only && snap ? snap.floor : {}), ...floor } });

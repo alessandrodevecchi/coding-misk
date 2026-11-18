@@ -99,7 +99,7 @@ const midiOfValue = x => (typeof x === 'number' ? x : typeof x === 'string' ? mi
 // it compares the mix only; @strudel/tonal does not load in Node here). Only `note` values are read as pitches: scale
 // and voicing stay no-ops, so the truth leaves out notes written as degrees
 let strudel = null;
-async function strudelTonal() {
+export async function strudelTonal() {
   registerHook(`data:text/javascript,${encodeURIComponent("export async function resolve(s, c, next) { return s === '@kabelsalat/web' ? { url: 'data:text/javascript,export class SalatRepl {}', shortCircuit: true } : next(s, c); }")}`);
   const log = console.log;
   console.log = () => {};

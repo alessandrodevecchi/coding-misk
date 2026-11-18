@@ -34,13 +34,21 @@ export async function createEssentiaEngine(load = browserLoader) {
   const free = (...xs) => { for (const x of xs) try { if (x && x.delete) x.delete(); } catch (err) { /* already freed */ } };
   return {
     id: ESSENTIA_ID, version: ESSENTIA_VERSION, core: e.version, incremental: false,
-    // whole-track tempo and beats: { bpm, confidence (0 to about 5.3), ticks: [seconds] }
+    // whole-track tempo and beats: { bpm, confidence (0 to about 5.3), ticks: [seconds], percival?, degara? }
     rhythm(pcm) {
       const v = e.arrayToVector(pcm);
       try {
         const r = e.RhythmExtractor2013(v, 208, 'multifeature', 40);
         const out = { bpm: r.bpm, confidence: r.confidence, ticks: Array.from(e.vectorToArray(r.ticks)) };
         free(r.ticks, r.estimates, r.bpmIntervals);
+        // (decode round 8: two more tempo estimates for the vote of full.js pickTempo, about 3 s on a 4-minute track:
+        // PercivalBpmEstimator, and BeatTrackerDegara's median beat interval)
+        try { out.percival = e.PercivalBpmEstimator(v, 1024, 2048, 128, 128, 210, 50, 44100).bpm; } catch (err) { /* left out */ }
+        try {
+          const d = e.BeatTrackerDegara(v, 208, 40), t = Array.from(e.vectorToArray(d.ticks)); free(d.ticks);
+          const ibi = t.slice(1).map((x, i) => x - t[i]).filter(x => x > 0.2).sort((a, b) => a - b);
+          if (ibi.length) out.degara = 60 / ibi[ibi.length >> 1];
+        } catch (err) { /* left out */ }
         return out;
       } finally { free(v); }
     },

@@ -8,7 +8,11 @@
 //   arc               correlation of the loudness per bar (dB), each curve's variance floored at ARC_DB² (decode-refine
 //                     11.3): a song whose bars differ by a few tenths of a dB has no arc, and its plain correlation was
 //                     noise that moved between two exports; such a song now scores near 0 every run
-// score(): the numbers a later run must not lose by more than MARGIN (higher is better for each).
+//   band error        RMS dB difference of the 10 octave bands' shares (round 6); reported, not in the snapshot yet
+//   (the brightness, a median frame centroid, stays as a reported score: it mostly says whether something sustained
+//   plays between the drum hits, decode-g10 review)
+// score(): the numbers a later run must not lose by more than MARGIN (higher is better for each; round 7: the band error
+// is lower-better with its own margin, LOWER, and the brightness is reported only, REPORTED).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +30,11 @@ export const MARGIN = 0.05;
 // bar by 3 to 10 dB; two exports of one song differ by well under it
 export const ARC_DB = 1;
 export const RATE = ANALYSIS_RATE;
+// the band error (decode-refine group 10, round 6): the long-term spectrum in 10 octave bands from 20 Hz to 16 kHz,
+// each band's share of the whole in dB, code against original; the RMS of the differences over the bands that hold at
+// least BAND_FLOOR of either file's energy. Unlike the median centroid it sees a missing part and added noise in any band
+export const OCTAVES = [20, 45, 90, 180, 355, 710, 1400, 2800, 5600, 11200, 16000];
+export const BAND_FLOOR = 1e-4;
 export { readAudio };
 
 // ---------- level B of a file, as Open in Compose writes it ----------
@@ -78,7 +87,7 @@ export function features(pcm) {
   frames(pcm, N, H, (k, pw, n) => {
     let tot = 0, cen = 0;
     for (let b = 1; b < n / 2; b++) { tot += pw[b]; cen += pw[b] * ((b * RATE) / n); }
-    fr.push({ low: bandSum(pw, n, 30, 150), mid: bandSum(pw, n, 150, 2000), high: bandSum(pw, n, 5000, 16000), sl: bandSum(pw, n, 20, 150), sm: bandSum(pw, n, 150, 2000), sh: bandSum(pw, n, 2000, 16000), tot, cen: tot > 0 ? cen / tot : 0 });
+    fr.push({ low: bandSum(pw, n, 30, 150), mid: bandSum(pw, n, 150, 2000), high: bandSum(pw, n, 5000, 16000), sl: bandSum(pw, n, 20, 150), sm: bandSum(pw, n, 150, 2000), sh: bandSum(pw, n, 2000, 16000), tot, cen: tot > 0 ? cen / tot : 0, ob: OCTAVES.slice(0, -1).map((lo, j) => bandSum(pw, n, lo, OCTAVES[j + 1])) });
   });
   const H2 = 2048, N2 = 8192, chroma = [], pcOf = [];
   for (let b = 0; b < N2 / 2; b++) { const f = (b * RATE) / N2; pcOf.push(f >= 27 && f <= 2000 ? ((Math.round(12 * Math.log2(f / 440) + 69) % 12) + 12) % 12 : -1); }
@@ -129,24 +138,39 @@ export function compare(fo, fc, grid) {
   const shares = list => { const t = { l: 0, m: 0, h: 0 }; for (const x of list) { t.l += x.sl; t.m += x.sm; t.h += x.sh; } const s = t.l + t.m + t.h || 1; return [r3(t.l / s), r3(t.m / s), r3(t.h / s)]; };
   const level = (f, t0) => Array.from(perWindow(f.fr.map(x => x.tot), f.hop, t0, grid.barSeconds, bars, true), v => 10 * Math.log10(v + 1e-10));
   const shO = shares(so), shC = shares(sc), co = cen(so), cc = cen(sc);
-  return { bars, rhythm, chroma: r3(chromaScore('all')), bassChroma: r3(chromaScore('bass')), brightness: r3(co ? cc / co : null), shares: { orig: shO, code: shC }, arc: r3(arcScore(Array.from(level(fo, grid.downbeat)), Array.from(level(fc, 0)))) };
+  // the band error: per octave band the code's share over the original's in dB (null where both are under the floor)
+  const ob = list => { const t = new Float64Array(OCTAVES.length - 1); for (const x of list) x.ob.forEach((v, j) => { t[j] += v; }); const s = t.reduce((a, b) => a + b, 0) || 1; return Array.from(t, v => v / s); };
+  const obO = ob(so), obC = ob(sc), bandDb = obO.map((o, j) => (o < BAND_FLOOR && obC[j] < BAND_FLOOR ? null : Math.round(10 * Math.log10(Math.max(obC[j], 1e-5) / Math.max(o, 1e-5)) * 10) / 10));
+  const used = bandDb.filter(v => v !== null), bandError = used.length ? r3(Math.sqrt(used.reduce((a, v) => a + v * v, 0) / used.length)) : null;
+  // the largest error above 5.6 kHz (the two top bands), dB
+  const highOff = Math.max(...bandDb.slice(-2).filter(v => v !== null).map(Math.abs), 0);
+  return { bandError, bandDb, highOff, bars, rhythm, chroma: r3(chromaScore('all')), bassChroma: r3(chromaScore('bass')), brightness: r3(co ? cc / co : null), shares: { orig: shO, code: shC }, arc: r3(arcScore(Array.from(level(fo, grid.downbeat)), Array.from(level(fc, 0)))) };
 }
 
 // the numbers held by the snapshot, each higher is better: the brightness ratio as its closeness to 1, the shares as one
 // minus the largest band difference
 export function score(c) {
   const b = c.brightness ? Math.min(c.brightness, 1 / c.brightness) : 0;
-  return { rhythmLow: c.rhythm.low, rhythmMid: c.rhythm.mid, rhythmHigh: c.rhythm.high, chroma: c.chroma, bassChroma: c.bassChroma, brightness: r3(b), shares: r3(1 - Math.max(...c.shares.orig.map((x, i) => Math.abs(x - c.shares.code[i])))), arc: c.arc };
+  return { rhythmLow: c.rhythm.low, rhythmMid: c.rhythm.mid, rhythmHigh: c.rhythm.high, chroma: c.chroma, bassChroma: c.bassChroma, brightness: r3(b), shares: r3(1 - Math.max(...c.shares.orig.map((x, i) => Math.abs(x - c.shares.code[i])))), arc: c.arc, bandError: c.bandError };
 }
+// (round 7) REPORTED: scores the snapshot holds but the check does not gate: the brightness, a median frame centroid
+// that mostly says whether something sustained plays between the drum hits (decode-g10 review); LOWER: scores where
+// lower is better, with their own margin: the band error in dB
+export const REPORTED = ['brightness'];
+export const LOWER = { bandError: 0.3 };
 // a run's scores against the snapshot's: the drops beyond the margin, [{ id, key, was, now }]
 export function drops(snapshot, now, margin = MARGIN) {
   const out = [];
   for (const [id, s] of Object.entries(snapshot || {})) {
     if (!now[id]) continue;
-    for (const [k, was] of Object.entries(s)) { const v = now[id][k]; if (was !== null && v !== null && v !== undefined && v < was - margin - 1e-9) out.push({ id, key: k, was, now: v }); }
+    for (const [k, was] of Object.entries(s)) {
+      const v = now[id][k];
+      if (REPORTED.includes(k) || was === null || v === null || v === undefined) continue;
+      if (k in LOWER ? v > was + LOWER[k] + 1e-9 : v < was - margin - 1e-9) out.push({ id, key: k, was, now: v });
+    }
   }
   return out;
 }
-export const line = (id, c) => `${id.padEnd(22)} rhythm low ${c.rhythm.low} mid ${c.rhythm.mid} high ${c.rhythm.high} · chroma ${c.chroma} bass ${c.bassChroma} · brightness ${c.brightness} · shares low/mid/high ${c.shares.orig.join('/')} vs ${c.shares.code.join('/')} · arc ${c.arc} · ${c.bars} bars`;
+export const line = (id, c) => `${id.padEnd(22)} band error ${c.bandError} dB · rhythm low ${c.rhythm.low} mid ${c.rhythm.mid} high ${c.rhythm.high} · chroma ${c.chroma} bass ${c.bassChroma} · brightness ${c.brightness} · shares low/mid/high ${c.shares.orig.join('/')} vs ${c.shares.code.join('/')} · arc ${c.arc} · ${c.bars} bars`;
 export const readSnapshot = () => (fs.existsSync(SNAPSHOT) ? JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8')) : null);
 export const writeSnapshot = data => fs.writeFileSync(SNAPSHOT, JSON.stringify(data, null, 2) + '\n');

@@ -318,6 +318,142 @@ What changed against D5: the chroma that leaves out the bass's harmonics shows l
 
 Not met on the bench: MELODIA follows the arp and the pad, louder than the lead in the arp-and-lead song (notes 52 to 60 against a lead at 72 to 81), and YIN finds no single pitch in a polyphonic mix. A tonal-peak tracker (the highest salient peak that is no harmonic) reached 0.47 on the arp song but gives no voicing, so it is not kept. MELODIA reports a pitch about 60 ms late (`MELODY_LAG`). Its voicing replaces `top.up` only in bars where `top.up` hears a top line at all (0.18), because MELODIA also voices a pad or a bass. The Lead is written as `n(…).scale(…)` degrees; a sung melody's Lead has `hush` in the song (muted in Compose) and starts muted in Decode's mix.
 
+### Group 10, second round (12 November)
+
+The first round's machine choice (hat brightness times 1.1, tuned on the bench) is replaced, and the measures are verified on held-out songs: eight short songs on other machines and drive settings (`HOLDOUT_SONGS` in `tools/decode-songs.mjs`, `tools/decode-kits.mjs --holdout`), never used to choose a rule. The bench chose the rules; the held-out songs only verify them.
+
+- **The machine by the hat's spectral shape** (`kit-measure.js`): the closed hats' summed spectrum in twelfth-octave bands from 2 to 16 kHz, in log energy, the tilt over the bands taken out, correlated with each machine's sample. Why not the brightness: the 909's, 707's and 505's hats have centroids within 3 %, and a mix reads hats 1 to 5 % darker than the sample (the other parts, the limiter, distortion tilt the spectrum); their partials sit at different places, which a twelfth of an octave resolves and a tilt does not move. Only hats on steps without a kick, a clap or an open hat count (a hat with a kick carries its sound). Machines within 0.02 of the best correlation are ordered by the hats' brightness. Kick measures are not used: under a bass they read the bass. Right on 7 of 8 bench files (decode-test-174 reads the MC303, 0.829 against the 909's 0.808) and 6 of 8 held-out songs (the 505 with drive read as the 909, a clean 909 under a distorted bass read as the CR-78); the first round's rule on the same held-out songs: 1 of 8.
+- **Distortion: not detected.** Tried: the kick's energy from 1.5 to 6 kHz over its 40-120 Hz energy, the sound before it subtracted, against the clean sample (driven 1.9 and 2.6, clean 0.6 to 2.7); the hats' decay against the sample's (driven 1.31 and 1.06, the clean radio seed 1.13). With the first round's two measures, none separates. The code writes no `distort`.
+- **Chords and Lead:** chords still sounding in the last eighth of their bar (amplitude at least 0.6 of the bar's mean, about -4 dB) get `.room(0.4)`; the Lead's wave and cutoff follow the bars' brightness as the chords' do, one step brighter.
+- **Part levels** (`balanceLevels` in `writer.js`): each sound the writer can write is measured once alone through the app (`tools/decode-levels.cjs` into `src/decode/part-levels.js`, 30 sounds, one 9-second export), and the code's band energy is predicted from it, the gain squared and the share of bars a part plays. Level B's original band shares come from `full.js`. The writer scales the drums', bass's, chords' and Lead's gains in 1.5 dB steps (gains up to 1) to make the largest share difference the smallest. When even the best gains leave a band more than 0.10 off, the prediction does not explain the original (a part the code does not write, a sound unlike the original's) and the gains stay as written: without that rule the balance raised luci-rosse's acid bass and moved its shares further off.
+- `ANALYSIS_VERSION` 8 (7 after the first round on this branch).
+
+| Similarity (B) | Before group 10 | After the second round | Target |
+| --- | --- | --- | --- |
+| Brightness ratio, luci-rosse / radio seed | 0.61 / 0.63 | 0.93 / 0.62 | 0.75 to 1.33 |
+| Brightness ratio, acid / arp | 0.50 / 0.93 | 1.03 / 0.74 | 0.75 to 1.33 |
+| Brightness ratio, decode-test-124 / 90 / 174 / long | 1.32 / 1.45 / 1.41 / 1.30 | 0.84 / 1.40 / 2.37 / 1.22 | 0.75 to 1.33 |
+| Band shares, largest difference: luci-rosse / radio seed | 0.07 / 0.16 | 0.20 / 0.03 | 0.10 |
+| Band shares: acid / arp | 0.14 / 0.15 | 0.20 / 0.02 | 0.10 |
+| Band shares: decode-test-124 / 90 / 174 / long | 0.04 / 0.19 / 0.31 / 0.14 | 0.02 / 0.12 / 0.02 / 0.02 | 0.10 |
+| Mid-band rhythm, decode-test-124 / long | 0.92 / 0.90 | 0.98 / 0.95 | (first round: 0.63 / 0.56) |
+| Low-band rhythm, decode-test-124 / 90 | 0.27 / 0.08 | 0.38 / 0.10 | 0.5 |
+| High-band rhythm, luci-rosse | 0.35 | 0.32 | 0.5 |
+
+Met: the brightness of luci-rosse, acid, decode-test-124 and long; the shares of six files. Not met: the radio seed's brightness (0.62: its supersaw bass, arp and hook are brighter than any sound the writer has), decode-test-90 (1.40) and 174 (2.37, the wrong machine), the arp song's (0.74: the balance lowered its chords and Lead to fit the shares); the shares of acid and luci-rosse (the acid bass); low-band rhythm on decode-test-124 and 90 and high-band rhythm on luci-rosse (not part of group 10's sounds). The first round's mid-band rhythm loss on decode-test-124 and long is gone (0.98 and 0.95): with the right machine, the hats now line up. The snapshot takes each score that improved; the scores that fell stay at their old values, so the check fails on decode-test-174's and the arp song's brightness and on acid's and luci-rosse's shares until they are fixed.
+
+### Group 10, third round (12 November)
+
+The four scores the similarity check failed after the second round, and why:
+
+- **decode-test-174's brightness (2.37) was not the machine.** Level B picks the 909 there (0.828 against the MC303's 0.822, a hair apart), and the exported song already played the 909. The balance had cut the chords by 15 dB (gain 0.05): its prediction counted the 909 with kick, clap and hat wherever a drum pattern played, and the bass on 8 steps of 16 where it sounds 3. The three shares matched, with the kick's mids standing in for the chords' body, so the code was all drums and twice as bright.
+- **The prediction now follows the code** (`balanceLevels` in `writer.js`): the drums per machine, row and hit in a bar, times the hits each pattern plays; the bass and the Lead times the share of steps their loops sound (`stepShare`); the acid bass by its filter's top (500, 1000 or 2000 Hz). It works in five bands (`LEVEL_BANDS`: 20-150, 150-400, 400-1000, 1000-2000, 2000-16000 Hz) and in the check's three, so a pad's body is not traded for a kick's click; the rule that leaves the gains as written stays on the three bands (0.10). `full.js` measures the original's five shares; `ANALYSIS_VERSION` 9.
+- **The table is measured again** (`tools/decode-levels.cjs`, 122 sounds: 23 machines by 4 rows, bass, acid bass, chords, Lead) with frames every 256 samples. With 4 hits and frames 4096 samples apart, a hit's attack fell inside a frame or between two by chance (the 909's kick read 5950 low and 6760 low-mid, now 7540 and 4010).
+- **The smallest change** (`SOUND_RULE.near`, half the target): among the gains that bring every band within 0.05, the one that moves the gains least wins. Before, the balance moved levels for any gain in the shares (the arp song's arpeggio, written as its bass, lost 9 dB and the Lead 15 dB for a share 0.016 nearer).
+- **Held out:** `tools/decode-similarity.cjs --holdout` prints the held-out songs' scores; they verified the two rules and chose none.
+
+| Similarity (B) | After the second round | After the third | Target |
+| --- | --- | --- | --- |
+| Brightness ratio, decode-test-174 | 2.37 | 1.34 | 0.75 to 1.33 |
+| Brightness ratio, arp | 0.74 | 0.79 | 0.75 to 1.33 |
+| Brightness ratio, decode-test-124 / 90 / long | 0.84 / 1.40 / 1.22 | 0.88 / 1.39 / 1.22 | 0.75 to 1.33 |
+| Brightness ratio, luci-rosse / acid / radio seed | 0.93 / 1.03 / 0.62 | 0.93 / 1.03 / 0.61 | 0.75 to 1.33 |
+| Band shares, largest difference: acid / luci-rosse | 0.20 / 0.20 | 0.20 / 0.20 | 0.10 |
+| Band shares: decode-test-124 / 90 / 174 / long / arp / radio seed | 0.02 / 0.12 / 0.02 / 0.02 / 0.02 / 0.03 | 0.01 / 0.01 / 0.04 / 0.02 / 0.03 / 0.00 | 0.10 |
+| Mid-band rhythm, arp | 0.68 (snapshot) | 0.44 | |
+| Held out: shares within 0.10 | 3 of 8 | 6 of 8 | |
+| Held out: brightness within 0.75 to 1.33 | 4 of 8 | 4 of 8 | |
+
+Not met: acid and luci-rosse's shares. The original holds 77 % of its energy below 150 Hz; the 909's kick and the acid bass each hold about 65 %, so no gains reach it and they stay as written (a sub under the acid line would, a new sound not tried in this round). decode-test-174's brightness is 0.01 over the range, decode-test-90's 1.39 and the radio seed's 0.61 as before. The arp song's brightness meets the range but stays under its snapshot (0.93, from before group 10, when the balance did not exist), and its mid-band rhythm fell from 0.68 to 0.44: with the chords at their written level the pad covers the arpeggio's onsets in the mid band; cutting the pad gave the rhythm back and the brightness 0.74. Held out, held-505-drive (0.17) and held-808-clean (0.57: the code holds 11 % low against 68 %) do not move. Distortion was not tried again (no new measure). The snapshot takes the scores that improved (decode-test-124's brightness and shares, decode-test-90's shares, decode-test-174's brightness and mid-band rhythm, and others); the check still fails on acid's and luci-rosse's shares and on the arp song's brightness and mid-band rhythm.
+
+### Group 10, fourth round (12 November)
+
+The owner approved two tries for the four scores the check still failed: a sub under the acid bass, and letting the arp song's onsets through its pad without lowering the pad. Success: acid's and luci-rosse's largest share difference at most 0.10; the arp song's mid-band rhythm at least 0.63 and its brightness inside 0.75 to 1.33; no other bench score more than 0.05 under the snapshot; the held-out songs not worse; rules chosen on the bench.
+
+- **The sub: tried, rejected.** A sine one octave under the bass line (no note under E1, 41 Hz), added by the balance only when the original's low share is more than 0.05 above the largest low share any gains of the written parts give (it fired on acid and luci-rosse only, on no held-out song), measured in the part table like the other sounds. It brought the largest share difference to 0.008 (acid) and 0.034 (luci-rosse), but the brightness fell to 0.58 and 0.46 (snapshot 0.97 and 0.93) and the arc dropped. The original's low end is its driven acid bass: alone it holds 83 % of its energy below 150 Hz, four times the drums' energy, centred at 109 Hz; the code's acid bass is about 30 times quieter and holds 58 %. A sine at 55 Hz pulls every frame's centroid down. Mixing the code's exported stems (drums, acid bass, sub) at every gain from -12 to +24 dB: whenever the shares are within 0.10 the brightness is at most 0.79, and the best brightness with shares within 0.15 is 0.875; the snapshot needs 0.92. Also tried, each failing one of the two: the sub at the bass's own pitch, an octave above it, as a triangle or a square, short notes, short notes on the beats only (these also cut the low-band rhythm from 0.87 to 0.77 or 0.52). The writer writes no sub.
+- **The arp song's pad: cut under the Lead** (`cutUnderLead` in `writer.js`, `SOUND_RULE.cut`, `leadOver`). Taking the pad out showed where the rhythm went (mid-band rhythm 0.70 without chords, 0.45 without the Lead, 0.19 without the bass: the intro's arpeggio, written as the bass, and the drums carry it). A Lead heard over at least half of the chords' bars plays in the pad's band (150 to 1000 Hz), and the pad's held body covers the Lead's and the drums' onsets there; the chords then get `.hpf(1200).lpf(4000)` instead of their low-pass. Applied after the balance: the table's prediction of the cut pad (measured like the other sounds) put the shares 0.075 off where the export measured 0.016, and the balance then lowered the bass and raised the Lead for nothing (mid-band rhythm 0.628, brightness 0.746). Tried on the arp song: high-pass at 400, 800, 1200 and 2000 Hz (mid-band rhythm 0.46, 0.59, 0.64, 0.68; brightness 0.85, 0.80, 0.75, 0.66), 1200 with the low-pass opened to 4000 (0.642 and 0.771, kept), a sawtooth pad (rhythm 0.57, high-band rhythm 0.94 to 0.78), the pad louder after the cut (rhythm under 0.63), the cut only in the Lead's bars (0.55), `.attack(.3)` (0.32). Ducking (`duckorbit`) was not tried: it needs the pad's orbit, which the compiler gives per track. On the bench the rule fires on the arp song only (the radio seed's Lead is a sung line, muted by default); on no held-out song (none has a Lead). Only the arp song's level B song changes.
+
+| Similarity (B) | After the third round | After the fourth | Target |
+| --- | --- | --- | --- |
+| Mid-band rhythm, arp (snapshot 0.684) | 0.435 | 0.642 | at least 0.63 |
+| Brightness ratio, arp | 0.79 | 0.771 | 0.75 to 1.33 |
+| Band shares, largest difference: acid / luci-rosse | 0.20 / 0.20 | 0.20 / 0.20 (with the sub 0.008 / 0.034, brightness 0.58 / 0.46) | 0.10 |
+| Other arp scores: low, high rhythm, chroma, bass chroma, shares, arc | 0.636, 0.94, 0.985, 0.96, 0.976, 0.926 | 0.632, 0.928, 0.987, 0.962, 0.984, 0.921 | within 0.05 of the snapshot |
+| Held out: shares within 0.10, brightness inside the range, machine right | 6, 4, 6 of 8 | 6, 4, 6 of 8 (every score equal) | not worse |
+
+Met: the arp song's mid-band rhythm and brightness range; every other bench file is unchanged; the held-out songs are unchanged. Not met: acid's and luci-rosse's shares (0.20), which no sound of the app reaches without losing the brightness; the arp song's brightness stays under its snapshot (0.771 against 0.934, from before group 10). The snapshot takes the arp song's shares (0.983 to 0.984), the one score above it. The check fails on three scores: acid's and luci-rosse's shares and the arp song's brightness.
+
+### Group 10, fifth round (12 November)
+
+The owner approved a new distortion measure, on the bass this time (rounds 1 to 3 tried only kick and hat measures), and a bass written closer to the original. Success: acid's and luci-rosse's largest share difference at most 0.10 and their brightness at most 0.05 under the snapshot; the arp song's brightness back toward its snapshot; distortion found on driven basses and not on clean ones, on the bench and the held-out songs; the held-out songs not worse; no other bench score more than 0.05 under the snapshot.
+
+- **The bass's level and drive, measured** (`bassDrive` in `kit-measure.js`, `m.bassDrive` in `full.js`; `ANALYSIS_VERSION` 10). On the steps with a bass note and no kick or clap, at the pitch level B decoded (a 4096-sample window, 8192-point spectrum): the even harmonics against the odd ones (2nd, 4th, 6th over 3rd, 5th, 7th, in dB, the median), and the low band (20-150 Hz) against the kick steps'. A clip turns a sawtooth toward a square, which holds odd harmonics only. Tried first and dropped: the harmonics from 400 to 2000 Hz against the fundamental (driven -13 to -15 dB, clean -2 to -7: it reads how loud the fundamental is, and a pad's notes sit on the bass's harmonics) and the slope of the harmonics (-3.3 to -6.8 dB an octave for both).
+
+| Bass (truth) | Even against odd (dB) | Low band against the kicks (dB) |
+| --- | --- | --- |
+| Bench, driven: decode-test-acid / luci-rosse | -5.2 / -5.6 | -0.3 / -2.5 |
+| Bench, clean: decode-test-124 / 90 / 174 / long / arp / radio seed | 2.7 / 2.2 / 4.6 / 1.9 / 4.1 / -1.3 | -16.0 / -0.4 / -14.9 / -15.9 / -18.6 / -15.7 |
+| Held out, driven: held-909-drive / held-909-clean-dist-bass | -5.9 / -4.8 | -2.5 / -2.7 |
+| Held out, clean: 707 / 505-drive / 606-drive / r8 / linn / 808 | 4.2 / 1.6 / 0.8 / 5.3 / 1.9 / no measure (7 notes) | -12.1 / -12.2 / -8.1 / -14.1 / -9.4 / - |
+
+  `DRIVE_RULE.evenOdd` is -3 dB, between the bench's clean -1.3 and driven -5.2: every driven bass is found and no clean one, on the bench and the held-out songs (the two held-out songs with driven drums and a clean bass read clean). The level does not tell drive: decode-test-90's clean bass is as loud as its kicks.
+- **The driven bass** (`soundsOf`, `SOUND_RULE.drive`): `.distort(4.5).distortvol(0.5).crush(4.85)` after the filter, and a moving filter's resonance of 4 instead of 8. The clip makes the bass the loud low end the original has. A resonance of 8 before the clip left a peak in the 150-400 Hz band (mid share 0.30 against 0.21; 2 or 4 brought it to 0.23 to 0.28). The louder bass made the code darker (brightness 0.69 to 0.80), and the crusher gives the highs back. Its bits are a narrow choice: on acid and luci-rosse `crush(6)` gave 0.85 and 0.75, `crush(5)` 0.98 and 0.86, `crush(4.85)` 0.93 and 0.88, `crush(4.8)` 0.90 and 0.90, `crush(4.6)` 0.82 and 0.98, `crush(4)` 0.58 and 0.78 (too bright). Also tried: `distort` 2 and 3 (darker, shares 0.82 to 0.86), a lower filter range, a fixed `lpf(300)`, `shape(.6)` before the clip.
+- **The level balance** (`balanceLevels`, `tools/decode-levels.cjs`): the part table measures the driven basses at the gain the writer writes (`bass:<wave>:<cut>:drive`, `bass:acid:<top>:drive`; alone, the driven acid bass holds 85 % of its energy below 150 Hz), and the balance moves a driven bass by its `distortvol`: the clip makes its level almost independent of the gain before it. On luci-rosse the balance raised the bass to `distortvol(0.59)`, on held-909-clean-dist-bass it lowered it to 0.15.
+
+| Similarity (B) | After the fourth round (snapshot) | After the fifth | Target |
+| --- | --- | --- | --- |
+| Band shares, largest difference: acid / luci-rosse | 0.205 / 0.225 (0.863 / 0.932) | 0.075 / 0.077 | 0.10 |
+| Brightness score: acid / luci-rosse | 0.97 / 0.926 (ratio 1.03 / 0.93) | 0.926 / 0.878 (ratio 1.08 / 0.878) | at least 0.92 / 0.876 |
+| Arc: acid / luci-rosse | 0.222 / 0.606 | 0.116 / 0.551 | at least 0.172 / 0.556 |
+| Rhythm low, mid, high: acid | 0.875, 0.757, 0.69 | 0.905, 0.772, 0.759 | |
+| Rhythm low, mid, high: luci-rosse | 0.757, 0.563, 0.349 | 0.767, 0.592, 0.44 | |
+| Brightness score, arp | 0.934 | 0.771 (unchanged: its bass is clean) | toward 0.934 |
+| Held out, driven: brightness ratio held-909-drive / held-909-clean-dist-bass | 0.60 / 0.73 | 0.79 / 1.28 | 0.75 to 1.33 |
+| Held out, driven: shares, largest difference | 0.058 / 0.035 | 0.039 / 0.043 | 0.10 |
+| Held out: shares within 0.10, brightness inside the range, machine right | 6, 4, 6 of 8 | 6, 6, 6 of 8 | not worse |
+
+Met: the shares of acid and luci-rosse; their brightness within 0.05 of the snapshot; drive found on the four driven basses and on no clean one; the held-out songs better (the two driven ones' brightness enters the range, every other held-out score unchanged). Not met: the arc of acid (0.116, 0.106 under the snapshot) and luci-rosse (0.551, 0.055 under): the louder bass flattens the code's loudness per bar (acid's arc 0.222 with the clean bass, 0.16 with the clip at `distortvol(.3)`, 0.10 to 0.12 at 0.5), while the original's arc comes mostly from the hook and the crash of its main sections, which the code does not write. The arp song's brightness does not move (0.771): its bass is clean, so nothing of this round reaches it. The snapshot takes the scores that rose (acid's rhythm in the three bands, chroma and shares; luci-rosse's rhythm, chroma and bass chroma); the check fails on acid's and luci-rosse's arc and on the arp song's brightness.
+
+### Group 10, sixth round (13 November)
+
+Phase 1 widened the bench (12 genre songs, a tuning and a validation split, `tools/decode-bench.cjs`); an independent review read the measurements (`notes/`, git-ignored) and found that the score that got worse on validation, the brightness ratio, is a median frame centroid that mostly says whether something sustained plays between the drum hits, and that the three largest problems were not sound constants: a missing or thin bass on sparse and held lines, a bass sound that is not measured (a sine on 13 of 28 songs), and a crusher that matched the brightness score with broadband noise.
+
+- **New measures first** (`tools/decode-similarity.mjs`, `tools/decode-bench.cjs`): the band error, the RMS dB difference of the 10 octave bands' shares from 20 Hz to 16 kHz, and the largest error above 5.6 kHz; per song the bass track's presence, its bar coverage against the truth, its wave family, whether drive was written, the parts written and the tempo. The brightness ratio stays as a reported score, no longer a target; the similarity snapshot is unchanged (its brightness and arc keys still fail as recorded in the fifth round).
+- **Sets.** TUNING (14), VALIDATION (14: the 8 held-out songs and 6 genre songs; looked at in phase 1 and its review, so a validation set already seen) and FRESH (9 songs built before any rule of this round and looked at only at its end: a supersaw bass, a Lead over chords, a square bass, driven basses on two other presets, a held sub, a two-feel bass, stab chords, driven drums). Each step was kept only when the validation set improved.
+- **C3, the cut under a Lead** (`cutUnderLead`): only in a song with drums and when the balance kept the Lead within `leadKeep` (6) dB; when the model has bass notes on more than `bassMissing` (a third) of the bars and no bass track is written, the balance may not raise the drums. The ambient song's chords are no longer cut (share difference 0.65 to 0.21). Tried and dropped: leaving out a part the balance turns down by 12 dB or more; it removed real chords and basses (the trap song's band error 2.2 to 4.1 dB).
+- **C2, the app's drive at a measured amount, no crusher.** `bassDrive` also reads the bass's harmonic profile (the fundamental's share of 12 harmonics, their slope); `tools/decode-bass-profiles.cjs` measures the app's own basses inside a mix (sawtooth and square at drive 0 to 4.5, supersaw; the share rises 0.37, 0.44, 0.64, 0.78, 0.86 with the sawtooth's drive) into `src/decode/bass-profiles.js`; the writer writes `.distort(d).distortvol(.5)` as the app does, d the drive of the nearest candidate by the share and the even/odd ratio over their spread; a share of `sineShare` (0.93) or more is a sine or a triangle. The even/odd threshold, `crush` and the fixed `distort` are gone; the level table was measured again. Alone, C2 made validation worse (band error at most 3 dB on 7 of 14 to 4): without the crusher a driven sine or a low-swept sawtooth has 3 to 6 dB too little above 355 Hz.
+- **C1, the wave of the nearest app bass** (on top of C2): the candidate's wave (sawtooth, square, supersaw, or a sine) through the app bass's default filter (`bassWave` 700, resonance 8, where the candidates were measured); a measured square or sine is not turned into a moving sawtooth; a profile whose harmonics rise with their number (a wrong octave) gives no measure. The drive-1 candidates are left out: on the tuning songs their share (0.44) sits inside the clean sawtooths' spread (0.38 to 0.58), and four of five drive-1 readings there were clean.
+- **C6, a bass bar by its level** (group 8 work, task 8.3): level B writes a bar with one bass note when its bass level reaches `bassBar` (0.2) of the song's loudest bar; two notes still count alone. A two-feel or held sub had no bass track.
+
+| Validation (14) | Base (76a2b93) | Round 6 | Review's target |
+| --- | --- | --- | --- |
+| Band error at most 3 dB | 7 | 8 | 10 |
+| Band error above 6 dB | 3 | 2 | 0 (1 without C4) |
+| A band above 5.6 kHz off by more than 6 dB | 2 | 3 | 0 |
+| Mean band error (dB) | 4.47 | 4.20 | 3.0 |
+| Gap to tuning (dB) | 1.53 | 1.36 | 1.0 |
+| Drive written on a clean bass | 1 of 11 | 2 of 11 | 0 |
+| Drive written on a driven bass | 2 of 2 | 2 of 2 | 2 of 2 |
+| Bass wave family right | 1 of 9 | 10 of 13 | 7 of 9 |
+| Share difference within 0.10 | 10 | 10 | 11 |
+| Chords cut without a Lead in the truth | 1 | 0 | 0 |
+| Kit right | 9 of 13 | 9 of 13 | 9 of 13 |
+| Bass track where the song has a bass | 9 of 13 | 13 of 13 | 12 of 13 |
+| Bass bars covered at least 80 % | 8 of 13 | 11 of 13 | 11 of 13 |
+| Tempo right | 11 of 14 | 11 of 14 | 13 of 14 |
+| Drums, bass or Lead on the ambient song | all three | all three | none |
+| Low-band rhythm, mean | 0.509 | 0.518 | 0.60 |
+
+Not met: the high band (the hats follow the kick's gain, C4 not done; the breakbeat's hats were masked by the crusher's noise before), the drive on clean basses (the clean bright acid reads drive 2, a sweep raises the fundamental's share), the tempo octave (task 7.5), the ambient song's phantom parts (analysis), and per-song rhythm on validation and tuning together: the low band down by 0.06 to 0.07 on three songs, the mid band by 0.05 to 0.13 on three, the high band by 0.09 on one (the resonant sawtooth at 700 holds through the mid onsets). On tuning the two driven acid songs got further from their originals (band error 1.8 to 3.6 and 3.3 to 5.5 dB: without the crusher their low sweep, 200 to 550 Hz before the clip, leaves the highs 5 to 12 dB short); the other tuning songs got closer (mean 2.94 to 2.84 dB). The sweep of every new constant is in the DEVLOG entry. The fresh set and the owner's files are reported in the git-ignored notes.
+
+### Group 10, seventh round (13 November)
+
+A second review read round 6. Acceptance set for this round: the owner's own files (no step may worsen their mean band error without the 11.2-16 kHz band, which no written sound reaches on some files, by more than 0.3 dB; their numbers stay in the git-ignored notes).
+
+- **The drive rule, narrowed** (`bassDriveOf`): the distance uses two fixed scales, `SOUND_RULE.drive.spread` (0.227 share, 6.44 dB even/odd; computed from the candidate list, removing a row moved every decision); the driven squares are no longer candidates (one win, on a clean square); the measured even/odd is clamped at `eoFloor` (-8 dB); a nearest row under `min` (drive 3) writes no drive (the drive-2 sawtooth fired only on clean basses); `sineShare` 0.91, mid-gap between the highest driven reading and the lowest sine (0.935). Drive on clean basses: 2, 2 and 1 to 0 on tuning, validation and fresh; driven basses unchanged. The owner's files stayed within the round's limit (numbers in the git-ignored notes). One validation song got further: the clean bright acid (2.1 to 4.1 dB): its drive-2 bass was turned down to `distortvol(0.09)` by the balance; written clean, the resonant sawtooth at 700 is louder in the 355-1400 Hz bands than the level table predicts (the table measures the static sawtooth without the resonance; open).
+- **The missing highs come from the drums' drive** (bench only, `decode-bench.cjs --oracle-drums`): writing the true drum drive on the six songs driven at 1.5 or more takes their mean band error from 4.67 to 2.64 dB and the largest error above 5.6 kHz from 7.8 to 3.9 dB (acid 3.6 to 1.2, luci-rosse 5.5 to 2.6). So the driven bass's sweep was not changed (the review's item 3), and a drum-drive measure is the next lever (task 10.6).
+- **The similarity check guards rounds 6 and 7.** The snapshot was written again from this round's code. The brightness score (a median frame centroid) is now reported, not gated (`REPORTED`): it passed songs with 11 dB missing or 14 dB of added noise above 5.6 kHz and failed songs within 3 dB. The band error is gated, lower is better, with its own margin of 0.3 dB (`LOWER`). This is a change of criterion, not a way to make round 5 pass: the old brightness and arc failures were recorded in the fifth round.
+
 ### Task 11.3: a stable similarity check (12 November)
 
 The arc score moved between two runs of the check on the same code (decode-test-124, 90 and 174 failed on the base commit; the radio seed's arc went from 0.48 to -0.03). Two causes:
@@ -333,6 +469,41 @@ The arc score moved between two runs of the check on the same code (decode-test-
 | floor pairs | -0.02 / -0.16 | -0.03 / -0.02 |
 
 Proof: the snapshot was written from one run, then the check ran twice more, each time from an empty cache (every original and every level B song exported again): both runs pass, and the scores of the two runs are equal except on decode-test-acid (at most 0.005 apart). The snapshot also takes the drops groups 7 to 9 brought, for the reasons in their entries: the brightness of decode-test-acid (0.74 to 0.50) and luci-rosse (0.67 to 0.61), the right drums playing on the 808 until group 10 picks the kit; luci-rosse's high-band rhythm (0.41 to 0.35), measured with the old noisy exports. The 0.05 margin is unchanged.
+
+### Group 10, round 8: phantom parts and the no-beat flag (15 November)
+
+Problem: on the bench's pad-only song level B wrote a kick, a bass, the chords and a Lead (band error 20.1 dB, the largest single error of validation). misk-analyzer finds hits in the pad's swells and YIN finds the pad's low notes; its per-bar levels are relative to the file's loudest bar, so they cannot tell an absent part from a quiet one.
+
+Decision (`PARTS_RULE` in `full.js`, bench only measures, no new download):
+
+- **No steady beat:** Essentia.js's `RhythmExtractor2013` confidence (already computed for the tempo) under 1.0 marks the file as having no steady beat (`model.beat = { steady, confidence }`). Level B then clears the drum hits and writes no drums. Measured on every bench song, the app's two bench songs and seven owner files: the pad-only song reads -0.11; every other file reads 1.63 or more. Without Essentia.js the flag is unknown and nothing changes.
+- **No bass:** the decoded bass notes are no bass when the original's 20-150 Hz share is under 0.3 and the bass profile at the decoded pitch has almost no energy at the fundamental (`h1` under 0.1). Level B clears the notes (`model.noBass`) and writes no bass. Pad-only song: 0.20 and 0.00. The lowest low-band share of a file with a bass is 0.39 (two owner files, `h1` 0.29 and 0.58). Three bench songs whose bass is decoded an octave off have `h1` near 0 but a low-band share of 0.48 or more, so they keep their bass.
+- Rejected: misk-analyzer's per-bar drum and bass levels (relative to the loudest bar: the pad-only song reads 0.25 drums and 0.56 bass); the bass profile alone (it would drop three real basses decoded an octave off).
+- Not changed: the tempo (the vote with other estimators waits for a listening test), the Lead (the pad-only song keeps a Lead and its chords keep the cut under it).
+
+| Bench (level B) | Before | After |
+| --- | --- | --- |
+| pad-only song: parts written | drums, bass, chords, Lead | chords, Lead |
+| pad-only song: band error | 20.1 dB | 13.0 dB |
+| pad-only song: share difference | 0.204 | 0.079 |
+| validation, mean band error (14 songs) | 3.77 dB | 3.26 dB |
+| tuning, fresh, owner files: band error and parts | | unchanged (every other file writes the same parts and scores) |
+
+`ANALYSIS_VERSION` 11 → 12 (stored level B models are made again).
+
+### Group 10: sounds by measure, in part (11 November)
+
+Done: the drum machines measured once from their first kick and closed hat samples (`tools/decode-kits.mjs`, `src/decode/kits.js`: kick decay, hat brightness above 2 kHz), the nearest machine in level B (`kit-measure.js`; a mix's hats read about 9 % darker than the sample, `MIX_HAT`; a kick decay under 20 ms, a loud bass stopping the measure, does not count); a bass whose band brightness moves by 350 Hz or more over a bar becomes a sawtooth with a moving resonant filter. Picked: the 909 on luci-rosse, the radio seed, decode-test-124 and long, the 808 on decode-test-90 (right); R8, 707 and 505 on decode-test-174, acid and arp (wrong: those machines' hats sit within 4 % of the 909's). Not done: distortion (neither the click above 1 kHz nor the 150-1000 Hz overtones of the first 50 ms separate driven kicks from clean ones on the bench), the chord and Lead sounds, and the part levels. The radio seed has no distortion (drive 0), so 10.3's "909 with distortion" holds for luci-rosse only.
+
+| Similarity (B) | Before | After | Target |
+| --- | --- | --- | --- |
+| luci-rosse brightness ratio | 0.61 | 1.05 | 0.75 to 1.33 |
+| acid brightness ratio | 0.50 | 1.04 | 0.75 to 1.33 |
+| radio seed brightness ratio | 0.63 | 0.59 | 0.75 to 1.33 |
+| decode-test-124, 90, 174, long brightness ratio | 1.35, 1.42, 1.38, 1.31 | 1.39, 1.42, 1.42, 1.46 | 0.75 to 1.33 |
+| luci-rosse band shares (original 0.76/0.20/0.04) | 0.83/0.13/0.04 | 0.71/0.18/0.12 | within 0.10 |
+| acid band shares (original 0.77/0.21/0.01) | 0.90/0.08/0.02 | 0.57/0.42/0.01 | within 0.10 |
+| decode-test-124 / long mid-band rhythm | 0.92 / 0.90 | 0.63 / 0.56 | |
 
 ## Risks / Trade-offs
 

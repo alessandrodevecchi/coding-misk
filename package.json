@@ -82,6 +82,7 @@
     "mediabunny": "^1.61.3"
   },
   "devDependencies": {
+    "onnxruntime-web": "1.31.1",
     "vite": "8.3.2"
   }
 }
