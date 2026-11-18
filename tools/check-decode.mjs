@@ -716,7 +716,8 @@ if (process.argv.includes('--app')) {
   check(ev[0] === ev[1] && ev[1] === 16 && ev[2] === 0, 'the copied code with the group evaluates in Strudel and plays only the parts; the group alone plays nothing', ev.join(','));
 }
 
-// the learned beat tracker (decode-beat-tracker, round 10; bench only, not offered in the app): the pure parts always;
+// the learned beat tracker (decode-beat-tracker, round 10; round 12: an option of Settings, off by default): the pure
+// parts and the option always;
 // the model itself when its files are in .cache/beat-this/ (git-ignored, downloaded by hand from the pinned URLs; skipped otherwise)
 {
   const BT = await import('../src/decode/beat-this.js'), F = await import('../src/decode/full.js');
@@ -734,6 +735,33 @@ if (process.argv.includes('--app')) {
   check(!sparse || !sparse.steady, 'beat tracker: a pad with a beat now and then is not steady');
   const rel = (b, pick) => F.trackerGrid({ bpm: b, steady: true, lock: 0.9 }, pick);
   check(rel(124.02, 124).relation === 1 && rel(80, 160).bpm === 160 && rel(176, 88).bpm === 88 && rel(174, 116).tempo && rel(174, 116).bpm === 174 && rel(130, 100) === null && F.trackerGrid({ bpm: 124, steady: false, lock: 0.9 }, 124) === null, 'beat tracker: same, half, double and 3:2 relations to the picked tempo; the picked octave stays; no relation or unsteady beats: no grid');
+  // (round 12) the option: off by default, on only with the user's choice or the local build flag, used only with the
+  // files downloaded; the runtime imported by one module only, and that one only by the level B worker, dynamically
+  {
+    const ST = await import('../src/decode/beat-this-store.js');
+    const mem = new Map(), fake = { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k) };
+    const had = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    Object.defineProperty(globalThis, 'localStorage', { value: fake, configurable: true, writable: true });
+    const states = [];
+    states.push([ST.BEAT_THIS_DEFAULT_ON, ST.beatThisChosen(), ST.beatThisOn()]);
+    fake.setItem(ST.BEAT_THIS_KEY, JSON.stringify({ installed: true }));
+    states.push([ST.beatThisChosen(), ST.beatThisOn()]);
+    ST.setBeatThisChosen(true);
+    states.push([ST.beatThisChosen(), ST.beatThisOn()]);
+    fake.removeItem(ST.BEAT_THIS_KEY);
+    states.push([ST.beatThisChosen(), ST.beatThisOn()]);
+    ST.setBeatThisChosen(false);
+    states.push([ST.beatThisChosen(), ST.beatThisOn(), fake.getItem(ST.BEAT_THIS_OPT)]);
+    if (had) Object.defineProperty(globalThis, 'localStorage', had); else delete globalThis.localStorage;
+    check(JSON.stringify(states) === JSON.stringify([[false, false, false], [false, false], [true, true], [true, false], [false, false, '"off"']]), 'beat tracker option: off by default (no build flag in Node) even with the files there; on with the files, used; on without them, not used; off again', JSON.stringify(states));
+    const srcFiles = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? srcFiles(path.join(dir, e.name)) : /\.m?js$/.test(e.name) ? [path.join(dir, e.name)] : []));
+    const users = srcFiles('src').filter(f => /(from |import\()['"]onnxruntime-web/.test(fs.readFileSync(f, 'utf8'))).map(f => path.relative('src', f));
+    const statics = srcFiles('src').filter(f => /^import [^(]*['"]\.\/engine-beat-this-browser\.js['"]/m.test(fs.readFileSync(f, 'utf8')));
+    const wk = fs.readFileSync('src/decode/worker.js', 'utf8');
+    check(JSON.stringify(users) === JSON.stringify(['decode/engine-beat-this-browser.js']) && !statics.length && /await import\('\.\/engine-beat-this-browser\.js'\)/.test(wk) && /beats \?/.test(wk), 'beat tracker: onnxruntime-web named only in engine-beat-this-browser.js, imported only dynamically by the level B worker when asked', users.join(','));
+    const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+    check(pkg.dependencies['onnxruntime-web'] === '1.31.1' && !(pkg.devDependencies || {})['onnxruntime-web'], 'beat tracker: onnxruntime-web pinned to 1.31.1 exactly, an app dependency');
+  }
   const { BT_DIR, nodeBeatThis } = await import('./beat-this-node.mjs');
   if (Object.values(BT.BEAT_THIS_FILES).every(f => fs.existsSync(path.join(BT_DIR, f.name)))) {
     // a generated track at 124 BPM, analysed with and without the tracker

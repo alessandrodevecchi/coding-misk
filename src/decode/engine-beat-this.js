@@ -1,7 +1,7 @@
 // Beat This! for level B (decode-beat-tracker): ONNX Runtime (onnxruntime-web, MIT, pinned in package.json) runs the
 // log-mel front end and the beat model on the whole file, a chunk of 30 s at a time, on the WebAssembly backend with one
-// thread. Bench only for now (tools/beat-this-node.mjs); the browser build that the round 10 spike measured is in the
-// notes. The model files come in as bytes the caller has checked against their SHA-256. Pure apart from the runtime
+// thread. In Node for the bench (tools/beat-this-node.mjs), in the browser in the level B worker when the user turned
+// the option on in Settings (engine-beat-this-browser.js, decode round 12). The model files come in as bytes the caller has checked against their SHA-256. Pure apart from the runtime
 // passed in.
 import { BT, toModelRate, chunkStarts, chunkOf, joinChunks, postprocess, BEAT_THIS_ID, BEAT_THIS_VERSION } from './beat-this.js';
 

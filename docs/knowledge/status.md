@@ -23,7 +23,7 @@ OpenSpec changes not archived: 127. With open tasks: 42. All tasks ticked, waiti
 | [console-add-ahead](../../openspec/changes/console-add-ahead/tasks.md) | 1 | 18 |
 | [crescendo](../../openspec/changes/crescendo/tasks.md) | 1 | 31 |
 | [crescendo-code](../../openspec/changes/crescendo-code/tasks.md) | 1 | 9 |
-| [decode-beat-tracker](../../openspec/changes/decode-beat-tracker/tasks.md) | 1 | 16 |
+| [decode-beat-tracker](../../openspec/changes/decode-beat-tracker/tasks.md) | 1 | 21 |
 | [decode-hit-rhythm](../../openspec/changes/decode-hit-rhythm/tasks.md) | 2 | 13 |
 | [decode-refine](../../openspec/changes/decode-refine/tasks.md) | 13 | 47 |
 | [decode-tab-audio](../../openspec/changes/decode-tab-audio/tasks.md) | 16 | 18 |

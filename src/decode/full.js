@@ -244,8 +244,8 @@ export function bassRange(bars, sections, rule = HARMONY_RULE) {
   }
 }
 
-// the learned beat tracker in level B (decode round 10, decode-beat-tracker; bench only: decode-bench.cjs --beat-this,
-// the app passes no tracker): Beat This! tracks the beats of the whole file (beat-this.js beatGrid: one tempo for the whole file, the beat phase, the
+// the learned beat tracker in level B (decode round 10, decode-beat-tracker; the bench with decode-bench.cjs
+// --beat-this; the app passes it only when the user turns it on in Settings and downloads it, decode round 12): Beat This! tracks the beats of the whole file (beat-this.js beatGrid: one tempo for the whole file, the beat phase, the
 // downbeats). It counts only when its beats are steady (`steady`) and lock to one grid (`lock`), and the tempo picked
 // above (misk-analyzer, Essentia.js, the vote) keeps its octave: the tracker reads some half-time grooves at half (a real
 // track at 160 read 80). Relations to the picked tempo: the same within `same`, half or double, or 3:2 (a drum and bass
