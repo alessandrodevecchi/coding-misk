@@ -28,7 +28,7 @@ import { SOUND_RULE as SR8, DRUM_DRIVE } from '../src/decode/writer.js';
 import { PART_LEVELS } from '../src/decode/part-levels.js';
 import { BASS_RULE } from '../src/decode/misk-analyzer.js';
 import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare, clapShift, thirdlessMode } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts } from '../src/decode/writer.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts, QUIET_RULE, LINE_RULE, lineChord, kickClicks, offSnare } from '../src/decode/writer.js';
 import { chordHits } from '../src/decode/hit-measure.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive, hatTop } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
@@ -563,6 +563,33 @@ if (process.argv.includes('--app')) {
       { id: 'bass', type: 'code', patterns: { A: { code: 'note("a1!16")' } }, clips: [{ start: 0, bars: 8, pattern: 'A' }] }];
     const pairs = twinParts(tracks, secs, bars);
     check(pairs.length === 1 && tracks[0].clips[1].pattern === 'A' && !tracks[0].patterns.B && tracks[1].clips.length === 2 && tracks[1].clips[1].start === 8, 'round 11: the second of two equal drops gets the kick and the bass of the first', JSON.stringify([pairs, tracks[0].clips, tracks[1].clips]));
+  }
+  // (round 12, decode-round12 1: quiet chords whose tones stand out are written, at a lower gain; a pad on the tonic with
+  // the other third is kept as power chords)
+  {
+    const mk = (chord, level, tonal, key = { root: 9, mode: 'minor' }) => ({ ...Mk, key, sections: [{ start: 0, bars: 8, kind: 'verse' }, { start: 8, bars: 8, kind: 'verse' }], ending: 16, bars: Array.from({ length: 16 }, (_, i) => ({ ...Mk.bars[0], drums: { bd: E, cp: E, hh: E, oh: E }, chord: i < 8 ? chord : 'Am', chordConf: 0.8, chordTonal: i < 8 ? tonal : 0.3, chordHeld: 0.6, level: { drums: 0, bass: 0, chords: i < 8 ? level : 1, other: 0 } })) });
+    const ch = m => writeFull(m).tracks.find(t => t.id === 'chords') || { clips: [], patterns: {} };
+    const q = ch(mk('Am', 0.02, 0.3)), noise = ch(mk('Am', 0.02, 0.05)), gainOf = (t, start) => { const c = t.clips.find(x => x.start === start); return c ? +(/\.gain\(([\d.]+)\)(?!.*\.gain\()/.exec(t.patterns[c.pattern].code) || [])[1] : null; };
+    check(q.clips.some(c => c.start === 0) && gainOf(q, 0) < gainOf(q, 8) && !noise.clips.some(c => c.start === 0), 'round 12: a quiet pad whose tones stand out is written at a lower gain; quiet chords from the drums\' noise are not', JSON.stringify([q.clips, gainOf(q, 0), gainOf(q, 8), noise.clips]));
+    const e = ch(mk('E', 0.5, 0.35, { root: 4, mode: 'minor' })), e0 = ch(mk('E', 0.5, 0.05, { root: 4, mode: 'minor' }));
+    const eCode = Object.values(e.patterns).map(p => p.code).join(' ');
+    check(e.clips.some(c => c.start === 0) && /chord\("E5"\)/.test(eCode) && !e0.clips.some(c => c.start === 0), 'round 12: one chord on the tonic with the other third and its tones standing out is kept as a power chord; with no tonal share it stays out', JSON.stringify([e.clips, eCode.slice(0, 60), e0.clips]));
+  }
+  // (round 12, decode-round12 2: a major chord on a driven line's own note, sixteenths, is the line's harmonics)
+  {
+    const line = (chord, i) => ({ ...Mk.bars[0], chord, chordConf: 0.8, chordHeld: 0.15, chordTonal: 0.2, bass: Array(16).fill(33), bassAttack: { rise: Array(16).fill(3), level: Array(16).fill(1), late: Array(16).fill(0.5) } });
+    const mk = (h1, minor = 0) => ({ ...Mk, key: { root: 9, mode: 'major' }, bassDrive: { h1, slope: -1, evenOdd: 0 }, sections: [{ start: 0, bars: 8, kind: 'verse' }], ending: 8, bars: Array.from({ length: 8 }, (_, i) => line(i < minor ? 'Am' : 'A', i)) });
+    const has = m => !!writeFull(m).tracks.find(t => t.id === 'chords');
+    check(lineChord(line('A'), 0.8) && !lineChord(line('Am'), 0.8) && !lineChord(line('A'), 0.4) && !has(mk(0.8)) && has(mk(0.4)) && has(mk(0.8, 3)), 'round 12: A major over a driven A line on sixteenths writes no chords; a plain bass, or minor stabs on a quarter of the bars, keep them', JSON.stringify([has(mk(0.8)), has(mk(0.4)), has(mk(0.8, 3))]));
+  }
+  // (round 12, decode-round12 3 and 4: the kick's click read as a clap on every beat a 16th late; a backbeat snare read as a
+  // hat a 16th off the grid)
+  {
+    const bars = Array.from({ length: 4 }, () => ({ drums: { bd: 'x...x...x...x...', cp: '.x...x...x...x..', hh: E, oh: E } }));
+    const p = kickClicks(bars, [0, 1, 2, 3]), plain = Array.from({ length: 4 }, () => ({ drums: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: E, oh: E } }));
+    check(p === 1 && bars[0].drums.bd === '.x...x...x...x..' && bars[0].drums.cp === E && kickClicks(plain, [0, 1, 2, 3]) === 0, 'round 12: claps on every beat a 16th after the kicks become the kicks; backbeat claps stay', JSON.stringify(bars[0].drums));
+    const hb = Array.from({ length: 6 }, (_, i) => ({ drums: { bd: E, cp: E, hh: i % 2 ? '.....x.......x..' : E, oh: i % 2 ? E : '.....x.......x..' } })), eighths = Array.from({ length: 6 }, () => ({ drums: { bd: E, cp: E, hh: 'x.x.x.x.x.x.x.x.', oh: E } }));
+    check(offSnare(hb).length === 1 && hb[0].drums.cp === '.....x.......x..' && hb[0].drums.oh === E && !offSnare(eighths).length, 'round 12: closed or open hats on 5 and 13 alone, a backbeat snare a 16th off, become claps; eighth hats stay', JSON.stringify(hb[0].drums));
   }
   // (round 11, decode-hit-rhythm A: the measure on a synthetic bar: an A minor triad struck on eighths, then held)
   {

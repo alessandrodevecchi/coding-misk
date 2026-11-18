@@ -187,9 +187,10 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
         leadTruth: x.truth ? (x.truth.leadBars || []).length > 0 : null,
         tempoOK: x.truth && x.truth.bpm ? Math.abs(m.bpm - x.truth.bpm) < 1 : null,
       });
-      // (decode round 11, G: hits per bar and how held each band is, original against code; and each part's onsets
+      // (decode round 11, G: hits per bar and how held each band is, original against code (round 12: and the bars where the
+      // code is silent and the original plays, silentBars); and each part's onsets
       // against the song's own where the song is known)
-      { const fo = featO.get(x.id), fc = featC.get(h); if (fo && fc) row.density = HD.density(fo, fc, { ...grid, bars: c.bars }); }
+      { const fo = featO.get(x.id), fc = featC.get(h); if (fo && fc) { row.density = HD.density(fo, fc, { ...grid, bars: c.bars }); if (HD.silentBars) row.silent = HD.silentBars(fo, fc, grid); } }
       if (x.song) { try { row.parts = await HD.partScore(x.song, song, m.downbeat); } catch (e) { row.partsError = e.message.split('\n')[0]; } }
       row.sharesOK = shareDiff <= 0.1;
       row.brightOK = c.brightness !== null && c.brightness >= 0.75 && c.brightness <= 1.33;
@@ -199,7 +200,7 @@ const STEPS = [0.8, 0.9, 1.1, 1.2];
       row.driveOK = row.bassDriveTruth === null || row.driven === null ? null : row.driven === row.bassDriveTruth > 0;
       if (W.bassDriveOf) { const dd = W.bassDriveOf(bd); Object.assign(row, { h1: bd ? bd.h1 : null, slope: bd ? bd.slope : null, driveAmount: dd ? dd.drive : null, driveNear: dd ? dd.near : null }); }
       if (out) out.write(JSON.stringify(row) + '\n');
-      console.log(`${tag} ${v.name.padEnd(16)} ${x.set.slice(0, 5)} ${x.id.padEnd(26)} kit ${String(row.kit).padEnd(12)}${row.kitOK === false ? '✗' : ' '} drive ${row.evenOdd} ${row.driven ? 'D' : '-'}${row.driveOK === false ? '✗' : ' '} cut ${row.cut ? 'y' : '-'} · rhythm ${sc.rhythmLow}/${sc.rhythmMid}/${sc.rhythmHigh} chroma ${sc.chroma}/${sc.bassChroma} band ${c.bandError} dB bright ${c.brightness}${row.brightOK ? '' : '✗'} shares ${shareDiff}${row.sharesOK ? '' : '✗'} arc ${sc.arc}${row.density ? ` · hits err ${row.density.hitErr} (low/mid/high ${row.density.low.hitErr}/${row.density.mid.hitErr}/${row.density.high.hitErr}) held ${row.density.heldErr}` : ''}${row.parts && row.parts.chords ? ` · chords recall ${row.parts.chords.recall} per bar ${row.parts.chords.truthPerBar}→${row.parts.chords.codePerBar}` : ''}`);
+      console.log(`${tag} ${v.name.padEnd(16)} ${x.set.slice(0, 5)} ${x.id.padEnd(26)} kit ${String(row.kit).padEnd(12)}${row.kitOK === false ? '✗' : ' '} drive ${row.evenOdd} ${row.driven ? 'D' : '-'}${row.driveOK === false ? '✗' : ' '} cut ${row.cut ? 'y' : '-'} · rhythm ${sc.rhythmLow}/${sc.rhythmMid}/${sc.rhythmHigh} chroma ${sc.chroma}/${sc.bassChroma} band ${c.bandError} dB bright ${c.brightness}${row.brightOK ? '' : '✗'} shares ${shareDiff}${row.sharesOK ? '' : '✗'} arc ${sc.arc}${row.density ? ` · hits err ${row.density.hitErr} (low/mid/high ${row.density.low.hitErr}/${row.density.mid.hitErr}/${row.density.high.hitErr}) held ${row.density.heldErr}` : ''}${row.silent ? ` · silent ${row.silent.silent}/${row.silent.music} (head ${row.silent.head}, tail ${row.silent.tail})` : ''}${row.parts && row.parts.chords ? ` · chords recall ${row.parts.chords.recall} per bar ${row.parts.chords.truthPerBar}→${row.parts.chords.codePerBar}` : ''}`);
     }
   }
   if (out) out.end();

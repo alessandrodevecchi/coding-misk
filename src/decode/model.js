@@ -8,7 +8,8 @@
 
 // raise when a change to misk-analyzer or the model changes results: stored analyses of an older version are
 // analysed again on the next open (spec: Stored analysis)
-export const ANALYSIS_VERSION = 20;
+// (21, decode round 12: the writer reads stored analyses anew; raised once with the round)
+export const ANALYSIS_VERSION = 21;
 
 export const STEPS = 16;
 export const DRUM_ROWS = ['bd', 'cp', 'hh', 'oh'];
