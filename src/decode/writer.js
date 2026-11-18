@@ -121,6 +121,58 @@ export function lineChord(b, h1 = 1, rule = LINE_RULE) {
   const main = lineBar(b, rule);
   return main !== null && main === c.root;
 }
+// the quiet ending (decode round 13, decode-round13 A): the model's ending is the bar after the last one with a part heard
+// or a level over 5 % of the loudest bar (sections.js endingOf), and a pad that fades out under that, 13 dB down, was cut
+// with the song: one real track's last 12 bars had its pad from -15 to -35 dB and no code. The song goes on over the bars
+// after the ending whose chord reads with confidence (TAIL_RULE.conf), whose tones stand out of the band (TAIL_RULE.tonal,
+// QUIET_RULE's tonal share) and whose chord level is not nil (TAIL_RULE.level, the model's power ratio rounded to 0.01:
+// about -23 dB), with gaps of at most TAIL_RULE.gap bars, when at least TAIL_RULE.bars such bars follow. → the song's end
+export const TAIL_RULE = { conf: 0.5, tonal: 0.2, level: 0.01, gap: 1, bars: 2 };
+export function tailEnd(model, rule = TAIL_RULE) {
+  const bars = model.bars || [], end = Math.min(model.ending ?? bars.length, bars.length);
+  if (!(rule.bars > 0)) return end;
+  const sounds = b => !!b && !!b.chord && (b.chordConf || 0) >= rule.conf && (b.chordTonal || 0) >= rule.tonal && !!b.level && (b.level.chords || 0) >= rule.level;
+  let last = end - 1, n = 0;
+  for (let i = end; i < bars.length && i - last <= rule.gap + 1; i++) if (sounds(bars[i])) { last = i; n++; }
+  return n >= rule.bars ? last + 1 : end;
+}
+// a quiet drone (decode round 13, decode-round13 A): a section whose chords no bar rule hears (each bar's tones stand out
+// too little, QUIET_RULE.tonal) and whose drums are heard on at most DRONE_RULE.drums of its bars (a break, an outro), where
+// one root in the key's scale is read with confidence on DRONE_RULE.share of the bars or more and those bars' mean tonal
+// share is DRONE_RULE.tonal or more, is a held pad or synth on that root: written as a power chord on those bars, at the
+// quiet gain. (A real track's outro, 3:15 to its end, read E on 6 of 8 bars at a tonal share of 0.06 to 0.21 under a synth
+// from -9 to -28 dB in its separated parts, and had no code; the drums' noise reads chords all over the key and 0.01 to
+// 0.06)
+export const DRONE_RULE = { share: 0.6, tonal: 0.1, drums: 0.5, conf: 0.5 };
+export function droneOf(list, key, rule = DRONE_RULE) {
+  if (!(rule.share > 0) || !list.length || !key) return null;
+  if (list.filter(b => drumsHeard(b)).length > rule.drums * list.length) return null;
+  const n = new Array(12).fill(0);
+  for (const b of list) { const c = b.chord && (b.chordConf || 0) >= rule.conf && parseChord(b.chord); if (c) n[c.root]++; }
+  const root = n.indexOf(Math.max(...n)), on = list.filter(b => { const c = b.chord && (b.chordConf || 0) >= rule.conf && parseChord(b.chord); return c && c.root === root; });
+  if (on.length < rule.share * list.length) return null;
+  if (!SCALE_PCS[key.mode === 'major' ? 'major' : 'minor'].map(d => (key.root + d) % 12).includes(root)) return null;
+  if (on.reduce((a, b) => a + (b.chordTonal || 0), 0) / on.length < rule.tonal) return null;
+  return { root, bars: on };
+}
+// chords that enter inside a section (decode round 13, decode-round13 D): the analysis keeps one section where only a pad
+// enters (a test song whose true pad starts at bar 16 of 32 stayed one section), and the bars before it read the drums'
+// noise in the chord band as chords of the key, held from the start. The noise's tones never hold (chordHeld, the tones'
+// mean over their top: 0.03-0.06; the pad 0.07-0.29 over the same drums, pads alone 0.6-0.7) and its chord level is
+// lower. A section's first LATE_RULE.min bars or more (a multiple of 4) whose mean held is under LATE_RULE.held, while the
+// bars after hold LATE_RULE.ratio times more and their chord level is at least 1 / LATE_RULE.level times theirs, have no
+// chords. → the bar index in the list where the chords enter, 0 for none
+export const LATE_RULE = { min: 8, held: 0.07, ratio: 2, level: 0.85 };
+export function lateChords(list, rule = LATE_RULE) {
+  if (!(rule.min > 0)) return 0;
+  const mean = (a, f) => a.reduce((x, b) => x + (f(b) || 0), 0) / Math.max(1, a.length), held = b => b.chordHeld ?? 1, lv = b => b.level && b.level.chords;
+  let best = 0, top = 0;
+  for (let k = rule.min; k <= list.length - rule.min; k += 4) {
+    const a = list.slice(0, k), z = list.slice(k), ha = mean(a, held), hz = mean(z, held);
+    if (ha < rule.held && hz >= rule.ratio * ha && mean(a, lv) <= rule.level * mean(z, lv) && hz / Math.max(1e-6, ha) > top) { top = hz / Math.max(1e-6, ha); best = k; }
+  }
+  return best;
+}
 export const chordsHeardB = (b, rule = QUIET_RULE) => (chordsHeard(b) || (!!b.chord && (b.chordConf || 0) >= 0.5 && !!b.level && b.level.chords >= rule.level && rule.tonal > 0 && (b.chordTonal || 0) >= rule.tonal && lineBar(b) === null));
 
 export function partsByBar(model) {
@@ -759,6 +811,41 @@ export function kickClicks(bars, idx, rule = KICK_CLICK) {
   }
   return 0;
 }
+// a full kick (decode round 13, decode-round13 C): a section whose drum bars carry the kick's attack (full.js kickShape: the
+// 90-250 Hz band's rise at each step) on one step of every beat, the same step p for the four beats, by FULL_KICK.low dB
+// or more on the weakest beat's mean and by FULL_KICK.margin dB over every other step of the beat, is a kick on every beat
+// at p, when another section of the song already has a kick row with FULL_KICK.beats hits a bar or more on those steps
+// (the song's own four-on-the-floor: alone, the band's rise also follows an offbeat bass or a dub's skank). Where the kick
+// row then has fewer than FULL_KICK.beats hits a bar on those steps, the section's drum bars get the four kicks at p and
+// no other kick. Only in a loud section, its drums' mean level FULL_KICK.level or more of the song's loudest bar: in breaks
+// and quiet verses (0.18 to 0.42) the rise follows a bass or a piano, and two real tracks' breaks and a quiet verse of the
+// owner's reference track got kicks they do not have (band error up to +0.44 dB) (The owner's file whose true code is known: its last drop, a kick on every beat under
+// a loud sidechained bass, read 0.95 kicks a bar; its band rose 8.7 dB on the kick's step, 2.6 dB at most elsewhere.
+// A section with no kick reads its steps within 2 dB of each other)
+// Claps a 16th before the kick on most beats go (below)
+export const FULL_KICK = { low: 6, margin: 3, beats: 3, min: 4, level: 0.6 };
+// fours: the steps p (0 to 3) of the song's sections whose kick row has a kick on every beat (fourOnFloor)
+export const fourOnFloor = (bars, idx, rule = FULL_KICK) => { const on = idx.filter(i => drumsHeard(bars[i])); if (on.length < rule.min) return []; const row = b => (b.drums && b.drums.bd) || EMPTY; return [0, 1, 2, 3].filter(p => on.reduce((a, i) => a + [0, 4, 8, 12].filter(j => row(bars[i])[j + p] === 'x').length, 0) / on.length >= rule.beats); };
+export function fullKick(bars, idx, fours = [0, 1, 2, 3], rule = FULL_KICK) {
+  if (!(rule.low > 0)) return null;
+  const on = idx.filter(i => drumsHeard(bars[i]) && bars[i].kickShape);
+  if (on.length < rule.min) return null;
+  if (on.reduce((a, i) => a + ((bars[i].level && bars[i].level.drums) || 0), 0) / on.length < rule.level) return null;
+  const rise = p => Math.min(...[0, 1, 2, 3].map(q => on.reduce((a, i) => a + bars[i].kickShape.low[4 * q + p], 0) / on.length));
+  const r = [0, 1, 2, 3].map(rise), p = r.indexOf(Math.max(...r));
+  if (!fours.includes(p) || r[p] < rule.low || r.some((x, k) => k !== p && r[p] - x < rule.margin)) return null;
+  const row = b => (b.drums && b.drums.bd) || EMPTY;
+  if (on.reduce((a, i) => a + [0, 4, 8, 12].filter(j => row(bars[i])[j + p] === 'x').length, 0) / on.length >= rule.beats) return null;
+  // (a clap on FULL_KICK.beats beats or more, each a 16th before the kick: the sidechained bass rising before each kick, as
+  // KICK_CLICK reads it; a clap there never plays with a kick on every beat. On the owner's file the claps kept there played
+  // a flam with the moved kicks, 3.7 to 6.4 false claps a bar)
+  const bd = Array.from({ length: STEPS }, (_, j) => (j % 4 === p ? 'x' : '.')).join(''), q = (p + 3) % 4;
+  for (const i of on) {
+    const cp = (bars[i].drums && bars[i].drums.cp) || EMPTY, flam = [0, 4, 8, 12].filter(j => cp[j + q] === 'x').length >= rule.beats;
+    bars[i].drums = { ...bars[i].drums, bd, ...(flam ? { cp: [...cp].map((c, j) => (j % 4 === q ? '.' : c)).join('') } : {}) };
+  }
+  return p;
+}
 // a backbeat snare read as a hat a 16th off the grid (decode round 12, decode-round12 3): full.js backbeatSnare moves a hat
 // row that plays the backbeat (4 and 12, or 8) to the claps; with the grid a 16th off, the backbeat sits on 3 and 11 or 5
 // and 13, and a real track's snare became an open hat there, cymbals where the original has a snare and nothing else
@@ -792,6 +879,9 @@ function drumPlan(model) {
   // (round 12: the kick's click, kickClicks, on a copy of the bars)
   const bars = model.bars.map(b => ({ ...b }));
   for (const sec of model.sections || []) kickClicks(bars, range(sec.start, Math.min(sec.start + sec.bars, end)));
+  // (round 13: a kick on every beat by its attack, fullKick, after the click)
+  { const idxOf = sec => range(sec.start, Math.min(sec.start + sec.bars, end)), fours = [...new Set((model.sections || []).flatMap(sec => fourOnFloor(bars, idxOf(sec))))];
+    if (fours.length) for (const sec of model.sections || []) fullKick(bars, idxOf(sec), fours); }
   for (const sec of model.sections || []) offSnare(bars.slice(sec.start, Math.min(sec.start + sec.bars, end)));
   const grid = k => Object.fromEntries(DRUM_ROWS.map((r, j) => [r, k.split('|')[j]]));
   return (model.sections || []).map(sec => {
@@ -947,8 +1037,10 @@ export function twinParts(tracks, secs, bars, rule = TWIN_RULE) {
 // heard (runs shorter than EDIT_RULE.runBars merged, decode-refine D7); sounds by measure per section (D10); the song ends at the
 // model's ending
 export function writeFull(model, opts = {}) {
-  const bars = model.bars, end = Math.max(1, Math.min(model.ending ?? bars.length, bars.length));
+  // (round 13, TAIL_RULE: the song goes on over a quiet pad that fades out past the model's ending; the last section grows)
+  const bars = model.bars, end = Math.max(1, Math.min(Math.max(model.ending ?? bars.length, tailEnd(model)), bars.length));
   const secs = (model.sections && model.sections.length ? model.sections : [{ start: 0, bars: end, kind: 'verse' }]).filter(s => s.start < end).map(s => ({ ...s, bars: Math.min(s.bars, end - s.start) }));
+  if (secs.length) { const last = secs[secs.length - 1]; last.bars = end - last.start; }
   const M = { ...model, sections: secs, ending: end };
   const named = new Map(), names = secs.map(s => { const base = SECTION_NAMES[s.kind] || 'Part', n = (named.get(base) || 0) + 1; named.set(base, n); return n > 1 ? `${base} ${n}` : base; });
   const all = soundsOf(bars.slice(0, end), opts.sounds), tracks = [];
@@ -987,8 +1079,24 @@ export function writeFull(model, opts = {}) {
   const part = (id, name, visual, heardOf, valueOf, code, same, keep = () => true) => {
     const patterns = {}, ids = new Map(), clips = [];
     secs.forEach(sec => {
-      const idx = range(sec.start, sec.start + sec.bars), on = steady(idx.map(i => heardOf(bars[i])), (opts.rule || EDIT_RULE).runBars);
-      const heard = idx.filter((i, j) => on[j] && heardOf(bars[i]));
+      const idx = range(sec.start, sec.start + sec.bars), late = id === 'chords' ? lateChords(idx.map(i => bars[i])) : 0;
+      // (round 13, LATE_RULE: chords that enter inside the section are not heard before)
+      const on = steady(idx.map((i, j) => j >= late && heardOf(bars[i])), (opts.rule || EDIT_RULE).runBars);
+      const heard = idx.filter((i, j) => on[j] && j >= late && heardOf(bars[i]));
+      // (round 13, DRONE_RULE: a quiet section with no chord heard but one root held is a power chord on that root, quiet)
+      if (id === 'chords' && !heard.length) {
+        const d = droneOf(idx.map(i => bars[i]), model.key);
+        if (!d) return;
+        const run = steady(idx.map(i => d.bars.includes(bars[i])), (opts.rule || EDIT_RULE).runBars);
+        if (!run.some(Boolean)) return;
+        const bp = bassDriveOf(model.bassDrive) || { drive: 0, wave: null }, snd = soundsOf(idx.map(i => bars[i]), opts.sounds, bars.slice(0, end), bp.drive, bp.wave);
+        const lv = list => list.reduce((a, i) => a + ((bars[i].level && bars[i].level.chords) || 0), 0) / Math.max(1, list.length);
+        const loud = range(0, end).filter(i => chordsHeard(bars[i])), k = Math.max(QUIET_RULE.floor, Math.min(1, Math.sqrt(lv(idx.filter((i, j) => run[j])) / Math.max(1e-6, loud.length ? lv(loud) : 0.15))));
+        const c = code([`${NOTE_NAMES[d.root]}5`], snd.chords).replace('.voicing()', `.mode("above").anchor("${POWER_RULE.anchor}").voicing()`).replace(/\.gain\(([\d.]+)\)(?!.*\.gain\()/, (_, x) => `.gain(${Math.round(+x * k * 1000) / 1000})`);
+        if (!ids.has(c)) { const p = pid(ids.size); ids.set(c, p); patterns[p] = { code: c }; }
+        clips.push(...runs(run.map(x => (x ? ids.get(c) : null)), sec.start));
+        return;
+      }
       // (round 12, LINE_RULE: a section whose chords are a line's harmonics writes none)
       if (id === 'chords' && LINE_RULE.attack > 0 && heard.length) { const h1 = (model.bassDrive && model.bassDrive.h1) || 0; const minor = heard.filter(i => { const c = parseChord(bars[i].chord), l = lineBar(bars[i]); return c && c.quality === 'min' && l !== null && l === c.root; }).length;
         const lined = heard.filter(i => lineChord(bars[i], h1)), roots = new Set(lined.map(i => lineBar(bars[i])));
@@ -1009,7 +1117,7 @@ export function writeFull(model, opts = {}) {
       if (kept === 'power' && idx.filter(i => drumsHeard(bars[i]) || heardBass(bars[i])).length < POWER_RULE.riff * idx.length) return;
       // (round 8: a section kept as power chords writes each chord's root with a fifth and no third)
       const power = kept === 'power' || kept === 'tonal', val = power ? b => { const c = parseChord(valueOf(b)); return c ? `${NOTE_NAMES[c.root]}5` : null; } : valueOf;
-      const byBar = {}; idx.forEach((i, j) => { byBar[i] = on[j] && heardOf(bars[i]) ? val(bars[i]) : null; });
+      const byBar = {}; idx.forEach((i, j) => { byBar[i] = on[j] && j >= late && heardOf(bars[i]) ? val(bars[i]) : null; });
       const loop = sectionLoop(byBar, idx, same ? { same } : {});
       if (!loop) return;
       const bp = bassDriveOf(model.bassDrive) || { drive: 0, wave: null }, snd = soundsOf(idx.map(i => bars[i]), opts.sounds, bars.slice(0, end), bp.drive, bp.wave), c0 = code(loop, id === 'bass' ? snd.bass : snd.chords);

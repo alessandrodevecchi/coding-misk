@@ -10,7 +10,7 @@ import { variationsOf } from './writer.js';
 import { mixHatShape, mixHatBright, rankKits, bandEnergy, sustainOf, bassDrive, LEVEL_BANDS } from './kit-measure.js';
 import { KIT_MEASURES } from './kits.js';
 import { beatGrid, phaseOn } from './beat-this.js';
-import { chordHits, bassAttack, bassPcs } from './hit-measure.js';
+import { chordHits, bassAttack, bassPcs, kickShape } from './hit-measure.js';
 
 export const MISK = 'misk-analyzer';
 // Essentia.js's tempo is taken when its confidence (RhythmExtractor2013 multifeature, 0 to about 5.3) is at least this
@@ -456,6 +456,8 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   // (and per bar with bass notes, the bass's attacks in the 300-1500 Hz band: hit-measure.js bassAttack, read by the
   // writer's bassFilled)
   m.bars.forEach((b, i) => { if ((b.bass || []).filter(x => x !== null && x !== undefined).length >= 2) b.bassAttack = bassAttack(pcm, sr, Math.round((m.downbeat + i * m.barSeconds) * sr), m.barSeconds * sr); });
+  // (decode round 13: per bar with drums, the kick's attack per step, hit-measure.js kickShape, read by the writer's fullKick)
+  m.bars.forEach((b, i) => { if (b.drums && Object.values(b.drums).some(r => /x/.test(r || ''))) b.kickShape = kickShape(pcm, sr, Math.round((m.downbeat + i * m.barSeconds) * sr), m.barSeconds * sr); });
   // (round 8: decoded bass notes that are no bass, a pad's low notes, are not a bass part)
   if (noBassPart(m.shares, m.bassDrive)) { for (const b of m.bars) if (b.bass) b.bass = b.bass.map(() => null); m.noBass = true; }
   // (Essentia.js's own tempo and confidence, to read why the engine was or was not taken)

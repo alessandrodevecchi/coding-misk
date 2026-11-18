@@ -61,3 +61,17 @@ export function bassAttack(pcm, sr, a, barLen, rule = BASS_HITS) {
 }
 // the pitch classes a bass note rings at in the chords' band: its own, its fifth and its major third (harmonics 1 to 5)
 export const bassPcs = notes => [...new Set(notes.filter(x => x !== null && x !== undefined).flatMap(x => [0, 7, 4].map(d => (((x + d) % 12) + 12) % 12)))];
+
+// the kick's attack per step (decode round 13, decode-round13 C): per 16th step of a bar, the rise in dB of the low band
+// (90-250 Hz, the kick's body over a sub bass) and of the high band (4-12 kHz, its click) at the step's start over their
+// least just before, frames of `window` samples four to a step. Read per section by the writer (writer.js fullKick): a kick
+// on every beat shows the same low and high rise on one step of each beat, even where the kick test hears none under a
+// loud sidechained bass (the owner's file whose true code is known: 0.95 kicks a bar in its last drop, four in the code)
+export const KICK_SHAPE = { size: 2048, window: 512, low: [90, 250], high: [4000, 12000], frames: 4 };
+export function kickShape(pcm, sr, a, barLen, rule = KICK_SHAPE) {
+  const hz = sr / rule.size, hop = barLen / 16 / rule.frames, lo = [], hi = [];
+  const band = (p, [f0, f1]) => { let e = 0; for (let k = Math.ceil(f0 / hz); k <= Math.floor(f1 / hz); k++) e += p[k]; return e; };
+  for (let f = -2; f < 16 * rule.frames; f++) { const p = spectrum(pcm, Math.round(a + f * hop) - rule.window / 2, rule.window, rule.size); lo.push(band(p, rule.low)); hi.push(band(p, rule.high)); }
+  const rise = e => Array.from({ length: 16 }, (_, s) => { const f0 = s * rule.frames + 2, peak = Math.max(e[f0], e[f0 + 1]), before = Math.min(e[f0 - 1], e[f0 - 2]); return Math.round(10 * Math.max(-30, Math.min(30, 10 * Math.log10(Math.max(1e-12, peak) / Math.max(1e-12, before))))) / 10; });
+  return { low: rise(lo), high: rise(hi) };
+}

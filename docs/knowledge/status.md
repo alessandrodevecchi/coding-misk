@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 127. With open tasks: 42. All tasks ticked, waiting to be archived: 85.
+OpenSpec changes not archived: 129. With open tasks: 44. All tasks ticked, waiting to be archived: 85.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -26,6 +26,8 @@ OpenSpec changes not archived: 127. With open tasks: 42. All tasks ticked, waiti
 | [decode-beat-tracker](../../openspec/changes/decode-beat-tracker/tasks.md) | 1 | 21 |
 | [decode-hit-rhythm](../../openspec/changes/decode-hit-rhythm/tasks.md) | 2 | 13 |
 | [decode-refine](../../openspec/changes/decode-refine/tasks.md) | 13 | 47 |
+| [decode-round12](../../openspec/changes/decode-round12/tasks.md) | 3 | 13 |
+| [decode-round13](../../openspec/changes/decode-round13/tasks.md) | 2 | 10 |
 | [decode-tab-audio](../../openspec/changes/decode-tab-audio/tasks.md) | 16 | 18 |
 | [fm-groove-lab](../../openspec/changes/fm-groove-lab/tasks.md) | 1 | 16 |
 | [generator-followups](../../openspec/changes/generator-followups/tasks.md) | 2 | 3 |

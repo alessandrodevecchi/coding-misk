@@ -177,6 +177,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Decode: Full keeps writing a pad that fades out after the drums stop, and a quiet outro that holds one note, instead of ending in silence.
+- Decode: Full writes four kicks a bar in a loud section with a kick on every beat that its kick test hears only now and then.
+- Decode: Full writes no chords before a pad enters inside a section, where only the drums' noise read as chords.
 - Decode: Full writes the quiet pads of intros, breaks and outros, at a lower level, instead of silence.
 - Decode: Full writes no chords where they are only the harmonics of a distorted bass on 16ths.
 - Decode: Full writes the kick on its click when the beat grid sits a 16th early, and a backbeat snare a 16th off the grid as a clap, not an open hat.

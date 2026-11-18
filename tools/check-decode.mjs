@@ -28,8 +28,8 @@ import { SOUND_RULE as SR8, DRUM_DRIVE } from '../src/decode/writer.js';
 import { PART_LEVELS } from '../src/decode/part-levels.js';
 import { BASS_RULE } from '../src/decode/misk-analyzer.js';
 import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare, clapShift, thirdlessMode } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts, QUIET_RULE, LINE_RULE, lineChord, kickClicks, offSnare } from '../src/decode/writer.js';
-import { chordHits } from '../src/decode/hit-measure.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts, QUIET_RULE, LINE_RULE, lineChord, kickClicks, offSnare, tailEnd, droneOf, lateChords, fullKick, fourOnFloor } from '../src/decode/writer.js';
+import { chordHits, kickShape } from '../src/decode/hit-measure.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive, hatTop } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
@@ -257,7 +257,7 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
   // the same model shape as level A for the same bars (analysis spec: One song model)
   const A = createAnalyzer(pcm).model(30), B = runs['Essentia.js'];
-  { const extra = ['lead', 'leadVoiced', 'third', 'sustain', 'chordHits', 'chordHeld', 'chordTonal', 'bassAttack']; check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !extra.includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !extra.includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line, the chords\' sustain and, round 11, how the chords and the bass are played)'); }
+  { const extra = ['lead', 'leadVoiced', 'third', 'sustain', 'chordHits', 'chordHeld', 'chordTonal', 'bassAttack', 'kickShape']; check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !extra.includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !extra.includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line, the chords\' sustain and, round 11, how the chords and the bass are played, round 13 the kick attack per step)'); }
   // level A never calls Essentia.js: the worker loads it only for "analyse all"
   const wsrc = fs.readFileSync('src/decode/worker.js', 'utf8'), msrc = fs.readFileSync('src/decode/misk-analyzer.js', 'utf8');
   check(!/essentia/i.test(msrc.replace(/\/\/.*$/gm, '')) && /async function all[\s\S]*import\('\.\/engine-essentia\.js'\)/.test(wsrc) && !/^import .*(engine-essentia|full)/m.test(wsrc), 'level A uses misk-analyzer only: Essentia.js is imported only by level B, inside the worker');
@@ -590,6 +590,36 @@ if (process.argv.includes('--app')) {
     check(p === 1 && bars[0].drums.bd === '.x...x...x...x..' && bars[0].drums.cp === E && kickClicks(plain, [0, 1, 2, 3]) === 0, 'round 12: claps on every beat a 16th after the kicks become the kicks; backbeat claps stay', JSON.stringify(bars[0].drums));
     const hb = Array.from({ length: 6 }, (_, i) => ({ drums: { bd: E, cp: E, hh: i % 2 ? '.....x.......x..' : E, oh: i % 2 ? E : '.....x.......x..' } })), eighths = Array.from({ length: 6 }, () => ({ drums: { bd: E, cp: E, hh: 'x.x.x.x.x.x.x.x.', oh: E } }));
     check(offSnare(hb).length === 1 && hb[0].drums.cp === '.....x.......x..' && hb[0].drums.oh === E && !offSnare(eighths).length, 'round 12: closed or open hats on 5 and 13 alone, a backbeat snare a 16th off, become claps; eighth hats stay', JSON.stringify(hb[0].drums));
+  }
+  // (round 13, decode-round13 A: a pad fading out past the ending; a quiet outro holding one root)
+  {
+    const bar = (chord, tonal, lv, drums = E) => ({ ...Mk.bars[0], drums: { bd: drums, cp: E, hh: E, oh: E }, chord, chordConf: 0.8, chordTonal: tonal, chordHeld: 0.4, level: { drums: drums === E ? 0 : 0.9, bass: 0, chords: lv, other: 0 } });
+    const fade = { ...Mk, sections: [{ start: 0, bars: 8, kind: 'verse' }], ending: 8, bars: [...Array.from({ length: 8 }, () => bar('Am', 0.4, 1, 'x...x...x...x...')), ...[0.04, 0.03, 0.02, 0.01, 0.01, 0, 0, 0].map(l => bar('Am', 0.4, l))] };
+    const noise = { ...fade, bars: fade.bars.map((b, i) => (i < 8 ? b : { ...b, chordTonal: 0.05 })) };
+    const song = writeFull(fade), bars = song.sections.reduce((a, x) => a + x.bars, 0);
+    check(tailEnd(fade) === 13 && bars === 13 && tailEnd(noise) === 8, 'round 13: a pad fading out past the ending keeps the song going to its last bar with a chord level; drums\' noise after the ending does not', JSON.stringify([tailEnd(fade), bars, tailEnd(noise)]));
+    const outro = tonal => ({ ...Mk, key: { root: 4, mode: 'minor' }, sections: [{ start: 0, bars: 8, kind: 'verse' }, { start: 8, bars: 8, kind: 'outro' }], ending: 16, bars: [...Array.from({ length: 8 }, () => bar('Em', 0.4, 1, 'x...x...x...x...')), ...['F', 'E', 'E', 'E', 'E', 'E', 'E', 'E'].map(c => bar(c, tonal, 0.03))] });
+    const ch = m => writeFull(m).tracks.find(t => t.id === 'chords') || { clips: [], patterns: {} }, o = ch(outro(0.13)), o0 = ch(outro(0.05));
+    const oc = o.clips.find(c => c.start >= 8);
+    check(!!droneOf(outro(0.13).bars.slice(8), { root: 4, mode: 'minor' }) && !!oc && /chord\("E5"\)/.test(o.patterns[oc.pattern].code) && !o0.clips.some(c => c.start >= 8), 'round 13: a quiet outro holding E writes a power chord; the same with no tonal share stays silent', JSON.stringify([o.clips, o0.clips]));
+  }
+  // (round 13, decode-round13 D: chords entering inside a section)
+  {
+    const b = (held, lv) => ({ chord: 'Gm', chordConf: 0.8, chordHeld: held, level: { chords: lv } });
+    const late = [...Array.from({ length: 16 }, () => b(0.04, 0.68)), ...Array.from({ length: 16 }, () => b(0.14, 0.92))], pad = Array.from({ length: 32 }, () => b(0.6, 0.8));
+    check(lateChords(late) === 16 && lateChords(pad) === 0, 'round 13: chords whose tones never hold before a held pad enters start with the pad; a held pad from the start stays', JSON.stringify([lateChords(late), lateChords(pad)]));
+  }
+  // (round 13, decode-round13 C: a kick on every beat by its attack)
+  {
+    const shape = p => ({ low: Array.from({ length: 16 }, (_, j) => (j % 4 === p ? 9 : 2)), high: Array(16).fill(0) });
+    const sec = (bd, p, lv = 0.8) => Array.from({ length: 4 }, () => ({ drums: { bd, cp: E, hh: '...x...x...x...x', oh: E }, kickShape: shape(p), level: { drums: lv } }));
+    const bars = [...sec('.x...x...x...x..', 1), ...sec('.x...........x..', 1)], fours = fourOnFloor(bars, [0, 1, 2, 3]);
+    const p = fullKick(bars, [4, 5, 6, 7], fours), quiet = sec('................', 1, 0.3), off = sec('..x...........x.', 2);
+    check(fours.join() === '1' && p === 1 && bars[4].drums.bd === '.x...x...x...x..' && fullKick(quiet, [0, 1, 2, 3], [1]) === null && fullKick(off, [0, 1, 2, 3], [1]) === null, 'round 13: a loud section whose band rises on one step of every beat gets four kicks there, when the song has a four-on-the-floor kick on that step; a quiet section or another step does not', JSON.stringify([fours, p, bars[4].drums.bd]));
+    const sr = 44100, bl = Math.round(sr * 240 / 128), x = new Float32Array(bl + sr);
+    for (let k = 0; k < 4; k++) { const a = sr / 2 + Math.round((k * 4 + 1) * bl / 16); for (let i = 0; i < 0.15 * sr; i++) x[a + i] += 0.8 * Math.exp(-i / sr / 0.05) * Math.sin(2 * Math.PI * (60 + 90 * Math.exp(-i / sr / 0.02)) * i / sr); }
+    const ks = kickShape(x, sr, sr / 2, bl), low = [0, 1, 2, 3].map(p => Math.min(...[0, 1, 2, 3].map(q => ks.low[4 * q + p])));
+    check(low[1] > 10 && low.every((v, p) => p === 1 || v < low[1] - 6), 'round 13: kickShape reads a kick on step 1 of every beat', JSON.stringify(ks.low));
   }
   // (round 11, decode-hit-rhythm A: the measure on a synthetic bar: an A minor triad struck on eighths, then held)
   {
