@@ -28,7 +28,7 @@ import { SOUND_RULE as SR8, DRUM_DRIVE } from '../src/decode/writer.js';
 import { PART_LEVELS } from '../src/decode/part-levels.js';
 import { BASS_RULE } from '../src/decode/misk-analyzer.js';
 import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare, clapShift, thirdlessMode } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts, QUIET_RULE, LINE_RULE, lineChord, kickClicks, offSnare, tailEnd, droneOf, lateChords, fullKick, fourOnFloor } from '../src/decode/writer.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts, QUIET_RULE, LINE_RULE, lineChord, kickClicks, offSnare, tailEnd, droneOf, lateChords, fullKick, fourOnFloor, gridRotation, rotateGrid, leadIns } from '../src/decode/writer.js';
 import { chordHits, kickShape } from '../src/decode/hit-measure.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive, hatTop } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
@@ -597,11 +597,25 @@ if (process.argv.includes('--app')) {
     const fade = { ...Mk, sections: [{ start: 0, bars: 8, kind: 'verse' }], ending: 8, bars: [...Array.from({ length: 8 }, () => bar('Am', 0.4, 1, 'x...x...x...x...')), ...[0.04, 0.03, 0.02, 0.01, 0.01, 0, 0, 0].map(l => bar('Am', 0.4, l))] };
     const noise = { ...fade, bars: fade.bars.map((b, i) => (i < 8 ? b : { ...b, chordTonal: 0.05 })) };
     const song = writeFull(fade), bars = song.sections.reduce((a, x) => a + x.bars, 0);
-    check(tailEnd(fade) === 13 && bars === 13 && tailEnd(noise) === 8, 'round 13: a pad fading out past the ending keeps the song going to its last bar with a chord level; drums\' noise after the ending does not', JSON.stringify([tailEnd(fade), bars, tailEnd(noise)]));
+    // (round 14, decode-round14 C: the fade goes on where the chord level rounds to 0 while the tones stand out)
+    const dim = { ...fade, bars: fade.bars.map((b, i) => (i < 13 ? b : { ...b, chordTonal: 0.1 })) };
+    check(tailEnd(fade) === 16 && bars === 16 && tailEnd(dim) === 13 && tailEnd(noise) === 8, 'round 13 and 14: a pad fading out past the ending keeps the song going to its last bar whose tones stand out, at a chord level of 0 too; drums\' noise after the ending does not', JSON.stringify([tailEnd(fade), bars, tailEnd(dim), tailEnd(noise)]));
     const outro = tonal => ({ ...Mk, key: { root: 4, mode: 'minor' }, sections: [{ start: 0, bars: 8, kind: 'verse' }, { start: 8, bars: 8, kind: 'outro' }], ending: 16, bars: [...Array.from({ length: 8 }, () => bar('Em', 0.4, 1, 'x...x...x...x...')), ...['F', 'E', 'E', 'E', 'E', 'E', 'E', 'E'].map(c => bar(c, tonal, 0.03))] });
     const ch = m => writeFull(m).tracks.find(t => t.id === 'chords') || { clips: [], patterns: {} }, o = ch(outro(0.13)), o0 = ch(outro(0.05));
     const oc = o.clips.find(c => c.start >= 8);
     check(!!droneOf(outro(0.13).bars.slice(8), { root: 4, mode: 'minor' }) && !!oc && /chord\("E5"\)/.test(o.patterns[oc.pattern].code) && !o0.clips.some(c => c.start >= 8), 'round 13: a quiet outro holding E writes a power chord; the same with no tonal share stays silent', JSON.stringify([o.clips, o0.clips]));
+  }
+  // (round 14, decode-round14 B: the grid moved onto the kick; C: a pad that fades in)
+  {
+    const shape = p => ({ low: Array.from({ length: 16 }, (_, j) => (j % 4 === p ? 9 : 2)), high: Array(16).fill(0) });
+    const bar = (p, cp = E) => ({ ...Mk.bars[0], drums: { bd: Array.from({ length: 16 }, (_, j) => (j % 4 === p ? 'x' : '.')).join(''), cp, hh: E, oh: E }, kickShape: shape(p), bass: Array.from({ length: 16 }, (_, j) => j), level: { drums: 0.9, bass: 0.5, chords: 0, other: 0 } });
+    const song = (p, cp) => ({ ...Mk, downbeat: 0.5, sections: [{ start: 0, bars: 8, kind: 'verse' }, { start: 8, bars: 8, kind: 'drop' }], ending: 16, bars: Array.from({ length: 16 }, () => bar(p, cp)) });
+    const m1 = song(1), s1 = gridRotation(m1), r1 = rotateGrid(m1, s1);
+    check(s1 === 1 && Math.abs(r1.downbeat - (0.5 + m1.barSeconds / 16)) < 0.002 && r1.bars[3].drums.bd === 'x...x...x...x...' && r1.bars[3].bass[0] === 1 && r1.bars[3].bass[15] === 0 && gridRotation(song(0)) === 0 && gridRotation(song(1, '....x.......x...')) === 0 && gridRotation(song(2)) === 0, 'round 14: a kick a 16th after the grid in every clear section moves the grid by that 16th (kick on step 0, the bass rotated across the bar line); a kick on the grid, a backbeat clap on the present grid or a kick on the offbeat 8th leave it', JSON.stringify([s1, r1.downbeat, r1.bars[3].drums.bd, r1.bars[3].bass]));
+    const pb = (chord, tonal, lv, drums = E) => ({ ...Mk.bars[0], drums: { bd: drums, cp: E, hh: E, oh: E }, chord, chordConf: 0.7, chordTonal: tonal, chordHeld: 0.4, level: { drums: drums === E ? 0 : 0.9, bass: 0, chords: lv, other: 0 } });
+    const list = [pb('C', 0.05, 0.01), pb('E', 0.06, 0.01), pb('E', 0.1, 0.02), pb('E', 0.4, 0.05), pb('E', 0.4, 0.05)], kick = [pb('E', 0.06, 0.01, 'x...x...x...x...'), pb('E', 0.4, 0.05)];
+    const li = leadIns(list, 5), lk = leadIns(kick, 2);
+    check(li.size === 2 && li.has(list[1]) && li.has(list[2]) && !li.has(list[0]) && lk.size === 0, 'round 14: quiet bars on the same root without drums before a heard pad play it; another root or drums stop the fade-in', JSON.stringify([li.size, lk.size]));
   }
   // (round 13, decode-round13 D: chords entering inside a section)
   {

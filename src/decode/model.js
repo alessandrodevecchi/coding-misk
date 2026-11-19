@@ -10,7 +10,9 @@
 // analysed again on the next open (spec: Stored analysis)
 // (21, decode round 12: the writer reads stored analyses anew; raised once with the round)
 // (22, decode round 13: level B measures the kick's attack per step, kickShape; raised once with the round)
-export const ANALYSIS_VERSION = 22;
+// (23, decode round 14: level B moves the grid onto the kick when it sits a 16th off, writer.js gridRotation; raised once
+// with the round)
+export const ANALYSIS_VERSION = 23;
 
 export const STEPS = 16;
 export const DRUM_ROWS = ['bd', 'cp', 'hh', 'oh'];

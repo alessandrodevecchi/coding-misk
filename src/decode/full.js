@@ -6,7 +6,7 @@
 import { createAnalyzer, ANALYSIS_RATE } from './misk-analyzer.js';
 import { chordName, parseChord } from './model.js';
 import { sectionsOf } from './sections.js';
-import { variationsOf } from './writer.js';
+import { variationsOf, gridRotation, rotateGrid } from './writer.js';
 import { mixHatShape, mixHatBright, rankKits, bandEnergy, sustainOf, bassDrive, LEVEL_BANDS } from './kit-measure.js';
 import { KIT_MEASURES } from './kits.js';
 import { beatGrid, phaseOn } from './beat-this.js';
@@ -458,6 +458,9 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   m.bars.forEach((b, i) => { if ((b.bass || []).filter(x => x !== null && x !== undefined).length >= 2) b.bassAttack = bassAttack(pcm, sr, Math.round((m.downbeat + i * m.barSeconds) * sr), m.barSeconds * sr); });
   // (decode round 13: per bar with drums, the kick's attack per step, hit-measure.js kickShape, read by the writer's fullKick)
   m.bars.forEach((b, i) => { if (b.drums && Object.values(b.drums).some(r => /x/.test(r || ''))) b.kickShape = kickShape(pcm, sr, Math.round((m.downbeat + i * m.barSeconds) * sr), m.barSeconds * sr); });
+  // (decode round 14, decode-round14 B: the grid a 16th off the kick moves by that 16th for the whole song, writer.js
+  // gridRotation and rotateGrid; the variations read again on the moved bars)
+  { const s = gridRotation(m); if (s) { const r = rotateGrid(m, s); Object.assign(m, { bars: r.bars, downbeat: r.downbeat, gridRotated: s }); m.variations = variationsOf(m); } }
   // (round 8: decoded bass notes that are no bass, a pad's low notes, are not a bass part)
   if (noBassPart(m.shares, m.bassDrive)) { for (const b of m.bars) if (b.bass) b.bass = b.bass.map(() => null); m.noBass = true; }
   // (Essentia.js's own tempo and confidence, to read why the engine was or was not taken)
