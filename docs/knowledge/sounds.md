@@ -126,6 +126,10 @@ What Strudel does not have at all, and how the app gets close:
 - **Orchestral sections.** Only single GM instruments (`gm_string_ensemble_1`, `gm_brass_section`) and the VCSL bank.
 - **Many soundfonts are never used.** Names not in bold above are free to try: sitar, koto, kalimba, steel drums, saxophones, harpsichord.
 
+## Sound dice
+
+The dice of a track in Compose (`random-sound-params`, `src/material/dice.js`) draws a new sound for drums, bass, arp, hook, pad and guitar tracks within the song's style, from the seed `<song id>:<track id>:sound:<n>`: a wave or a composed sound kind with its FM device, the filter and effect values of the style's ranges, a guitar type, or a kit and drum tones, plus a variation. Lock groups (Sound, Filter, Effects, Variation; drums Kit, Kick, Snare and clap, Hats, Variation) each draw from their own stream, so a lock never changes another group. The level, octave, mode, patterns, clips and the user's rack devices are never rolled. Locks and the FM device the dice owns are kept in the browser per song and track. Undo in the toast gives back the settings and rack before the roll.
+
 ## FM lab
 
 The FM category of the Sounds tab (`fm-groove-lab`, `#80`) has one card per FM kind of the material generator (every kind of `SOUND_KINDS` but `square`): Campana (bell), Reese, Ringhio (growl), Sporco (dirty), Piano elettrico (tine), Metallo (clang), Sub, Organo (organ). `FM_CARDS` in `src/sounds/fm-lab.js` holds each card's fixed patch (inside its kind's rule in `sound()`, near the middle of the ranges), carrier wave, part (a preset of a pattern kind) and tempo. A new FM kind without a card fails `npm run check:fm-lab`.

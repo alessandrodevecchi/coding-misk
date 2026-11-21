@@ -7,6 +7,14 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Compose: sound dice in the track panel of drums, bass, arp, lead, pad and guitar tracks, with a roll number, lock chips per group and Undo.
+- Songs: `tone` drum setting with decay, tune, drive and cutoff per kit piece group, inside a safe range table.
+- Songs: `vary` setting with up to three seeded per-hit variations around the track's own values.
+- Radio: new sessions, compilations and New song panel songs compose drum tones and per-hit variation (session option `sound`).
+- Styles: `tones` (drums) and `variation` fields in an instrument's `material`.
+- `tools/endless.mjs --sound` to turn on composed drum tones and variation.
+- `npm run check:sound-params`, `tools/check-sound-dice.cjs` and `tools/check-sound-levels.cjs`.
+- Guide: "Sound dice" card.
 - Code: Instrument name option (Random per song, `$:`, name at line start) and Names from option (instrument or track), in Compose's code options, the radio's Custom section and the Decode tab's Options.
 - `tools/check-light-start.cjs`: browser check of a light start (no Sounds photo at startup, layout shift under 0.1 at desktop and phone width).
 - `tools/decode-hits.mjs`: hit density per band and per part for the Decode bench, with six songs built for repeated chords and basses (`tools/decode-export.cjs --hits`, `tools/decode-bench.cjs --set hits`).
@@ -102,6 +110,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Built-in styles give drum tone ranges and variation amounts and targets in their character.
+- Playlists: a session saved with an older composed sound version warns that it may sound different.
 - Startup: the photos of the Sounds tab load only when the tab opens, and only for the rows on screen.
 - Startup: the header, the stage and the work area keep their place after the first paint (no layout jump).
 - Decode: in Full, chords that hit with clear, repeating gaps are written with their rhythm (`.struct("…")` after the voicing).

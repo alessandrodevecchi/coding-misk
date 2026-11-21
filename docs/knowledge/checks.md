@@ -166,8 +166,11 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 | `tools/check-soul-display.cjs` |  | dev server, Chrome | Browser checks for the Soul display (#46, phase 2): hidden screw and "soul" show the tab, OPEN and the question, the display's controls, shell selector, override with the SCART cable (the stage shows the soul), cable… |
 | `tools/check-soul.cjs` |  | dev server, Chrome | Browser checks for the song soul scene (#46): the visual dropdown, the soul of the song on air, every view draws and moves, HW amber, analyzing on a new song, recalibrating on steering, lock, full screen. |
 | `tools/check-soul.mjs` | `npm run check:soul` | Node | Checks for the song soul data (#46): same song, same soul; radio souls follow the director; every built-in song gives a soul the views can draw; steering changes the soul. No browser. |
+| `tools/check-sound-dice.cjs` |  | dev server, Chrome | Browser checks for the sound dice of Compose (random-sound-params, #94; app/sound-dice): a new sound for a bass with the toast and the number, other tracks unchanged, the level kept, the same number giving the same… |
 | `tools/check-sound-guard.mjs` | `npm run check:sound-guard` | Node | Checks for the sound guard (#54): the register of broken sounds and its stand-ins, the error kinds it learns, zone learning from a font file, the sound wrapper and the decode guard; the voice helper's local say_* banks… |
+| `tools/check-sound-levels.cjs` |  | dev server, Chrome | Levels of composed drum tones (random-sound-params tasks 2.2 and 2.4, #94; endless/drum-tones "Tone levels"), rendered by the fast export's render page (renderOffline), no real time: 1. On three kits,… |
 | `tools/check-sound-names.cjs` |  | dev server, Chrome | Checks every sound the app's songs can call by name (#54): the built-in songs, and songs generated for every style recipe and every artist, are compiled to Strudel code; every sound, drum machine hit (bank + hit) and… |
+| `tools/check-sound-params.mjs` | `npm run check:sound-params` | Node | Checks for composed drum tones and per-hit variation (random-sound-params, #94; endless/drum-tones, endless/sound-variation, app/sound-dice): the writer's code for each tone value and each variation target, ranges… |
 | `tools/check-sounds.cjs` |  | dev server, Chrome | Checks every sound the app can call (#54): every zone of every General MIDI soundfont font, and every sample of every sample bank in the app's sound map, fetched and decoded in the browser. A broken part is "covered"… |
 | `tools/check-speakers.mjs` | `npm run check:speakers` | Node | The speakers' voices (real-voices D8): every speaker (SPEAKERS in src/song/build.js) is listed by `say -v '?'` for each language it speaks and sounds different from the default voice (a probe line with the same audio… |
 | `tools/check-spoken-play.cjs` |  | dev server, Chrome | Voice instrument in the browser (voice-instrument, #39): the example song plays every section without an evaluation error, its spoken lines are heard on the fx analyser, the master output stays below clipping… |
@@ -205,7 +208,7 @@ Generated from the `tools/` folder: the header comment of each tool and whether 
 ## Fixtures and versions
 
 <!-- generated:fixtures -->
-Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/decode-radio-song.json`, `tests/snapshots/decode-similarity.json`, `tests/snapshots/endless-v14.json`, `tests/snapshots/endless.json`, `tests/snapshots/invented-styles.json`, `tests/snapshots/kit-rows.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`.
+Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixtures/live-code.json`, `tools/fixtures/live-coder.json`, `tests/snapshots/code`, `tests/snapshots/code-before-ideas`, `tests/snapshots/decode-radio-song.json`, `tests/snapshots/decode-similarity.json`, `tests/snapshots/endless-v14.json`, `tests/snapshots/endless.json`, `tests/snapshots/invented-styles.json`, `tests/snapshots/kit-rows.json`, `tests/snapshots/levels.json`, `tests/snapshots/radio-growth.json`, `tests/snapshots/sound-fixtures.json`.
 <!-- /generated -->
 
 | Fixture | Guards | Rewrite only when | Then |
@@ -214,6 +217,7 @@ Fixtures and snapshots in the repo: `tools/fixtures/crescendo.json`, `tools/fixt
 | `tests/snapshots/code-before-ideas/` | the reference of `check-ideas.cjs` | never | |
 | `tests/snapshots/levels.json` | peaks per section and instrument | levels are meant to change | `node tools/snapshot-levels.cjs write <id>` |
 | `tests/snapshots/endless.json` | radio songs per seed | the director is meant to change | `npm run check:endless -- --write-fixtures`, raise `DIRECTOR_VERSION` |
+| `tests/snapshots/sound-fixtures.json` | drum tones and variation of radio songs at `sound` 1, per style (random-sound-params) | the composed sound is meant to change | `npm run check:sound-params -- --write-fixtures`, raise `SOUND_VERSION` |
 | `tests/snapshots/endless-v14.json` | the radio songs of director version 14: with the effect gestures off (director-fold-ring) the director gives them exactly | never | |
 | `tools/fixtures/crescendo.json` | Classic and Crescendo steps | almost never | `npm run check:crescendo -- --write`, raise `CRESCENDO_VERSION` |
 | `tools/fixtures/live-coder.json` | Live coder growth | growth shapes are meant to change | `npm run check:crescendo -- --write-fixtures`, raise `SHAPES_VERSION` |

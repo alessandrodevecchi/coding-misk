@@ -8,7 +8,7 @@ import { loadStyles } from './styles-dir.mjs';
 import { loadArtists } from './artists-dir.mjs';
 import { withDefaults } from '../src/endless/recipe.js';
 import { createSongOptions, RADIO_KEY, NEW_SONG_KEY, SONG_KEYS, readOptions } from '../src/endless/song-options.js';
-import { OPTION_DEFAULTS } from '../src/endless/director.js';
+import { OPTION_DEFAULTS, SOUND_VERSION } from '../src/endless/director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../src/endless/artist.js';
 import { RADIO_CHOICES, CUSTOM_DEFAULT, profileOptions } from '../src/endless/profile.js';
 import { styleId } from '../src/endless/recipe.js';
@@ -66,7 +66,8 @@ function oldRadio(saved0, ids, artists, userPatterns) {
   if (!opts.styles.length) opts.styles = [ids.includes('synthwave') ? 'synthwave' : ids[0]];
   const artistOf = id => (id ? artists().find(a => a.id === id) || (opts.temp && opts.temp.id === id ? opts.temp : null) : null);
   const a = artistOf(opts.artist), up = userPatterns();
-  const how = { transition: opts.transition, harmony: opts.harmony, ...profileOptions(opts.profile, opts.custom), ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}), ...(voiceOption(opts.voice) ? { voice: voiceOption(opts.voice) } : {}), ...(isAutoSound(opts.narratorSound) ? {} : { narratorSound: cleanSound(opts.narratorSound) }), ...(opts.voices.narrator && opts.voices.track ? {} : { voices: { ...(opts.voices.narrator ? {} : { narrator: false }), ...(opts.voices.track ? {} : { track: false }) } }) };
+  // (random-sound-params D6: the composed sound version joins the options, recorded in new recipes)
+  const how = { transition: opts.transition, harmony: opts.harmony, sound: SOUND_VERSION, ...profileOptions(opts.profile, opts.custom), ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}), ...(voiceOption(opts.voice) ? { voice: voiceOption(opts.voice) } : {}), ...(isAutoSound(opts.narratorSound) ? {} : { narratorSound: cleanSound(opts.narratorSound) }), ...(opts.voices.narrator && opts.voices.track ? {} : { voices: { ...(opts.voices.narrator ? {} : { narrator: false }), ...(opts.voices.track ? {} : { track: false }) } }) };
   if (opts.compilation !== 'off') return { opts, current: { compilation: { every: opts.compilation, setup: clone(opts.compSetup), pool: clone(artists()), ...(Object.keys(opts.compLocks).length ? { locks: { ...opts.compLocks } } : {}) }, ...how } };
   return { opts, current: a ? { artist: clone(a), ...how } : { styles: opts.styles.slice(), chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, ...how } };
 }
@@ -91,6 +92,13 @@ const genWith = (patch, seed, recipes = RECIPES) => { const st = memStore(); con
 const withProfile = (song, profile, extra = {}) => ({ ...song, config: { ...normalConfig({ profile, live: profile !== 'classic', options: extra }), ...(song.config.durationTarget ? { durationTarget: song.config.durationTarget } : {}) } });
 
 const CHECKS = {
+'the radio and the New song panel record the composed sound version (random-sound-params D6)': () => {
+  const radio = radioOf(memStore()), panel = panelOf(memStore(), radio);
+  assert(radio.directorOptions({ use: 'radio' }).sound === SOUND_VERSION && panel.directorOptions({ use: 'new-song' }).sound === SOUND_VERSION, 'no sound in the director options');
+  radio.set({ compilation: 'song' });
+  assert(radio.directorOptions({ use: 'radio' }).sound === SOUND_VERSION, 'a compilation does not record the sound');
+  assert(OPTION_DEFAULTS.sound === 0, 'the default must stay 0 (old recipes)');
+},
 'old saved radio options read the same, and the radio director options are the same as before (D1)': () => {
   const ids = RECIPES.map(r => r.id);
   for (const saved of SAVED) {

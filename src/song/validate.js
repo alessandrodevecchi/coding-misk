@@ -10,6 +10,8 @@ import { checkGrowthShape } from './shapes.js';
 import { VOICE_PHRASES, VOICE_KINDS, VOICE_WAYS } from '../endless/voice-options.js';
 import { checkSpokenPattern, checkNarrator } from './spoken.js';
 import { checkConfig } from '../live/song-config.js';
+import { toneErrors } from '../material/tone.js';
+import { varyErrors, varySkips } from '../material/variation.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
 export const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
 
@@ -125,6 +127,16 @@ export function validateSong(song, opts = {}) {
     if (!TYPES.includes(tr.type)) { err(`${p}.type`, `one of ${TYPES.join(', ')}`); return; }
     checkSettings(tr.type, tr.settings || {}, `${p}.settings`, err, warn);
     if (tr.rack !== undefined) checkRack(tr.rack, `${p}.rack`, err, warn);
+    // variation left out by the writer (random-sound-params D4): an automated target, one a rack device writes later on
+    // the line, or one an idea's random values write too
+    const vary = (tr.settings || {}).vary;
+    if (Array.isArray(vary)) {
+      const skips = varySkips(tr.type, tr.settings, tr.rack), randoms = new Set(Object.values(tr.patterns || {}).map(x => x && x.idea && x.idea.random && x.idea.random.on).filter(Boolean));
+      vary.forEach((e, i) => {
+        if (!e || !skips[e.on]) { if (e && randoms.has(e.on)) warn(`${p}.settings.vary[${i}]`, `an idea's random values write ${e.on} too: the variation is left out`); return; }
+        warn(`${p}.settings.vary[${i}]`, `the variation is left out: ${skips[e.on]}`);
+      });
+    }
     for (const k of ['mute', 'solo']) if (tr[k] !== undefined && typeof tr[k] !== 'boolean') err(`${p}.${k}`, 'true or false');
     if (tr.pinned !== undefined && (!Array.isArray(tr.pinned) || tr.pinned.some(k => !SETTING_FIELDS[tr.type].includes(k)))) err(`${p}.pinned`, `settings fixed against the live build steps, from: ${SETTING_FIELDS[tr.type].join(', ')}`);
     // the voice instrument options a spoken track was written with in Compose (voice-placement)
@@ -212,6 +224,9 @@ function checkSettings(type, set, p, err, warn) {
     if (k === 'mode' && !MODES.some(([m]) => m === v)) err(`${p}.mode`, `one of ${MODES.map(([m]) => m).join(', ')}`);
     if (k === 'speaker' && v !== '' && !SPEAKERS.includes(v)) warn(`${p}.speaker`, REMOVED_SPEAKERS.includes(v) ? `removed speaker: the default voice speaks; speakers: ${SPEAKERS.join(', ')}` : `unknown speaker; speakers: ${SPEAKERS.join(', ')} (or "" for the default voice)`);
     if (k === 'visual' && !VISUALS.includes(v)) warn(`${p}.visual`, `the visuals know: ${VISUALS.join(', ')}`);
+    // composed drum tones and variation (random-sound-params): null is the default (none)
+    if (k === 'tone' && v !== null) for (const [q, m] of toneErrors(v)) err(`${p}.tone${q}`, m);
+    if (k === 'vary' && v !== null) for (const [q, m, kind] of varyErrors(v, type)) (kind === 'warn' ? warn : err)(`${p}.vary${q}`, m);
   }
 }
 

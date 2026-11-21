@@ -98,7 +98,9 @@ function patternOf(type, ch) {
   for (const k of PATTERN_FIELDS[type]) { const v = ch[stateKey(type, k)]; if (v !== '' && v !== undefined) p[k] = v; }
   return p;
 }
-const settingsOf = (type, ch) => Object.fromEntries(SETTING_FIELDS[type].map(k => [k, ch[k] ?? null]));
+// the sound settings of random-sound-params (D1): objects, null by default and left out of a track until a value is set
+export const SOUND_FIELDS = ['tone', 'vary'];
+const settingsOf = (type, ch) => Object.fromEntries(SETTING_FIELDS[type].filter(k => !(SOUND_FIELDS.includes(k) && (ch[k] === null || ch[k] === undefined))).map(k => [k, ch[k] ?? null]));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // v1 track (scenes with a full state each, as saved by older versions of the app) → v2 song.

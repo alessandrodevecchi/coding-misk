@@ -3,7 +3,7 @@
 // Compose under `coding-misk-new-song`; a change in one never changes the other. The director options of a song are
 // built by one function from either store (directorOptions), so the radio's stay what they were before this change.
 // Pure apart from the store passed in: checked in Node (tools/check-song-options.mjs).
-import { OPTION_DEFAULTS } from './director.js';
+import { OPTION_DEFAULTS, SOUND_VERSION } from './director.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from './artist.js';
 import { RADIO_CHOICES, CUSTOM_DEFAULT, profileOptions } from './profile.js';
 import { styleId } from './recipe.js';
@@ -135,7 +135,8 @@ export function createSongOptions({ store, key = RADIO_KEY, recipes = [], artist
     // heard, the written song one phrase shorter); use: 'radio' or 'new-song', kept for the callers
     directorOptions({ use = 'radio' } = {}) {
       const a = artistOf(opts.artist), up = userPatterns();
-      const how = { transition: opts.transition, harmony: opts.harmony, ...profileOptions(opts.profile, opts.custom), ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}), ...(voiceOption(opts.voice) ? { voice: voiceOption(opts.voice) } : {}), ...(isAutoSound(opts.narratorSound) ? {} : { narratorSound: cleanSound(opts.narratorSound) }), ...(opts.voices.narrator && opts.voices.track ? {} : { voices: { ...(opts.voices.narrator ? {} : { narrator: false }), ...(opts.voices.track ? {} : { track: false }) } }) };
+      // (sound, random-sound-params D6: new sessions, compilations and New song panel songs compose drum tones and variation)
+      const how = { transition: opts.transition, harmony: opts.harmony, sound: SOUND_VERSION, ...profileOptions(opts.profile, opts.custom), ...(opts.sounds ? { sounds: opts.sounds } : {}), ...(opts.material !== 'mix' ? { material: opts.material } : {}), ...(up.length ? { userPatterns: up } : {}), ...(voiceOption(opts.voice) ? { voice: voiceOption(opts.voice) } : {}), ...(isAutoSound(opts.narratorSound) ? {} : { narratorSound: cleanSound(opts.narratorSound) }), ...(opts.voices.narrator && opts.voices.track ? {} : { voices: { ...(opts.voices.narrator ? {} : { narrator: false }), ...(opts.voices.track ? {} : { track: false }) } }) };
       // (the radio sends it only when its Durata is set, so its recipes and the endless fixtures stay as before without it)
       const len = hasLength(opts.length) ? { length: cleanLength(opts.length), lengthHeard: true } : {};
       // a compilation carries its setup and the artists it may use, so a replay draws the same songs

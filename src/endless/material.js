@@ -4,6 +4,7 @@
 // plan keep their draws; at complexity 0 nothing here runs and the songs stay as the presets give them.
 import { stream } from './random.js';
 import { compose, KIND_OF_TYPE, SESSION_SOURCES } from '../material/index.js';
+import { fitToneDrive } from '../material/tone.js';
 
 // the part of a song that gives each track type (mix.js parts)
 const PART_OF = { drums: 'drums', bass: 'bass', arp: 'lead', hook: 'lead', pad: 'pads', guitar: 'pads' };
@@ -93,6 +94,44 @@ export function applyMaterial(tracks, R, complexity, opts, M) {
   return used;
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// ---------- composed sound: drum tones and per-hit variation (random-sound-params D3, D6, D8) ----------
+
+// the session option `sound` (0 or SOUND_VERSION): composed tones and variation only from 1; a recipe without it reads 0
+export const soundOf = opts => (Number.isFinite(Number(opts && opts.sound)) ? Number(opts.sound) : 0);
+const VARY_ON = ['drums', 'bass', 'arp', 'hook', 'pad', 'guitar'];
+// A drum track's tone from its seed (D3): inside the style's ranges, at the energy given. The drive only where the track
+// drives already and the style gives a range (fitToneDrive: distortvol halves a clean row)
+export function toneFor(t, R, seed, energy) {
+  const style = (R.drums && R.drums.material) || {};
+  return fitToneDrive(compose('tone', { seed, style, energy }).settings.tone, t.settings && t.settings.drive, style.tones);
+}
+// A track's variation from its seed (D8): the instrument's style, its settings and rack (targets the writer would leave
+// out are not drawn)
+export function varyFor(t, R, seed, energy) {
+  if (!VARY_ON.includes(t.type)) return null;
+  const style = (R[t.type] && R[t.type].material) || {};
+  const rows = t.type === 'drums' ? [...new Set(Object.values(t.patterns || {}).flatMap(p => Object.keys((p && p.rows) || (p && p.idea && p.idea.beat) || {}).filter(k => k !== 'grid')))] : null;
+  return compose('vary', { seed, style, type: t.type, energy, settings: t.settings, rack: t.rack, rows }).settings.vary;
+}
+// Gives the tracks of a song their tones and variation at session sound 1 or more (D6): one tone for every drum track of
+// the song (the kick and the beat share it, like the groove), a variation per track. Each from its own seed
+// (<session seed>:<index>:drums:tone, <session seed>:<index>:<track id>:vary) and the "material:tone" and
+// "material:vary" streams, so every other draw of the session stays as at sound 0. M: as applyMaterial's.
+export function applySound(tracks, R, opts, M) {
+  if (soundOf(opts) < 1) return;
+  const order = tracks.slice().sort((a, b) => M.entry.indexOf(a.type) - M.entry.indexOf(b.type));
+  let tone = null;
+  for (const t of tracks) {
+    if (!VARY_ON.includes(t.type)) continue;
+    const E = patternEnergies(M.targets, order.indexOf(t));
+    const set = { ...(t.settings || {}) };
+    if (t.type === 'drums') { tone = tone || toneFor(t, R, `${M.seed}:${M.index}:drums:tone`, E.A); set.tone = JSON.parse(JSON.stringify(tone)); }
+    const vary = varyFor({ ...t, settings: set }, R, `${M.seed}:${M.index}:${t.id}:vary`, E.A);
+    if (vary) set.vary = vary;
+    t.settings = set;
+  }
+}
 
 // ---------- material composed on air (radio-variation, docs/ENDLESS.md "Steering") ----------
 

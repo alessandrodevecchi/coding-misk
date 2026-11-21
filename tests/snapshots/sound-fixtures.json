@@ -1,0 +1,106 @@
+{
+ "sound": 1,
+ "director": 20,
+ "songs": [
+  {
+   "style": "acid",
+   "id": "endless-fx-acid-1",
+   "hash": "572d794a"
+  },
+  {
+   "style": "ambient",
+   "id": "endless-fx-ambient-1",
+   "hash": "f1cdb13c"
+  },
+  {
+   "style": "berlin-techno",
+   "id": "endless-fx-berlin-techno-1",
+   "hash": "ff6460e6"
+  },
+  {
+   "style": "classic-rock",
+   "id": "endless-fx-classic-rock-1",
+   "hash": "ffcca268"
+  },
+  {
+   "style": "country",
+   "id": "endless-fx-country-1",
+   "hash": "f2b2632e"
+  },
+  {
+   "style": "dark-cyberpunk",
+   "id": "endless-fx-dark-cyberpunk-1",
+   "hash": "9c34f3d2"
+  },
+  {
+   "style": "darksynth",
+   "id": "endless-fx-darksynth-1",
+   "hash": "5aee6bf6"
+  },
+  {
+   "style": "dreamy-cyberpunk",
+   "id": "endless-fx-dreamy-cyberpunk-1",
+   "hash": "61a2bae3"
+  },
+  {
+   "style": "drum-and-bass",
+   "id": "endless-fx-drum-and-bass-1",
+   "hash": "9077bbce"
+  },
+  {
+   "style": "gated-trance",
+   "id": "endless-fx-gated-trance-1",
+   "hash": "fd15202b"
+  },
+  {
+   "style": "house",
+   "id": "endless-fx-house-1",
+   "hash": "2302b9b0"
+  },
+  {
+   "style": "industrial",
+   "id": "endless-fx-industrial-1",
+   "hash": "16d0ac2d"
+  },
+  {
+   "style": "jazz",
+   "id": "endless-fx-jazz-1",
+   "hash": "49f11200"
+  },
+  {
+   "style": "lo-fi",
+   "id": "endless-fx-lo-fi-1",
+   "hash": "299b53ac"
+  },
+  {
+   "style": "melodic-metal",
+   "id": "endless-fx-melodic-metal-1",
+   "hash": "334a8379"
+  },
+  {
+   "style": "phonk",
+   "id": "endless-fx-phonk-1",
+   "hash": "d687e1a"
+  },
+  {
+   "style": "progressive-house",
+   "id": "endless-fx-progressive-house-1",
+   "hash": "d413e05c"
+  },
+  {
+   "style": "pure-trance",
+   "id": "endless-fx-pure-trance-1",
+   "hash": "e4fcd304"
+  },
+  {
+   "style": "synthwave",
+   "id": "endless-fx-synthwave-1",
+   "hash": "dbbda580"
+  },
+  {
+   "style": "trance",
+   "id": "endless-fx-trance-1",
+   "hash": "81f13983"
+  }
+ ]
+}

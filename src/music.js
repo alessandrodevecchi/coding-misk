@@ -2,9 +2,13 @@ import { t, tx } from './i18n.js';
 // the idea writer (idea-model): it reads the tables below only when it writes code, so the two modules can import each other
 import { writeIdea, expandIdea, ideaRows, seqForm, beatForm, slotTokens, altForm, stepItem, noteHead, arpForm, drumRow, topTokens as ideaTokens, STEP_FUNCTIONS } from './song/ideas.js';
 import { LINE, LABEL_SPACE } from './song/line-names.js';
+import { toneOfRow } from './material/tone.js';
+import { varyFor, varyArg } from './material/variation.js';
 
 export const f = n => String(Math.round(n * 100) / 100).replace(/^0\./, '.');
 const num = n => String(Math.round(n * 100) / 100);
+// three decimals, without the leading zero (drum tones: .944)
+const f3 = n => String(Math.round(n * 1000) / 1000).replace(/^0\./, '.').replace(/^-0\./, '-.');
 
 // ---------- dati musicali ----------
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -306,13 +310,13 @@ export const INSTRUMENTS = ['kick', 'snare', 'hats', 'fx', 'bass', 'guitar', 'ar
 // cutoff 20000 = filtro aperto. grit 0 = niente bitcrusher. drive 0 = niente saturazione.
 export const DEFAULT = {
   bpm: 138, bpmEnd: null, key: 'A', prog: 'epica', meter: '4/4', swing: 0,
-  drums: { on: true, kit: 'RolandTR909', gain: .9, gainEnd: null, cutoff: 20000, cutoffEnd: null, drive: 0, grit: 0,
+  drums: { on: true, kit: 'RolandTR909', gain: .9, gainEnd: null, cutoff: 20000, cutoffEnd: null, drive: 0, grit: 0, tone: null, vary: null,
     rows: Object.fromEntries(ROWS.map(([id]) => [id, { steps: GROOVES.trance[1][id], mute: false }])) },
-  bass: { on: true, preset: 'rolling', wave: 'sawtooth', gain: .8, gainEnd: null, cutoff: 700, cutoffEnd: null, move: 'lento', reso: 8, drive: 0, steps: '', notes: '' },
-  arp: { on: true, preset: 'su', wave: 'supersaw', gain: .4, gainEnd: null, cutoff: 2400, cutoffEnd: null, move: 'lento', reso: 4, delay: .35, speed: '16', drive: 0, steps: '', notes: '' },
-  hook: { on: true, preset: 'richiamo', wave: 'square', gain: .3, gainEnd: null, cutoff: 3000, cutoffEnd: null, move: 'fisso', delay: .4, mode: 'minor', fm: 0, vowel: '', grit: 0, drive: 0, harmony: '', octave: '4', steps: '', notes: '' },
-  guitar: { on: false, type: 'distorted', pattern: 'power8', gain: .5, gainEnd: null, cutoff: 4200, cutoffEnd: null, drive: 0, octave: '0', width: 'double', room: .2, steps: '' },
-  pad: { on: true, preset: 'pad', wave: 'supersaw', gain: .28, gainEnd: null, cutoff: 1400, cutoffEnd: null, move: 'lento', room: .85, drive: 0, steps: '' },
+  bass: { on: true, preset: 'rolling', wave: 'sawtooth', gain: .8, gainEnd: null, cutoff: 700, cutoffEnd: null, move: 'lento', reso: 8, drive: 0, vary: null, steps: '', notes: '' },
+  arp: { on: true, preset: 'su', wave: 'supersaw', gain: .4, gainEnd: null, cutoff: 2400, cutoffEnd: null, move: 'lento', reso: 4, delay: .35, speed: '16', drive: 0, vary: null, steps: '', notes: '' },
+  hook: { on: true, preset: 'richiamo', wave: 'square', gain: .3, gainEnd: null, cutoff: 3000, cutoffEnd: null, move: 'fisso', delay: .4, mode: 'minor', fm: 0, vowel: '', grit: 0, drive: 0, vary: null, harmony: '', octave: '4', steps: '', notes: '' },
+  guitar: { on: false, type: 'distorted', pattern: 'power8', gain: .5, gainEnd: null, cutoff: 4200, cutoffEnd: null, drive: 0, octave: '0', width: 'double', room: .2, vary: null, steps: '' },
+  pad: { on: true, preset: 'pad', wave: 'supersaw', gain: .28, gainEnd: null, cutoff: 1400, cutoffEnd: null, move: 'lento', room: .85, drive: 0, vary: null, steps: '' },
   texture: { on: false, sample: 'numbers', rhythm: 'bar', gain: .4, gainEnd: null, grit: .7, room: .6 },
   riser: { on: false, gain: .25, bars: '8', dir: 'up' },
 };
@@ -471,6 +475,17 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
   };
   const drive = d => d > 0 ? `.distort(${num(d)}).distortvol(.5)` : '';
   const grit = v => v > 0 ? `.crush(${Math.round(16 - v * 13)})` : '';
+  // variation (random-sound-params D4): the entries of a line ({ target: entry }) without the targets the rack or the
+  // idea's own random values write later on the line; vArg: the varied argument around the track's value v
+  const vOn = (vary, row, after = '') => { const V = varyFor(vary, row); if (!V) return null; for (const k of Object.keys(V)) if (after.includes(`.${k}(`)) delete V[k]; return Object.keys(V).length ? V : null; };
+  const vArg = (V, k, v) => (V && V[k] ? varyArg(V[k], v) : '');
+  // the targets a line does not write yet: appended, each around the track's value (vals) or the target's own base
+  const vf = (V, c, cEnd, move) => (V && V.lpf && (cEnd === null || cEnd === undefined || cEnd === c) && (!move || move === 'fisso') ? `.lpf(${vArg(V, 'lpf', c)})` : filter(c, cEnd, move));
+  // (a clean line, drive 0, never varies its distortion: distortvol would halve its level)
+  const vd = (V, x, vol = '.5') => (V && V.distort && x > 0 ? `.distort(${vArg(V, 'distort', x)}).distortvol(${vol})` : '');
+  const vg = (V, a, aEnd) => (V && V.gain && (aEnd === null || aEnd === undefined || aEnd === a) ? vArg(V, 'gain', a) : auto(a, aEnd));
+  const vn = (V, k, x, fmt = f) => (V && V[k] ? vArg(V, k, x) : fmt(x));
+  const vExtra = (V, keys, vals) => (V ? keys.filter(k => V[k]).map(k => (k === 'distort' ? `.distort(${vArg(V, k, vals[k])}).distortvol(.5)` : `.${k}(${vArg(V, k, vals[k])})`)).join('') : '');
   const scaleGain = (a, b, k) => auto(a * k, b === null || b === undefined ? null : b * k);
   const breathMask = breath && bars > 0 ? `.mask("${rle(rotate([...Array(bars - 1).fill('1'), '[1 0]'], start))}")` : '';
   const L = [];
@@ -486,7 +501,18 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
   if (want('drums')) for (const [id, , mult, inst] of ROWS) {
     const row = d.rows[id], on = d.on && (irows ? !!irows[id] : !row.mute), steps = irows ? irows[id] || '' : fitSteps(row.steps, N);
     if (!steps.includes('x') || !show(on)) continue;
-    L.push(`${lab(on)}: ${drumRow(kitRow(d.kit, id), steps, { coarse })}.bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${rack}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
+    // composed tones and variation (random-sound-params D2, D4): none without the settings, so the line stays as it was
+    if (!d.tone && !d.vary) { L.push(`${lab(on)}: ${drumRow(kitRow(d.kit, id), steps, { coarse })}.bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${rack}${breathMask}${g}${orb('drums')}.analyze("${inst}")`); continue; }
+    const tn = toneOfRow(d.tone, id), V = vOn(d.vary, id, rack);
+    const fixedCut = d.cutoffEnd === null || d.cutoffEnd === undefined || d.cutoffEnd === d.cutoff;
+    const cut = fixedCut && tn && tn.cutoff !== null && tn.cutoff < Math.min(d.cutoff, 18000) ? tn.cutoff : d.cutoff;
+    const dec = tn && tn.decay !== null ? tn.decay : null, drv = tn && tn.drive !== null ? tn.drive : d.drive;
+    const head = `${dec !== null ? `.decay(${vArg(V, 'decay', dec) || f3(dec)}).sustain(0)` : ''}${tn && tn.speed !== null ? `.speed(${f3(tn.speed)})` : ''}`;
+    const gainCode = V && V.gain && (d.gainEnd === null || d.gainEnd === undefined || d.gainEnd === d.gain) ? vArg(V, 'gain', d.gain * mult) : scaleGain(d.gain, d.gainEnd, mult);
+    const lpfCode = V && V.lpf && fixedCut ? `.lpf(${vArg(V, 'lpf', cut)})` : filter(cut, fixedCut ? null : d.cutoffEnd);
+    const drvCode = V && V.distort && drv > 0 ? `.distort(${vArg(V, 'distort', drv)}).distortvol(.5)` : drive(drv);
+    const gritCode = V && V.crush ? `.crush(${vArg(V, 'crush', d.grit > 0 ? Math.round(16 - d.grit * 13) : 16)})` : grit(d.grit);
+    L.push(`${lab(on)}: ${drumRow(kitRow(d.kit, id), steps, { coarse })}.bank("${d.kit}")${head}.gain(${gainCode})${lpfCode}${drvCode}${gritCode}${vExtra(V, ['hpf', 'pan', 'delay', 'room', 'vowel'], {})}${sw}${rack}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
   }
   if (want('drums') && fill && d.on) L.push(`$: s("sd*${N}").bank("${d.kit}").gain(saw.range(.15, .75)).mask("${rle(rotate([...Array(Math.max(0, bars - 1)).fill('0'), '1'], start))}")${g}${orb('drums')}.analyze("snare")`);
   if (want('drums') && crash && d.on) L.push(`$: s("cr").bank("${NO_CRASH.includes(d.kit) ? 'RolandTR909' : d.kit}").gain(.55).room(.4).mask("${rle(rotate(['1', ...Array(Math.max(0, bars - 1)).fill('0')], start))}")${g}${orb('drums')}.analyze("fx")`);
@@ -502,8 +528,11 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
       const idea = b.steps ? { ...bp.idea, rhythm: [...fitSteps(b.steps, N)].map(c => (c === 'x' ? 'x' : '~')).join(' '), per: 'slot' } : bp.idea;
       L.push(...ideaLines(b.on, writeIdea(idea, ideaCtx('bass', b, { steps: null }))));
     }
-    L.push(`  .s("${b.wave}")${filter(b.cutoff, b.cutoffEnd, b.move)}.lpq(${num(b.reso)})${drive(b.drive)}`);
-    L.push(`  .decay(${f(bp[2])}).sustain(${f(bp[3])})${bp[4] ? `.postgain("${rhythmShort(bp[4], N)}")` : ''}.gain(${auto(b.gain, b.gainEnd)})${bTail}${rack}${breathMask}${g}${orb('bass')}.analyze("bass")`);
+    // (a bass never varies its distortion, random-sound-params D8)
+    const V = vOn(b.vary, null, `${bTail}${rack}`);
+    if (V) delete V.distort;
+    L.push(`  .s("${b.wave}")${vf(V, b.cutoff, b.cutoffEnd, b.move)}.lpq(${num(b.reso)})${drive(b.drive)}`);
+    L.push(`  .decay(${vn(V, 'decay', bp[2])}).sustain(${f(bp[3])})${bp[4] ? `.postgain("${rhythmShort(bp[4], N)}")` : ''}.gain(${vg(V, b.gain, b.gainEnd)})${vExtra(V, ['hpf', 'pan', 'delay', 'room', 'crush', 'vowel'], {})}${bTail}${rack}${breathMask}${g}${orb('bass')}.analyze("bass")`);
   }
   const a = s.arp, ap = ARPS[a.preset] || ARPS.su;
   if (want('arp') && show(a.on)) {
@@ -517,8 +546,9 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
       const viaArp = ar ? `note("${ar.chords}").arp("${ar.order}")` : null;
       L.push(`${lab(a.on)}: ${viaArp && viaArp.length < own.length ? viaArp : own}${trs}${a.steps ? `.mask("${stepsMask(fitSteps(a.steps, N))}")` : ''}${sw}`);
     }
-    L.push(`  .s("${a.wave}")${filter(a.cutoff, a.cutoffEnd, a.move)}.lpq(${num(a.reso)})${drive(a.drive)}`);
-    L.push(`  .decay(.15).sustain(.15)${a.delay > 0 ? `.delay(${f(a.delay)})` : ''}.gain(${auto(a.gain, a.gainEnd)})${aTail}${rack}${breathMask}${g}${orb('arp')}.analyze("arp")`);
+    const V = vOn(a.vary, null, `${aTail}${rack}`);
+    L.push(`  .s("${a.wave}")${vf(V, a.cutoff, a.cutoffEnd, a.move)}.lpq(${num(a.reso)})${vd(V, a.drive) || drive(a.drive)}`);
+    L.push(`  .decay(${vn(V, 'decay', .15)}).sustain(.15)${V && V.delay ? `.delay(${vArg(V, 'delay', a.delay)})` : a.delay > 0 ? `.delay(${f(a.delay)})` : ''}.gain(${vg(V, a.gain, a.gainEnd)})${vExtra(V, ['hpf', 'pan', 'room', 'crush', 'vowel'], {})}${aTail}${rack}${breathMask}${g}${orb('arp')}.analyze("arp")`);
   }
   const h = s.hook, hp = HOOKS[h.preset] || HOOKS.richiamo;
   if (want('hook') && show(h.on)) {
@@ -527,8 +557,9 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     L.push('', `// Hook · ${named(h, h.notes ? t('cNotes') : tx(hp[0]))}`);
     if (h.idea) hTail = (w => (L.push(...ideaLines(h.on, w)), w.tail))(writeIdea(h.idea, ideaCtx('hook', h)));
     else L.push(`${lab(h.on)}: n("${mel}")${h.harmony ? `.superimpose(x => x.add(${h.harmony}))` : ''}.scale("${s.key}${h.octave || 4}:${h.mode}")${h.steps ? `.mask("${stepsMask(fitSteps(h.steps, N))}")` : ''}${sw}`);
-    L.push(`  ${h.wave === 'cowbell' ? '.s("cb").bank("RolandTR808")' : `.s("${h.wave}")`}${drive(h.drive)}${h.fm > 0 ? `.fm(${num(h.fm)})` : ''}${h.vowel ? `.vowel("${h.vowel}")` : ''}${filter(h.cutoff, h.cutoffEnd, h.move)}${grit(h.grit)}`);
-    L.push(`  .decay(.2).sustain(.3).delay(${f(h.delay)}).room(.3).gain(${auto(h.gain, h.gainEnd)})${hTail}${rack}${breathMask}${g}${orb('hook')}.analyze("hook")`);
+    const V = vOn(h.vary, null, `${hTail}${rack}`);
+    L.push(`  ${h.wave === 'cowbell' ? '.s("cb").bank("RolandTR808")' : `.s("${h.wave}")`}${vd(V, h.drive) || drive(h.drive)}${h.fm > 0 ? `.fm(${num(h.fm)})` : ''}${V && V.vowel ? `.vowel(${vArg(V, 'vowel')})` : h.vowel ? `.vowel("${h.vowel}")` : ''}${vf(V, h.cutoff, h.cutoffEnd, h.move)}${V && V.crush ? `.crush(${vArg(V, 'crush', h.grit > 0 ? Math.round(16 - h.grit * 13) : 16)})` : grit(h.grit)}`);
+    L.push(`  .decay(${vn(V, 'decay', .2)}).sustain(.3).delay(${vn(V, 'delay', h.delay)}).room(${vn(V, 'room', .3)}).gain(${vg(V, h.gain, h.gainEnd)})${vExtra(V, ['hpf', 'pan'], {})}${hTail}${rack}${breathMask}${g}${orb('hook')}.analyze("hook")`);
   }
   const gt = s.guitar, gty = GUITAR_TYPES[gt.type] || GUITAR_TYPES.distorted, gpt = GUITAR_PATTERNS[gt.pattern] || GUITAR_PATTERNS.power8;
   if (want('guitar') && show(gt.on)) {
@@ -542,11 +573,12 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     L.push('', `// ${t('cGuitar')} · ${tx(gty[0])}, ${named(gt, tx(gpt[0]))}${gt.octave && gt.octave !== '0' ? ` · ${t('tuning').toLowerCase()} ${gt.octave}` : ''}`);
     if (gt.idea) gTail = (w => (L.push(...ideaLines(gt.on, w)), w.tail))(writeIdea(gt.idea, ideaCtx('guitar', gt, { tr: gtr, voice: voicing, sw: gt.idea.hold ? '' : sw })));
     else L.push(`${lab(gt.on)}: note("${altForm(chords.map(c => `[${voicing(c)}]`), { unwrap: false })}")${gtr ? `.transpose(${gtr})` : ''}${gr ? `.struct("${gr}")` : ''}${shift}${gr ? sw : ''}`);
-    L.push(`  .s("${gty[1]}").attack(.003).decay(${held ? 1.5 : short ? .09 : .3}).sustain(${held ? .8 : short ? 0 : .55}).release(.08)`);
-    L.push(`  ${dist > 0 ? `.distort(${num(dist)}).distortvol(.2)` : ''}.hpf(${gty[3]})${filter(gt.cutoff, gt.cutoffEnd)}${gt.width === 'double' ? '.jux(x => x.late(.012))' : ''}`);
+    const V = vOn(gt.vary, null, `${gTail}${rack}`);
+    L.push(`  .s("${gty[1]}").attack(.003).decay(${vn(V, 'decay', held ? 1.5 : short ? .09 : .3, String)}).sustain(${held ? .8 : short ? 0 : .55}).release(.08)`);
+    L.push(`  ${vd(V, dist, '.2') || (dist > 0 ? `.distort(${num(dist)}).distortvol(.2)` : '')}.hpf(${vn(V, 'hpf', gty[3], String)})${vf(V, gt.cutoff, gt.cutoffEnd)}${gt.width === 'double' ? '.jux(x => x.late(.012))' : ''}`);
     // il volume va dopo l'amplificatore (postgain): prima della distorsione cambierebbe solo la saturazione
-    const lvl = auto(gt.gain, gt.gainEnd);
-    L.push(`  .room(${f(gt.room)}).gain(.8)${gTail}${rack}${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}${orb('guitar')}.analyze("guitar")`);
+    const lvl = vg(V, gt.gain, gt.gainEnd);
+    L.push(`  .room(${vn(V, 'room', gt.room)}).gain(.8)${vExtra(V, ['pan', 'delay', 'crush', 'vowel'], {})}${gTail}${rack}${breathMask}${gate ? `.mask(${gate}).postgain(${gate}.mul(${lvl}))` : `.postgain(${lvl})`}${orb('guitar')}.analyze("guitar")`);
   }
   const p = s.pad, pp = PADS[p.preset] || PADS.pad;
   if (want('pad') && show(p.on)) {
@@ -555,8 +587,9 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     const legato = !rhythm(pp[1], N), pr = p.steps ? (legato ? stepsStruct(fitSteps(p.steps, N), true) : stepsShort(fitSteps(p.steps, N))) : rhythmShort(pp[1], N);
     if (p.idea) pTail = (w => (L.push(...ideaLines(p.on, w)), w.tail))(writeIdea(p.idea, ideaCtx('pad', p, { voice, sw: p.idea.hold ? '' : sw })));
     else L.push(`${lab(p.on)}: note("${altForm(chords.map(c => `[${voice(c)}]`), { unwrap: false })}")${trs}${pr ? `.struct("${pr}")` : ''}${pr ? sw : ''}`);
-    L.push(`  .s("${p.wave}").attack(${f(pp[2])})${pp[3] ? `.decay(${f(pp[3])}).sustain(${f(pp[4])})` : ''}.release(${f(pp[5])})${filter(p.cutoff, p.cutoffEnd, p.move)}${drive(p.drive)}`);
-    L.push(`  .room(${f(p.room)})${pp[6] ? `.postgain("${rhythmShort(pp[6], N)}")` : ''}.gain(${auto(p.gain, p.gainEnd)})${pTail}${rack}${g}${orb('pad')}.analyze("pad")`);
+    const V = vOn(p.vary, null, `${pTail}${rack}`);
+    L.push(`  .s("${p.wave}").attack(${f(pp[2])})${pp[3] ? `.decay(${vn(V, 'decay', pp[3])}).sustain(${f(pp[4])})` : ''}.release(${f(pp[5])})${vf(V, p.cutoff, p.cutoffEnd, p.move)}${vd(V, p.drive) || drive(p.drive)}`);
+    L.push(`  .room(${vn(V, 'room', p.room)})${pp[6] ? `.postgain("${rhythmShort(pp[6], N)}")` : ''}.gain(${vg(V, p.gain, p.gainEnd)})${vExtra(V, ['hpf', 'pan', 'delay', 'crush', 'vowel'], {})}${pTail}${rack}${g}${orb('pad')}.analyze("pad")`);
   }
   const x = s.texture, xr = TEX_RHYTHMS[x.rhythm] || TEX_RHYTHMS.bar;
   if (want('texture') && show(x.on)) {

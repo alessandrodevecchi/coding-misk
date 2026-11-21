@@ -57,6 +57,7 @@
     "check:ideas": "node --no-warnings tools/check-idea-writer.mjs",
     "check:functions": "node --no-warnings tools/check-functions.mjs",
     "check:material": "node --no-warnings tools/check-material.mjs",
+    "check:sound-params": "node --no-warnings tools/check-sound-params.mjs",
     "check:patterns": "node --no-warnings tools/check-patterns.mjs",
     "check:preview": "node --no-warnings tools/check-preview.mjs",
     "check:fm-lab": "node --no-warnings tools/check-fm-lab.mjs",

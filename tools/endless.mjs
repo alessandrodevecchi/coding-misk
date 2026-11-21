@@ -1,6 +1,6 @@
 // Endless sessions from the command line (docs/ENDLESS.md).
 //   node tools/endless.mjs --styles berlin-techno[,jazz…] [--chaos 0.3] [--energy 0.6] [--complexity 0.5] [--talk 0.5]
-//                          [--minutes 15] [--seed text] [--artist id|file] [--material mix] [--out songs/endless] [--join] [--quiet]
+//                          [--minutes 15] [--seed text] [--artist id|file] [--material mix] [--sound 0|1] [--out songs/endless] [--join] [--quiet]
 // Writes one song file per song and session.json in --out, prints the seed and a report.
 // --join also writes one song with the whole session in order, to play in Compose as a single live build.
 // Run with `node --no-warnings` to hide Node's experimental localStorage warning.
@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadStyles } from './styles-dir.mjs';
 import { validateRecipe } from '../src/endless/recipe.js';
-import { generateSession, OPTION_DEFAULTS } from '../src/endless/director.js';
+import { generateSession, OPTION_DEFAULTS, SOUND_VERSION } from '../src/endless/director.js';
 import { joinSession } from '../src/endless/join.js';
 import { validateSong } from '../src/song/validate.js';
 import { findArtist, loadArtists } from './artists-dir.mjs';
@@ -21,7 +21,7 @@ const opt = name => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[
 const KNOWN = ['styles', 'artist', 'chaos', 'energy', 'complexity', 'talk', 'minutes', 'seed', 'material', 'out', 'join', 'quiet', 'help'];
 for (const a of args) if (a.startsWith('--') && !KNOWN.includes(a.slice(2))) fail(`unknown option ${a}; options: ${KNOWN.map(k => `--${k}`).join(' ')}`);
 if (args.includes('--help') || !args.length) {
-  console.log('usage: node tools/endless.mjs --styles id[,id…] [--chaos 0-1] [--energy 0-1] [--complexity 0-1] [--talk 0-1] [--minutes n] [--seed text] [--material patterns|varied|composed|mix] [--out dir] [--join] [--quiet]');
+  console.log('usage: node tools/endless.mjs --styles id[,id…] [--chaos 0-1] [--energy 0-1] [--complexity 0-1] [--talk 0-1] [--minutes n] [--seed text] [--material patterns|varied|composed|mix] [--sound 0|1] [--out dir] [--join] [--quiet]');
   process.exit(args.length ? 0 : 1);
 }
 
@@ -57,6 +57,12 @@ if (opt('minutes') !== undefined) {
   options.minutes = m;
 }
 if (opt('seed') !== undefined) options.seed = opt('seed');
+// composed drum tones and per-hit variation (random-sound-params D6): 0 (the default here) plays as before
+if (opt('sound') !== undefined) {
+  const v = Number(opt('sound'));
+  if (!Number.isInteger(v) || v < 0 || v > SOUND_VERSION) fail(`--sound must be 0 or ${SOUND_VERSION} (got ${opt('sound')})`);
+  options.sound = v;
+}
 if (artist) options.artist = artist;
 // where the parts come from (material-generator): the library as written, varied, composed, or each recipe's choice
 if (opt('material') !== undefined) {

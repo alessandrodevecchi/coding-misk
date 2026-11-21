@@ -567,6 +567,8 @@ export function checkBuild(song, total, err, warn) {
     if (s.set) {
       const t = needTrack(`${p}.set.track`, s.set.track);
       if (t) for (const k of Object.keys(s.set)) if (k !== 'track' && !(SETTING_FIELDS[t.type] || []).includes(k)) err(`${p}.set.${k}`, `not a ${t.type} setting; settings: ${(SETTING_FIELDS[t.type] || []).join(', ')}`);
+      // (random-sound-params D1: a track's tone and variation are part of its line from the start, never set by a step)
+      else if (k === 'tone' || k === 'vary') err(`${p}.set.${k}`, `a live build step cannot set ${k}: it is part of the track's line from its first step`);
     }
     if (s.pattern) {
       const t = needTrack(`${p}.pattern.track`, s.pattern.track);

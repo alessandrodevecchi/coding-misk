@@ -32,7 +32,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const stamp = (o, fresh = false) => { if (fresh || !o.created) o.created = today(); if (fresh || !o.appVersion) o.appVersion = APP_VERSION; return o; };
 import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
-import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, VOICE_STYLES, styleOf, fromScenes, clipState } from './song/format.js';
+import { FORMAT, VERSION, SETTING_FIELDS, SOUND_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, VOICE_STYLES, styleOf, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice, choiceLabel } from './song/rack.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
 import { inventStyle } from './endless/style-maker.js';
@@ -45,9 +45,9 @@ import { createSongsView, confirmInline } from './library/songs-view.js';
 import { trashSong, restoreSong, deleteForGood, emptyTrash, purgeTrash, trashList, daysLeft, hideSong, showHidden, hiddenIds, entryTitle } from './library/trash.js';
 import { kindOf, parseFree } from './library/song-filter.js';
 import { createPlaylistStore, createQueue, REPEATS, isSession, sessionOutdated } from './library/playlists.js';
-import { DIRECTOR_VERSION } from './endless/director.js';
+import { DIRECTOR_VERSION, SOUND_VERSION } from './endless/director.js';
 // the versions a saved radio session is compared with (#38, radio-profiles D11)
-const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION, choosers: Object.keys(AIR_CHOOSERS) };
+const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION, choosers: Object.keys(AIR_CHOOSERS), sound: SOUND_VERSION };
 import { createPlaylistsTab } from './library/playlists-tab.js';
 import { createDecodeTab } from './decode/tab.js';
 import { pickJsonFiles } from './library/library.js';
@@ -107,6 +107,7 @@ import { createPreview, previewOrbit } from './player/preview.js';
 import { createPatternsTab } from './library/patterns-tab.js';
 import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS, KIND_TYPE, loopSong } from './library/patterns.js';
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
+import { rollSound, DICE_GROUPS } from './material/dice.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
 import { textIn } from './voices/phrases.js';
@@ -2423,7 +2424,7 @@ function cellOf(tr, j) {
   return parts.length ? { parts } : null;
 }
 const curTrack = () => T.tracks[tk];
-const baseSettings = type => type === 'code' ? { visual: 'fx' } : type === 'voice' || type === 'spoken' ? { ...VOICE_DEFAULT } : Object.fromEntries(SETTING_FIELDS[type].map(k => [k, DEFAULT[type][k]]));
+const baseSettings = type => type === 'code' ? { visual: 'fx' } : type === 'voice' || type === 'spoken' ? { ...VOICE_DEFAULT } : Object.fromEntries(SETTING_FIELDS[type].filter(k => !SOUND_FIELDS.includes(k)).map(k => [k, DEFAULT[type][k]]));
 // impostazioni che suonano nella sezione selezionata: traccia + eventuale modifica solo per questa sezione
 // clip su cui agiscono pattern e impostazioni "solo qui": nella timeline quello scelto, altrimenti quello della sezione
 const focusClip = tr => (arrMode === 'timeline' && tr === curTrack() && selClip !== null && tr.clips[selClip]) || wholeClip(tr, sel);
@@ -4074,6 +4075,51 @@ function composeRow(tr, pat) {
       ${varies ? `<button class="btn small" id="pt-keep-rhythm" title="${esc(t('keepRhythmTip'))}">${RHYTHM}<span>${esc(t('keepRhythm'))}</span></button><button class="btn small" id="pt-keep-notes" title="${esc(t('keepNotesTip'))}">${NOTES}<span>${esc(t('keepNotes'))}</span></button>` : ''}
     </div>`;
 }
+// The sound dice (random-sound-params D5, app/sound-dice): a new sound for this track within its style, from the seed
+// "<song id>:<track id>:sound:<n>"; lock chips keep groups of settings across rolls. The locks and the FM device the
+// dice added are remembered per song and track in the browser (not in the song file); the number is a page counter
+const DICE_KEY = 'coding-misk-sound-dice';
+const diceNums = {};
+const diceKey = tr => `${T.id}:${tr.id}`;
+const diceNumOf = tr => diceNums[diceKey(tr)] || 1;
+const diceMem = tr => { const all = store.get(DICE_KEY, {}) || {}, m = all[diceKey(tr)]; return m && typeof m === 'object' ? { locks: Array.isArray(m.locks) ? m.locks : [], fm: m.fm || null } : { locks: [], fm: null }; };
+const setDiceMem = (tr, patch) => { const all = store.get(DICE_KEY, {}) || {}; all[diceKey(tr)] = { ...diceMem(tr), ...patch }; store.set(DICE_KEY, all); };
+function diceRow(tr) {
+  const groups = DICE_GROUPS[tr.type];
+  if (!groups) return '';
+  const R = composeStyle(), locks = new Set(diceMem(tr).locks);
+  const off = R ? '' : ` disabled title="${esc(t('diceNoStyle'))}"`;
+  return `<div class="tp-dice" role="group" aria-label="${esc(t('diceGroup'))}">
+      <button class="btn small" id="pt-dice"${off || ` title="${esc(t('diceTip'))}"`}>${DICE}<span>${esc(t('diceRoll'))}</span></button>
+      <label class="tp-cnum" for="pt-dnum"><span class="lbl">#</span><input type="number" id="pt-dnum" min="1" max="9999" step="1" value="${diceNumOf(tr)}" aria-label="${esc(t('diceNum'))}" title="${esc(t('diceNumTip'))}"${R ? '' : ' disabled'}></label>
+      <span class="lbl tp-dlocks-lbl" title="${esc(t('diceLockTip'))}">${LOCK}<span>${esc(t('diceKeep'))}</span></span>
+      <div class="chips tp-dlocks">${groups.map(g => `<button class="chip" data-dlock="${g}" aria-pressed="${locks.has(g)}" title="${esc(t('diceLockTip'))}">${esc(t(`diceLock:${g}`))}</button>`).join('')}</div>
+    </div>`;
+}
+// the settings the dice may change (the level, octave, mode, patterns and clips never)
+const DICE_KEYS = ['wave', 'type', 'kit', 'tone', 'cutoff', 'reso', 'drive', 'delay', 'room', 'vary'];
+function rollTrackSound(tr) {
+  const R = composeStyle();
+  if (!R || !DICE_GROUPS[tr.type]) { toast(t('diceNoStyle')); return; }
+  const n = diceNumOf(tr), mem = diceMem(tr), full = { ...baseSettings(tr.type), ...tr.settings };
+  const out = rollSound({ track: { ...tr, settings: full }, recipe: R, seedBase: `${T.id}:${tr.id}:sound`, n, locks: mem.locks, energy: composeEnergy, owned: mem.fm });
+  if (!out) return;
+  const before = { settings: clone(tr.settings), rack: tr.rack ? clone(tr.rack) : undefined, fm: mem.fm }, who = tr;
+  for (const k of DICE_KEYS) {
+    if (k in out.settings) { if (JSON.stringify(out.settings[k]) !== JSON.stringify(full[k])) tr.settings[k] = out.settings[k]; }
+    else if (k in tr.settings) delete tr.settings[k];
+  }
+  if (out.rack.length || tr.rack) tr.rack = out.rack;
+  setDiceMem(tr, { fm: out.owned });
+  diceNums[diceKey(tr)] = n + 1;
+  changed(); renderTrackPanel();
+  toast(t('diceRolled', { n }), { label: t('patUndo'), run: () => {
+    who.settings = before.settings;
+    if (before.rack) who.rack = before.rack; else delete who.rack;
+    setDiceMem(who, { fm: before.fm });
+    changed(); renderTrackPanel();
+  } });
+}
 // the style of the song for the generator: its first style tag, else the style closest to its tempo and meter
 function composeStyle() {
   const tag = ((T.tags || {}).styles || []).map(styleId).find(id => RECIPES.some(r => r.id === id));
@@ -4313,6 +4359,7 @@ function panelHtml(ti) {
     <div class="tp-editor">${editor}</div>
     <div class="tp-scope"${tr.type === 'voice' ? ' hidden' : ''}><span class="lbl">${t('settingsScope')}</span>
       <div class="chips"><button class="chip" data-scope="track" aria-pressed="${scope === 'track'}">${t('scopeTrack')}</button><button class="chip" data-scope="section" aria-pressed="${scope === 'section'}" ${focusClip(tr) ? '' : 'disabled'}>${esc(arrMode === 'timeline' && selClip !== null ? t('scopeClip') : t('scopeSection', { name: SEC().name }))}</button></div></div>
+    ${diceRow(tr)}
     <div class="ctrls">${tr.type === 'voice' || tr.type === 'spoken' ? vstyleHtml() : ''}${(CONTROLS[tr.type] || []).map(settingHtml).join('')}</div>
     <div class="tp-rack"><div class="row"><span class="lbl">Rack</span><span class="hint">${t('rackHint')}</span></div>
       <div class="rack-list">${(tr.rack || []).map((d, i) => deviceHtml(d, i, tr)).join('') || `<p class="note">${t('noDevices')}</p>`}</div>
@@ -4438,6 +4485,7 @@ $('#track-panel').addEventListener('input', e => {
   if (k) { let v = e.target.value; if (e.target.type === 'range') v = e.target.dataset.cut ? rangeToCut(+v) : +v; setSetting(k, v); changed(); syncTrackPanel(); return; }
   if (role(e.target) === 'tk-name') { curTrack().name = e.target.value; changed(); return; }
   if (role(e.target) === 'pt-cnum') { const v = Math.round(+e.target.value); if (v >= 1) composeNums[`${T.id}:${curTrack().id}`] = v; return; }
+  if (role(e.target) === 'pt-dnum') { const v = Math.round(+e.target.value); if (v >= 1) diceNums[diceKey(curTrack())] = v; return; }
   if (role(e.target) === 'pt-cguitar') { composeGuitar = e.target.value === 'chords' ? 'chords' : 'riff'; return; }
   if (role(e.target) === 'pt-cenergy') { composeEnergy = +e.target.value; const o = e.target.closest('.tp-cen').querySelector('output'); if (o) o.textContent = `${Math.round(composeEnergy * 100)}%`; return; }
   if (role(e.target) === 'pt-code') { const v = e.target.value; clearTimeout(codeTimer); codeTimer = setTimeout(() => editPattern(p => { p.code = v; }), 400); return; }
@@ -4553,6 +4601,8 @@ $('#track-panel').addEventListener('click', e => {
     return;
   }
   if (r === 'pt-compose') return composePattern(tr);
+  if (r === 'pt-dice') return rollTrackSound(tr);
+  if (b.dataset.dlock) { const g = b.dataset.dlock, l = new Set(diceMem(tr).locks); if (l.has(g)) l.delete(g); else l.add(g); setDiceMem(tr, { locks: [...l] }); b.setAttribute('aria-pressed', String(l.has(g))); return; }
   if (r === 'pt-listen') return listenPattern(tr);
   if (r === 'pt-preview') { if (labPreview) labPreview.stop(); preview.toggle(tr.id, patOf(tr)); syncPreviewButtons(); return; }
   if (r === 'pt-savepat') return savePattern(tr);

@@ -40,7 +40,7 @@
     "max": 6
   },
   "drums": {
-    "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
+    "material": { "source": "mix", "share": 0.2, "families": ["four-floor"], "tones": {"kick": {"decay": [0.3, 0.55], "drive": [0, 0.3]}, "snare": {"decay": [0.12, 0.3], "drive": [0, 0.3]}, "hats": {"decay": [0.04, 0.14], "drive": [0, 0.1], "cutoff": [9000, 18000]}}, "variation": { "amount": 0.2, "targets": ["pan", "decay"] } },
     "kits": [
       "RolandTR909",
       "RolandTR707"
@@ -59,7 +59,7 @@
     }
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["rolling", "offbeat", "octaves"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["rolling", "offbeat", "octaves"], "variation": { "amount": 0.2, "targets": ["lpf"] } },
     "presets": [
       "rolling",
       "offbeat",
@@ -81,7 +81,7 @@
     }
   },
   "arp": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["up", "pedal", "skips"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["up", "pedal", "skips"], "variation": { "amount": 0.25, "targets": ["pan", "lpf"] } },
     "presets": [
       "su",
       "pulsar",
@@ -106,7 +106,7 @@
     }
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["tail", "call-response"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["tail", "call-response"], "variation": { "amount": 0.25, "targets": ["pan", "lpf"] } },
     "presets": [
       "neon",
       "segnale",
@@ -128,7 +128,7 @@
     }
   },
   "pad": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"], "variation": { "amount": 0.25, "targets": ["pan", "lpf"] } },
     "presets": [
       "sidechain",
       "pump"

@@ -46,6 +46,7 @@ Randomness is always seeded: the same song gives the same sound, in the app, in 
 | 8 | `growth-shapes` | Openings, pace and development of a live build, chosen by song, style or seed | #64 |
 | 9 | `voice-instrument` | Spoken lines as part of a song | #39 |
 | 10 | `radio-variation` | Vary a part on air; Add and More complex compose; curves steer the generator | #24 |
+| 11 | `random-sound-params` | Sound dice in Compose; composed drum tones and seeded per-hit variation in new songs | #94 |
 
 ### How they connect
 

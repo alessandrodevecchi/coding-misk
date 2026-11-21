@@ -7,7 +7,7 @@ import { memoOn, baseId, contextVersion, caches, keep, work, timed } from './ste
 import { stateAt, buildSteps } from '../song/build.js';
 import { playing, curveParts, CURVES } from './energy.js';
 import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, GROOVES, PROGS, meterSteps, fitSteps } from '../music.js';
-import { airIdea, airGroove, rowsKey, composesOnAir, sessionSource, readyParts } from './material.js';
+import { airIdea, airGroove, rowsKey, composesOnAir, sessionSource, readyParts, soundOf, toneFor, varyFor } from './material.js';
 import { presetOf, compose } from '../material/index.js';
 import { rewriteSpoken, nextQuiet, newSpokenTrack, wherePartsOf } from './voice-track.js';
 import { whereOfTrack } from '../song/spoken.js';
@@ -501,7 +501,18 @@ function newTrack(P, O, part, st, at, seed) {
     const rest = (list || []).filter(x => !held.has(x));
     if (rest.length) { const a = (t.patterns.A || {}).speed; t.patterns = { A: { [key]: r.pick(rest), ...(a ? { speed: a } : {}) } }; }
   }
-  if (!same.length) return t;
+  // composed tones and variation (random-sound-params D3, D6) at session sound 1 or more, on the finished track: a new
+  // kit gets its own tone and the track its own variation, seeded by the command
+  const withSound = () => {
+    if (soundOf(O) < 1 || !t.settings) return t;
+    const e = airInputs(P, O, st, at).energy, set = { ...t.settings };
+    if (t.type === 'drums') set.tone = toneFor({ ...t, settings: set }, R, `${seed}:tone:0`, e);
+    const v = varyFor({ ...t, settings: set }, R, `${seed}:vary`, e);
+    if (v) set.vary = v; else delete set.vary;
+    t.settings = set;
+    return t;
+  };
+  if (!same.length) return withSound();
   // the sound: one of the style's the instrument does not use, a composed one when the style names sound kinds
   const rr = R[t.type] || {}, s = t.settings;
   const other = (list, key) => { const used = new Set(same.map(x => (x.settings || {})[key])), rest = (list || []).filter(x => !used.has(x)); return rest.length ? r.pick(rest) : (list && list.length ? r.pick(list) : s[key]); };
@@ -525,7 +536,7 @@ function newTrack(P, O, part, st, at, seed) {
   // the level: under the instrument's loudest track (x 0.75 for a second one, x 0.6 for a third or a second bass) (the headroom rule scales the whole song)
   const gains = same.map(x => (x.settings || {}).gain).filter(Number.isFinite);
   if (Number.isFinite(s.gain)) s.gain = round2((gains.length ? Math.max(...gains) : s.gain) * (same.length === 1 && part !== 'bass' ? 0.75 : 0.6));
-  return t;
+  return withSound();
 }
 const KIND_OF_TYPE_MELODIC = ['bass', 'arp', 'hook', 'pad', 'guitar'];
 // The track "−" takes away (D2): among the playing tracks of the instrument, the listener's last one, else the one
