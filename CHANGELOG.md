@@ -11,6 +11,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Settings: "Deep beat analysis" option, off by default, that downloads the third-party beat tracker Beat This! (about 88 MB, files pinned by SHA-256) with progress, Cancel and Remove, and a disclaimer on its licence, training data, size, host and on-device use.
 - Decode: with "Deep beat analysis" on and downloaded, Full takes its beat grid from Beat This! and names it in the panel.
 - Local build flag `VITE_DECODE_BEAT_TRACKER` that starts "Deep beat analysis" on.
+- `tools/local-models.mjs`: local dev server plugin that serves the "Deep beat analysis" model files from one folder on the machine, copied into each local origin's cache after the SHA-256 check.
 - `tools/check-beat-tracker.cjs`: browser check of the "Deep beat analysis" card and of Full with and without the tracker.
 - Code: Instrument name option (Random per song, `$:`, name at line start) and Names from option (instrument or track), in Compose's code options, the radio's Custom section and the Decode tab's Options.
 - `tools/check-light-start.cjs`: browser check of a light start (no Sounds photo at startup, layout shift under 0.1 at desktop and phone width).

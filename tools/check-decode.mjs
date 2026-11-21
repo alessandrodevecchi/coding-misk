@@ -796,6 +796,28 @@ if (process.argv.includes('--app')) {
     states.push([ST.beatThisChosen(), ST.beatThisOn()]);
     ST.setBeatThisChosen(false);
     states.push([ST.beatThisChosen(), ST.beatThisOn(), fake.getItem(ST.BEAT_THIS_OPT)]);
+    // (round 14, d12h) the local copy: '' in Node and in the build, so nothing is tried; a file that does not match its
+    // pin is not kept; the files of this machine's shared folder (when there) fill the cache and the flag
+    {
+      const store = new Map(), fakeCaches = { open: async () => ({ match: async u => store.get(u), put: async (u, r) => { store.set(u, r); } }), delete: async () => store.clear() };
+      const hadCaches = Object.getOwnPropertyDescriptor(globalThis, 'caches');
+      Object.defineProperty(globalThis, 'caches', { value: fakeCaches, configurable: true, writable: true });
+      ST.setBeatThisChosen(true); fake.removeItem(ST.BEAT_THIS_KEY);
+      const none = await ST.seedBeatThisLocal();
+      const bad = await ST.seedBeatThisLocal({ base: '/__local-models/', fetchFn: async () => new Response(new Uint8Array(4)) });
+      const seeded = [ST.BEAT_THIS_LOCAL, none, bad, store.size, ST.beatThisInstalled()];
+      const { LOCAL_MODELS_DIR, localModels } = await import('./local-models.mjs');
+      const plugin = localModels(), def = plugin.config().define;
+      const cfg = fs.readFileSync('vite.config.js', 'utf8');
+      check(JSON.stringify(seeded) === JSON.stringify(['', false, false, 0, false]) && plugin.apply === 'serve' && def['import.meta.env.VITE_DECODE_BEAT_TRACKER'] === '"on"' && def['import.meta.env.VITE_DECODE_BEAT_LOCAL'] === '"/__local-models/"' && !/local-models/.test(cfg), 'beat tracker local copy (d12h): nothing tried without the local path, a file off its pin not kept, the plugin only for the dev server and never in vite.config.js');
+      if (Object.values(BT.BEAT_THIS_FILES).every(f => fs.existsSync(path.join(LOCAL_MODELS_DIR, f.name)))) {
+        const ok = await ST.seedBeatThisLocal({ base: '/__local-models/', fetchFn: async u => new Response(fs.readFileSync(path.join(LOCAL_MODELS_DIR, u.split('/').pop()))) });
+        const st = await ST.beatThisStatus();
+        check(ok && ST.beatThisInstalled() && st.installed && st.bytes === BT.BEAT_THIS_BYTES, 'beat tracker local copy (d12h): the shared folder\'s files fill the cache, pinned, and the option is ready');
+      } else console.log(`skip  beat tracker local copy: model files not in ${LOCAL_MODELS_DIR}`);
+      if (hadCaches) Object.defineProperty(globalThis, 'caches', hadCaches); else delete globalThis.caches;
+      ST.setBeatThisChosen(false); fake.removeItem(ST.BEAT_THIS_KEY);
+    }
     if (had) Object.defineProperty(globalThis, 'localStorage', had); else delete globalThis.localStorage;
     check(JSON.stringify(states) === JSON.stringify([[false, false, false], [false, false], [true, true], [true, false], [false, false, '"off"']]), 'beat tracker option: off by default (no build flag in Node) even with the files there; on with the files, used; on without them, not used; off again', JSON.stringify(states));
     const srcFiles = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? srcFiles(path.join(dir, e.name)) : /\.m?js$/.test(e.name) ? [path.join(dir, e.name)] : []));

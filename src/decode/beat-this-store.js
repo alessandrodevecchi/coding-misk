@@ -15,6 +15,10 @@ export const BEAT_THIS_OPT = 'coding-misk-beat-this-opt';
 // git-excluded vite.local.config.mjs can, with define; the published build never does). In Node there is no
 // import.meta.env: off
 export const BEAT_THIS_DEFAULT_ON = (() => { try { return import.meta.env.VITE_DECODE_BEAT_TRACKER === 'on'; } catch (e) { return false; } })();
+// local only (decode round 14, d12h): the dev server's path to the model files kept once on this machine
+// (tools/local-models.mjs, added only by the owner's git-excluded vite.local.config.mjs); '' everywhere else, the
+// published build included
+export const BEAT_THIS_LOCAL = (() => { try { return import.meta.env.VITE_DECODE_BEAT_LOCAL || ''; } catch (e) { return ''; } })();
 const hexToB64 = hex => btoa(String.fromCharCode(...hex.match(/../g).map(h => parseInt(h, 16))));
 const sha256 = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
 const ls = () => { try { return globalThis.localStorage || null; } catch (e) { return null; } };
@@ -32,9 +36,34 @@ export function beatThisInstalled() { const v = read(BEAT_THIS_KEY); return !!(v
 // → whether Full uses the tracker: the option on and the files downloaded
 export function beatThisOn() { return beatThisChosen() && beatThisInstalled(); }
 
+// local only: copies the files from the local path into this origin's cache, each checked against its pin, when the
+// option is on and a file is missing (once per page; tried again after a failure). → whether the files are there afterwards. Quiet on a failure: the
+// card then offers the normal download
+let seeding = null;
+export function seedBeatThisLocal({ base = BEAT_THIS_LOCAL, fetchFn = globalThis.fetch } = {}) {
+  if (!base || !globalThis.caches || !beatThisChosen()) return Promise.resolve(false);
+  if (!seeding) seeding = (async () => {
+    try {
+      const c = await caches.open(BEAT_THIS_CACHE);
+      for (const f of Object.values(BEAT_THIS_FILES)) {
+        if (await c.match(f.url)) continue;
+        const res = await fetchFn(`${base}${f.name}`, { cache: 'no-store' });
+        if (!res.ok) return false;
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        if (bytes.length !== f.bytes || (await sha256(bytes)) !== f.sha256) return false;
+        await c.put(f.url, new Response(bytes, { headers: { 'content-type': 'application/octet-stream', 'content-length': String(bytes.length), 'x-sha256': f.sha256 } }));
+      }
+      write(BEAT_THIS_KEY, { installed: true, at: Date.now(), local: true });
+      return true;
+    } catch (e) { return false; }
+  })().then(ok => { if (!ok) seeding = null; return ok; });
+  return seeding;
+}
+
 // → { installed, bytes, supported } from the cache itself (the Settings card, only while the option is on)
 export async function beatThisStatus() {
   if (!globalThis.caches) return { installed: false, bytes: 0, supported: false };
+  if (BEAT_THIS_LOCAL) await seedBeatThisLocal();
   try {
     const c = await caches.open(BEAT_THIS_CACHE);
     let bytes = 0, all = true;
