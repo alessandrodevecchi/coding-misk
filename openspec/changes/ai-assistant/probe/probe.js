@@ -4,10 +4,15 @@
 // after each step, so a crash still leaves data. No network besides localhost.
 // Round 2 (probeVersion 2): enums for pattern names and track ids, an anyOf branch per command kind when the model
 // takes it, 20 s per request, 10 new requests, a variance run, and Compose with an anyOf branch per track type.
+// Round 3 (probeVersion 3, the default since the MVP; the page stays as a prompt bench): the app's real registry,
+// prompt, schema and guards (src/ai/commands.js, src/ai/generate.js) on the radio requests of both rounds, scored on
+// the commands the app would apply (pattern names matched, unknown ones rejected, "cannot" answered before the model).
+// Results: notes/nano-probe-results-v3-<time>.json. ?round2 runs round 2 as it was (with ?all its extra tests).
 
 const $ = s => document.querySelector(s);
-const runId = `v2-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`;
-const R = { runId, probeVersion: 2, started: new Date().toISOString(), finished: null, imports: {}, tests: {}, errors: [], log: [] };
+const ROUND2 = new URLSearchParams(location.search).has('round2');
+const runId = `${ROUND2 ? 'v2' : 'v3'}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`;
+const R = { runId, probeVersion: ROUND2 ? 2 : 3, started: new Date().toISOString(), finished: null, imports: {}, tests: {}, errors: [], log: [] };
 const now = () => performance.now();
 const clone = o => JSON.parse(JSON.stringify(o));
 
@@ -58,11 +63,12 @@ addEventListener('unhandledrejection', e => { R.errors.push({ type: 'rejection',
 let M = null;
 const loading = (async () => {
   try {
-    const [steering, validate, format, music, rack] = await Promise.all([
+    const [steering, validate, format, music, rack, registry, generate] = await Promise.all([
       import('/src/endless/steering.js'), import('/src/song/validate.js'), import('/src/song/format.js'), import('/src/music.js'), import('/src/song/rack.js'),
+      import('/src/ai/commands.js'), import('/src/ai/generate.js'),
     ]);
     const song = await (await fetch('/songs/examples/02-bass-and-chords.json')).json();
-    M = { steering, validate, format, music, rack, song };
+    M = { steering, validate, format, music, rack, song, registry, generate };
     R.imports = { ok: true, commands: Object.keys(steering.COMMANDS) };
   } catch (e) { R.imports = { ok: false, error: errInfo(e) }; log(`app modules failed to load: ${e}`, 'bad'); }
 })();
@@ -599,12 +605,69 @@ async function testReuse() {
   log(`reuse: ${JSON.stringify(T)}`);
 }
 
+// ---------- round 3: the app's registry, prompt, schema and guards ----------
+
+// round 2 on the owner's Chrome (notes/nano-probe-results-v2-2026-11-21T10-39-42.json), anyOf schema, the grades of the
+// requests that were not exact
+const ROUND2_NOT_EXACT = { 'the pad should play in thirds': 'partial', 'make it darker and calmer': 'partial', 'simplify it and stay on this part a bit longer': 'partial', 'change the tempo to 140 bpm': 'wrong', 'replace the bass with the acid line pattern': 'partial', 'più energia e togli un basso': 'partial', 'add neon hook': 'wrong', 'add my saved pattern Sunset Lead': 'wrong', 'make it warmer and softer': 'wrong' };
+const ROUND2_SUMMARY = { english: { exact: 30, partial: 4, wrong: 4 }, latencyMs: { median: 2254 } };
+const V3_CTX = () => ({ tracks: TRACKS.map(([id, instrument]) => ({ id, name: id, instrument, type: instrument })), patterns: PATTERNS.map((name, i) => ({ id: `p${i}`, name, type: 'bass' })), lockedParts: [], lockedTracks: [], voiceHelper: true, why: () => null });
+const V3_STATE = () => ({ style: 'berlin-techno', energy: '3 of 5', part: 'build', tracks: TRACKS.map(([id, instrument]) => ({ id, instrument })), patterns: PATTERNS, lockedParts: [], disabled: [] });
+// the commands the app would apply, in the probe's expected form (a pattern by its matched name)
+const applied = r => r.items.filter(it => it.cmd && !it.error && !it.why).map(it => ({ kind: it.kind, ...it.args, ...(it.kind === 'pattern' ? { name: it.cmd.item.name } : {}) }));
+
+async function runRadioV3() {
+  const T = R.tests.radioV3 = { mode: 'registry' };
+  const G = M.generate, Reg = M.registry, ctx = V3_CTX(), state = V3_STATE();
+  const initial = G.initialPrompts(), schema = G.answerSchema(ctx);
+  T.prompt = { initial, schema, state, registryVersion: Reg.REGISTRY_VERSION, sizeTokens: G.promptSize(state) };
+  const cr = await timed(() => create({ initialPrompts: initial }, 'radio-v3'));
+  if (!cr.ok) { T.createError = cr.error; log(`radio v3: session failed ${cr.error.name}: ${cr.error.message}`, 'bad'); RADIO_REQUESTS.forEach(step); return; }
+  const base = cr.value.s;
+  T.createMs = cr.value.ms; T.usageSystemAndExamples = await usageOf(base); T.window = ctxWindow(base);
+  log(`radio v3: base session ${T.createMs} ms, usage ${T.usageSystemAndExamples} of ${T.window}`);
+  T.results = [];
+  for (const req of RADIO_REQUESTS) {
+    status(`Radio console (v3): ${T.results.length + 1}/${RADIO_REQUESTS.length}`);
+    const pre = Reg.precheck(req.q, ctx);
+    let row;
+    if (pre.cannot) row = { q: req.q, cat: req.cat, expected: req.exp, guard: 'cannot', note: pre.cannot, ms: 0, validJson: true, applied: [], ...score({ commands: [] }, req.exp) };
+    else {
+      const cl = await timed(() => base.clone());
+      const sess = cl.ok ? cl.value : (await create({ initialPrompts: initial }, 'radio')).s;
+      const r = await ask(sess, G.requestText(state, req.q), { responseConstraint: schema }, RADIO_MS);
+      let json = null, parseError = null;
+      if (r.ok) { try { json = JSON.parse(r.value); } catch (e) { parseError = String(e); } }
+      const read = json ? Reg.readAnswer(json, ctx) : { invalid: true, items: [] };
+      const app = read.invalid ? null : applied(read);
+      const rejected = read.invalid ? [] : read.items.filter(it => it.error).map(it => `${it.kind}: ${it.error} ${JSON.stringify(it.vars || {})}`);
+      row = { q: req.q, cat: req.cat, expected: req.exp, raw: r.ok ? r.value : undefined, json, parseError, error: r.error, ms: r.ms, validJson: !!json, note: read.note, cannot: !!read.cannot, rejected, applied: app, ...(app ? score({ commands: app }, req.exp) : { grade: 'invalid' }) };
+      try { sess.destroy(); } catch (e) { /* ignore */ }
+    }
+    row.vague = !!pre.vague; row.round2 = ROUND2_NOT_EXACT[req.q] || 'exact';
+    T.results.push(row);
+    log(`${row.grade.padEnd(7)} ${row.ms} ms ${row.vague ? '[vague] ' : ''}${row.guard ? '[cannot before the model] ' : ''}"${req.q}" -> ${row.raw ?? row.note ?? ''}${row.rejected && row.rejected.length ? `  rejected: ${row.rejected.join('; ')}` : ''}`, row.grade === 'exact' ? 'ok' : row.grade === 'partial' ? '' : 'bad');
+    step(); save();
+  }
+  try { base.destroy(); } catch (e) { /* ignore */ }
+  const rows = T.results, en = rows.filter(x => x.cat !== 'italian'), ms = rows.filter(x => !x.error && x.ms).map(x => x.ms).sort((a, b) => a - b);
+  T.summary = {
+    allEnglish: countBy(en, 'grade'), italian: countBy(rows.filter(x => x.cat === 'italian'), 'grade'), total: rows.length, round2: ROUND2_SUMMARY,
+    vsRound2: { better: rows.filter(x => ROUND2_NOT_EXACT[x.q] && x.grade === 'exact').map(x => x.q), worse: rows.filter(x => !ROUND2_NOT_EXACT[x.q] && x.cat !== 'italian' && x.grade !== 'exact').map(x => x.q) },
+    cannotBeforeModel: rows.filter(x => x.guard === 'cannot').map(x => x.q), flaggedVague: rows.filter(x => x.vague).map(x => x.q), rejectedPatterns: rows.filter(x => (x.rejected || []).some(y => /pattern/.test(y))).map(x => x.q),
+    latencyMs: { median: ms[Math.floor(ms.length / 2)], max: ms[ms.length - 1], min: ms[0] },
+    byCategory: Object.fromEntries([...new Set(rows.map(x => x.cat))].map(c => [c, countBy(rows.filter(x => x.cat === c), 'grade')])),
+  };
+  log(`radio v3 summary: ${JSON.stringify(T.summary)}`, 'ok');
+}
+
 // ---------- run ----------
 
 // round 2 by default: environment, schema check, radio (anyOf if accepted, then flat with enums for comparison), variance,
 // compose. ?all adds round 1's context, image and reuse tests (already measured: window 9216, image ok, clone ~0 ms).
 const ALL = new URLSearchParams(location.search).has('all');
 async function runAll() {
+  if (!ROUND2) return runV3();
   $('#run').disabled = true; $('#log').textContent = ''; stepsDone = 0;
   stepsTotal = 2 + 2 * RADIO_REQUESTS.length + VARIANCE.length + COMPOSE_REQUESTS.length + (ALL ? 3 : 0);
   await loading;
@@ -628,6 +691,24 @@ async function runAll() {
     await guard('compose', testCompose);
     if (ALL) { await guard('image', testImage); step(); await guard('reuse', testReuse); step(); }
   } else if (!M) log('app modules missing: nothing more to test', 'bad');
+  R.finished = new Date().toISOString();
+  await save();
+  $('#bar > div').style.width = '100%';
+  status(R.savedTo ? `Done. Results saved to ${R.savedTo}` : 'Done, but the results could not be saved (see the log).');
+  log(R.savedTo ? `saved to ${R.savedTo}` : 'not saved', R.savedTo ? 'ok' : 'bad');
+  $('#run').disabled = false;
+}
+
+// round 3: environment, then the radio set with the app's registry and guards (about 5 minutes)
+async function runV3() {
+  $('#run').disabled = true; $('#log').textContent = ''; stepsDone = 0;
+  stepsTotal = 1 + RADIO_REQUESTS.length;
+  await loading;
+  log(`run ${runId} (probe v${R.probeVersion}, the app's registry and guards) on ${location.origin}`);
+  const guard = async (name, fn) => { const t = now(); try { return await fn(); } catch (e) { R.tests[name] = { ...(R.tests[name] || {}), crashed: errInfo(e) }; log(`${name} crashed: ${e && e.name}: ${e && e.message}`, 'bad'); return undefined; } finally { (R.tests[name] = R.tests[name] || {}).totalMs = Math.round(now() - t); await save(); } };
+  const go = await guard('environment', testEnvironment); step();
+  if (go !== false && M) await guard('radioV3', runRadioV3);
+  else if (!M) log('app modules missing: nothing more to test', 'bad');
   R.finished = new Date().toISOString();
   await save();
   $('#bar > div').style.width = '100%';

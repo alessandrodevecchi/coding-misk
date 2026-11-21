@@ -47,6 +47,8 @@ import { voiceSoundHtml, syncVoiceSound, soundEvent, nextSound, cleanSound, isAu
 import { dieHtml, knobSlider, artistChips, styleChips, trialChip, trialHint, diceRow, materialSeg, profileSelect, customPanel, voicesGroup, songControlEvent, lengthChips, applyTrial } from './song-controls.js';
 import { hasLength } from '../endless/song-options.js';
 import { createLoadMonitor } from './load-monitor.js';
+import { createAskRow } from '../ai/console-row.js';
+import { ENTRIES as ASK_ENTRIES } from '../ai/commands.js';
 
 const HISTORY = 50;
 const barsOf = song => song.sections.reduce((a, s) => a + s.bars, 0);
@@ -65,7 +67,7 @@ export function usableRecipes(list) {
 // keepArtist(artist): saves a random artist among the listener's, returns its id (#50)
 // invent(seed, { genre, base }): a new invented style (invented-styles); keepStyle(recipe): saves it among the user's, → id
 // userPatterns(): the user's saved patterns as the director reads them (pattern-library): they join a song where they fit
-export function createRadio({ root, t, tx, esc, store, options, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, invent = null, keepStyle = null, userPatterns = () => [], onPatternUsed = () => {}, reloadSamples = async () => {}, voiceFiles = () => ({}), mine = () => null, onTyped = () => {}, onSampleMade = () => {}, typedSaved = () => true, saveTyped = () => {} }) {
+export function createRadio({ root, t, tx, esc, store, options, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, invent = null, keepStyle = null, userPatterns = () => [], onPatternUsed = () => {}, reloadSamples = async () => {}, voiceFiles = () => ({}), mine = () => null, onTyped = () => {}, onSampleMade = () => {}, typedSaved = () => true, saveTyped = () => {}, openSettings = () => {} }) {
   const ids = recipes.map(r => r.id);
   // the options of how the next songs are made (new-song-panel D1): read, migrated and saved by the shared store under
   // coding-misk-radio, as before; the New song panel of Compose keeps its own values in a second instance
@@ -432,7 +434,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the recipe's lead: the song as written, its bar, and the profile and controls it keeps (D2; none for Classic)
   const leadRecord = L => ({ song: clone(L.song), from: L.from || 0, ...(L.profile ? { profile: L.profile } : {}), ...(L.controls ? { controls: clone(L.controls) } : {}) });
   function stopQuiet() { if (S) { S = null; } }
-  function stop() { if (!S) return; if (recS) stopRec(); S = null; player.stop(); render(); }
+  function stop() { if (!S) return; if (recS) stopRec(); S = null; player.stop(); if (askRow) askRow.release(); render(); }
   // pause keeps the session, the window and the bar; resume plays on from that bar
   function pause() { if (!S || S.paused !== undefined) return; S.paused = player.halt(); if (recS) { recS.cap.pause(); recS.pauseStart = performance.now(); } render(); }
   function resume() {
@@ -1574,9 +1576,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const at = applyBar('say-live', rel, item.plan, lead);
     return at > rel && at < barsOf(item.song) ? at : null;
   }
-  async function sayLine(mode) {
+  // (typed: a line from the assistant's row, ai-assistant; the console's field keeps its own text)
+  async function sayLine(mode, typed) {
     const item = S && S.stream[S.onAir]; if (!item || !item.plan) return;
-    const text = sv.line.trim().replace(/\s+/g, ' '), words = text ? text.split(' ').length : 0;
+    const text = (typed ?? sv.line).trim().replace(/\s+/g, ' '), words = text ? text.split(' ').length : 0;
     if (!text) return toast(t('plEmptyText'));
     if (words > 12) return toast(t('plTooMany', { n: words, max: 12 }));
     const song = item.plain || item.song, lang = getLang(), speaker = speakerIn(lang, lineSpeaker(song));
@@ -1584,7 +1587,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       const why = whyNot({ kind: 'say-live', mode }, song, item.plan, relNow());
       if (why) return toast(t('svNoPart'));
     }
-    sv.line = '';
+    if (typed === undefined) sv.line = '';
     // (the queue shows the bar Say now aims at while the sample comes)
     const w = { text, mode, item, at: mode === 'now' ? sayAt(item) : null }; sayWait.push(w); renderSteer(true);
     // (my-phrases D2, D3: the line is offered to my phrases, kind voice, the style's vocabulary group and the style)
@@ -1675,6 +1678,57 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // the song's state at a bar, kept for the bar (renderSteer runs four times a second; steps and clips are on whole bars)
   let stateMemo = null;
   const stateNow = (song, rel) => { const b = Math.floor(rel); if (!stateMemo || stateMemo.song !== song || stateMemo.b !== b) stateMemo = { song, b, st: stateAt(song, b).song }; return stateMemo.st; };
+  // ---------- the assistant's row (ai-assistant D0, D5) ----------
+  // why a command cannot apply now: the same reason the console's button shows in its tooltip (renderSteer's whyOf)
+  function whyNow(c) {
+    if (!S) return 'paused';
+    const item = S.stream[S.onAir];
+    if (!item.plan) return item.frozen ? 'frozen' : 'lead';
+    if (S.paused !== undefined) return 'paused';
+    const rel = relNow(), air = airSteer(item) && item.g0, o = item.opts || (item.base && item.base.opts) || {};
+    return air ? airWhy(c, { rel, plan: item.plan, base: item.base.plan, grown: item.g0, plain: item.plain || item.base.song, tail: tailOf(item), opts: o }) : whyNot(c, item.song, item.plan, rel, tailOf(item), o);
+  }
+  // the validation context of the registry: the tracks of the song on air now, the saved patterns that fit it, the locks
+  function askCtx() {
+    const item = S.stream[S.onAir], rel = relNow(), air = airSteer(item) && item.g0, songNow = air ? item.plain || item.base.song : item.song;
+    const st = stateNow(item.song, rel), now = x => x.clips.some(c => c.start <= rel && c.start + c.bars > rel);
+    const tracks = st.tracks.filter(x => !['voice', 'spoken', 'riser'].includes(x.type) && now(x)).map(x => ({ id: x.id, name: x.name || x.id, type: x.type, instrument: instrumentOf(x) || x.type, mute: !!x.mute }));
+    const patterns = userPatterns().filter(x => fitsAir(x, item.plan, songNow)).sort((a, b) => (Number(b.uses) || 0) - (Number(a.uses) || 0));
+    return { tracks, patterns, lockedParts: item.plan.lockedParts || [], lockedTracks: lockedIds(item.plan), why: whyNow, voiceHelper };
+  }
+  // the song on air as the prompt says it (D3)
+  function askState() {
+    const item = S.stream[S.onAir], ctx = askCtx(), rel = relNow();
+    let a = 0, sec = item.song.sections[0];
+    for (const x of item.song.sections) { if (rel >= a) sec = x; a += x.bars; }
+    const disabled = ASK_ENTRIES.filter(e => !Object.keys(e.args.properties).length).map(e => [e.kind, whyNow({ kind: e.kind })]).filter(([, w]) => w).map(([k, w]) => `${k} (${w})`);
+    return { style: (item.entry.styles || []).map(styleName).join(' + '), part: sec && sec.name, tracks: ctx.tracks.map(x => ({ id: x.id, instrument: x.mute ? `${x.instrument}, muted` : x.instrument })), lockedParts: ctx.lockedParts, patterns: ctx.patterns.map(x => x.name || x.id), disabled };
+  }
+  // a saved pattern from a request: the same path as the panel's buttons (a new track waits in its batch, a replace is
+  // queued), the pattern without the console's counters, one use counted
+  function askPattern(c) {
+    const id = c.item.id, item = JSON.parse(JSON.stringify(c.item));
+    delete item.created; delete item.uses; delete item.lastUsed;
+    const ok = c.mode === 'new' ? pendPattern(item) : command({ kind: 'pattern', mode: 'replace', target: c.target, item, by: 'assistant' });
+    if (ok) { onPatternUsed(id); renderSteer(); }
+    return !!ok;
+  }
+  const askRow = typeof document === 'undefined' ? null : createAskRow({
+    t, esc, store, getLang, openSettings,
+    radio: {
+      ready: () => !!(S && S.stream[S.onAir] && S.stream[S.onAir].plan && S.paused === undefined),
+      state: askState, ctx: askCtx,
+      label: c => cmdLabel(c.kind === 'pattern' && c.mode === 'new' ? { ...c } : c, S && S.stream[S.onAir]),
+      api: {
+        command: c => !!command({ ...c, by: 'assistant' }),
+        pend: (kind, part) => pend(kind, part),
+        pendLock: (key, kind, target) => pendLock(key, kind, target),
+        pattern: askPattern,
+        say: text => { sayLine('now', text); return true; },
+      },
+    },
+  });
+
   function renderSteer(force = false) {
     const box = root.querySelector('#radio-steer');
     if (!box || dragging) return;
@@ -1799,9 +1853,10 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const group = (name, html) => `<div class="steer-group${name === 'arrangement' ? ' arr' : ''}"><span class="lbl"${name === 'harmony' ? ` title="${esc(t(`steerGroupTip:${name}`))}"` : ''}>${esc(t(`steerGroup:${name}`))}</span><div class="steer-btns">${html}</div></div>`;
     // the saved patterns panel survives the rebuild (D1): the same node when nothing in it changed, else a new one that
     // takes the drawings already made; then its scroll, the focus and the search's caret come back
-    const spOld = box.querySelector('.sp'), spFocus = spFocusOf(spOld);
+    const spOld = box.querySelector('.sp'), spFocus = spFocusOf(spOld), askFocus = askRow ? askRow.focusState() : null;
     box.innerHTML = `<div class="steer-head"><div class="lbl">${esc(t('steerTitle'))}</div>
         <span class="hand-from steer-scope" ${tip('steerScopeTip')}><button class="led" id="steer-scope" aria-pressed="${opts.scope === 'session'}" aria-labelledby="steer-scope-lbl"></button><span id="steer-scope-lbl">${esc(t(opts.scope === 'session' ? 'steerScopeSession' : 'steerScopeSong'))}</span></span></div>
+      <div class="ask-slot"></div>
       <div class="steer-console">
         ${group('energy', btn({ kind: 'energy-up' }) + btn({ kind: 'energy-down' }))}
         ${group('arrangement', types)}
@@ -1821,6 +1876,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         <button class="mini" data-mix-lock="${esc(x.id)}" aria-pressed="${locked}" title="${esc(t('steerTip:lock'))}" aria-label="${esc(t('steerTip:lock'))}">${locked ? LOCK : LOCK_OPEN}</button>
         <button class="mini" data-mix-inst="${esc(x.id)}" title="${esc(t('steerTip:instrument'))}">♪</button></div>`; }).join('') || `<p class="muted">${esc(t('steerMixerEmpty'))}</p>`}</div>`;
     spMount(box.querySelector('.sp-slot'), spOld, savedPanel, spFocus);
+    if (askRow) askRow.mount(box.querySelector('.ask-slot'), askFocus);
     // (the locks waiting for their boundary keep their ring after a rebuild, D8)
     paintPending();
     paintExtend();
@@ -2435,6 +2491,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     get paused() { return !!S && S.paused !== undefined; },
     // the console alone drawn again: my phrases changed (a typed row's save button, #82)
     renderConsole() { renderSteer(true); },
+    // the assistant's row (ai-assistant; tools/check-ai.cjs): send a request, the last prompt sent
+    get ask() { return askRow; },
     // the console changes pending (tools/check-add-lag.cjs): per batch its boundary, counts, state and pushes
     get pendingAdds() { return batches.map(b => ({ id: b.id, at: b.at, at0: b.at0, parts: { ...b.parts }, pats: b.pats.map(x => x.part), locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), state: b.state, pushes: b.pushes, t0: b.t0, q: b.q, times: { ...(b.times || {}) }, moves: b.moves.slice(), presses: b.presses.slice(), head: b.head || null })); },
     // the last batches that entered: boundary planned and taken, pushes, whether under load, ms from the first press
