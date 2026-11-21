@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Built-in model probe</title>
+<style>
+  :root { color-scheme: light dark; --bg: #111; --fg: #eee; --muted: #999; --ok: #4c8; --bad: #e66; --accent: #6af; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, sans-serif; margin: 0; padding: 24px 16px; }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 16px; }
+  button { font: inherit; font-size: 18px; padding: 14px 28px; border-radius: 8px; border: 0; background: var(--accent); color: #000; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { margin: 16px 0 8px; font-weight: 600; }
+  #bar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; }
+  #bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  #log { margin-top: 16px; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; background: #000; padding: 12px; border-radius: 6px; max-height: 60vh; overflow: auto; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Built-in model probe</h1>
+  <p>One click runs every test (about 5 minutes). Results are saved to the project automatically after each test. Keep this tab in front until it says "Done".</p>
+  <button id="run">Run all tests</button>
+  <div id="status">Ready.</div>
+  <div id="bar"><div></div></div>
+  <div id="log"></div>
+</main>
+<script type="module" src="./probe.js"></script>
+</body>
+</html>
