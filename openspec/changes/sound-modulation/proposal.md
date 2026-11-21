@@ -1,0 +1,54 @@
+# Proposal
+
+## Why
+
+A held note in the app never moves (#95). Strudel reads effect values at each note's onset, so `.lpf(sine.slow(8))` on a pad held for a bar stays frozen for that bar, and `slider()` changes only the next notes. The app writes no modulator that runs inside a note except the Tremolo device: the catalog lists `env`, `lfo`, `lpenv`, `lpsync`, `bmod` and `duckorbit` as never written (`docs/STRUDEL-FUNCTIONS.md`).
+
+Three things are missing:
+
+- **Continuous movement inside a note or across bars:** a filter that opens over 8 bars, a filter or a pan that sways in time.
+- **Sidechain pump** on a held pad.
+- **A knob that moves a note already sounding.**
+
+Decode needs the same words: it cannot write a pumping pad until the app can play one, and it cannot learn to measure one without test songs whose modulation is known (owner's proposal, `notes/modulazione-proposta-2026-11-21.md`, steps 1 and 2).
+
+## Relationship with #94 (`random-sound-params`)
+
+- **#94 is per-hit seeded variation.** Each note gets a different random value, fixed at its onset (`vary`), plus composed drum tones (`tone`) and the sound dice in Compose.
+- **This change is movement with a shape over time,** inside a held note or across bars, plus live knobs. It holds no random value.
+- **Both write effect parameters on a track.** This change does not reuse `vary` or `tone`: modulation lives in the track's rack as devices, beside the two settings. It builds on #94's structures where they meet: the writer's "one call per control" merge, the validator rule that skips a `vary` target a rack device writes, the dice that keeps the user's rack devices, and the session `sound` version for future generator use (design D2).
+- **This change depends on #94 being merged first.** The implementation branches from `feat/94-random-sound-params`.
+
+## What Changes
+
+- **Three rack devices** for melodic tracks (bass, arp, hook, pad, guitar, code):
+  - **Sweep** ("Apertura"): moves a target (filter, high-pass, reverb send, delay send) from one value to another over 1 to 16 bars, linear or exponential, gliding inside held notes.
+  - **LFO** ("Oscillazione"): sways a target (filter, pan, reverb send, delay send) in time with the song, 1/16 bar to 4 bars, with a depth and a shape.
+  - **Pump** ("Pompa"): ducks the track on every kick through Strudel's `duckorbit`, with a depth and a recovery time; without a kick in the section, a gain LFO on the beat.
+- **Test songs at the Decode bench:** held-out app songs with pads modulated by known parameters (pump, filter LFO, tremolo, sweep), a reader of the modulation truth from a song, and a new envelope error per band and per beat phase next to the band error in `tools/decode-bench.cjs`.
+- **Live knobs, designed now, built in a later phase:** a device marked "live" gets one knob that moves sounding notes through Strudel's `bmod` bus, at most two per track. The knob appears inline on the device card in Compose, inside the existing Parts row of the radio console while that part plays a live device, and in code as a slider widget. A recorded knob path plays back in the fast export and becomes steps per bar in code copied out of the app.
+- **Existing songs are unchanged:** no new default setting, no version bump; a song without the new devices compiles byte for byte as today.
+
+## Out of scope (future work)
+
+- **Decode writes modulation** (owner's step 3): measuring pump, gate, sweep, tremolo and stab length in real tracks and writing them.
+- **Generator, Live coder growth and radio console commands** (owner's step 4): recipe fields such as "pump" for house and techno, a Live coder line that adds `.lpenv`, radio keys "Open the filter in 8 bars", "Pump", "Sway". They will draw from a new `material:mod` stream behind a `sound` version step from #94.
+
+## Capabilities
+
+### New Capabilities
+
+- `app/modulation-devices`: Sweep, LFO and Pump in the rack: arguments, code, level rule, how they meet track settings and #94's `vary`.
+- `app/live-knobs` (later phase): the "live" mark, the bus, the knob in Compose, radio and code, the recorded path and what export does with it.
+- `app/decode-modulation-bench`: the modulated test songs, the truth reader and the envelope error.
+
+### Modified Capabilities
+
+None. The rack and #94's variation keep their requirements; the meeting points are new requirements of `app/modulation-devices`.
+
+## Impact
+
+- Step 1: `src/song/rack.js` (three devices, a `writes` list per device), `src/song/compile.js` and `src/music.js` (the Pump write on kick lines, target base values), `src/song/validate.js`, `src/main.js` (device cards), `src/i18n.js`, `src/guide.js`, `docs/SONG-FORMAT.md`, `docs/STRUDEL-FUNCTIONS.md` (catalog: written), `docs/knowledge/`, `songs/examples/`.
+- Step 2: `tools/decode-songs.mjs`, `tools/decode-hits.mjs`, `tools/decode-bench.cjs`.
+- Later phase: `src/sounds/` (bus driver), `src/render/page.js` (path in the fast export), `src/radio/radio.js`, the code editor widgets (`src/live/widgets.js`, `src/widgets/app-widgets.js`), `src/style.css`.
+- Checks: `check:code` unchanged, `check:songs`, `check:strudel`, `check:functions`, `check-levels.cjs`, a new `check:modulation` (Node) and `tools/check-modulation.cjs` (browser), `check:decode`.
