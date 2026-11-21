@@ -8,7 +8,10 @@ Issue #25 plans optional agents with validated answers and "a small local server
 
 Research (21 November 2026, raw notes in the git-ignored `notes/`):
 
-- **Built-in model (Chrome Prompt API).** On web pages since Chrome 148, no origin trial for the base API. `LanguageModel.availability()` returns `unavailable`, `downloadable`, `downloading` or `available`; `create()` needs a user gesture while the model downloads and reports `downloadprogress`. The context window is not documented as a number: read `session.contextWindow` and `contextUsage`, measure with `measureContextUsage()` (older builds: `inputQuota`, `inputUsage`, `measureInputUsage`). On overflow the oldest turns go, the system prompt stays, and `QuotaExceededError` is thrown if that is not enough. `responseConstraint` takes a JSON Schema; `omitResponseConstraintInput` keeps the schema out of the context. `initialPrompts` with a system role, `clone()`, `destroy()`, AbortSignal. No tool calling. Languages: English, Spanish, Japanese, German, French (no Italian). Hardware: macOS 13+, 22 GB free disk, a GPU with more than 4 GB of VRAM or 16 GB of RAM and 4 cores. Whether `http://localhost` counts is not documented; the first task checks it on the owner's Mac.
+- **Built-in model (Chrome Prompt API).** On web pages since Chrome 148 (stable 5 May 2026), no origin trial for the base API; text, image and audio input are part of the shipped API, output is text only. `LanguageModel.availability()` returns `unavailable`, `downloadable`, `downloading` or `available`; `create()` needs a user activation while the model is `downloadable` or `downloading`, and its `monitor` reports `downloadprogress`. The context window is not documented as a number: read `session.contextWindow` and `contextUsage`, measure with `measureContextUsage()` (old names `inputQuota`, `inputUsage`, `measureInputUsage` are removed on the web, deprecated in extensions). Early releases reported about 4k to 6k tokens; nothing official is newer. On overflow the oldest turns go, the system prompt stays, and `QuotaExceededError` is thrown if that is not enough. `responseConstraint` takes a JSON Schema; `omitResponseConstraintInput` keeps the schema out of the context. `initialPrompts` with a system role, `clone()`, `destroy()`, AbortSignal. No tool calling. Languages: English, Spanish, Japanese, German, French (German and French from Chrome 149; no Italian). Hardware: macOS 13+, 22 GB free on the profile volume (a requirement, not the download size), a GPU with more than 4 GB of VRAM or 16 GB of RAM and 4 cores (audio input needs the GPU).
+- **Size and storage.** The model itself is about 4 GB (4.0 GB on the owner's Mac, Chrome 158, folder `OptGuideOnDeviceModel` in Chrome's user data directory). It is one copy per Chrome install, shared by every site and every profile: a project that already triggered it reuses it. Below 10 GB free it is deleted; the Prompt API page says it comes back once the requirements are met, the model-management page says it is not downloaded again by itself, so the app treats a deleted model as `downloadable` again. `chrome://on-device-internals` shows the model, its version and errors; the old entry in `chrome://components` is gone in current builds.
+- **Where it runs.** `LanguageModel` is `[Exposed=Window, SecureContext]`: top-level windows and same-origin iframes (cross-origin iframes need `allow="language-model"`, default allowlist `'self'`), never workers. `http://localhost` is a potentially trustworthy origin, so the dev server qualifies; Chrome's docs have a "Troubleshoot localhost" section but do not state it outright, so task 1.1 confirms it.
+- **Managed browsers.** Two Chrome Enterprise policies can turn the engine off: `GenAILocalFoundationalModelSettings` (machine level, default 0 = download and use; 1 = no download and the model is deleted) and `BuiltInAIAPIsEnabled` (per profile, default true; false makes the API calls fail). A work Google profile can carry them; `chrome://policy` lists them and `chrome://management` says whether the browser or profile is managed. The engine reports this as `unavailable` with the reason "turned off by your organisation" when `availability()` says unavailable and the hardware is fine.
 - **OpenRouter.** `GET /api/v1/models` needs no key and returns `id`, `canonical_slug`, `name`, `created`, `expiration_date`, `pricing`, `context_length`, `supported_parameters` and more (476 models, 407 with `structured_outputs`). It also lists alias ids such as `~anthropic/claude-haiku-latest`. CORS is open (`access-control-allow-origin: *`). Structured output: `response_format: { type: "json_schema", json_schema: { name, strict: true, schema } }` with `provider: { require_parameters: true }`. Free models (`:free`): 20 requests a minute, 50 a day, 1000 a day once 10 credits were ever bought; `GET /api/v1/key` reports the daily free count.
 - **Anthropic API.** `GET /v1/models` lists the current models with `id`, `display_name`, `created_at`. Browser calls need a special opt-in header; calls through the helper do not.
 
@@ -73,6 +76,7 @@ Generated, never hand-copied, so it follows the console:
           },
           "type": { "enum": ["lead", "bass", "arp", "pad", "guitar"] },
           "track": { "type": "string" },
+          "name": { "type": "string", "maxLength": 60 },
           "value": { "type": "number" },
           "treatment": { "type": "string" },
           "to": { "type": "string" },
@@ -89,9 +93,11 @@ Generated, never hand-copied, so it follows the console:
 
 `note` is a short reply when nothing fits ("I can't change the tempo from the console").
 
-**MVP command set:** energy, more and less of an instrument, the instrument locks, more and less complex, riser, part harmony, vary, swap, the five sound commands, change instrument, change chords, change key, talk more and less, add a line (`say-live`), drop, stay, extend, end, and the mixer (volume, mute, back, lock, unlock). Left out: the legacy `add` and `remove`, `pattern` (needs a saved pattern by name, later), `voice` and `voice-sound` (preset forms), `curve` and `curve-reset` (drawn values).
+**MVP command set:** energy, more and less of an instrument, the instrument locks, more and less complex, riser, part harmony, vary, swap, the five sound commands, change instrument, change chords, change key, talk more and less, add a line (`say-live`), a saved pattern by name (`pattern`), drop, stay, extend, end, and the mixer (volume, mute, back, lock, unlock). Left out: the legacy `add` and `remove`, `voice` and `voice-sound` (preset forms), `curve` and `curve-reset` (drawn values).
 
-**Size.** Total about 1.5k tokens with the schema, about 1.2k with `omitResponseConstraintInput`. That fits a context window of 4k or more with room to spare. The full knowledge note (about 6k tokens) is never sent. If a build reports a smaller window, the builder drops in order: the examples down to 2, the kinds disabled now, the help text (kind names only). `npm run check:ai` fails when the prompt passes 2k tokens (counted as characters / 4).
+**Saved patterns by name.** The per-request state lists the names of the saved patterns that fit the song on air (`fitsAir`), at most 20, the most used first (about 100 tokens). The answer gives `{ kind: "pattern", name, track? }`: no `track` means a new track, a `track` id means in place of that playing track. The validator matches `name` against the fitting patterns (case and accents ignored, exact first, then a unique prefix or a unique close match); no match or two equal matches drop the command with "no saved pattern called …" or "which one: A or B?". The match builds the same `{ kind: 'pattern', mode, target, item }` the Saved patterns panel sends, with `item` from `forRadio`.
+
+**Size.** Total about 1.6k tokens with the schema and the pattern names, about 1.3k with `omitResponseConstraintInput`. That fits a context window of 4k or more with room to spare. The full knowledge note (about 6k tokens) is never sent. If a build reports a smaller window, the builder drops in order: the examples down to 2, the kinds disabled now, the help text (kind names only). `npm run check:ai` fails when the prompt passes 2k tokens (counted as characters / 4).
 
 **Built-in sessions.** One base session per page with the system prompt, created on the first request (or on the download click); each request runs in a `clone()` and destroys it after, so turns never pile up and `contextoverflow` cannot drop anything that matters. The base session is destroyed when the Radio tab closes. Expected languages `en` in and out.
 
@@ -102,11 +108,16 @@ Generated, never hand-copied, so it follows the console:
 3. Each kept command is checked with `whyNot` or `airWhy` against the song with the commands before it. A disabled one shows its usual reason ("late", "not-playing", "cap"…).
 4. Valid commands are applied in order through the same functions as the buttons: `pend` for "+" and "−" of an instrument, `command` for the rest. They enter the queue, keep their boundaries and can be cancelled with ✕ like any press. A request never bypasses the console.
 
+**Two modes**, a switch in the field's small menu and in Settings, stored per area in `coding-misk-ai` (`apply: 'now' | 'ask'`, default `now`):
+
+- **Apply at once:** step 4 runs as soon as the answer is validated.
+- **Ask before applying:** the answer row shows the valid commands as a proposal with Apply (Enter) and Dismiss (Escape); each chip can be dropped with its ✕ before Apply. Nothing is queued until Apply. On Apply steps 3 and 4 run again against the song as it is then, so a proposal that went stale shows the new reasons. A new request replaces an open proposal.
+
 Commands from a request carry `by: "assistant"` in the recorded steering, so replay and history show them; the song they make is the same as with the presses.
 
 ### D5. What the console shows
 
-A one-line field at the top of the console ("Ask the console…", Enter to send, Escape to clear), with the engine and model name in small type. While the engine works: a spinner and Cancel. Then an answer row: the request, one chip per command with its button label ("▼ Less energy", "+ Arp") marked applied, or struck through with its reason, and the `note` if any. The row stays until the next request. On the built-in engine: `downloadable` shows "Download the built-in model" with a progress bar and the disk space it needs (at least 22 GB free); `unavailable` shows the reason (hardware, disk, browser version) and a link to Settings. When the app language is Italian, the field says that the built-in engine understands English only.
+**Placement: inside the existing Radio console, compact.** The console is already crowded, so the assistant adds no panel and no new group. It is one row at the top of the console area, above the command groups: a single-line text field ("Ask the console…", Enter to send, Escape to clear) that takes the row's free width, with one small icon button at its end for a menu (engine and model, the mode switch, "What is sent", Settings). The engine and model name show as the field's placeholder suffix, not as a separate label. At 400 px the row stays one line. While the engine works the icon becomes a spinner and Cancel. Then a single answer line under the field, the same height as a queue row: one chip per command with its button label ("▼ Less energy", "+ Arp") marked applied, proposed, or struck through with its reason, and the `note` if any; it wraps only when the chips do not fit, and has a ✕ to close it. The line stays until the next request or ✕. Long texts (download progress, the reason a model is unavailable) go in the same line, never in a box. On the built-in engine: `downloadable` shows "Download the built-in model (about 4 GB; Chrome needs 22 GB free)" with a progress bar; `unavailable` shows the reason (hardware, disk, browser version, turned off by the organisation) and a link to Settings. When the app language is Italian, the field says that the built-in engine understands English only.
 
 ### D6. OpenRouter and Anthropic engines
 
@@ -161,6 +172,8 @@ The helper adds the key, forwards only these paths, caps the body at 64 kB and t
 
 A later `compose` area returns a structured edit of the song, never Strudel code: operations such as `set-track`, `add-idea`, `set-sound`, `rack-add`, `rack-remove` on tracks, ideas, sounds and rack devices, validated by the song format's validator (`src/song/`, as `tools/song.mjs validate`) and shown as a diff with Apply and Undo. It reuses D1, D2, D7 to D10 unchanged; only its prompt builder, schema, validator and apply step are new. Its default model is a larger one (Sonnet class), chosen per area.
 
+**Compose needs OpenRouter or Claude, not the built-in engine.** A Compose request carries about 8k to 15k tokens of song format and schema plus a song of several thousand tokens: 12k to 20k tokens or more. The built-in model's window has only ever been reported at about 4k to 6k tokens, and a single prompt larger than the window fails with `QuotaExceededError`. The `compose` area therefore offers only online engines; the built-in engine is not listed for it.
+
 ### D12. Checks
 
 - `npm run check:ai` (no browser): the prompt builder's size and content for songs of every profile; the schema; the validator on about 40 fixture requests with canned answers (good, partly wrong, unknown kinds, bad tracks, invalid JSON); the family key and upgrade rules on a saved, trimmed model list (missing model, expired model, price jump, pinned, free stays free); the helper's routes with a fake upstream (no key in any answer).
@@ -173,6 +186,8 @@ A later `compose` area returns a structured edit of the song, never Strudel code
 - **Hardware.** On a machine without the GPU, RAM or disk the built-in engine is `unavailable`; the field says so and offers an online engine.
 - **Free online models churn.** A free model may vanish within weeks; the family upgrade and the daily refresh cover it, and the free mark never turns into a paid one silently.
 - **API names move.** The Prompt API renamed its quota fields during 2026; the engine feature-detects both names.
+- **Managed browsers.** A work profile or an MDM can turn the built-in model off by policy; the field says so and the online engines still work.
+- **Disk.** Chrome deletes the model below 10 GB free; the engine falls back to `downloadable` and offers the download again.
 - **A key in Settings can be read by page code.** Hence the helper is the recommendation and the warning is shown on the field.
 
 ## Migration Plan
@@ -181,9 +196,9 @@ Nothing to migrate. Without an engine the console is unchanged. Steering records
 
 ## Open Questions
 
-1. **Apply at once or confirm?** Recommended: apply at once; every command is in the queue and cancellable with ✕. A Settings switch "Ask before applying" for those who want a preview.
+1. **Apply at once or confirm?** Decided: both, as two modes (D4); default "Apply at once".
 2. **Italian requests.** Recommended: English only on the built-in engine for the MVP; online engines accept Italian, so the hint shows only on the built-in engine.
 3. **Which key file.** Recommended: `ai-keys.local.json` in the repository root (git-ignored), with environment variables as a fallback.
-4. **`pattern` by name in the MVP?** Recommended: later, once the request flow is proven; it needs a fuzzy match on saved pattern names.
+4. **`pattern` by name in the MVP?** Decided: yes (D3, saved patterns by name).
 5. **Add a line (`say-live`) in the MVP?** Recommended: yes, with the text limited to 120 characters and the usual voice helper path; it is the most natural spoken request.
 6. **Daily auto refresh.** Recommended: once a day on the first request, never at startup, so a closed network never slows the app.

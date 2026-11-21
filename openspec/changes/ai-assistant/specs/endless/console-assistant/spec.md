@@ -4,7 +4,7 @@
 
 ### Requirement: Typed requests become console commands
 
-The Radio console SHALL have a request field. A request in English SHALL be sent to the area's engine with a generated prompt (the console's command kinds and help texts, the song on air, the kinds disabled now) and a JSON schema, and the answer SHALL be read as at most four console commands from the MVP set, in the order asked. The assistant SHALL NOT produce Strudel code or commands outside `COMMANDS`.
+The Radio console SHALL have a request field. A request in English SHALL be sent to the area's engine with a generated prompt (the console's command kinds and help texts, the song on air, the kinds disabled now) and a JSON schema, and the answer SHALL be read as at most four console commands from the MVP set, in the order asked. The MVP set SHALL include the listener's saved patterns by name. The assistant SHALL NOT produce Strudel code or commands outside `COMMANDS`.
 
 #### Scenario: Several commands in one request
 
@@ -15,6 +15,35 @@ The Radio console SHALL have a request field. A request in English SHALL be sent
 
 - **WHEN** the listener asks for something no command does, such as "play it in 7/8"
 - **THEN** no command is queued and the answer row shows the engine's short note
+
+#### Scenario: A saved pattern by name
+
+- **WHEN** the listener has a saved pattern called "Rolling bass" that fits the song and types "put my rolling bass in place of the bass"
+- **THEN** the console queues that saved pattern in place of the playing bass track, as the Saved patterns panel would
+
+#### Scenario: An unclear pattern name
+
+- **WHEN** an answer names a saved pattern that matches none or two of the fitting patterns equally
+- **THEN** that command is shown struck through with "no saved pattern called …" or "which one: A or B?" and nothing is queued for it
+
+### Requirement: Apply at once or ask first
+
+The assistant SHALL offer two modes per area, chosen in its menu and in Settings: "Apply at once" (the default) applies the valid commands as soon as they are validated; "Ask before applying" shows them as a proposal and applies nothing until the listener accepts it. On acceptance the commands SHALL be checked again against the song as it is then.
+
+#### Scenario: Ask before applying
+
+- **WHEN** the mode is "Ask before applying" and a request returns two valid commands
+- **THEN** the answer row shows them as a proposal with Apply and Dismiss, and nothing is queued until Apply
+
+#### Scenario: A proposal that went stale
+
+- **WHEN** the listener presses Apply on a proposal after its "− Bass" boundary has passed with no bass playing
+- **THEN** that chip shows the console's reason and the other commands apply
+
+#### Scenario: Apply at once
+
+- **WHEN** the mode is "Apply at once" and a request returns valid commands
+- **THEN** they are queued at once and shown as applied
 
 ### Requirement: Every answer validated like a press
 
@@ -48,6 +77,15 @@ Valid commands SHALL be applied through the same paths as the console buttons: t
 
 - **WHEN** a radio session with requested commands is replayed
 - **THEN** the songs are the same as in a session where those commands were pressed on the same bars
+
+### Requirement: Compact placement in the console
+
+The request field SHALL sit inside the existing Radio console area as one compact row, with one menu icon, and SHALL add no new panel or command group. The answer SHALL take one line under the field, wrapping only when its chips do not fit.
+
+#### Scenario: Compact on a phone
+
+- **WHEN** the console is shown at 400 px wide
+- **THEN** the request field and its menu icon take one line and the command groups below keep their layout
 
 ### Requirement: What the console shows for a request
 

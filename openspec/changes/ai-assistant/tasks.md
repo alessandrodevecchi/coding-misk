@@ -1,13 +1,13 @@
-Estimates are in agent hours. Stage 1 is the Radio MVP on the built-in engine (about 10 h). Stages 2 to 4 follow after the owner's go for each.
+Estimates are in agent hours. Stage 1 is the Radio MVP on the built-in engine (about 10.5 h). Stages 2 to 4 follow after the owner's go for each.
 
-## 1. Stage 1: built-in engine and the Radio console (about 10 h)
+## 1. Stage 1: built-in engine and the Radio console (about 10.5 h)
 
-- [ ] 1.1 Probe on the owner's Mac: `LanguageModel.availability()` on `http://localhost:5173`, the context window and usage names this Chrome exposes, a `responseConstraint` answer with the D3 schema, time per request. Record the numbers in `docs/knowledge/` and DEVLOG (0.5 h).
+- [ ] 1.1 Probe on the owner's Mac (model already on disk, 4.0 GB, Chrome 158): `LanguageModel.availability()` on `http://localhost:5173`, `session.contextWindow` and the usage names this Chrome exposes, `chrome://policy` for `GenAILocalFoundationalModelSettings` and `BuiltInAIAPIsEnabled` on the profile used, a `responseConstraint` answer with the D3 schema, time per request. Record the numbers in `docs/knowledge/` and DEVLOG (0.5 h).
 - [ ] 1.2 `src/ai/engine.js` (interface, timeouts, AbortSignal) and `src/ai/engines/nano.js`: status, download with progress from a click, base session plus `clone()` per request, both quota API names, destroy on leaving the Radio tab (D1, D3) (1.5 h).
-- [ ] 1.3 `src/ai/areas.js` and the Radio area's prompt builder: command lines from `COMMANDS` and the English help texts, argument lists, the song state, 6 examples, the shortening order; the D3 schema with the MVP kind list (1.5 h).
-- [ ] 1.4 Validator and apply: map to button objects, drop with reasons, `whyNot` and `airWhy` in sequence, `pend` and `command`, `by: "assistant"` in the steering record (D4) (2 h).
-- [ ] 1.5 Console UI: request field, engine and model label, progress and Cancel, answer row with chips, download and unavailable states, the English-only hint (D5); strings in `src/i18n.js` in both languages (1.5 h).
-- [ ] 1.6 Settings, AI section, minimal: the Radio console's engine (built-in only in this stage), its status and the download button; the `coding-misk-ai` store (D2) (0.5 h).
+- [ ] 1.3 `src/ai/areas.js` and the Radio area's prompt builder: command lines from `COMMANDS` and the English help texts, argument lists, the song state, 6 examples, the shortening order; the fitting saved pattern names; the D3 schema with the MVP kind list (1.5 h).
+- [ ] 1.4 Validator and apply: map to button objects, drop with reasons, the saved pattern name match, `whyNot` and `airWhy` in sequence, `pend` and `command`, `by: "assistant"` in the steering record; the two modes, with the proposal checked again on Apply (D3, D4) (2.5 h).
+- [ ] 1.5 Console UI, one compact row inside the existing console area: request field with the engine and model in the placeholder, one menu icon (engine, mode, What is sent, Settings), progress and Cancel, the one-line answer row with chips and the proposal's Apply and Dismiss, download and unavailable states, the English-only hint; one line at 400 px (D5); strings in `src/i18n.js` in both languages (1.5 h).
+- [ ] 1.6 Settings, AI section, minimal: the Radio console's engine (built-in only in this stage), its status and the download button, the mode switch; the `coding-misk-ai` store (D2, D4) (0.5 h).
 - [ ] 1.7 Guide card for the assistant (both languages), `docs/knowledge/` note `ai-assistant.md` and its row in the README table, `docs/AGENT-API.md` with the answer format, a line in `docs/knowledge/decisions.md`; `npm run check:guide`, `npm run check:knowledge` (1 h).
 - [ ] 1.8 `npm run check:ai` (prompt size and content, schema, about 40 validator fixtures) and `tools/check-ai.cjs` with a fake engine (queue, cancel, reasons, row, Italian, 400 px); the manual quality probe with 30 requests on the built-in engine, results in DEVLOG (D12) (1.5 h).
 
@@ -26,4 +26,4 @@ Estimates are in agent hours. Stage 1 is the Radio MVP on the built-in engine (a
 
 ## 4. Stage 4: Compose area (about 14 h, its own OpenSpec change first)
 
-- [ ] 4.1 A separate change for the Compose edit format (operations on tracks, ideas, sounds, rack devices), its validator on top of `src/song/`, the diff view with Apply and Undo, and its default model per area (D11).
+- [ ] 4.1 A separate change for the Compose edit format (operations on tracks, ideas, sounds, rack devices), its validator on top of `src/song/`, the diff view with Apply and Undo, and its default model per area; online engines only, the built-in model's context window is too small (D11).

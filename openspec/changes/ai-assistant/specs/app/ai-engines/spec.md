@@ -21,6 +21,16 @@ The app SHALL reach AI models only through engines that share one interface (sta
 - **WHEN** the browser reports the built-in model as unavailable
 - **THEN** the request field says why and links to Settings, and the rest of the console works as before
 
+#### Scenario: Turned off by policy
+
+- **WHEN** a Chrome Enterprise policy turns the built-in model or the built-in AI APIs off
+- **THEN** the field says the built-in model is turned off by the organisation and offers the online engines
+
+#### Scenario: Compose on an online engine only
+
+- **WHEN** the user picks an engine for the Compose area
+- **THEN** only online engines are offered, because a Compose request does not fit the built-in model's context window
+
 ### Requirement: An engine and a model per app area
 
 Settings SHALL let the user choose an engine and a model for each app area separately (the Radio console now; Compose and other areas later). A choice for one area SHALL NOT change another area.
