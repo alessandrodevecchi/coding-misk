@@ -25,7 +25,7 @@ What the code and the installed Strudel do today (`@strudel/core` 1.2.6, superdo
 
 - Sweep, LFO and Pump rack devices that move a held note, deterministic, with no random value.
 - Test songs with known modulation and an envelope error at the Decode bench, so step 3 has a baseline.
-- The design and UI placement of live knobs, built in a later phase.
+- The design and UI placement of the devices' knobs, built in a later phase.
 - Every existing song compiles byte for byte as today.
 
 **Non-Goals:**
@@ -39,9 +39,9 @@ What the code and the installed Strudel do today (`@strudel/core` 1.2.6, superdo
 
 ### D1. Rack devices, not a track setting
 
-- **Where.** Sweep, LFO and Pump are rack devices of kind `move` (new kind, labelled "Movement" in the rack menu), on melodic tracks: bass, arp, hook, pad, guitar, code. Not on drums (Pump's source is the kick), voice, spoken, texture and riser tracks in this version.
-- **Why the rack.** The rack is already per track, ordered, bypassable and drawn as cards, which is where a live knob goes (D7). Modulation has a shape, a rate and, for Pump, a write on another track: none of that fits `vary`'s entry `{ on, amount, seed, cycles }`.
-- **Limits.** At most one Sweep and one LFO per target and one Pump per track; at most three movement devices per track. The validator reports more.
+- **Where.** Sweep, LFO and Pump are ordinary rack devices of a new kind `move`, added from the existing rack menu ("+ Add device") in a new group "Movement" (Italian "Movimento"), on melodic tracks: bass, arp, hook, pad, guitar, code. Not on drums (Pump's source is the kick), voice, spoken, texture and riser tracks in this version.
+- **Why the rack.** The rack is already per track, ordered, bypassable and drawn as cards, which is where the knob goes (D7). Modulation has a shape, a rate and, for Pump, a write on another track: none of that fits `vary`'s entry `{ on, amount, seed, cycles }`.
+- **Limits.** At most one Sweep and one LFO per target and one Pump per track; at most two movement devices per track, so a track shows at most two knobs (D8). The validator reports more.
 - **No randomness.** Every device is a pure function of its arguments and the song time. "Seeded and deterministic" holds without a seed. The future generator (step 4) draws device arguments from a new `material:mod` stream, so it never moves another draw.
 
 ### D2. Built on #94, depends on it
@@ -102,25 +102,36 @@ The change sits beside `vary` and `tone` and reuses #94's structures:
 - **Never louder.** Ducking only lowers the orbit. The level rule: each line's peak with Pump is at most its peak without, plus 0.02 of measurement noise (`check-levels.cjs`).
 - **Many pumps.** Two pads with Pump: one `duck("6:9")` on the kick with two depths.
 
-### D7. Live knobs (later phase)
+### D7. Knobs (later phase)
 
-- **The mark.** A movement device holds `live: true`. At most two live devices per track; the validator reports a third. A live device shows one knob that moves the device's target: the Sweep's position (from → to), the LFO's centre, the Pump's depth.
-- **Bus.** Sweep and LFO: the writer adds `.bmod({ b: N, c: '<target>', da: <range> × 0.3 })` with `N` = the song's k-th live device (bus 1, 2…), so a knob in 0-1 maps onto the target's range without the `/0.3` trap. The page drives bus N with a `ConstantSourceNode` per knob and reconnects every bus after each `reset()` (Play, Stop, a new evaluation that resets).
-- **Pump needs no bus.** `duckdepth` is read at each kick, so the Pump knob writes through a `ref()` read at each onset: live within a beat.
-- **Path.** Moving a knob while the song plays in Compose with the device's Rec dot on records `path: [[bar, value], …]` on the device (sixteenth resolution, at most 256 points, thinned to the moves). On playback the path drives the bus: `setValueAtTime` and `linearRampToValueAtTime` scheduled a bar ahead. A hand on the knob wins until it is released.
+- **One main knob per device, always.** Every movement device shows one knob on its card. No mark or toggle turns it on. The knob's parameter per device:
+
+| Device | Knob | Range |
+| --- | --- | --- |
+| Sweep | opening: where the sweep is between `from` and `to` | 0-1 |
+| LFO | depth | 0-1 |
+| Pump | depth | 0-1 |
+
+- **Starts at the set value.** The knob shows the device's own value. Untouched, the device plays exactly as set.
+- **Acts at once, through the bus.** Sweep and LFO: the writer adds `.bmod({ b: N, c: '<control>', da: <range> × 0.3 })`, `N` the song's k-th movement device. The bus carries the knob's offset from the set value, so an undriven bus (0) sounds as set: a page or export that never touches a knob is unchanged. The page drives each bus with a `ConstantSourceNode` and reconnects every bus after each `reset()` (Play, Stop, a new evaluation that resets). A note already sounding moves.
+- **Pump needs no bus.** `duckdepth` is read at each kick, so the Pump knob writes through a `ref()` read at each onset: it acts from the next kick, within a beat.
+- **Tracks without a movement device have no knob.** Their settings change from the next note, as today.
+- **Record dot.** With the card's record dot on, knob moves while the song plays in Compose are recorded on the device as `path: [[bar, value], …]` (sixteenth resolution, at most 256 points, thinned to the moves). On playback the path drives the bus, with `setValueAtTime` and `linearRampToValueAtTime` scheduled a bar ahead. A hand on the knob wins until it is released.
 - **Export.**
   - Real-time export: the same as playback.
   - Fast export: the render page builds the same `ConstantSourceNode`s on its own controller and schedules each path as automation from the export's start bar.
-  - Code copied out of the app, or opened in plain Strudel: no bus there. The writer leaves out the `bmod` and writes the path as steps per bar into the base (`.lpf("<800 1200 2000 …>")`), or the knob's current value when no path exists. The copied code's comment line says the knob became steps.
-  - Radio, Live coder growth: a live device plays its path, else its static value.
-- **Decode, generator:** never write `live`.
+  - Code copied out of the app, or opened in plain Strudel: no bus there. The writer leaves out the `bmod` and writes the path as steps per bar into the base (`.lpf("<800 1200 2000 …>")`), or the set value when no path exists. The copied code's comment line says the knob became steps.
+  - Radio, Live coder growth: a device plays its path, else its set value.
+- **Decode, generator:** never write a path.
 
 ### D8. Where the knobs go (later phase; revisit at the UI review)
 
 The owner finds the interface cluttered, so no permanent panel is added:
 
-- **Compose rack card.** A small "Live" chip in the movement device's `.dev-head`, next to the LED. Off by default. When on, one knob appears as the first row of that card's `.dev-args`, with a Rec dot; nothing appears on other cards or tracks. In the hardware theme the knob is the theme's knob; in neon and light it is the existing range input with a larger thumb. The chip is disabled with a tooltip on a track that has two live devices.
-- **Radio console.** Inside the existing Parts row, after Vary and Swap, only while the selected part (the `.steer-part` chip) plays a live device: one compact knob per live device of that part, at most two, labelled by the device. No knob otherwise, so the row looks as today for almost every song. Moves in the radio are live only, never recorded (open question 3).
+- **Ordinary rack devices.** Sweep, LFO and Pump are added from the existing rack menu ("+ Add device", Italian "+ Aggiungi modulo") in a new group "Movement" (Italian "Movimento"), next to the Notes and Sound groups. There is no separate panel or menu.
+- **Compose rack card.** The knob is the first row of the device's `.dev-args`, with the record dot next to it. A small drawn mark next to the knob (an arc with a lightning tip, `src/icons.js`) shows that it acts at once; its tooltip says "acts on the notes already sounding". The word "Live" is not used. In the hardware theme the knob is the theme's knob; in neon and light it is the existing range input with a larger thumb. Other cards keep their controls as today.
+- **Knobs per track.** A track holds at most two movement devices (D1), so at most two knobs.
+- **Radio console.** Inside the existing Parts row, after the Vary and Swap keys, only while the selected part (the `.steer-part` chip) plays a movement device: one compact knob per device of that part, at most two, labelled by the device, with the same mark. It acts while the song plays and is never recorded. No knob otherwise, so the row looks as today for almost every song.
 - **Code.** `knob(n)` written by the app in place of the device's `bmod` line, drawn by the editor as the same slider widget `slider()` gets (task 6.5 checks the transpiler's widget hook; else an app code widget). In a code track the user may type `knob(…)` by hand.
 - **Not added:** a mixer strip, a floating knob panel, knobs on the player bar or on the arranger rows.
 
@@ -157,8 +168,8 @@ The owner finds the interface cluttered, so no permanent panel is added:
 5. **Variazione e movimento insieme (#94).** Dove: un pad con la variazione per colpo sul filtro (dado del suono di #94) e Oscillazione sul filtro. Cosa fare: ascolta 4 battute; poi sostituisci Oscillazione con Apertura sul filtro. Cosa deve succedere: con Oscillazione senti entrambe le cose (ogni accordo parte un po' diverso e poi ondeggia); con Apertura la variazione sul filtro sparisce e la validazione mostra un avviso. Perché: le due funzioni si sommano dove ha senso e non litigano sullo stesso valore.
 6. **Brani vecchi uguali.** Dove: scheda Brani, tre brani integrati e uno tuo. Cosa fare: suonali in Classic e Crescendo. Cosa deve succedere: suonano esattamente come ieri. Perché: niente cambia se non aggiungi un dispositivo.
 7. **Stesso suono nell'export.** Dove: il brano del test 3. Cosa fare: esporta veloce in WAV e riascolta. Cosa deve succedere: il pompaggio e l'apertura sono uguali a quelli in riproduzione, negli stessi punti. Perché: i dispositivi sono deterministici.
-8. **Fase successiva, manopola in Compose.** Dove: la scheda di Oscillazione del test 2. Cosa fare: accendi il chip "Live", accendi il punto Rec, gira la manopola durante un accordo tenuto, poi spegni Rec e riascolta. Cosa deve succedere: il filtro si muove subito, dentro l'accordo che sta suonando; al riascolto la manopola si muove da sola e ripete il tuo gesto; nessuna altra scheda mostra manopole. Perché: la manopola muove una nota già partita e il gesto resta nel brano.
-9. **Fase successiva, manopola in radio e nel codice.** Dove: Radio, un tuo brano con un dispositivo Live in una playlist; poi Copia codice. Cosa fare: nella console scegli la parte con il dispositivo, gira la manopola; poi incolla il codice copiato in Strudel. Cosa deve succedere: la manopola compare solo per quella parte, accanto a Varia e Scambia, e sparisce scegliendo un'altra parte; nel codice copiato il gesto diventa un valore per battuta. Perché: nessun pannello nuovo, e il codice copiato suona anche fuori dall'app.
+8. **Fase successiva, manopola in Compose.** Dove: la scheda di Oscillazione del test 2, nel rack del pad. Cosa fare: guarda la manopola in cima alla scheda, poi girala durante un accordo tenuto; accendi il punto di registrazione, rifai il gesto, spegni il punto e riascolta. Cosa deve succedere: la manopola parte dal valore impostato e senza toccarla il pad suona come nel test 2; girandola il filtro si muove subito, dentro l'accordo che sta suonando; accanto alla manopola c'è solo un piccolo segno (nessuna scritta "Live"); al riascolto la manopola si muove da sola e ripete il gesto; le tracce senza dispositivi di movimento non hanno manopole. Perché: la manopola muove una nota già partita e il gesto resta nel brano.
+9. **Fase successiva, manopola in radio e nel codice.** Dove: Radio, un tuo brano con un dispositivo di movimento in una playlist; poi Copia codice. Cosa fare: nella console scegli la parte con il dispositivo, gira la manopola; poi incolla il codice copiato in Strudel. Cosa deve succedere: la manopola compare solo per quella parte, accanto a Varia e Scambia, e sparisce scegliendo un'altra parte; il gesto in radio non viene registrato; nel codice copiato il gesto registrato in Compose diventa un valore per battuta. Perché: nessun pannello nuovo, e il codice copiato suona anche fuori dall'app.
 
 ## Risks / Trade-offs
 
@@ -166,17 +177,21 @@ The owner finds the interface cluttered, so no permanent panel is added:
 - **`lpdepth` units.** The filter LFO's depth scale is not documented; task 1.4 measures it before the range is fixed.
 - **LFO phase per note.** Off-grid notes sway out of phase. Accepted: the bar-aligned case is the common one.
 - **Pump on the kick line.** A write on one track caused by another track's device. The kick line grows by three calls; song functions fold them. A muted kick track still ducks (its notes are not played but the duck is): the compiler leaves `duck` out of muted and soloed-out tracks.
-- **Bus reset (later phase).** A missed reconnect leaves the knob dead until the next Play. The browser check presses Stop, Play and a re-evaluation and moves the knob after each.
+- **Bus reset (later phase).** A missed reconnect leaves the knob dead until the next Play; the sound stays as set, since an undriven bus is 0. The browser check presses Stop, Play and a re-evaluation and moves the knob after each.
 - **Knob path in copied code** is coarser than the original gesture (steps per bar). Accepted and said in the code's comment.
 
-## Open Questions
+## Decisions approved by the owner
 
-1. **Gain as a Sweep target** (a fade). Recommended: no, `gainEnd` and Crescendo already fade. Alternative: add it with `once` only.
-2. **Pump in a section without a kick.** Recommended: the beat gain LFO, automatically (D6). Alternative: no pump there, the pad holds still.
-3. **Knob moves in the radio.** Recommended: live only, not recorded. Alternative: recorded into the session's replay.
-4. **Recording a path.** Recommended: an explicit Rec dot on the card. Alternative: every move while playing records, with Undo.
-5. **Name of the code helper.** Recommended: `knob(n)`, distinct from `slider()` because it moves sounding notes. Alternative: reuse `slider()` with an option.
-6. **Movement devices on drums** (a filter sweep on a beat in a build). Recommended: later, with step 4. Alternative: allow Sweep and LFO on drum tracks now.
+The six open questions of the first draft, approved as recommended:
+
+1. **Gain is not a Sweep target.** `gainEnd` and Crescendo already fade.
+2. **Pump in a section without a kick** uses the beat gain dip automatically (D6).
+3. **Knob moves in the radio** act while the song plays only and are not recorded (D8).
+4. **A path is recorded** only with the card's record dot on (D7).
+5. **The code helper is `knob(n)`,** distinct from `slider()` because it moves sounding notes (D8).
+6. **Movement devices on drums** come later, with step 4 (D1).
+
+The knob model was also revised: no "Live" mark or toggle; every movement device always shows one main knob (D7, D8).
 
 ## Estimate
 
@@ -184,6 +199,6 @@ In agent hours:
 
 - Step 1, devices (D1-D6), validator, Compose cards, guide, knowledge, catalog, example songs, checks: about 6.5.
 - Step 2, test songs, truth reader, envelope error, parameter score, baseline run: about 3.5.
-- Later phase, live knobs (D7, D8): about 8 (bus driver and reset 2, Compose card and path 2, fast export and copied code 1.5, radio row 1, code widget 1, checks 0.5).
+- Later phase, knobs (D7, D8): about 8 (bus driver and reset 2, Compose card and path 2, fast export and copied code 1.5, radio row 1, code widget 1, checks 0.5).
 
 This change, without the later phase: about 10.

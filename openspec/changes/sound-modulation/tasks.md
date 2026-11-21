@@ -1,6 +1,6 @@
 # Tasks
 
-Steps 1 and 2 of #95, then live knobs as a later phase. Depends on #94 (`random-sound-params`): branch from `feat/94-random-sound-params` once it is merged into `develop`.
+Steps 1 and 2 of #95, then the devices' knobs as a later phase. Depends on #94 (`random-sound-params`): branch from `feat/94-random-sound-params` once it is merged into `develop`.
 
 ## 0. Base
 
@@ -14,7 +14,7 @@ Steps 1 and 2 of #95, then live knobs as a later phase. Depends on #94 (`random-
 - [ ] 1.4 LFO (D5): filter form with `lpsync`, `lpdepth`, `lpshape`, generic form with `lfo`; measure `lpdepth`'s units and fix the depth mapping.
 - [ ] 1.5 Pump (D6): the kick-line write in `src/song/compile.js` / `src/music.js` (one entry per pumped track, none from muted or soloed-out drums), the beat gain LFO without a kick that only dips; pick its shape and offset by measurement.
 - [ ] 1.6 Validator (`src/song/validate.js`, `checkRack`): limits per track, Sweep over track automation, every error and warning of the spec with JSON paths. Document the devices in `docs/SONG-FORMAT.md`.
-- [ ] 1.7 Compose cards (`src/main.js`): the "Movement" group in the rack menu, choice labels in both languages (`src/i18n.js`), the code preview.
+- [ ] 1.7 Compose cards (`src/main.js`): the new "Movement" group (Italian "Movimento") in the existing "+ Add device" menu, no separate panel, choice labels in both languages (`src/i18n.js`), the code preview.
 - [ ] 1.8 Example songs in `songs/examples/` (a pumped pad, a swept pad, a swaying pad).
 
 ## 2. Checks for step 1
@@ -40,12 +40,12 @@ Steps 1 and 2 of #95, then live knobs as a later phase. Depends on #94 (`random-
 
 - [ ] 5.1 Show the owner tests 1-7; act on the notes before the later phase.
 
-## 6. Live knobs (later phase, after the owner's go and the UI review)
+## 6. Knobs (later phase, after the owner's go and the UI review)
 
-- [ ] 6.1 `live` and `path` on movement devices, validator limits (two live per track, 256 points) (D7).
-- [ ] 6.2 Bus driver in `src/sounds/`: one `ConstantSourceNode` per live device on bus N, reconnected after every `reset()`; `.bmod({ b: N, c, da })` in the writer; Pump through `ref()`.
-- [ ] 6.3 Compose card: Live chip, knob row, Rec dot, path recording and playback, hand wins (D8); both themes, hardware knob, 400 px.
+- [ ] 6.1 `path` on movement devices, validator limits (two movement devices per track, 256 points) (D1, D7).
+- [ ] 6.2 Bus driver in `src/sounds/`: one `ConstantSourceNode` per Sweep or LFO on bus N carrying the knob's offset from the set value (0 when untouched), reconnected after every `reset()`; `.bmod({ b: N, c, da })` in the writer; Pump through `ref()`.
+- [ ] 6.3 Compose card: the main knob as the first row of every movement device's card (Sweep opening, LFO depth, Pump depth), starting at the set value, the drawn "acts at once" mark (`src/icons.js`, no "Live" text), the record dot, path recording and playback, hand wins (D7, D8); both themes, hardware knob, 400 px.
 - [ ] 6.4 Export: real time as playback; fast export schedules paths on the render page's controller (`src/render/page.js`); copied code writes the path as steps per bar with a comment.
 - [ ] 6.5 Code: `knob(n)` with the editor's slider widget (check the transpiler's widget hook; else an app code widget in `src/widgets/app-widgets.js`).
-- [ ] 6.6 Radio console: knobs in the Parts row only while the selected part plays a live device, at most two, not recorded (`src/radio/radio.js`, `src/style.css`).
-- [ ] 6.7 Browser check: knob moves a held note, Stop, Play and re-evaluation, path replay, fast against real-time export, copied code in plain Strudel, radio row; guide and knowledge; owner tests 8-9.
+- [ ] 6.6 Radio console: knobs in the Parts row only while the selected part plays a movement device, at most two, acting while the song plays, never recorded (`src/radio/radio.js`, `src/style.css`).
+- [ ] 6.7 Browser check: untouched knob leaves the sound as set, knob moves a held note, Stop, Play and re-evaluation, path replay, fast against real-time export, copied code in plain Strudel, radio row and no path saved from the radio; guide and knowledge; owner tests 8-9.

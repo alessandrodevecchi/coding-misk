@@ -7,11 +7,22 @@ Rack devices that move a melodic track's sound over time, inside held notes and 
 ## ADDED Requirements
 
 ### Requirement: Movement devices in the rack
-The rack SHALL offer three devices of a new kind "Movement" on bass, arp, hook, pad, guitar and code tracks: Sweep (Italian "Apertura"), LFO ("Oscillazione") and Pump ("Pompa"), with the arguments and defaults of design D4, D5 and D6. They SHALL NOT be offered on drums, voice, spoken, texture and riser tracks. A track SHALL hold at most three movement devices, at most one Pump, and at most one Sweep and one LFO per target; the validator SHALL report more.
+The rack SHALL offer three ordinary devices, Sweep (Italian "Apertura"), LFO ("Oscillazione") and Pump ("Pompa"), in a new group "Movement" (Italian "Movimento") of the existing rack menu ("+ Add device"), with the arguments and defaults of design D4, D5 and D6. No separate panel SHALL be added for them.
 
 #### Scenario: Adding a Sweep in Compose
 - **WHEN** the user adds Apertura to a pad track
 - **THEN** a device card appears with target Filter, from 400, to 4000, 8 bars, curve exponential, repeat once, and its code preview
+
+### Requirement: Where movement devices go
+Movement devices SHALL be offered on bass, arp, hook, pad, guitar and code tracks only. A track SHALL hold at most two movement devices, at most one Pump, and at most one Sweep and one LFO per target; the validator SHALL report more.
+
+#### Scenario: Drums track
+- **WHEN** the user opens "+ Add device" on a drums track
+- **THEN** the menu shows no Movement group
+
+#### Scenario: Three movement devices
+- **WHEN** a song's pad track has a Sweep, an LFO and a Pump
+- **THEN** `node tools/song.mjs validate` reports an error at the third device
 
 #### Scenario: Two Pumps
 - **WHEN** a song's pad track has two Pump devices

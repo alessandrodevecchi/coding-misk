@@ -15,18 +15,18 @@ Decode needs the same words: it cannot write a pumping pad until the app can pla
 ## Relationship with #94 (`random-sound-params`)
 
 - **#94 is per-hit seeded variation.** Each note gets a different random value, fixed at its onset (`vary`), plus composed drum tones (`tone`) and the sound dice in Compose.
-- **This change is movement with a shape over time,** inside a held note or across bars, plus live knobs. It holds no random value.
+- **This change is movement with a shape over time,** inside a held note or across bars, plus knobs that act at once. It holds no random value.
 - **Both write effect parameters on a track.** This change does not reuse `vary` or `tone`: modulation lives in the track's rack as devices, beside the two settings. It builds on #94's structures where they meet: the writer's "one call per control" merge, the validator rule that skips a `vary` target a rack device writes, the dice that keeps the user's rack devices, and the session `sound` version for future generator use (design D2).
 - **This change depends on #94 being merged first.** The implementation branches from `feat/94-random-sound-params`.
 
 ## What Changes
 
-- **Three rack devices** for melodic tracks (bass, arp, hook, pad, guitar, code):
+- **Three ordinary rack devices,** added from the existing rack menu in a new "Movimento" group, for melodic tracks (bass, arp, hook, pad, guitar, code):
   - **Sweep** ("Apertura"): moves a target (filter, high-pass, reverb send, delay send) from one value to another over 1 to 16 bars, linear or exponential, gliding inside held notes.
   - **LFO** ("Oscillazione"): sways a target (filter, pan, reverb send, delay send) in time with the song, 1/16 bar to 4 bars, with a depth and a shape.
   - **Pump** ("Pompa"): ducks the track on every kick through Strudel's `duckorbit`, with a depth and a recovery time; without a kick in the section, a gain LFO on the beat.
 - **Test songs at the Decode bench:** held-out app songs with pads modulated by known parameters (pump, filter LFO, tremolo, sweep), a reader of the modulation truth from a song, and a new envelope error per band and per beat phase next to the band error in `tools/decode-bench.cjs`.
-- **Live knobs, designed now, built in a later phase:** a device marked "live" gets one knob that moves sounding notes through Strudel's `bmod` bus, at most two per track. The knob appears inline on the device card in Compose, inside the existing Parts row of the radio console while that part plays a live device, and in code as a slider widget. A recorded knob path plays back in the fast export and becomes steps per bar in code copied out of the app.
+- **Knobs, designed now, built in a later phase:** every movement device always shows one main knob on its card (Sweep opening, LFO depth, Pump depth). It starts at the set value and, turned, acts at once through Strudel's `bmod` bus, also on a note already sounding. A record dot records the movement into the song, and exports replay it. The radio console shows the knob inside the existing Parts row while that part plays a movement device; it acts while the song plays and is not recorded. In code it is `knob(n)`, drawn as a slider widget. Copied code gets the path as steps per bar. Tracks without a movement device have no knob.
 - **Existing songs are unchanged:** no new default setting, no version bump; a song without the new devices compiles byte for byte as today.
 
 ## Out of scope (future work)
@@ -39,7 +39,7 @@ Decode needs the same words: it cannot write a pumping pad until the app can pla
 ### New Capabilities
 
 - `app/modulation-devices`: Sweep, LFO and Pump in the rack: arguments, code, level rule, how they meet track settings and #94's `vary`.
-- `app/live-knobs` (later phase): the "live" mark, the bus, the knob in Compose, radio and code, the recorded path and what export does with it.
+- `app/device-knobs` (later phase): the main knob of each movement device, the bus, the knob in Compose, radio and code, the recorded path and what export does with it.
 - `app/decode-modulation-bench`: the modulated test songs, the truth reader and the envelope error.
 
 ### Modified Capabilities
