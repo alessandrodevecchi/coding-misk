@@ -50,6 +50,7 @@ import { DIRECTOR_VERSION } from './endless/director.js';
 const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION, choosers: Object.keys(AIR_CHOOSERS) };
 import { createPlaylistsTab } from './library/playlists-tab.js';
 import { createDecodeTab } from './decode/tab.js';
+import { BEAT_THIS_LOCAL, seedBeatThisLocal } from './decode/beat-this-store.js';
 import { pickJsonFiles } from './library/library.js';
 import { createSettings } from './settings/settings.js';
 import { createGenresTab } from './library/genres-tab.js';
@@ -5203,6 +5204,9 @@ $('#songs').addEventListener('click', e => {
     return startCard(i, bar);
   }
 });
+// local only (decode round 14, d12h): the beat tracker's files from this machine's shared folder into this origin's
+// cache, a few seconds after the start (BEAT_THIS_LOCAL is '' outside the owner's local dev server)
+if (BEAT_THIS_LOCAL) setTimeout(() => seedBeatThisLocal(), 3000);
 $('#songs').addEventListener('change', e => {
   const cb = e.target.closest('[data-loop]'); if (!cb) return;
   const { tr } = cards[+cb.dataset.loop];

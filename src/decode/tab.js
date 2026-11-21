@@ -4,6 +4,7 @@
 // main.js wires it: the player (Strudel's scheduler, the code column's typing) and the master stage.
 import { probe, decode, fingerprint, sameFile, analysisCopy, MAX_SECONDS, ANALYSIS_RATE } from './input.js';
 import { createDecodeStore, freshModel } from './store.js';
+import { beatThisOn } from './beat-this-store.js';
 import { createLibraryPanel } from './library-panel.js';
 import { nextOf, prevOf } from './library.js';
 import { prepareTrack, prepareAt, endStep } from './autoplay.js';
@@ -223,7 +224,10 @@ export function createDecodeTab({ root, app }) {
     // a stored analysis of an older analyser is made again, and the tab says so (decode-refine: Stored analysis)
     const old = match && ((rec.modelA && !freshModel(rec.modelA)) || (rec.modelB && !freshModel(rec.modelB)));
     // a track with a stored level B analysis opens in Full (owner answer 1)
-    if (match && freshModel(rec.modelB) && rec.modelB.level === 'B') { modelB = rec.modelB; modelBSeq++; }
+    // (decode round 12: with the beat tracker on and downloaded, a level B analysis made without it is left for Full to
+    // make again with it; one where it ran and failed is kept)
+    const stale = m => beatThisOn() && !m.beatTracker && !(m.notes || []).some(x => /^Beat tracker/.test(x));
+    if (match && freshModel(rec.modelB) && rec.modelB.level === 'B' && !stale(rec.modelB)) { modelB = rec.modelB; modelBSeq++; }
     setLevel(modelB ? 'B' : 'A', { quiet: true });
     if (p.worker) {
       // the prepared worker (D9): already loaded, its first answer kept or still on its way
@@ -724,7 +728,7 @@ export function createDecodeTab({ root, app }) {
     const pcm = await analysisCopy(track.buffer);
     if (!full || full.id !== id) return;
     w.postMessage({ type: 'load', pcm, rate: ANALYSIS_RATE }, [pcm.buffer]);
-    w.postMessage({ type: 'all', id, tempo: track.tempo || null, essentia: !globalThis.codingMiskNoEssentia });
+    w.postMessage({ type: 'all', id, tempo: track.tempo || null, essentia: !globalThis.codingMiskNoEssentia, beats: beatThisOn() && !globalThis.codingMiskNoBeatThis });
   }
   // Export and Fragments (D16): both write the Full song, the whole file; the analysis runs first when it is missing, then the
   // export starts by itself. kind: 'out' (audio or video as the display says) or 'frag'
@@ -867,15 +871,15 @@ export function createDecodeTab({ root, app }) {
   };
   // the model whose grid the tab shows: level B's in Full, else level A's
   const shownModel = () => (level() === 'B' ? modelB : model);
-  const engineName = id => (id === 'essentia.js' ? 'Essentia.js' : id === 'tapped' ? t('dcTappedBadge') : id === 'picked' ? t('dcPicked') : 'misk-analyzer');
+  const engineName = id => (id === 'beat-this' ? 'Beat This!' : id === 'essentia.js' ? 'Essentia.js' : id === 'tapped' ? t('dcTappedBadge') : id === 'picked' ? t('dcPicked') : 'misk-analyzer');
   // level B: where each measure came from (D5)
-  const enginesHtml = () => { const e = modelB && modelB.engines; return level() === 'B' && e ? `<p class="note dc-engines" id="dc-engines">${esc(t('dcEngines', { tempo: engineName(e.tempo), key: engineName(e.key), chords: engineName(e.chords) }))}</p>` : ''; };
+  const enginesHtml = () => { const e = modelB && modelB.engines; return level() === 'B' && e ? `<p class="note dc-engines" id="dc-engines">${esc(t('dcEngines', { tempo: engineName(e.tempo), key: engineName(e.key), chords: engineName(e.chords) }) + (e.grid ? ` · ${t('dcGrid', { grid: engineName(e.grid) })}` : ''))}</p>` : ''; };
   // the level switch: Live and Full; Full shows the growing mark and the progress while level B runs, with Cancel
   const levelHtml = () => {
     const lv = level(), run = full ? `<span class="dc-full-run" id="dc-full-run"><span id="dc-full-pct">${esc(fullText())}</span><button class="btn" id="dc-full-cancel">${esc(t('dcCancel'))}</button></span>` : '';
     return `<span class="chips dc-seg" role="radiogroup" aria-label="${esc(t('dcLevel'))}"><button class="chip" role="radio" aria-checked="${lv === 'A'}" aria-pressed="${lv === 'A'}" data-dc-level="A" title="${esc(t('dcLiveTip'))}">${esc(t('dcLive'))}</button><button class="chip${full ? ' growing' : ''}" role="radio" aria-checked="${lv === 'B'}" aria-pressed="${lv === 'B'}" data-dc-level="B" title="${esc(t(modelB ? 'dcFullTip' : 'dcFullRunTip'))}">${full ? '<span class="growing-mark dc-grow" aria-hidden="true"></span>' : ''}${esc(t('dcFullLvl'))}</button></span>${run}`;
   };
-  const STAGES = { frames: 'dcStage:frames', tempo: 'dcStage:tempo', bars: 'dcStage:bars', harmony: 'dcStage:harmony', melody: 'dcStage:melody', sections: 'dcStage:sections', done: 'dcStage:sections' };
+  const STAGES = { frames: 'dcStage:frames', tempo: 'dcStage:tempo', beats: 'dcStage:beats', bars: 'dcStage:bars', harmony: 'dcStage:harmony', melody: 'dcStage:melody', sections: 'dcStage:sections', done: 'dcStage:sections' };
   const fullText = () => (full ? t('dcFullProgress', { pct: Math.round((full.f || 0) * 100), stage: t(STAGES[full.stage] || 'dcStage:frames') }) : '');
   // level B: the sections of the original, the one playing lit; a click seeks to its start
   const sectionsHtml = () => {
@@ -1072,7 +1076,7 @@ export function createDecodeTab({ root, app }) {
     fileNow,
     get model() { return model; },
     // for the browser checks (tools/check-decode.cjs)
-    state: () => (cur ? { bar: shownModel() && shownModel().barSeconds ? cycleOfFile(shownModel(), fileNow()) : null, title: cur.title, artist: cur.artist, attribution: cur.attribution, settings: JSON.parse(JSON.stringify(cur.settings)), playing, startedCode, file: fileNow(), duration: cur.duration, trim: cur.trim, bars: model ? model.bars.length : 0, bpm: model ? model.bpm : 0, downbeat: model ? model.downbeat : 0, tempo: cur.tempo, levels: { orig: peakOf(origAn), code: peakOf(codeAn), ...Object.fromEntries(playLevel === 'B' ? codeIds().map(id => [id, orbitPeak(id)]) : []) }, gains: gainsOf(cur.settings.mix), level: level(), playLevel, full: full ? { f: full.f, stage: full.stage, then: full.then } : null, modelB: modelB ? { bpm: modelB.bpm, downbeat: modelB.downbeat, bars: modelB.bars.length, sections: modelB.sections, ending: modelB.ending, engines: modelB.engines, key: modelB.key, ms: modelB.ms } : null, orbits: bMemo ? bMemo.sg.orbits : null, sync: orig && orig.info ? { ...orig.info } : null, status, ...libState() } : { status, ...libState() }),
+    state: () => (cur ? { bar: shownModel() && shownModel().barSeconds ? cycleOfFile(shownModel(), fileNow()) : null, title: cur.title, artist: cur.artist, attribution: cur.attribution, settings: JSON.parse(JSON.stringify(cur.settings)), playing, startedCode, file: fileNow(), duration: cur.duration, trim: cur.trim, bars: model ? model.bars.length : 0, bpm: model ? model.bpm : 0, downbeat: model ? model.downbeat : 0, tempo: cur.tempo, levels: { orig: peakOf(origAn), code: peakOf(codeAn), ...Object.fromEntries(playLevel === 'B' ? codeIds().map(id => [id, orbitPeak(id)]) : []) }, gains: gainsOf(cur.settings.mix), level: level(), playLevel, full: full ? { f: full.f, stage: full.stage, then: full.then } : null, modelB: modelB ? { bpm: modelB.bpm, downbeat: modelB.downbeat, bars: modelB.bars.length, sections: modelB.sections, ending: modelB.ending, engines: modelB.engines, key: modelB.key, ms: modelB.ms, beatTracker: modelB.beatTracker || null } : null, orbits: bMemo ? bMemo.sg.orbits : null, sync: orig && orig.info ? { ...orig.info } : null, status, ...libState() } : { status, ...libState() }),
     store,
     // the original and the code at the same moment (two long analysers before the master stage), to measure their sync
     probe() {

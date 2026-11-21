@@ -2122,6 +2122,15 @@ summary .vt-cs-dot { margin-left: 0; }
 .sv-msg:empty { display: none; }
 @media (max-width: 560px) { .sv-name { max-width: 100%; flex-basis: 60%; } }
 
+/* the "Deep beat analysis" card (decode-beat-tracker): the third-party note set apart, the state and the progress */
+#set-beat-tracker p { margin: 0 0 8px; }
+#set-beat-tracker .bt-third { padding: 6px 10px; border-left: 3px solid var(--a2); background: var(--panel2); border-radius: 0 6px 6px 0; }
+#set-beat-tracker .bt-state { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#set-beat-tracker .bt-state:empty { display: none; }
+#set-beat-tracker .bt-state progress { flex: 1 1 140px; max-width: 240px; }
+#bt-remove { display: inline-flex; align-items: center; gap: 6px; }
+#bt-remove svg { width: 14px; height: 14px; }
+
 /* the Oscilloscope card (oscilloscope-visual D7): a slider, its value and the link to the song on one row */
 .osc-param { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .osc-param input[type="range"] { flex: 1 1 140px; min-width: 120px; }

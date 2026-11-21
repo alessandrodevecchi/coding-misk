@@ -3,6 +3,8 @@
 import { makeBackup, mergeBackup, backupParts } from './backup.js';
 import { DECODES_KEY, BACKUP_RECENT } from '../decode/store.js';
 import { MIXTAPES_KEY } from '../decode/mixtapes.js';
+import { beatThisStatus, downloadBeatThis, removeBeatThis, beatThisChosen, setBeatThisChosen, beatThisInstalled } from '../decode/beat-this-store.js';
+import { BEAT_THIS_BYTES } from '../decode/beat-this.js';
 import { pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { OWN_IDS, STRUDEL_IDS, FONTS, SIZES, themeName, fontName } from '../code-themes/themes.js';
@@ -132,6 +134,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         ${codeOverCard()}
         ${stageCard()}
         ${stageVideosCard()}
+        ${beatTrackerCard()}
         ${oscilloscopeCard()}
         <div class="card set-card" id="set-advanced"><h3>${esc(t('setAdvanced'))}</h3>
           <p class="muted">${esc(t('setAdvancedIntro'))}</p>
@@ -166,6 +169,36 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setCodeSize'), seg('data-set-code-size', Object.keys(SIZES).map(k => [k, t(`codeSize:${k}`)]), C.size), t('setCodeSizeHint'))}
           ${row(t('setCodeDim'), seg('data-set-code-dim', [['1', t('cwYes')], ['0', t('cwNo')]], C.dim ? '1' : '0'), t('setCodeDimHint'))}
           ${row(t('setCodeLit'), seg('data-set-code-lit', [['outline', t('codeLit:outline')], ['fill', t('codeLit:fill')], ['underline', t('codeLit:underline')]], C.lit || 'outline'), t('setCodeLitHint'))}`;
+  }
+
+  // the "Deep beat analysis" card (decode-beat-tracker, decode round 12): the option, off by default (on with the local
+  // build flag, beat-this-store.js), its disclaimer, and while it is on the download with its progress, Cancel and
+  // Remove. Off, the cache is not even opened; on, it is read once per page (status null: not read yet)
+  const bt = { status: null, pct: null, ctrl: null, msg: '' };
+  const mb = n => Math.round(n / 1e6);
+  function beatTrackerCard() {
+    const on = beatThisChosen(), busy = bt.pct !== null;
+    if (on && bt.status === null) { bt.status = { reading: true }; beatThisStatus().then(x => { bt.status = x; render(); }); }
+    const S = on ? bt.status : null;
+    let state = '', actions = '';
+    if (busy) { state = t('btDownloading', { pct: bt.pct }); actions = `<button class="btn" id="bt-cancel">${esc(t('dcCancel'))}</button>`; }
+    else if (!on) {
+      const kept = beatThisInstalled();
+      state = kept ? t('btOffKept', { mb: mb(BEAT_THIS_BYTES) }) : '';
+      if (kept) actions = `<button class="btn danger" id="bt-remove">${BIN}<span>${esc(t('btRemove'))}</span></button>`;
+    } else if (!S.reading) {
+      if (S.supported === false) state = t('btNoCache');
+      else if (S.installed) { state = t('btInstalled', { mb: mb(S.bytes) }); actions = `<button class="btn danger" id="bt-remove">${BIN}<span>${esc(t('btRemove'))}</span></button>`; }
+      else { state = t('btMissing'); actions = `<button class="btn primary" id="bt-download">${esc(t('btDownload', { mb: mb(BEAT_THIS_BYTES) }))}</button>`; }
+    }
+    return `<div class="card set-card" id="set-beat-tracker"><h3>${esc(t('setBt'))}</h3>
+      <p class="muted">${esc(t('btIntro'))}</p>
+      <p class="hint muted bt-third">${esc(t('btThirdParty'))}</p>
+      <p class="hint muted">${esc(t('btSize', { mb: mb(BEAT_THIS_BYTES) }))}</p>
+      ${row(t('btUse'), seg('data-bt-use', [['off', t('btOff')], ['on', t('btOn')]], on ? 'on' : 'off'), t('btUseHint'))}
+      <p class="bt-state" id="bt-state" aria-live="polite">${esc(state)}${busy ? ` <progress max="100" value="${bt.pct}"></progress>` : ''}</p>
+      ${bt.msg ? `<p class="hint bt-msg" id="bt-msg">${esc(bt.msg)}</p>` : ''}
+      ${actions ? `<div class="actions">${actions}</div>` : ''}</div>`;
   }
 
   // the "Stage videos" card (stage-video D7, D10): the folders of the Video look, their access and the size mode
@@ -386,6 +419,20 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       app.stageVideos.add().then(r => { svMsg = r.kind === 'dup' ? t('svDup', { name: r.name }) : r.kind === 'added' ? t('svAdded', { name: r.name, n: r.count }) : r.kind === 'error' ? t('svAddError') : ''; render(); });
       return;
     }
+    if (b.dataset.btUse) {
+      if (bt.pct !== null) return;
+      setBeatThisChosen(b.dataset.btUse === 'on'); bt.status = null; bt.msg = ''; return render();
+    }
+    if (b.id === 'bt-download') {
+      bt.ctrl = new AbortController(); bt.pct = 0; bt.msg = ''; render();
+      let shown = 0;
+      downloadBeatThis({ signal: bt.ctrl.signal, onProgress: (got, all) => { const p = Math.floor((got / all) * 100); if (p !== shown) { shown = p; bt.pct = p; const el = root.querySelector('#bt-state'); if (el) el.innerHTML = `${esc(t('btDownloading', { pct: p }))} <progress max="100" value="${p}"></progress>`; } } })
+        .then(() => { bt.msg = t('btDone'); }, e => { bt.msg = e && e.name === 'AbortError' ? t('btCancelled') : t('btFailed', { why: String((e && e.message) || e) }); })
+        .finally(() => { bt.pct = null; bt.ctrl = null; bt.status = null; render(); });
+      return;
+    }
+    if (b.id === 'bt-cancel') { if (bt.ctrl) bt.ctrl.abort(); return; }
+    if (b.id === 'bt-remove') { if (!confirmTwice('bt-remove', t('btRemoveConfirm'))) return; removeBeatThis().then(() => { bt.status = null; bt.msg = t('btRemoved'); render(); }); return; }
     if (b.dataset.svAllow) { svMsg = ''; app.stageVideos.allow(b.dataset.svAllow).then(() => render()); return; }
     if (b.dataset.svRemove) {
       const f = app.stageVideos.list().find(x => x.id === b.dataset.svRemove);
@@ -476,7 +523,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       const keys = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('coding-misk-')) keys.push(k); }
       keys.forEach(k => { try { localStorage.removeItem(k); } catch (err) {} });
       // the stage video folders go too (stage-video D10: a reset clears the folders and the size mode)
-      Promise.resolve(app.stageVideos ? app.stageVideos.clear() : null).catch(() => {}).finally(() => location.reload());
+      // and the beat tracker's files (decode-beat-tracker)
+      Promise.all([Promise.resolve(app.stageVideos ? app.stageVideos.clear() : null).catch(() => {}), removeBeatThis().catch(() => {})]).finally(() => location.reload());
     }
   });
   // the oscilloscope's sliders: the stage follows while dragging, the card is not drawn again

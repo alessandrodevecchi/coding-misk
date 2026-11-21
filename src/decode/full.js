@@ -6,11 +6,11 @@
 import { createAnalyzer, ANALYSIS_RATE } from './misk-analyzer.js';
 import { chordName, parseChord } from './model.js';
 import { sectionsOf } from './sections.js';
-import { variationsOf } from './writer.js';
+import { variationsOf, gridRotation, rotateGrid } from './writer.js';
 import { mixHatShape, mixHatBright, rankKits, bandEnergy, sustainOf, bassDrive, LEVEL_BANDS } from './kit-measure.js';
 import { KIT_MEASURES } from './kits.js';
 import { beatGrid, phaseOn } from './beat-this.js';
-import { chordHits, bassAttack, bassPcs } from './hit-measure.js';
+import { chordHits, bassAttack, bassPcs, kickShape } from './hit-measure.js';
 
 export const MISK = 'misk-analyzer';
 // Essentia.js's tempo is taken when its confidence (RhythmExtractor2013 multifeature, 0 to about 5.3) is at least this
@@ -244,8 +244,8 @@ export function bassRange(bars, sections, rule = HARMONY_RULE) {
   }
 }
 
-// the learned beat tracker in level B (decode round 10, decode-beat-tracker; bench only: decode-bench.cjs --beat-this,
-// the app passes no tracker): Beat This! tracks the beats of the whole file (beat-this.js beatGrid: one tempo for the whole file, the beat phase, the
+// the learned beat tracker in level B (decode round 10, decode-beat-tracker; the bench with decode-bench.cjs
+// --beat-this; the app passes it only when the user turns it on in Settings and downloads it, decode round 12): Beat This! tracks the beats of the whole file (beat-this.js beatGrid: one tempo for the whole file, the beat phase, the
 // downbeats). It counts only when its beats are steady (`steady`) and lock to one grid (`lock`), and the tempo picked
 // above (misk-analyzer, Essentia.js, the vote) keeps its octave: the tracker reads some half-time grooves at half (a real
 // track at 160 read 80). Relations to the picked tempo: the same within `same`, half or double, or 3:2 (a drum and bass
@@ -456,6 +456,11 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   // (and per bar with bass notes, the bass's attacks in the 300-1500 Hz band: hit-measure.js bassAttack, read by the
   // writer's bassFilled)
   m.bars.forEach((b, i) => { if ((b.bass || []).filter(x => x !== null && x !== undefined).length >= 2) b.bassAttack = bassAttack(pcm, sr, Math.round((m.downbeat + i * m.barSeconds) * sr), m.barSeconds * sr); });
+  // (decode round 13: per bar with drums, the kick's attack per step, hit-measure.js kickShape, read by the writer's fullKick)
+  m.bars.forEach((b, i) => { if (b.drums && Object.values(b.drums).some(r => /x/.test(r || ''))) b.kickShape = kickShape(pcm, sr, Math.round((m.downbeat + i * m.barSeconds) * sr), m.barSeconds * sr); });
+  // (decode round 14, decode-round14 B: the grid a 16th off the kick moves by that 16th for the whole song, writer.js
+  // gridRotation and rotateGrid; the variations read again on the moved bars)
+  { const s = gridRotation(m); if (s) { const r = rotateGrid(m, s); Object.assign(m, { bars: r.bars, downbeat: r.downbeat, gridRotated: s }); m.variations = variationsOf(m); } }
   // (round 8: decoded bass notes that are no bass, a pad's low notes, are not a bass part)
   if (noBassPart(m.shares, m.bassDrive)) { for (const b of m.bars) if (b.bass) b.bass = b.bass.map(() => null); m.noBass = true; }
   // (Essentia.js's own tempo and confidence, to read why the engine was or was not taken)

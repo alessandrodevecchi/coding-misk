@@ -28,8 +28,8 @@ import { SOUND_RULE as SR8, DRUM_DRIVE } from '../src/decode/writer.js';
 import { PART_LEVELS } from '../src/decode/part-levels.js';
 import { BASS_RULE } from '../src/decode/misk-analyzer.js';
 import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare, clapShift, thirdlessMode } from '../src/decode/full.js';
-import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts } from '../src/decode/writer.js';
-import { chordHits } from '../src/decode/hit-measure.js';
+import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts, QUIET_RULE, LINE_RULE, lineChord, kickClicks, offSnare, tailEnd, droneOf, lateChords, fullKick, fourOnFloor, gridRotation, rotateGrid, leadIns } from '../src/decode/writer.js';
+import { chordHits, kickShape } from '../src/decode/hit-measure.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive, hatTop } from '../src/decode/kit-measure.js';
 import { KIT_MEASURES } from '../src/decode/kits.js';
 import { composeConfig, decodeControls } from '../src/decode/tab.js';
@@ -257,7 +257,7 @@ const M = createAnalyzer(P124).model(P124.length / RATE);
   check(Object.values(runs['Essentia.js failing'].engines).every(x => x === 'misk-analyzer') && /did not load/.test((runs['Essentia.js failing'].notes || []).join()), 'Essentia.js failing: misk-analyzer computes the three measures, the model says why', (runs['Essentia.js failing'].notes || []).join());
   // the same model shape as level A for the same bars (analysis spec: One song model)
   const A = createAnalyzer(pcm).model(30), B = runs['Essentia.js'];
-  { const extra = ['lead', 'leadVoiced', 'third', 'sustain', 'chordHits', 'chordHeld', 'chordTonal', 'bassAttack']; check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !extra.includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !extra.includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line, the chords\' sustain and, round 11, how the chords and the bass are played)'); }
+  { const extra = ['lead', 'leadVoiced', 'third', 'sustain', 'chordHits', 'chordHeld', 'chordTonal', 'bassAttack', 'kickShape']; check(JSON.stringify(Object.keys(A.bars[0]).filter(k => !extra.includes(k)).sort()) === JSON.stringify(Object.keys(B.bars[0]).filter(k => !extra.includes(k)).sort()) && A.bars.length > 10, 'level A and level B fill the same bar fields (level B adds the top line, the chords\' sustain and, round 11, how the chords and the bass are played, round 13 the kick attack per step)'); }
   // level A never calls Essentia.js: the worker loads it only for "analyse all"
   const wsrc = fs.readFileSync('src/decode/worker.js', 'utf8'), msrc = fs.readFileSync('src/decode/misk-analyzer.js', 'utf8');
   check(!/essentia/i.test(msrc.replace(/\/\/.*$/gm, '')) && /async function all[\s\S]*import\('\.\/engine-essentia\.js'\)/.test(wsrc) && !/^import .*(engine-essentia|full)/m.test(wsrc), 'level A uses misk-analyzer only: Essentia.js is imported only by level B, inside the worker');
@@ -564,6 +564,77 @@ if (process.argv.includes('--app')) {
     const pairs = twinParts(tracks, secs, bars);
     check(pairs.length === 1 && tracks[0].clips[1].pattern === 'A' && !tracks[0].patterns.B && tracks[1].clips.length === 2 && tracks[1].clips[1].start === 8, 'round 11: the second of two equal drops gets the kick and the bass of the first', JSON.stringify([pairs, tracks[0].clips, tracks[1].clips]));
   }
+  // (round 12, decode-round12 1: quiet chords whose tones stand out are written, at a lower gain; a pad on the tonic with
+  // the other third is kept as power chords)
+  {
+    const mk = (chord, level, tonal, key = { root: 9, mode: 'minor' }) => ({ ...Mk, key, sections: [{ start: 0, bars: 8, kind: 'verse' }, { start: 8, bars: 8, kind: 'verse' }], ending: 16, bars: Array.from({ length: 16 }, (_, i) => ({ ...Mk.bars[0], drums: { bd: E, cp: E, hh: E, oh: E }, chord: i < 8 ? chord : 'Am', chordConf: 0.8, chordTonal: i < 8 ? tonal : 0.3, chordHeld: 0.6, level: { drums: 0, bass: 0, chords: i < 8 ? level : 1, other: 0 } })) });
+    const ch = m => writeFull(m).tracks.find(t => t.id === 'chords') || { clips: [], patterns: {} };
+    const q = ch(mk('Am', 0.02, 0.3)), noise = ch(mk('Am', 0.02, 0.05)), gainOf = (t, start) => { const c = t.clips.find(x => x.start === start); return c ? +(/\.gain\(([\d.]+)\)(?!.*\.gain\()/.exec(t.patterns[c.pattern].code) || [])[1] : null; };
+    check(q.clips.some(c => c.start === 0) && gainOf(q, 0) < gainOf(q, 8) && !noise.clips.some(c => c.start === 0), 'round 12: a quiet pad whose tones stand out is written at a lower gain; quiet chords from the drums\' noise are not', JSON.stringify([q.clips, gainOf(q, 0), gainOf(q, 8), noise.clips]));
+    const e = ch(mk('E', 0.5, 0.35, { root: 4, mode: 'minor' })), e0 = ch(mk('E', 0.5, 0.05, { root: 4, mode: 'minor' }));
+    const eCode = Object.values(e.patterns).map(p => p.code).join(' ');
+    check(e.clips.some(c => c.start === 0) && /chord\("E5"\)/.test(eCode) && !e0.clips.some(c => c.start === 0), 'round 12: one chord on the tonic with the other third and its tones standing out is kept as a power chord; with no tonal share it stays out', JSON.stringify([e.clips, eCode.slice(0, 60), e0.clips]));
+  }
+  // (round 12, decode-round12 2: a major chord on a driven line's own note, sixteenths, is the line's harmonics)
+  {
+    const line = (chord, i) => ({ ...Mk.bars[0], chord, chordConf: 0.8, chordHeld: 0.15, chordTonal: 0.2, bass: Array(16).fill(33), bassAttack: { rise: Array(16).fill(3), level: Array(16).fill(1), late: Array(16).fill(0.5) } });
+    const mk = (h1, minor = 0) => ({ ...Mk, key: { root: 9, mode: 'major' }, bassDrive: { h1, slope: -1, evenOdd: 0 }, sections: [{ start: 0, bars: 8, kind: 'verse' }], ending: 8, bars: Array.from({ length: 8 }, (_, i) => line(i < minor ? 'Am' : 'A', i)) });
+    const has = m => !!writeFull(m).tracks.find(t => t.id === 'chords');
+    check(lineChord(line('A'), 0.8) && !lineChord(line('Am'), 0.8) && !lineChord(line('A'), 0.4) && !has(mk(0.8)) && has(mk(0.4)) && has(mk(0.8, 3)), 'round 12: A major over a driven A line on sixteenths writes no chords; a plain bass, or minor stabs on a quarter of the bars, keep them', JSON.stringify([has(mk(0.8)), has(mk(0.4)), has(mk(0.8, 3))]));
+  }
+  // (round 12, decode-round12 3 and 4: the kick's click read as a clap on every beat a 16th late; a backbeat snare read as a
+  // hat a 16th off the grid)
+  {
+    const bars = Array.from({ length: 4 }, () => ({ drums: { bd: 'x...x...x...x...', cp: '.x...x...x...x..', hh: E, oh: E } }));
+    const p = kickClicks(bars, [0, 1, 2, 3]), plain = Array.from({ length: 4 }, () => ({ drums: { bd: 'x...x...x...x...', cp: '....x.......x...', hh: E, oh: E } }));
+    check(p === 1 && bars[0].drums.bd === '.x...x...x...x..' && bars[0].drums.cp === E && kickClicks(plain, [0, 1, 2, 3]) === 0, 'round 12: claps on every beat a 16th after the kicks become the kicks; backbeat claps stay', JSON.stringify(bars[0].drums));
+    const hb = Array.from({ length: 6 }, (_, i) => ({ drums: { bd: E, cp: E, hh: i % 2 ? '.....x.......x..' : E, oh: i % 2 ? E : '.....x.......x..' } })), eighths = Array.from({ length: 6 }, () => ({ drums: { bd: E, cp: E, hh: 'x.x.x.x.x.x.x.x.', oh: E } }));
+    check(offSnare(hb).length === 1 && hb[0].drums.cp === '.....x.......x..' && hb[0].drums.oh === E && !offSnare(eighths).length, 'round 12: closed or open hats on 5 and 13 alone, a backbeat snare a 16th off, become claps; eighth hats stay', JSON.stringify(hb[0].drums));
+  }
+  // (round 13, decode-round13 A: a pad fading out past the ending; a quiet outro holding one root)
+  {
+    const bar = (chord, tonal, lv, drums = E) => ({ ...Mk.bars[0], drums: { bd: drums, cp: E, hh: E, oh: E }, chord, chordConf: 0.8, chordTonal: tonal, chordHeld: 0.4, level: { drums: drums === E ? 0 : 0.9, bass: 0, chords: lv, other: 0 } });
+    const fade = { ...Mk, sections: [{ start: 0, bars: 8, kind: 'verse' }], ending: 8, bars: [...Array.from({ length: 8 }, () => bar('Am', 0.4, 1, 'x...x...x...x...')), ...[0.04, 0.03, 0.02, 0.01, 0.01, 0, 0, 0].map(l => bar('Am', 0.4, l))] };
+    const noise = { ...fade, bars: fade.bars.map((b, i) => (i < 8 ? b : { ...b, chordTonal: 0.05 })) };
+    const song = writeFull(fade), bars = song.sections.reduce((a, x) => a + x.bars, 0);
+    // (round 14, decode-round14 C: the fade goes on where the chord level rounds to 0 while the tones stand out)
+    const dim = { ...fade, bars: fade.bars.map((b, i) => (i < 13 ? b : { ...b, chordTonal: 0.1 })) };
+    check(tailEnd(fade) === 16 && bars === 16 && tailEnd(dim) === 13 && tailEnd(noise) === 8, 'round 13 and 14: a pad fading out past the ending keeps the song going to its last bar whose tones stand out, at a chord level of 0 too; drums\' noise after the ending does not', JSON.stringify([tailEnd(fade), bars, tailEnd(dim), tailEnd(noise)]));
+    const outro = tonal => ({ ...Mk, key: { root: 4, mode: 'minor' }, sections: [{ start: 0, bars: 8, kind: 'verse' }, { start: 8, bars: 8, kind: 'outro' }], ending: 16, bars: [...Array.from({ length: 8 }, () => bar('Em', 0.4, 1, 'x...x...x...x...')), ...['F', 'E', 'E', 'E', 'E', 'E', 'E', 'E'].map(c => bar(c, tonal, 0.03))] });
+    const ch = m => writeFull(m).tracks.find(t => t.id === 'chords') || { clips: [], patterns: {} }, o = ch(outro(0.13)), o0 = ch(outro(0.05));
+    const oc = o.clips.find(c => c.start >= 8);
+    check(!!droneOf(outro(0.13).bars.slice(8), { root: 4, mode: 'minor' }) && !!oc && /chord\("E5"\)/.test(o.patterns[oc.pattern].code) && !o0.clips.some(c => c.start >= 8), 'round 13: a quiet outro holding E writes a power chord; the same with no tonal share stays silent', JSON.stringify([o.clips, o0.clips]));
+  }
+  // (round 14, decode-round14 B: the grid moved onto the kick; C: a pad that fades in)
+  {
+    const shape = p => ({ low: Array.from({ length: 16 }, (_, j) => (j % 4 === p ? 9 : 2)), high: Array(16).fill(0) });
+    const bar = (p, cp = E) => ({ ...Mk.bars[0], drums: { bd: Array.from({ length: 16 }, (_, j) => (j % 4 === p ? 'x' : '.')).join(''), cp, hh: E, oh: E }, kickShape: shape(p), bass: Array.from({ length: 16 }, (_, j) => j), level: { drums: 0.9, bass: 0.5, chords: 0, other: 0 } });
+    const song = (p, cp) => ({ ...Mk, downbeat: 0.5, sections: [{ start: 0, bars: 8, kind: 'verse' }, { start: 8, bars: 8, kind: 'drop' }], ending: 16, bars: Array.from({ length: 16 }, () => bar(p, cp)) });
+    const m1 = song(1), s1 = gridRotation(m1), r1 = rotateGrid(m1, s1);
+    check(s1 === 1 && Math.abs(r1.downbeat - (0.5 + m1.barSeconds / 16)) < 0.002 && r1.bars[3].drums.bd === 'x...x...x...x...' && r1.bars[3].bass[0] === 1 && r1.bars[3].bass[15] === 0 && gridRotation(song(0)) === 0 && gridRotation(song(1, '....x.......x...')) === 0 && gridRotation(song(2)) === 0, 'round 14: a kick a 16th after the grid in every clear section moves the grid by that 16th (kick on step 0, the bass rotated across the bar line); a kick on the grid, a backbeat clap on the present grid or a kick on the offbeat 8th leave it', JSON.stringify([s1, r1.downbeat, r1.bars[3].drums.bd, r1.bars[3].bass]));
+    const pb = (chord, tonal, lv, drums = E) => ({ ...Mk.bars[0], drums: { bd: drums, cp: E, hh: E, oh: E }, chord, chordConf: 0.7, chordTonal: tonal, chordHeld: 0.4, level: { drums: drums === E ? 0 : 0.9, bass: 0, chords: lv, other: 0 } });
+    const list = [pb('C', 0.05, 0.01), pb('E', 0.06, 0.01), pb('E', 0.1, 0.02), pb('E', 0.4, 0.05), pb('E', 0.4, 0.05)], kick = [pb('E', 0.06, 0.01, 'x...x...x...x...'), pb('E', 0.4, 0.05)];
+    const li = leadIns(list, 5), lk = leadIns(kick, 2);
+    check(li.size === 2 && li.has(list[1]) && li.has(list[2]) && !li.has(list[0]) && lk.size === 0, 'round 14: quiet bars on the same root without drums before a heard pad play it; another root or drums stop the fade-in', JSON.stringify([li.size, lk.size]));
+  }
+  // (round 13, decode-round13 D: chords entering inside a section)
+  {
+    const b = (held, lv) => ({ chord: 'Gm', chordConf: 0.8, chordHeld: held, level: { chords: lv } });
+    const late = [...Array.from({ length: 16 }, () => b(0.04, 0.68)), ...Array.from({ length: 16 }, () => b(0.14, 0.92))], pad = Array.from({ length: 32 }, () => b(0.6, 0.8));
+    check(lateChords(late) === 16 && lateChords(pad) === 0, 'round 13: chords whose tones never hold before a held pad enters start with the pad; a held pad from the start stays', JSON.stringify([lateChords(late), lateChords(pad)]));
+  }
+  // (round 13, decode-round13 C: a kick on every beat by its attack)
+  {
+    const shape = p => ({ low: Array.from({ length: 16 }, (_, j) => (j % 4 === p ? 9 : 2)), high: Array(16).fill(0) });
+    const sec = (bd, p, lv = 0.8) => Array.from({ length: 4 }, () => ({ drums: { bd, cp: E, hh: '...x...x...x...x', oh: E }, kickShape: shape(p), level: { drums: lv } }));
+    const bars = [...sec('.x...x...x...x..', 1), ...sec('.x...........x..', 1)], fours = fourOnFloor(bars, [0, 1, 2, 3]);
+    const p = fullKick(bars, [4, 5, 6, 7], fours), quiet = sec('................', 1, 0.3), off = sec('..x...........x.', 2);
+    check(fours.join() === '1' && p === 1 && bars[4].drums.bd === '.x...x...x...x..' && fullKick(quiet, [0, 1, 2, 3], [1]) === null && fullKick(off, [0, 1, 2, 3], [1]) === null, 'round 13: a loud section whose band rises on one step of every beat gets four kicks there, when the song has a four-on-the-floor kick on that step; a quiet section or another step does not', JSON.stringify([fours, p, bars[4].drums.bd]));
+    const sr = 44100, bl = Math.round(sr * 240 / 128), x = new Float32Array(bl + sr);
+    for (let k = 0; k < 4; k++) { const a = sr / 2 + Math.round((k * 4 + 1) * bl / 16); for (let i = 0; i < 0.15 * sr; i++) x[a + i] += 0.8 * Math.exp(-i / sr / 0.05) * Math.sin(2 * Math.PI * (60 + 90 * Math.exp(-i / sr / 0.02)) * i / sr); }
+    const ks = kickShape(x, sr, sr / 2, bl), low = [0, 1, 2, 3].map(p => Math.min(...[0, 1, 2, 3].map(q => ks.low[4 * q + p])));
+    check(low[1] > 10 && low.every((v, p) => p === 1 || v < low[1] - 6), 'round 13: kickShape reads a kick on step 1 of every beat', JSON.stringify(ks.low));
+  }
   // (round 11, decode-hit-rhythm A: the measure on a synthetic bar: an A minor triad struck on eighths, then held)
   {
     const sr = 44100, bl = Math.round(sr * 240 / 124), x = new Float32Array(bl + sr), fs = [220, 261.63, 329.63, 440, 523.25, 659.25];
@@ -689,7 +760,8 @@ if (process.argv.includes('--app')) {
   check(ev[0] === ev[1] && ev[1] === 16 && ev[2] === 0, 'the copied code with the group evaluates in Strudel and plays only the parts; the group alone plays nothing', ev.join(','));
 }
 
-// the learned beat tracker (decode-beat-tracker, round 10; bench only, not offered in the app): the pure parts always;
+// the learned beat tracker (decode-beat-tracker, round 10; round 12: an option of Settings, off by default): the pure
+// parts and the option always;
 // the model itself when its files are in .cache/beat-this/ (git-ignored, downloaded by hand from the pinned URLs; skipped otherwise)
 {
   const BT = await import('../src/decode/beat-this.js'), F = await import('../src/decode/full.js');
@@ -707,6 +779,55 @@ if (process.argv.includes('--app')) {
   check(!sparse || !sparse.steady, 'beat tracker: a pad with a beat now and then is not steady');
   const rel = (b, pick) => F.trackerGrid({ bpm: b, steady: true, lock: 0.9 }, pick);
   check(rel(124.02, 124).relation === 1 && rel(80, 160).bpm === 160 && rel(176, 88).bpm === 88 && rel(174, 116).tempo && rel(174, 116).bpm === 174 && rel(130, 100) === null && F.trackerGrid({ bpm: 124, steady: false, lock: 0.9 }, 124) === null, 'beat tracker: same, half, double and 3:2 relations to the picked tempo; the picked octave stays; no relation or unsteady beats: no grid');
+  // (round 12) the option: off by default, on only with the user's choice or the local build flag, used only with the
+  // files downloaded; the runtime imported by one module only, and that one only by the level B worker, dynamically
+  {
+    const ST = await import('../src/decode/beat-this-store.js');
+    const mem = new Map(), fake = { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k) };
+    const had = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    Object.defineProperty(globalThis, 'localStorage', { value: fake, configurable: true, writable: true });
+    const states = [];
+    states.push([ST.BEAT_THIS_DEFAULT_ON, ST.beatThisChosen(), ST.beatThisOn()]);
+    fake.setItem(ST.BEAT_THIS_KEY, JSON.stringify({ installed: true }));
+    states.push([ST.beatThisChosen(), ST.beatThisOn()]);
+    ST.setBeatThisChosen(true);
+    states.push([ST.beatThisChosen(), ST.beatThisOn()]);
+    fake.removeItem(ST.BEAT_THIS_KEY);
+    states.push([ST.beatThisChosen(), ST.beatThisOn()]);
+    ST.setBeatThisChosen(false);
+    states.push([ST.beatThisChosen(), ST.beatThisOn(), fake.getItem(ST.BEAT_THIS_OPT)]);
+    // (round 14, d12h) the local copy: '' in Node and in the build, so nothing is tried; a file that does not match its
+    // pin is not kept; the files of this machine's shared folder (when there) fill the cache and the flag
+    {
+      const store = new Map(), fakeCaches = { open: async () => ({ match: async u => store.get(u), put: async (u, r) => { store.set(u, r); } }), delete: async () => store.clear() };
+      const hadCaches = Object.getOwnPropertyDescriptor(globalThis, 'caches');
+      Object.defineProperty(globalThis, 'caches', { value: fakeCaches, configurable: true, writable: true });
+      ST.setBeatThisChosen(true); fake.removeItem(ST.BEAT_THIS_KEY);
+      const none = await ST.seedBeatThisLocal();
+      const bad = await ST.seedBeatThisLocal({ base: '/__local-models/', fetchFn: async () => new Response(new Uint8Array(4)) });
+      const seeded = [ST.BEAT_THIS_LOCAL, none, bad, store.size, ST.beatThisInstalled()];
+      const { LOCAL_MODELS_DIR, localModels } = await import('./local-models.mjs');
+      const plugin = localModels(), def = plugin.config().define;
+      const cfg = fs.readFileSync('vite.config.js', 'utf8');
+      check(JSON.stringify(seeded) === JSON.stringify(['', false, false, 0, false]) && plugin.apply === 'serve' && def['import.meta.env.VITE_DECODE_BEAT_TRACKER'] === '"on"' && def['import.meta.env.VITE_DECODE_BEAT_LOCAL'] === '"/__local-models/"' && !/local-models/.test(cfg), 'beat tracker local copy (d12h): nothing tried without the local path, a file off its pin not kept, the plugin only for the dev server and never in vite.config.js');
+      if (Object.values(BT.BEAT_THIS_FILES).every(f => fs.existsSync(path.join(LOCAL_MODELS_DIR, f.name)))) {
+        const ok = await ST.seedBeatThisLocal({ base: '/__local-models/', fetchFn: async u => new Response(fs.readFileSync(path.join(LOCAL_MODELS_DIR, u.split('/').pop()))) });
+        const st = await ST.beatThisStatus();
+        check(ok && ST.beatThisInstalled() && st.installed && st.bytes === BT.BEAT_THIS_BYTES, 'beat tracker local copy (d12h): the shared folder\'s files fill the cache, pinned, and the option is ready');
+      } else console.log(`skip  beat tracker local copy: model files not in ${LOCAL_MODELS_DIR}`);
+      if (hadCaches) Object.defineProperty(globalThis, 'caches', hadCaches); else delete globalThis.caches;
+      ST.setBeatThisChosen(false); fake.removeItem(ST.BEAT_THIS_KEY);
+    }
+    if (had) Object.defineProperty(globalThis, 'localStorage', had); else delete globalThis.localStorage;
+    check(JSON.stringify(states) === JSON.stringify([[false, false, false], [false, false], [true, true], [true, false], [false, false, '"off"']]), 'beat tracker option: off by default (no build flag in Node) even with the files there; on with the files, used; on without them, not used; off again', JSON.stringify(states));
+    const srcFiles = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? srcFiles(path.join(dir, e.name)) : /\.m?js$/.test(e.name) ? [path.join(dir, e.name)] : []));
+    const users = srcFiles('src').filter(f => /(from |import\()['"]onnxruntime-web/.test(fs.readFileSync(f, 'utf8'))).map(f => path.relative('src', f));
+    const statics = srcFiles('src').filter(f => /^import [^(]*['"]\.\/engine-beat-this-browser\.js['"]/m.test(fs.readFileSync(f, 'utf8')));
+    const wk = fs.readFileSync('src/decode/worker.js', 'utf8');
+    check(JSON.stringify(users) === JSON.stringify(['decode/engine-beat-this-browser.js']) && !statics.length && /await import\('\.\/engine-beat-this-browser\.js'\)/.test(wk) && /beats \?/.test(wk), 'beat tracker: onnxruntime-web named only in engine-beat-this-browser.js, imported only dynamically by the level B worker when asked', users.join(','));
+    const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+    check(pkg.dependencies['onnxruntime-web'] === '1.31.1' && !(pkg.devDependencies || {})['onnxruntime-web'], 'beat tracker: onnxruntime-web pinned to 1.31.1 exactly, an app dependency');
+  }
   const { BT_DIR, nodeBeatThis } = await import('./beat-this-node.mjs');
   if (Object.values(BT.BEAT_THIS_FILES).every(f => fs.existsSync(path.join(BT_DIR, f.name)))) {
     // a generated track at 124 BPM, analysed with and without the tracker

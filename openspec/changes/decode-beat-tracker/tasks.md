@@ -1,6 +1,6 @@
 # Tasks
 
-Estimate: about 9 agent hours: research and measurements (about 3 h), pipeline and grid (about 2 h), Settings card and storage (about 1.5 h), bench with the tracker on and off (about 1.5 h), checks and docs (about 1 h). The in-app part ships only if the round 10 verdict rule holds (proposal).
+Estimate: about 9 agent hours: research and measurements (about 3 h), pipeline and grid (about 2 h), Settings card and storage (about 1.5 h), bench with the tracker on and off (about 1.5 h), checks and docs (about 1 h). Round 10: the in-app part ships only if the verdict rule holds (proposal). Round 12: it ships as an option off by default (section 6).
 
 ## 1. Research
 
@@ -31,4 +31,12 @@ Estimate: about 9 agent hours: research and measurements (about 3 h), pipeline a
 ## 5. After the verdict
 
 - [x] 5.1 Leave out the in-app part: the Settings card, the storage, the worker's and the tab's wiring, the strings, the Guide text, the browser check; `onnxruntime-web` moved to the dev dependencies (the bench runs it in Node).
-- [ ] 5.2 A later round: a gate that the real tracks pass (see design, Verdict), then 2.4, 3.1 to 3.3 and 4.3 again from the patch.
+- [ ] 5.2 A later round: a gate that the real tracks pass (see design, Verdict), before the tracker can be on by default.
+
+## 6. Round 12: an option off by default
+
+- [x] 6.1 The patch's in-app parts ported onto the current code: the worker's `beats` flag, the tab's flag and stale level B analyses, the grid's engine in the panel, the progress stage (2.4); `beat-this-store.js` (3.1); the card (3.2) with an on/off option, off by default (the cache not even opened while off), Remove also while off, the files removed by Reset everything, the downloaded flag left out of backups; the Guide text (3.3).
+- [x] 6.2 The local build flag `VITE_DECODE_BEAT_TRACKER` (`on`): the option starts on; set only by the git-excluded `vite.local.config.mjs` with `define`.
+- [x] 6.3 `onnxruntime-web` 1.31.1 back in the app's dependencies (exact version, `--ignore-scripts`).
+- [x] 6.4 Security checked again (design, "Round 12").
+- [x] 6.5 Checks: `check:decode` (the option off by default, the runtime imported only by the worker's dynamic import, the pin in `package.json`), `tools/check-beat-tracker.cjs` (off by default with nothing requested through a Full analysis, on, a changed file refused, download, Full with the tracker, off again, Remove; `--flag`).
