@@ -2,9 +2,23 @@
 
 ## ADDED Requirements
 
+### Requirement: One command registry
+
+Every console command the assistant may use SHALL have one registry entry: a description, a JSON Schema for its arguments, the console's validation and the button's apply path. The prompt, the answer schema, the online tool definitions, the MCP tools and `docs/AGENT-API.md` SHALL be generated from it. A check SHALL fail when the document is stale or an entry is incomplete.
+
+#### Scenario: The document follows the registry
+
+- **WHEN** a registry entry's description changes and `docs/AGENT-API.md` is not written again
+- **THEN** `npm run check:agent-api` fails and names the stale file
+
+#### Scenario: Apply is the button's path
+
+- **WHEN** a request's answer holds "+ Arp"
+- **THEN** the registry applies it through the same function as the console's "+" of the arp, with the same batch and boundary
+
 ### Requirement: Typed requests become console commands
 
-The Radio console SHALL have a request field. A request in English SHALL be sent to the area's engine with a generated prompt (the console's command kinds and help texts, the song on air, the kinds disabled now) and a JSON schema, and the answer SHALL be read as at most four console commands from the MVP set, in the order asked. The MVP set SHALL include the listener's saved patterns by name. The assistant SHALL NOT produce Strudel code or commands outside `COMMANDS`.
+The Radio console SHALL have a request field. An English request (Italian not guaranteed) SHALL be sent to the area's engine with a prompt and schema generated from the registry and the song on air, and the answer SHALL be read as at most four console commands of the MVP set, saved patterns by name included, in the order asked. The assistant SHALL NOT produce Strudel code or commands outside `COMMANDS`.
 
 #### Scenario: Several commands in one request
 
@@ -25,6 +39,38 @@ The Radio console SHALL have a request field. A request in English SHALL be sent
 
 - **WHEN** an answer names a saved pattern that matches none or two of the fitting patterns equally
 - **THEN** that command is shown struck through with "no saved pattern called …" or "which one: A or B?" and nothing is queued for it
+
+### Requirement: Pattern names matched by the app
+
+The answer schema SHALL take a saved pattern's name as free text, never as a list of names. The app SHALL match it against the names of the saved patterns that fit the song, normalised (case, accents, punctuation, filler words), exact first, then by a fuzzy score with a threshold. No match and an ambiguous match SHALL be rejected with a clear message.
+
+#### Scenario: A near name
+
+- **WHEN** the listener has a fitting pattern "Dusty Breaks" and the answer names "Dusty Break"
+- **THEN** the console queues "Dusty Breaks"
+
+#### Scenario: An unknown name
+
+- **WHEN** the answer names "Sunset Lead" and no fitting pattern is close to it
+- **THEN** the chip says there is no saved pattern called "Sunset Lead" and nothing is queued for it
+
+### Requirement: A "cannot" path always present
+
+The answer schema SHALL always allow an answer with no commands and a short note, with the note required. Requests about what the console never does (tempo, time signature, playing backwards) SHALL be answered "cannot" without asking the engine.
+
+#### Scenario: Tempo
+
+- **WHEN** the listener types "change the tempo to 140 bpm"
+- **THEN** nothing is queued and the row says the console cannot change the tempo
+
+### Requirement: Vague requests asked first
+
+A request that names no command word, instrument, playing track or saved pattern SHALL be flagged as vague, and its answer SHALL be shown as a proposal with Apply and Dismiss even in "Apply at once", with a line saying why.
+
+#### Scenario: A mood
+
+- **WHEN** the mode is "Apply at once" and the listener types "it is getting boring"
+- **THEN** the answer row shows the commands as a proposal with "A vague request: check before applying", and nothing is queued until Apply
 
 ### Requirement: Apply at once or ask first
 
@@ -108,7 +154,7 @@ The generated prompt with the song state SHALL stay under 2000 tokens (counted a
 #### Scenario: Normal song
 
 - **WHEN** the prompt is built for a Live coder song with eight playing tracks
-- **THEN** it stays under 2000 tokens and holds every enabled kind of the MVP set
+- **THEN** it stays under 2000 tokens (about 800 measured for the system text and examples, in a window of 9216) and holds every kind of the MVP set
 
 #### Scenario: Each request starts clean
 

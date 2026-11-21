@@ -15,6 +15,13 @@ Research (21 November 2026, raw notes in the git-ignored `notes/`):
 - **OpenRouter.** `GET /api/v1/models` needs no key and returns `id`, `canonical_slug`, `name`, `created`, `expiration_date`, `pricing`, `context_length`, `supported_parameters` and more (476 models, 407 with `structured_outputs`). It also lists alias ids such as `~anthropic/claude-haiku-latest`. CORS is open (`access-control-allow-origin: *`). Structured output: `response_format: { type: "json_schema", json_schema: { name, strict: true, schema } }` with `provider: { require_parameters: true }`. Free models (`:free`): 20 requests a minute, 50 a day, 1000 a day once 10 credits were ever bought; `GET /api/v1/key` reports the daily free count.
 - **Anthropic API.** `GET /v1/models` lists the current models with `id`, `display_name`, `created_at`. Browser calls need a special opt-in header; calls through the helper do not.
 
+**Measured on the owner's Mac (probe page `probe/`, 21 November 2026, results in the git-ignored `notes/`).** Two rounds against the real built-in model on `http://localhost`:
+
+- **Context window: 9216 tokens** (`session.contextWindow`); the console prompt (system text, 6 examples) takes **about 800 tokens** (783 in round 1, 799 in round 2). A clone costs about 0 ms; the base session is reused.
+- **Round 1** (flat schema, free strings for pattern names and track ids): **23 of 28 English requests exact**, 3 partial, 2 invalid (both saved-pattern requests); **median 1.26 s**. Italian: 3 of 3 exact, but the model does not declare Italian, so it is not guaranteed.
+- **Round 2** (one `anyOf` branch per command kind, enums for pattern names and track ids, 20 s timeout): **30 of 38 English exact**, 4 partial, 4 wrong; **median about 2.2 s**, no timeouts. The `anyOf` schema is accepted. Two new failures: with an enum of pattern names the model picks a wrong existing name ("Sunset Lead", which does not exist, became "Rolling Sub"; "acid line" became "Rolling Sub"); and the "cannot" path was lost ("change the tempo to 140 bpm" became a key change). Variance: 4 of 10 hard requests gave the same answer three times.
+- **Compose on the built-in model:** with one `anyOf` branch per track type, **12 of 12 answers valid**, 10 of 12 of the right type, but **only 5 of 12 musically right**, about **10 s each**. Compose on the built-in model is at most a "light" option (one track, clearly labelled); real Compose needs the online engines (D11).
+
 ## Goals / Non-Goals
 
 **Goals:** a typed English request in the Radio console becomes valid console commands, applied like presses; engines and models are pluggable and chosen per area; model lists refresh and gone models are replaced inside their family; keys stay out of page code; the built-in engine works with no key and no network after its download.
@@ -22,6 +29,26 @@ Research (21 November 2026, raw notes in the git-ignored `notes/`):
 **Non-Goals:** Compose edits (kept open, D11), voice input, the director's own agents, Italian requests on the built-in engine, streaming answers, tool calling.
 
 ## Decisions
+
+### D0. The command registry (the first step)
+
+One registry, `src/ai/commands.js`, holds one entry per Radio console command the assistant may use. Everything an engine or an agent sees of the console is generated from it, never written by hand twice. An entry has:
+
+- `kind` (the console command, a key of `COMMANDS`) and `button` (how the console labels it);
+- `description`: one English line of what it does;
+- `args`: a JSON Schema for its arguments (`properties`, `required`), with the console's own lists (`INSTRUMENTS`, `VARY_TYPES`, `TREATMENTS`, `KEY_MOVES`, `RISER_BARS`) and, filled per request, the playing track ids;
+- `words`: the words a precise request uses for it ("darker", "mute", "drop"…), read by the vague-request guard (D4);
+- `validate(args, ctx)`: the same rules as the console: the arguments mapped to the object the button sends, then the console's own reason (`whyNot`, or `airWhy` on a grown song) for the song on air; it returns the command or a reason;
+- `apply(cmd, api)`: the same code path as the console button. `api` is the set of functions the buttons call in `src/radio/radio.js` (`command`, `pend`, `pendPattern`, `pendLock`, the typed-line path); the registry never touches the song itself.
+
+From the registry the app generates:
+
+1. the built-in model's system prompt and its `responseConstraint` (D3);
+2. tool definitions for the online engines (name, description, input schema), used from stage 2;
+3. the tools of the future MCP server (#26), the same definitions with the MCP field names;
+4. `docs/AGENT-API.md`, written by `npm run agent-api` and checked by `npm run check:agent-api`, which fails when the file is stale or an entry is incomplete (no description, no schema, a kind outside `COMMANDS`, a schema property without a type).
+
+Only the Radio console commands are in scope now. Compose and other areas add their own entries later, in registries of their own with the same shape.
 
 ### D1. One engine interface
 
@@ -38,86 +65,110 @@ The area code never sees engine details. An engine that cannot force a schema st
 
 ### D2. Areas, each with its engine and model
 
-`src/ai/areas.js` registers areas: `radio` now, `compose` later. An area brings its prompt builder, its schema, its validator and its apply step. Settings stores, per area, `{ engine, model, family, pinned }` in `coding-misk-ai` (in the backup; it holds no secret). Defaults: Radio console on the built-in engine; when it is `unavailable`, the request field says why and offers Settings.
+`src/ai/areas.js` registers areas: `radio` now, `compose` later. An area brings its command registry (D0), from which its prompt, schema, validation and apply step come. Settings stores, per area, `{ engine, model, family, pinned }` in `coding-misk-ai` (in the backup; it holds no secret). Defaults: Radio console on the built-in engine; when it is `unavailable`, the request field says why and offers Settings.
 
 ### D3. The prompt and the answer format for the Radio console
 
-Generated, never hand-copied, so it follows the console:
+Generated from the registry (D0), never hand-copied, so it follows the console:
 
-- **System prompt** (about 600 tokens): the role ("turn a listener's request into console commands of a live music radio; never invent a command"), one line per command kind from `COMMANDS` and the console's help texts (`src/i18n.js`, English), the argument words (instruments `INSTRUMENTS`, parts `VARY_TYPES`, treatments, key moves `KEY_MOVES`, riser lengths), rules (at most 4 commands, order as asked, nothing when unclear), and 6 short examples.
-- **Per request** (about 200 tokens): the style, energy, the playing tracks with ids and instruments, locked parts, the kinds disabled now with their reason, then the request.
-- **Answer schema** (flat, small enough for the built-in model's grammar):
+- **System prompt** (about 800 tokens measured, with the examples): the role ("turn a listener's request into console commands of a live music radio; never invent a command"), one line per registry entry (`kind: description {arguments}`), the argument lists, the rules (at most 4 commands, order as asked, a saved pattern's name written as the listener wrote it, nothing and a note when the console cannot do it), and 6 short examples, one of them a request the console cannot do.
+- **Per request** (about 200 tokens): the style, energy and part, the playing tracks with ids and instruments, the names of the saved patterns that fit (at most 20, the most used first), then the request.
+- **Answer schema**: an object with `note` first, then `commands`. `note` is required: empty when the console can do the request, else one short sentence of what it cannot do. `commands` is an array of at most 4 items, each item an `anyOf` with one branch per registry entry (its `kind` as a one-value enum and only its own arguments, `additionalProperties: false`); kinds without arguments share one branch. Track ids are an enum of the playing tracks. A saved pattern's `name` is free text (`maxLength` 60), never an enum (D4, guard 1). Round 2 showed the built-in model takes `anyOf` branches.
 
 ```json
 {
   "type": "object",
-  "required": ["commands"],
+  "required": ["note", "commands"],
+  "additionalProperties": false,
   "properties": {
+    "note": { "type": "string", "maxLength": 120 },
     "commands": {
       "type": "array",
       "maxItems": 4,
       "items": {
-        "type": "object",
-        "required": ["kind"],
-        "properties": {
-          "kind": { "enum": ["energy-up", "…every kind of the MVP set…"] },
-          "part": {
-            "enum": [
-              "kick",
-              "beat",
-              "bass",
-              "arp",
-              "hook",
-              "guitar",
-              "pad",
-              "texture",
-              "riser"
-            ]
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["kind"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "energy-up",
+                  "energy-down",
+                  "…kinds without arguments…"
+                ]
+              }
+            }
           },
-          "type": { "enum": ["lead", "bass", "arp", "pad", "guitar"] },
-          "track": { "type": "string" },
-          "name": { "type": "string", "maxLength": 60 },
-          "value": { "type": "number" },
-          "treatment": { "type": "string" },
-          "to": { "type": "string" },
-          "bars": { "type": "string" },
-          "dir": { "enum": ["up", "down"] },
-          "text": { "type": "string", "maxLength": 120 }
-        }
+          {
+            "type": "object",
+            "required": ["kind", "part"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "enum": ["more"] },
+              "part": {
+                "enum": [
+                  "kick",
+                  "beat",
+                  "bass",
+                  "arp",
+                  "hook",
+                  "guitar",
+                  "pad",
+                  "texture"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["kind", "name"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "enum": ["pattern"] },
+              "name": { "type": "string", "maxLength": 60 },
+              "track": { "enum": ["…playing track ids…"] }
+            }
+          },
+          "…one branch per registry entry with arguments…"
+        ]
       }
-    },
-    "note": { "type": "string", "maxLength": 120 }
+    }
   }
 }
 ```
 
-`note` is a short reply when nothing fits ("I can't change the tempo from the console").
-
 **MVP command set:** energy, more and less of an instrument, the instrument locks, more and less complex, riser, part harmony, vary, swap, the five sound commands, change instrument, change chords, change key, talk more and less, add a line (`say-live`), a saved pattern by name (`pattern`), drop, stay, extend, end, and the mixer (volume, mute, back, lock, unlock). Left out: the legacy `add` and `remove`, `voice` and `voice-sound` (preset forms), `curve` and `curve-reset` (drawn values).
 
-**Saved patterns by name.** The per-request state lists the names of the saved patterns that fit the song on air (`fitsAir`), at most 20, the most used first (about 100 tokens). The answer gives `{ kind: "pattern", name, track? }`: no `track` means a new track, a `track` id means in place of that playing track. The validator matches `name` against the fitting patterns (case and accents ignored, exact first, then a unique prefix or a unique close match); no match or two equal matches drop the command with "no saved pattern called …" or "which one: A or B?". The match builds the same `{ kind: 'pattern', mode, target, item }` the Saved patterns panel sends, with `item` from `forRadio`.
-
-**Size.** Total about 1.6k tokens with the schema and the pattern names, about 1.3k with `omitResponseConstraintInput`. That fits a context window of 4k or more with room to spare. The full knowledge note (about 6k tokens) is never sent. If a build reports a smaller window, the builder drops in order: the examples down to 2, the kinds disabled now, the help text (kind names only). `npm run check:ai` fails when the prompt passes 2k tokens (counted as characters / 4).
+**Size.** Measured: about 800 tokens for the system text and the examples in a window of 9216 tokens, plus about 200 per request and the schema (kept out of the context with `omitResponseConstraintInput` when the build supports it). The full knowledge note is never sent. If a build reports a window smaller than the prompt needs, the builder drops in order: the examples down to 2, the kinds disabled now, the descriptions (kind names only). `npm run check:ai` fails when the prompt passes 2000 tokens (counted as characters / 4).
 
 **Built-in sessions.** One base session per page with the system prompt, created on the first request (or on the download click); each request runs in a `clone()` and destroys it after, so turns never pile up and `contextoverflow` cannot drop anything that matters. The base session is destroyed when the Radio tab closes. Expected languages `en` in and out.
 
 ### D4. Validation and apply
 
 1. The answer must parse and match the schema; otherwise nothing applies and the row says "The answer was not understood" with Retry.
-2. Each command is mapped to the object a button would send (`{ kind, part }`, `{ kind, type, target }`, `{ kind, track, value }`…). Unknown kinds, words outside the lists, track ids not on air, values out of range (volume 0 to 150 %) are dropped with a reason.
-3. Each kept command is checked with `whyNot` or `airWhy` against the song with the commands before it. A disabled one shows its usual reason ("late", "not-playing", "cap"…).
-4. Valid commands are applied in order through the same functions as the buttons: `pend` for "+" and "−" of an instrument, `command` for the rest. They enter the queue, keep their boundaries and can be cancelled with ✕ like any press. A request never bypasses the console.
+2. A non-empty `note` with no commands is the "cannot" answer (guard 2): nothing applies and the row shows the note.
+3. Each command goes through its registry entry's `validate` (D0): mapped to the object a button would send (`{ kind, part }`, `{ kind, type, target }`, `{ kind, track, value }`…). Unknown kinds, words outside the lists, track ids not on air, values out of range (volume 0 to 1.2, the mixer slider's range) and unknown or ambiguous pattern names (guard 1) are dropped with a reason.
+4. Each kept command is checked with the console's own reason, `whyNot` or `airWhy`, on the song on air, as the button's tooltip is. "+" and "−" are then checked by `pend` against the pending changes, as a press is. A disabled one shows its usual reason ("late", "not-playing", "cap"…).
+5. Valid commands are applied in order through the entry's `apply`, the same functions as the buttons: `pend` for "+" and "−" of an instrument, `pendPattern` for a saved pattern as a new track, `pendLock` for the locks, the typed-line path for `say-live`, `command` for the rest. They enter the queue, keep their boundaries and can be cancelled with ✕ like any press. A request never bypasses the console.
+
+**Three guards** (from the probe's failures):
+
+1. **Pattern names.** The model writes the name as free text, as the listener said it. The app matches it against the names of the saved patterns that fit the song: normalised (case, accents, punctuation, and the filler words "my", "saved", "pattern"), exact first, then a fuzzy score per word (edit distance) with a threshold of 0.75. No match gives "No saved pattern called “Sunset Lead”"; two matches within 0.05 of each other give "Which one: Tape Chords or Tape Chord Stabs?". Round 2 showed that an enum of names makes the model pick a wrong existing name, so the schema never lists them as an enum; the prompt lists them as plain text.
+2. **A "cannot" path, always.** The schema's `note` is required and comes first, `commands` may be empty, and one of the six examples is a request the console cannot do. Round 2 lost this path ("change the tempo to 140 bpm" became a key change). Before the engine is asked, the registry's short list of things the console never does (tempo or BPM, time signature, playing backwards) answers "cannot" at once, with no model call.
+3. **Ask before applying for vague requests.** A request is vague when it names no registry entry's `words`, no instrument, no playing track and no saved pattern ("it is getting boring", "give it some air"). Decided: the app flags it and shows that answer as a proposal even in "Apply at once", with the line "A vague request: check before applying". Settings and the menu still recommend "Ask before applying" to listeners who mostly type moods. Rationale: the probe's vague requests were the least stable (several answers are right, the model picks one), and a proposal costs one key press.
 
 **Two modes**, a switch in the field's small menu and in Settings, stored per area in `coding-misk-ai` (`apply: 'now' | 'ask'`, default `now`):
 
 - **Apply at once:** step 4 runs as soon as the answer is validated.
 - **Ask before applying:** the answer row shows the valid commands as a proposal with Apply (Enter) and Dismiss (Escape); each chip can be dropped with its ✕ before Apply. Nothing is queued until Apply. On Apply steps 3 and 4 run again against the song as it is then, so a proposal that went stale shows the new reasons. A new request replaces an open proposal.
 
-Commands from a request carry `by: "assistant"` in the recorded steering, so replay and history show them; the song they make is the same as with the presses.
+Commands queued through `command` carry `by: "assistant"` in the recorded steering, so replay and history show them; the song they make is the same as with the presses. The "+", "−", locks and new saved-pattern tracks go through the prepared batches like presses and are recorded as presses.
 
 ### D5. What the console shows
 
-**Placement: inside the existing Radio console, compact.** The console is already crowded, so the assistant adds no panel and no new group. It is one row at the top of the console area, above the command groups: a single-line text field ("Ask the console…", Enter to send, Escape to clear) that takes the row's free width, with one small icon button at its end for a menu (engine and model, the mode switch, "What is sent", Settings). The engine and model name show as the field's placeholder suffix, not as a separate label. At 400 px the row stays one line. While the engine works the icon becomes a spinner and Cancel. Then a single answer line under the field, the same height as a queue row: one chip per command with its button label ("▼ Less energy", "+ Arp") marked applied, proposed, or struck through with its reason, and the `note` if any; it wraps only when the chips do not fit, and has a ✕ to close it. The line stays until the next request or ✕. Long texts (download progress, the reason a model is unavailable) go in the same line, never in a box. On the built-in engine: `downloadable` shows "Download the built-in model (about 4 GB; Chrome needs 22 GB free)" with a progress bar; `unavailable` shows the reason (hardware, disk, browser version, turned off by the organisation) and a link to Settings. When the app language is Italian, the field says that the built-in engine understands English only.
+**Placement: inside the existing Radio console, compact.** The console is already crowded, so the assistant adds no panel and no new group. It is one row at the top of the console area, above the command groups: a single-line text field ("Ask the console…", Enter to send, Escape to clear) that takes the row's free width, with one small icon button at its end for a menu (engine and model, the mode switch, "What is sent", Settings). The engine and model name show as the field's placeholder suffix, not as a separate label. At 400 px the row stays one line. While the engine works the icon becomes a spinner and Cancel. Then a single answer line under the field, the same height as a queue row: one chip per command with its button label ("▼ Less energy", "+ Arp") marked applied, proposed, or struck through with its reason, and the `note` if any; it wraps only when the chips do not fit, and has a ✕ to close it. The line stays until the next request or ✕. Long texts (download progress, the reason a model is unavailable) go in the same line, never in a box. On the built-in engine: `downloadable` shows "Download the built-in model (about 4 GB; Chrome needs 22 GB free)" with a progress bar; `unavailable` shows the reason (hardware, disk, browser version, turned off by the organisation) and a link to Settings. When the app language is Italian, the field says that the built-in engine understands English only (Italian requests may work, round 1 got 3 of 3, but are not guaranteed). A vague request (D4, guard 3) shows its proposal with the line "A vague request: check before applying".
 
 ### D6. OpenRouter and Anthropic engines
 
@@ -172,17 +223,18 @@ The helper adds the key, forwards only these paths, caps the body at 64 kB and t
 
 A later `compose` area returns a structured edit of the song, never Strudel code: operations such as `set-track`, `add-idea`, `set-sound`, `rack-add`, `rack-remove` on tracks, ideas, sounds and rack devices, validated by the song format's validator (`src/song/`, as `tools/song.mjs validate`) and shown as a diff with Apply and Undo. It reuses D1, D2, D7 to D10 unchanged; only its prompt builder, schema, validator and apply step are new. Its default model is a larger one (Sonnet class), chosen per area.
 
-**Compose needs OpenRouter or Claude, not the built-in engine.** A Compose request carries about 8k to 15k tokens of song format and schema plus a song of several thousand tokens: 12k to 20k tokens or more. The built-in model's window has only ever been reported at about 4k to 6k tokens, and a single prompt larger than the window fails with `QuotaExceededError`. The `compose` area therefore offers only online engines; the built-in engine is not listed for it.
+**Real Compose needs the online engines; the built-in engine is at most a "light" option.** A full Compose request carries the song format, the schema and a song of several thousand tokens: 12k to 20k tokens or more, past the built-in model's measured window of 9216 tokens. The probe's single-track request (one `anyOf` branch per track type, a small example song) fitted and gave 12 of 12 valid answers, 10 of 12 of the right type, but only 5 of 12 musically right, at about 10 s each. So the `compose` area defaults to an online engine; the built-in engine may be listed later as "Light: one track, may miss what you asked", never as the default, and only after its own change measures it again.
 
 ### D12. Checks
 
-- `npm run check:ai` (no browser): the prompt builder's size and content for songs of every profile; the schema; the validator on about 40 fixture requests with canned answers (good, partly wrong, unknown kinds, bad tracks, invalid JSON); the family key and upgrade rules on a saved, trimmed model list (missing model, expired model, price jump, pinned, free stays free); the helper's routes with a fake upstream (no key in any answer).
-- `tools/check-ai.cjs` (browser, dev server): a fake engine; requests apply through the queue, cancel, disabled reasons, the answer row, Settings per area, the upgrade toast and Undo, the key warning, the backup without keys, Italian, 400 px.
-- A manual quality probe, not a gate: 30 English requests against the real built-in engine and one OpenRouter model, scored by how many commands match the expected ones.
+- `npm run check:agent-api` (no browser, D0): every registry entry has a kind of `COMMANDS`, a description, a button label, a schema whose properties all have a type, words for the vague guard, `validate` and `apply`; the generated prompt, schema, tool definitions and MCP tools build; `docs/AGENT-API.md` is the same as `npm run agent-api` writes.
+- `npm run check:ai` (no browser): the prompt's size (under 2000 tokens) and content for a song with eight playing tracks; the schema (`note` first and required, one branch per entry, no enum of pattern names); the three guards (pattern names exact, near, unknown and ambiguous; the "cannot" list; vague and precise requests); the validator on fixture answers (good, partly wrong, unknown kinds, bad tracks, values out of range, invalid JSON) with a fake console. Stage 2 adds the family key and upgrade rules and the helper's routes.
+- The probe page stays as a permanent prompt bench (`openspec/changes/ai-assistant/probe/`): it imports the real registry, prompt, schema and guards, runs the radio requests of both rounds on the real built-in model and saves `notes/nano-probe-results-v3-<time>.json`. Task 1.1 reruns it with the guards; the owner runs it (about 5 minutes). It is a measure, not a gate.
+- `tools/check-ai.cjs` (browser, dev server, a fake engine): requests apply through the queue, cancel, disabled reasons, the answer row, Settings per area, Italian, 400 px. Later stages add the upgrade toast and Undo, the key warning and the backup without keys.
 
 ## Risks / Trade-offs
 
-- **The built-in model is small.** It may pick the wrong kind or invent track ids. Mitigation: enums in the schema, per-request state with real ids, validation that drops what does not fit, the quality probe before release.
+- **The built-in model is small.** It may pick the wrong kind or invent track ids (round 2: 30 of 38 exact). Mitigation: one schema branch per kind, enums for the console's lists and the playing track ids, free-text pattern names matched by the app, the "cannot" path, proposals for vague requests, validation that drops what does not fit, and the bench rerun before release.
 - **Hardware.** On a machine without the GPU, RAM or disk the built-in engine is `unavailable`; the field says so and offers an online engine.
 - **Free online models churn.** A free model may vanish within weeks; the family upgrade and the daily refresh cover it, and the free mark never turns into a paid one silently.
 - **API names move.** The Prompt API renamed its quota fields during 2026; the engine feature-detects both names.

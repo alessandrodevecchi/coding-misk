@@ -1,15 +1,20 @@
-Estimates are in agent hours. Stage 1 is the Radio MVP on the built-in engine (about 10.5 h). Stages 2 to 4 follow after the owner's go for each.
+Estimates are in agent hours. Stage 0 is the command registry; stage 1 is the Radio MVP on the built-in engine (about 10 h). Stages 2 to 4 follow after the owner's go for each.
 
-## 1. Stage 1: built-in engine and the Radio console (about 10.5 h)
+## 0. Stage 0: the command registry (about 2 h)
 
-- [ ] 1.1 Probe on the owner's Mac (model already on disk, 4.0 GB, Chrome 158): `LanguageModel.availability()` on `http://localhost:5173`, `session.contextWindow` and the usage names this Chrome exposes, `chrome://policy` for `GenAILocalFoundationalModelSettings` and `BuiltInAIAPIsEnabled` on the profile used, a `responseConstraint` answer with the D3 schema, time per request. Record the numbers in `docs/knowledge/` and DEVLOG (0.5 h).
+- [ ] 0.1 `src/ai/commands.js`: one entry per console command of the MVP set with `kind`, `button`, `description`, `args` (JSON Schema), `words`, `validate` (the console's rules and reasons) and `apply` (the button's code path through an `api` of the console's functions); the "cannot" list (D0, D4) (1 h).
+- [ ] 0.2 Generators from the registry: the system prompt and the answer schema (D3), tool definitions for online engines, MCP tools (#26); `tools/agent-api.mjs` writes `docs/AGENT-API.md`; `npm run check:agent-api` checks the entries and that the file is current; added to `docs/knowledge/checks.md` like the other checks (1 h).
+
+## 1. Stage 1: built-in engine and the Radio console (about 8 h)
+
+- [ ] 1.1 Rerun the probe page as a bench (probe v3: the real registry, prompt, schema and guards; the radio requests of both rounds) on the owner's Mac; the owner runs it (about 5 minutes). Expected: at least round 2's 30 of 38 exact, the pattern requests right or rejected with a clear message, the impossible requests answered "cannot". Record the numbers in DEVLOG (0.5 h, plus the owner's run). Rounds 1 and 2 are done: window 9216 tokens, prompt about 800 tokens, 23 of 28 then 30 of 38 exact, median 1.26 s then about 2.2 s, Compose 5 of 12 musically right.
 - [ ] 1.2 `src/ai/engine.js` (interface, timeouts, AbortSignal) and `src/ai/engines/nano.js`: status, download with progress from a click, base session plus `clone()` per request, both quota API names, destroy on leaving the Radio tab (D1, D3) (1.5 h).
-- [ ] 1.3 `src/ai/areas.js` and the Radio area's prompt builder: command lines from `COMMANDS` and the English help texts, argument lists, the song state, 6 examples, the shortening order; the fitting saved pattern names; the D3 schema with the MVP kind list (1.5 h).
-- [ ] 1.4 Validator and apply: map to button objects, drop with reasons, the saved pattern name match, `whyNot` and `airWhy` in sequence, `pend` and `command`, `by: "assistant"` in the steering record; the two modes, with the proposal checked again on Apply (D3, D4) (2.5 h).
-- [ ] 1.5 Console UI, one compact row inside the existing console area: request field with the engine and model in the placeholder, one menu icon (engine, mode, What is sent, Settings), progress and Cancel, the one-line answer row with chips and the proposal's Apply and Dismiss, download and unavailable states, the English-only hint; one line at 400 px (D5); strings in `src/i18n.js` in both languages (1.5 h).
-- [ ] 1.6 Settings, AI section, minimal: the Radio console's engine (built-in only in this stage), its status and the download button, the mode switch; the `coding-misk-ai` store (D2, D4) (0.5 h).
-- [ ] 1.7 Guide card for the assistant (both languages), `docs/knowledge/` note `ai-assistant.md` and its row in the README table, `docs/AGENT-API.md` with the answer format, a line in `docs/knowledge/decisions.md`; `npm run check:guide`, `npm run check:knowledge` (1 h).
-- [ ] 1.8 `npm run check:ai` (prompt size and content, schema, about 40 validator fixtures) and `tools/check-ai.cjs` with a fake engine (queue, cancel, reasons, row, Italian, 400 px); the manual quality probe with 30 requests on the built-in engine, results in DEVLOG (D12) (1.5 h).
+- [ ] 1.3 `src/ai/areas.js` and the Radio area: the prompt and schema from the registry, the song state, the fitting saved pattern names as text, the shortening order (D2, D3) (1 h).
+- [ ] 1.4 Validation, apply and the guards: the registry's `validate` and `apply`, pattern names matched with the fuzzy threshold and the ambiguous case, the "cannot" path and list, the vague-request flag; `by: "assistant"` on queued commands; the two modes, with the proposal checked again on Apply (D4) (2 h).
+- [ ] 1.5 Console UI, one compact row inside the existing console area: request field with the engine in the placeholder, one menu icon (mode, What is sent, Settings), progress and Cancel, the one-line answer row with chips, the proposal's Apply and Dismiss, the vague line, download and unavailable states, the English-only hint; one line at 400 px (D5); strings in `src/i18n.js` in both languages (1.5 h).
+- [ ] 1.6 Settings, AI section, minimal: the engine and model per area (built-in only now; the online engines listed as coming), its status and the download button, the mode switch; the `coding-misk-ai` store (D2, D4) (0.5 h).
+- [ ] 1.7 Guide part for the assistant (both languages), `docs/knowledge/` note `ai-assistant.md` and its row in the README table, the "Add a radio command" recipe updated for the registry, a line in `docs/knowledge/decisions.md`; `npm run check:guide`, `npm run check:knowledge` (0.5 h).
+- [ ] 1.8 `npm run check:ai` (prompt size and content, schema, the three guards, validator fixtures with a fake console); `tools/check-ai.cjs` with a fake engine (queue, cancel, reasons, row, Italian, 400 px) (1 h).
 
 ## 2. Stage 2: OpenRouter, keys, model lists and upgrades (about 6 h)
 

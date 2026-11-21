@@ -26,10 +26,10 @@ The app SHALL reach AI models only through engines that share one interface (sta
 - **WHEN** a Chrome Enterprise policy turns the built-in model or the built-in AI APIs off
 - **THEN** the field says the built-in model is turned off by the organisation and offers the online engines
 
-#### Scenario: Compose on an online engine only
+#### Scenario: Compose on an online engine by default
 
 - **WHEN** the user picks an engine for the Compose area
-- **THEN** only online engines are offered, because a Compose request does not fit the built-in model's context window
+- **THEN** an online engine is the default, and the built-in engine is at most offered as a "light" option for one track, because a full Compose request does not fit its window of 9216 tokens and the probe got 5 of 12 single-track requests musically right
 
 ### Requirement: An engine and a model per app area
 
