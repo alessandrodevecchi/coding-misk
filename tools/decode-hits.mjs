@@ -98,3 +98,25 @@ export async function partScore(truth, song, downbeat, rule = HIT_RULE) {
   }
   return out;
 }
+
+// ---------- silent bars (decode round 12, decode-round12 1) ----------
+// The bars where the code is silent and the original plays: per bar of the original's grid (from its downbeat to the end
+// of the file) the original's level (mean power, dB) against its loud bars (the 90th percentile of its bars), music when
+// within SILENT_RULE.music dB of them; the code's bar level against the code's loud bars, silent when more than
+// SILENT_RULE.code dB under them or past the code's end. → { bars, music, silent, share, head, tail, list } (head and
+// tail: the silent bars in the first and the last runs, an intro or an outro the code leaves out)
+export const SILENT_RULE = { music: 35, code: 30 };
+export function silentBars(fo, fc, grid, rule = SILENT_RULE) {
+  const level = (f, t0, n) => { const s = new Float64Array(n), c = new Uint32Array(n); f.fr.forEach((x, i) => { const k = Math.floor((i * f.hop - t0) / grid.barSeconds); if (k >= 0 && k < n) { s[k] += x.tot; c[k]++; } }); return Array.from(s, (v, k) => (c[k] ? db(v / c[k]) : -200)); };
+  const n = Math.max(0, Math.floor((fo.fr.length * fo.hop - grid.downbeat) / grid.barSeconds));
+  const lo = level(fo, grid.downbeat, n), lc = level(fc, 0, n), topO = pct(lo, 0.9), topC = pct(lc.filter(v => v > -200), 0.9);
+  const list = [];
+  let music = 0;
+  for (let k = 0; k < n; k++) { if (lo[k] < topO - rule.music) continue; music++; if (lc[k] < topC - rule.code) list.push(k); }
+  let head = 0, tail = 0;
+  const firstMusic = lo.findIndex(v => v >= topO - rule.music);
+  for (let k = firstMusic; k >= 0 && k < n && list.includes(k); k++) head++;
+  let lastMusic = n - 1; while (lastMusic >= 0 && lo[lastMusic] < topO - rule.music) lastMusic--;
+  for (let k = lastMusic; k >= 0 && list.includes(k); k--) tail++;
+  return { bars: n, music, silent: list.length, share: music ? r3(list.length / music) : null, head, tail, list };
+}

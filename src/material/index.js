@@ -5,7 +5,7 @@
 //   compose(kind, { seed, style, harmony, meter, energy, from, keep, type, riff }) → { idea, settings, rack, why, stats }
 // riff (guitar chords only): true a riff every time, false power chords only, left out as the style decides
 //
-// kind: melody, bass, arp, chords, drums, sound. style: the recipe instrument's `material` ({ rules, families, sounds }).
+// kind: melody, bass, arp, chords, drums, sound, tone (a drum track's tone), vary (a track's per-hit variation). style: the recipe instrument's `material` ({ rules, families, sounds }).
 // harmony: { key, mode, chords (a PROGS name or chord names in A), shared }. energy: 0 to 1. from + keep: vary a preset
 // ('rhythm' keeps its onsets, 'notes' its pitches). Each kind draws from its own stream, "material:<kind>" of the seed.
 // shape (radio-variation D3, material composed on air): { density, register, complexity }, each 0 to 1: density sets the
@@ -20,8 +20,10 @@ import { chords, CHORD_RULES, modeProgression } from './chords.js';
 import { groove, FAMILIES, KICK_VARIANTS, kickRow, kickVariants } from './drums.js';
 import { sound, SOUND_KINDS, SOUND_KIND_ALIASES, soundKind, FM_RANGES, fmInRange } from './sound.js';
 import { varyPreset, VARY_TYPES, presetOf } from './vary.js';
+import { drawTone, TONE_RANGES, TONE_GROUPS, toneInRange } from './tone.js';
+import { drawVary, VARY_TARGETS } from './variation.js';
 
-export const KINDS = ['melody', 'bass', 'arp', 'chords', 'drums', 'sound'];
+export const KINDS = ['melody', 'bass', 'arp', 'chords', 'drums', 'sound', 'tone', 'vary'];
 // the kind of part a track type gets
 export const KIND_OF_TYPE = { hook: 'melody', bass: 'bass', arp: 'arp', pad: 'chords', guitar: 'chords', drums: 'drums' };
 export const MATERIAL_TYPES = Object.keys(KIND_OF_TYPE);
@@ -29,6 +31,7 @@ export const MATERIAL_TYPES = Object.keys(KIND_OF_TYPE);
 export const SOURCES = ['preset', 'generated', 'mix'];
 export const SESSION_SOURCES = ['patterns', 'varied', 'composed', 'mix'];
 export const RULES = { melody: MELODY_RULES, bass: BASS_RULES, arp: ARP_RULES, chords: CHORD_RULES };
+export { TONE_RANGES, TONE_GROUPS, toneInRange, VARY_TARGETS };
 export { FAMILIES, KICK_VARIANTS, kickRow, kickVariants, SOUND_KINDS, SOUND_KIND_ALIASES, soundKind, FM_RANGES, fmInRange, sharedRoots, modeProgression, VARY_TYPES, presetOf };
 
 // the random stream of a kind for a seed: a melody never changes the drums of the same seed
@@ -42,6 +45,11 @@ export function compose(kind, opts = {}) {
   const r = materialStream(seed, from ? `${kind}/${from}/${keep || 'rhythm'}` : kind);
   const type = opts.type || Object.keys(KIND_OF_TYPE).find(t => KIND_OF_TYPE[t] === kind) || 'hook';
   if (!KINDS.includes(kind)) throw new Error(`unknown kind of part "${kind}"; kinds: ${KINDS.join(', ')}`);
+  // random-sound-params: a drum track's tone (its own streams material:tone/<group>, D3) and a track's variation
+  // (material:vary, D8); style: the drum material's `tones` or the instrument material's `variation`; groups: the tone
+  // groups to draw (the others left out); settings and rack: the track's, so the variation leaves out what the writer skips
+  if (kind === 'tone') return { idea: null, settings: { tone: drawTone({ seed, style: (style && style.tones) || null, energy: e, groups: opts.groups }) }, rack: [], why: ['tone'], stats: {} };
+  if (kind === 'vary') { const v = drawVary({ seed, style: (style && style.variation) || null, type: opts.type || 'hook', energy: e, settings: opts.settings, rack: opts.rack, rows: opts.rows }); return { idea: null, settings: { vary: v }, rack: [], why: [v ? `vary ${v.map(x => `${x.on} ${x.amount}`).join(', ')}` : 'vary none'], stats: {} }; }
   if (from) {
     const v = varyPreset(r, { type, from, keep: keep || 'rhythm', energy: e, harmony, N });
     if (!v) return null;

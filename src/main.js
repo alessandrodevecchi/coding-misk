@@ -32,7 +32,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const stamp = (o, fresh = false) => { if (fresh || !o.created) o.created = today(); if (fresh || !o.appVersion) o.appVersion = APP_VERSION; return o; };
 import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
-import { FORMAT, VERSION, SETTING_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, VOICE_STYLES, styleOf, fromScenes, clipState } from './song/format.js';
+import { FORMAT, VERSION, SETTING_FIELDS, SOUND_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, VOICE_STYLES, styleOf, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice, choiceLabel } from './song/rack.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
 import { inventStyle } from './endless/style-maker.js';
@@ -45,11 +45,12 @@ import { createSongsView, confirmInline } from './library/songs-view.js';
 import { trashSong, restoreSong, deleteForGood, emptyTrash, purgeTrash, trashList, daysLeft, hideSong, showHidden, hiddenIds, entryTitle } from './library/trash.js';
 import { kindOf, parseFree } from './library/song-filter.js';
 import { createPlaylistStore, createQueue, REPEATS, isSession, sessionOutdated } from './library/playlists.js';
-import { DIRECTOR_VERSION } from './endless/director.js';
+import { DIRECTOR_VERSION, SOUND_VERSION } from './endless/director.js';
 // the versions a saved radio session is compared with (#38, radio-profiles D11)
-const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION, choosers: Object.keys(AIR_CHOOSERS) };
+const APP_VERSIONS = { director: DIRECTOR_VERSION, shapes: SHAPES_VERSION, growth: CRESCENDO_VERSION, choosers: Object.keys(AIR_CHOOSERS), sound: SOUND_VERSION };
 import { createPlaylistsTab } from './library/playlists-tab.js';
 import { createDecodeTab } from './decode/tab.js';
+import { BEAT_THIS_LOCAL, seedBeatThisLocal } from './decode/beat-this-store.js';
 import { pickJsonFiles } from './library/library.js';
 import { createSettings } from './settings/settings.js';
 import { createGenresTab } from './library/genres-tab.js';
@@ -107,6 +108,7 @@ import { createPreview, previewOrbit } from './player/preview.js';
 import { createPatternsTab } from './library/patterns-tab.js';
 import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS, KIND_TYPE, loopSong } from './library/patterns.js';
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
+import { rollSound, DICE_GROUPS, DICE_KEYS, soundSnapshot, applySnapshot, keepCurrent, addRoll, nextRollNumber, rollEntry, rollNumbers } from './material/dice.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
 import { textIn } from './voices/phrases.js';
@@ -2423,7 +2425,7 @@ function cellOf(tr, j) {
   return parts.length ? { parts } : null;
 }
 const curTrack = () => T.tracks[tk];
-const baseSettings = type => type === 'code' ? { visual: 'fx' } : type === 'voice' || type === 'spoken' ? { ...VOICE_DEFAULT } : Object.fromEntries(SETTING_FIELDS[type].map(k => [k, DEFAULT[type][k]]));
+const baseSettings = type => type === 'code' ? { visual: 'fx' } : type === 'voice' || type === 'spoken' ? { ...VOICE_DEFAULT } : Object.fromEntries(SETTING_FIELDS[type].filter(k => !SOUND_FIELDS.includes(k)).map(k => [k, DEFAULT[type][k]]));
 // impostazioni che suonano nella sezione selezionata: traccia + eventuale modifica solo per questa sezione
 // clip su cui agiscono pattern e impostazioni "solo qui": nella timeline quello scelto, altrimenti quello della sezione
 const focusClip = tr => (arrMode === 'timeline' && tr === curTrack() && selClip !== null && tr.clips[selClip]) || wholeClip(tr, sel);
@@ -4074,6 +4076,77 @@ function composeRow(tr, pat) {
       ${varies ? `<button class="btn small" id="pt-keep-rhythm" title="${esc(t('keepRhythmTip'))}">${RHYTHM}<span>${esc(t('keepRhythm'))}</span></button><button class="btn small" id="pt-keep-notes" title="${esc(t('keepNotesTip'))}">${NOTES}<span>${esc(t('keepNotes'))}</span></button>` : ''}
     </div>`;
 }
+// The sound dice (random-sound-params D5, app/sound-dice): a new sound for this track within its style, from the seed
+// "<song id>:<track id>:sound:<n>"; lock chips keep groups of settings across rolls. The locks and the FM device the
+// dice added are remembered per song and track in the browser (not in the song file). The sounds rolled are kept on the
+// track (track.soundRolls, D10): one chip each, the lit one is the sound the track has; «New sound» takes the highest
+// number plus one; the number field applies a number by itself (a chip restores, a new number rolls)
+const DICE_KEY = 'coding-misk-sound-dice';
+const diceKey = tr => `${T.id}:${tr.id}`;
+const diceMem = tr => { const all = store.get(DICE_KEY, {}) || {}, m = all[diceKey(tr)]; return m && typeof m === 'object' ? { locks: Array.isArray(m.locks) ? m.locks : [], fm: m.fm || null } : { locks: [], fm: null }; };
+const setDiceMem = (tr, patch) => { const all = store.get(DICE_KEY, {}) || {}; all[diceKey(tr)] = { ...diceMem(tr), ...patch }; store.set(DICE_KEY, all); };
+let diceNumTimer = null;
+function diceRow(tr) {
+  const groups = DICE_GROUPS[tr.type];
+  if (!groups) return '';
+  const R = composeStyle(), locks = new Set(diceMem(tr).locks), H = tr.soundRolls, cur = H && H.cur, nums = rollNumbers(H);
+  const off = R ? '' : ` disabled title="${esc(t('diceNoStyle'))}"`;
+  const hist = nums.length ? `<div class="tp-dhist" role="group" aria-label="${esc(t('diceHistory'))}"><span class="lbl" title="${esc(t('diceHistoryTip'))}">${esc(t('diceHistory'))}</span>
+      <div class="chips">${nums.map(n => `<button class="chip pat-chip" data-droll="${n}" aria-pressed="${n === cur}" title="${esc(t('diceChipTip', { n }))}"><span class="pat-k">#${n}</span></button>`).join('')}</div></div>` : '';
+  return `${hist}<div class="tp-dice" role="group" aria-label="${esc(t('diceGroup'))}">
+      <button class="btn small" id="pt-dice"${off || ` title="${esc(t('diceTip'))}"`}>${DICE}<span>${esc(t('diceRoll'))}</span></button>
+      <label class="tp-cnum" for="pt-dnum"><span class="lbl">#</span><input type="number" id="pt-dnum" min="1" max="9999" step="1" value="${cur || ''}" placeholder="${nextRollNumber(H)}" aria-label="${esc(t('diceNum'))}" title="${esc(t('diceNumTip'))}"${R ? '' : ' disabled'}></label>
+      <span class="lbl tp-dlocks-lbl" title="${esc(t('diceLockTip'))}">${LOCK}<span>${esc(t('diceKeep'))}</span></span>
+      <div class="chips tp-dlocks">${groups.map(g => `<button class="chip" data-dlock="${g}" aria-pressed="${locks.has(g)}" title="${esc(t('diceLockTip'))}">${esc(t(`diceLock:${g}`))}</button>`).join('')}</div>
+    </div>`;
+}
+// what an Undo gives back: the track's settings, rack, the dice's FM device and the history as they were
+const diceBefore = tr => ({ settings: clone(tr.settings), rack: tr.rack ? clone(tr.rack) : undefined, fm: diceMem(tr).fm, rolls: tr.soundRolls ? clone(tr.soundRolls) : undefined });
+const diceUndo = (who, before) => ({ label: t('patUndo'), run: () => {
+  who.settings = before.settings;
+  if (before.rack) who.rack = before.rack; else delete who.rack;
+  if (before.rolls) who.soundRolls = before.rolls; else delete who.soundRolls;
+  setDiceMem(who, { fm: before.fm });
+  changed(); renderTrackPanel();
+} });
+// roll number n (a new number: «New sound», or a number typed without a chip); the sound left is kept in its entry
+function rollTrackSound(tr, n = nextRollNumber(tr.soundRolls)) {
+  const R = composeStyle();
+  if (!R || !DICE_GROUPS[tr.type]) { toast(t('diceNoStyle')); return; }
+  const mem = diceMem(tr), full = { ...baseSettings(tr.type), ...tr.settings };
+  const out = rollSound({ track: { ...tr, settings: full }, recipe: R, seedBase: `${T.id}:${tr.id}:sound`, n, locks: mem.locks, energy: composeEnergy, owned: mem.fm });
+  if (!out) return;
+  const before = diceBefore(tr), kept = keepCurrent(tr.soundRolls, tr, mem.fm);
+  for (const k of DICE_KEYS) {
+    if (k in out.settings) { if (JSON.stringify(out.settings[k]) !== JSON.stringify(full[k])) tr.settings[k] = out.settings[k]; }
+    else if (k in tr.settings) delete tr.settings[k];
+  }
+  if (out.rack.length || tr.rack) tr.rack = out.rack;
+  setDiceMem(tr, { fm: out.owned });
+  tr.soundRolls = addRoll(kept, n, soundSnapshot(tr, out.owned));
+  changed(); renderTrackPanel();
+  toast(t('diceRolled', { n }), diceUndo(tr, before));
+}
+// back to sound n of the history: exactly its entry (the sound left is kept in its own entry first)
+function restoreTrackSound(tr, n) {
+  const H = tr.soundRolls, e = rollEntry(H, n);
+  if (!e || H.cur === n) return;
+  const mem = diceMem(tr), before = diceBefore(tr), kept = keepCurrent(H, tr, mem.fm);
+  applySnapshot(tr, e);
+  setDiceMem(tr, { fm: e.fm || null });
+  tr.soundRolls = { cur: n, rolls: kept.rolls };
+  changed(); renderTrackPanel();
+  toast(t('diceBack', { n }), diceUndo(tr, before));
+}
+// the number field applies by itself: a chip's number restores it, a new number rolls it, the lit number does nothing
+function applyDiceNum(tr, input) {
+  clearTimeout(diceNumTimer); diceNumTimer = null;
+  const n = Math.round(+input.value), H = tr.soundRolls;
+  if (!(n >= 1 && n <= 9999) || (H && H.cur === n)) return;
+  const refocus = document.activeElement === input, id = input.id;
+  if (rollEntry(H, n)) restoreTrackSound(tr, n); else rollTrackSound(tr, n);
+  if (refocus) { const el = document.getElementById(id); if (el) el.focus(); }
+}
 // the style of the song for the generator: its first style tag, else the style closest to its tempo and meter
 function composeStyle() {
   const tag = ((T.tags || {}).styles || []).map(styleId).find(id => RECIPES.some(r => r.id === id));
@@ -4313,6 +4386,7 @@ function panelHtml(ti) {
     <div class="tp-editor">${editor}</div>
     <div class="tp-scope"${tr.type === 'voice' ? ' hidden' : ''}><span class="lbl">${t('settingsScope')}</span>
       <div class="chips"><button class="chip" data-scope="track" aria-pressed="${scope === 'track'}">${t('scopeTrack')}</button><button class="chip" data-scope="section" aria-pressed="${scope === 'section'}" ${focusClip(tr) ? '' : 'disabled'}>${esc(arrMode === 'timeline' && selClip !== null ? t('scopeClip') : t('scopeSection', { name: SEC().name }))}</button></div></div>
+    ${diceRow(tr)}
     <div class="ctrls">${tr.type === 'voice' || tr.type === 'spoken' ? vstyleHtml() : ''}${(CONTROLS[tr.type] || []).map(settingHtml).join('')}</div>
     <div class="tp-rack"><div class="row"><span class="lbl">Rack</span><span class="hint">${t('rackHint')}</span></div>
       <div class="rack-list">${(tr.rack || []).map((d, i) => deviceHtml(d, i, tr)).join('') || `<p class="note">${t('noDevices')}</p>`}</div>
@@ -4438,6 +4512,7 @@ $('#track-panel').addEventListener('input', e => {
   if (k) { let v = e.target.value; if (e.target.type === 'range') v = e.target.dataset.cut ? rangeToCut(+v) : +v; setSetting(k, v); changed(); syncTrackPanel(); return; }
   if (role(e.target) === 'tk-name') { curTrack().name = e.target.value; changed(); return; }
   if (role(e.target) === 'pt-cnum') { const v = Math.round(+e.target.value); if (v >= 1) composeNums[`${T.id}:${curTrack().id}`] = v; return; }
+  if (role(e.target) === 'pt-dnum') { const inp = e.target, tr = curTrack(); clearTimeout(diceNumTimer); diceNumTimer = setTimeout(() => { if (inp.isConnected) applyDiceNum(tr, inp); }, 1000); return; }
   if (role(e.target) === 'pt-cguitar') { composeGuitar = e.target.value === 'chords' ? 'chords' : 'riff'; return; }
   if (role(e.target) === 'pt-cenergy') { composeEnergy = +e.target.value; const o = e.target.closest('.tp-cen').querySelector('output'); if (o) o.textContent = `${Math.round(composeEnergy * 100)}%`; return; }
   if (role(e.target) === 'pt-code') { const v = e.target.value; clearTimeout(codeTimer); codeTimer = setTimeout(() => editPattern(p => { p.code = v; }), 400); return; }
@@ -4447,6 +4522,7 @@ let codeTimer = 0;
 $('#track-panel').addEventListener('change', e => {
   if (!hostTrack(e)) return;
   const tr = curTrack(), r = role(e.target);
+  if (r === 'pt-dnum') return applyDiceNum(tr, e.target);
   if (e.target.matches('select[data-set]')) { setSetting(e.target.dataset.set, e.target.value); changed(); syncTrackPanel(); return; }
   // a voice style (voice-full-controls D3): its seven values at once, speaker and volume kept
   if (e.target.matches('select[data-vstyle]')) { const st = VOICE_STYLES[e.target.value]; if (st) { for (const [k, v] of Object.entries(st)) setSetting(k, v, tr); changed(); syncTrackPanel(); } return; }
@@ -4553,6 +4629,9 @@ $('#track-panel').addEventListener('click', e => {
     return;
   }
   if (r === 'pt-compose') return composePattern(tr);
+  if (r === 'pt-dice') return rollTrackSound(tr);
+  if (b.dataset.droll !== undefined) return restoreTrackSound(tr, +b.dataset.droll);
+  if (b.dataset.dlock) { const g = b.dataset.dlock, l = new Set(diceMem(tr).locks); if (l.has(g)) l.delete(g); else l.add(g); setDiceMem(tr, { locks: [...l] }); b.setAttribute('aria-pressed', String(l.has(g))); return; }
   if (r === 'pt-listen') return listenPattern(tr);
   if (r === 'pt-preview') { if (labPreview) labPreview.stop(); preview.toggle(tr.id, patOf(tr)); syncPreviewButtons(); return; }
   if (r === 'pt-savepat') return savePattern(tr);
@@ -5203,6 +5282,9 @@ $('#songs').addEventListener('click', e => {
     return startCard(i, bar);
   }
 });
+// local only (decode round 14, d12h): the beat tracker's files from this machine's shared folder into this origin's
+// cache, a few seconds after the start (BEAT_THIS_LOCAL is '' outside the owner's local dev server)
+if (BEAT_THIS_LOCAL) setTimeout(() => seedBeatThisLocal(), 3000);
 $('#songs').addEventListener('change', e => {
   const cb = e.target.closest('[data-loop]'); if (!cb) return;
   const { tr } = cards[+cb.dataset.loop];
@@ -5830,6 +5912,8 @@ radio = createRadio({
   userPatterns: () => forRadio(patternsStore.list(), { meta: true }),
   // a saved pattern queued from the console (Add as a new track, Replace) counts as one use
   onPatternUsed: id => patternsStore.markUsed(id),
+  // the assistant's menu and its unavailable line open Settings → AI (ai-assistant D5)
+  openSettings: () => { showTab('impostazioni'); requestAnimationFrame(() => { const c = $('#set-ai'); if (c) { c.scrollIntoView({ block: 'start', behavior: 'smooth' }); c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 1200); } }); },
   // the samples of the lines typed in the console (voice-full-controls D10): read again once the voice helper made them
   reloadSamples: bank => reloadSamples(bank),
   // the samples manifest, for the voices of Next changes (after-tests-oct28 D2)

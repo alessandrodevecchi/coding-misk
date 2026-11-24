@@ -7,6 +7,26 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- `tools/decode-hits.mjs`: the bars where the decoded code is silent and the original plays, in the Decode bench.
+- Settings: "Deep beat analysis" option, off by default, that downloads the third-party beat tracker Beat This! (about 88 MB, files pinned by SHA-256) with progress, Cancel and Remove, and a disclaimer on its licence, training data, size, host and on-device use.
+- Decode: with "Deep beat analysis" on and downloaded, Full takes its beat grid from Beat This! and names it in the panel.
+- Local build flag `VITE_DECODE_BEAT_TRACKER` that starts "Deep beat analysis" on.
+- `tools/local-models.mjs`: local dev server plugin that serves the "Deep beat analysis" model files from one folder on the machine, copied into each local origin's cache after the SHA-256 check.
+- `tools/check-beat-tracker.cjs`: browser check of the "Deep beat analysis" card and of Full with and without the tracker.
+- Compose: sound dice in the track panel of drums, bass, arp, lead, pad and guitar tracks, with a roll number, lock chips per group and Undo.
+- Songs: `tone` drum setting with decay, tune, drive and cutoff per kit piece group, inside a safe range table.
+- Songs: `vary` setting with up to three seeded per-hit variations around the track's own values.
+- Radio: new sessions, compilations and New song panel songs compose drum tones and per-hit variation (session option `sound`).
+- Styles: `tones` (drums) and `variation` fields in an instrument's `material`.
+- `tools/endless.mjs --sound` to turn on composed drum tones and variation.
+- `npm run check:sound-params`, `tools/check-sound-dice.cjs` and `tools/check-sound-levels.cjs`.
+- Guide: "Sound dice" card.
+- Radio: a request row at the top of the console turns a typed request into console commands with the browser's built-in model, applied at once or proposed first.
+- Radio: requests name saved patterns by name, refuse unknown or unclear names, answer "cannot" for tempo, time signature and playing backwards, and show vague requests as a proposal.
+- Settings: AI assistant card with the engine, model, status, download and mode per area.
+- `docs/AGENT-API.md`: every console command an AI engine or agent may give, generated from the command registry.
+- `npm run agent-api`, `npm run check:agent-api`, `npm run check:ai` and `tools/check-ai.cjs`: the command registry, its document and the console assistant.
+- Guide: "Ask the console" part in the Radio card.
 - Code: Instrument name option (Random per song, `$:`, name at line start) and Names from option (instrument or track), in Compose's code options, the radio's Custom section and the Decode tab's Options.
 - `tools/check-light-start.cjs`: browser check of a light start (no Sounds photo at startup, layout shift under 0.1 at desktop and phone width).
 - `tools/decode-hits.mjs`: hit density per band and per part for the Decode bench, with six songs built for repeated chords and basses (`tools/decode-export.cjs --hits`, `tools/decode-bench.cjs --set hits`).
@@ -102,6 +122,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- `onnxruntime-web` 1.31.1 is an app dependency instead of a development dependency.
+- Built-in styles give drum tone ranges and variation amounts and targets in their character.
+- Playlists: a session saved with an older composed sound version warns that it may sound different.
 - Startup: the photos of the Sounds tab load only when the tab opens, and only for the rows on screen.
 - Startup: the header, the stage and the work area keep their place after the first paint (no layout jump).
 - Decode: in Full, chords that hit with clear, repeating gaps are written with their rhythm (`.struct("…")` after the voicing).
@@ -171,6 +194,14 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Decode: Full puts the beat grid on the kick when the whole track's kick sits a sixteenth off it, so the drums read `x...x...x...x...`.
+- Decode: Full keeps writing a pad that fades out to the very end of a track, and a quiet pad that fades in before it is heard.
+- Decode: Full keeps writing a pad that fades out after the drums stop, and a quiet outro that holds one note, instead of ending in silence.
+- Decode: Full writes four kicks a bar in a loud section with a kick on every beat that its kick test hears only now and then.
+- Decode: Full writes no chords before a pad enters inside a section, where only the drums' noise read as chords.
+- Decode: Full writes the quiet pads of intros, breaks and outros, at a lower level, instead of silence.
+- Decode: Full writes no chords where they are only the harmonics of a distorted bass on 16ths.
+- Decode: Full writes the kick on its click when the beat grid sits a 16th early, and a backbeat snare a 16th off the grid as a clap, not an open hat.
 - Radio: near the end of a growth the console's riser button stays enabled when the riser fits on the grown song, and a riser with no room within two phrases shows a notice instead of disappearing.
 - Radio: a track added with "+" on the half-phrase start just before a break or a charge plays its whole first phrase instead of leaving with the drums after 4 bars.
 

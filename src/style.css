@@ -335,6 +335,18 @@
   .tp-compose .tp-cen { flex: 0 1 150px; min-width: 110px; }
   .tp-compose .tp-cguitar { display: inline-flex; align-items: center; gap: 4px; }
   .tp-compose .tp-cguitar select { padding: 3px 6px; font-size: 12px; }
+  /* the sound dice (random-sound-params): roll, number and lock chips, wrapping on a phone */
+  .tp-dice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+  .tp-dice .btn { display: inline-flex; align-items: center; gap: 5px; }
+  .tp-dice .tp-cnum { display: inline-flex; align-items: center; gap: 4px; }
+  .tp-dice .tp-cnum input { width: 64px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); font: inherit; font-size: 12px; }
+  .tp-dice .tp-dlocks-lbl { display: inline-flex; align-items: center; gap: 4px; }
+  .tp-dice .tp-dlocks-lbl svg { width: 12px; height: 12px; }
+  .tp-dice .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  /* the sound history (random-sound-params D10): one chip per sound rolled, the lit one is the sound now */
+  .tp-dhist { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 0; }
+  .tp-dhist .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tp-dhist + .tp-dice { margin-top: 6px; }
   .ico-compose, .ico-rhythm, .ico-notes { width: 14px; height: 14px; flex: none; }
   .tp-editor { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 60%, transparent); }
   .pt-top { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -1013,6 +1025,27 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 /* radio console (#24) */
 .radio-steer { margin-top: 16px; display: grid; gap: 10px; }
 .steer-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+/* the assistant's row (ai-assistant D5): one line at the top of the console, the answer line under it */
+.ask-row { display: grid; gap: 6px; min-width: 0; }
+.ask-line { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.ask-input { flex: 1 1 auto; min-width: 0; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; }
+.ask-input:disabled { opacity: .6; }
+.ask-menu-btn { flex: 0 0 auto; display: inline-grid; place-items: center; }
+.ask-spin { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: grow-turn .8s linear infinite; }
+.ask-menu { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 13px; }
+.ask-menu[hidden], .ask-answer[hidden], .ask-sent[hidden] { display: none; }
+.ask-menu-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ask-sent { max-height: 220px; overflow: auto; margin: 0; white-space: pre-wrap; font: 11px/1.4 var(--mono); }
+.ask-answer { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 13px; min-height: 24px; }
+.ask-answer progress { width: 120px; }
+.ask-close { margin-left: auto; }
+.ask-chip.applied { border-color: var(--a1); }
+.ask-chip.struck { text-decoration: line-through; opacity: .75; }
+.ask-chip.struck small { text-decoration: none; display: inline; }
+.ask-chip.proposed { border-style: dashed; }
+.ask-drop { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 0 0 4px; font: inherit; }
+.ask-vague { color: var(--a2); }
+.ask-note { color: var(--muted); }
 .steer-console { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 16px; }
 .steer-group { display: grid; gap: 6px; align-content: start; }
 .steer-btns { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -2121,6 +2154,15 @@ summary .vt-cs-dot { margin-left: 0; }
 .sv-empty { padding: 4px 0; }
 .sv-msg:empty { display: none; }
 @media (max-width: 560px) { .sv-name { max-width: 100%; flex-basis: 60%; } }
+
+/* the "Deep beat analysis" card (decode-beat-tracker): the third-party note set apart, the state and the progress */
+#set-beat-tracker p { margin: 0 0 8px; }
+#set-beat-tracker .bt-third { padding: 6px 10px; border-left: 3px solid var(--a2); background: var(--panel2); border-radius: 0 6px 6px 0; }
+#set-beat-tracker .bt-state { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#set-beat-tracker .bt-state:empty { display: none; }
+#set-beat-tracker .bt-state progress { flex: 1 1 140px; max-width: 240px; }
+#bt-remove { display: inline-flex; align-items: center; gap: 6px; }
+#bt-remove svg { width: 14px; height: 14px; }
 
 /* the Oscilloscope card (oscilloscope-visual D7): a slider, its value and the link to the song on one row */
 .osc-param { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }

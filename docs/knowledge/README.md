@@ -44,6 +44,7 @@ The detailed references stay in `docs/*.md`. Each note links them.
 | [patterns.md](patterns.md) | Built-in presets as patterns, saved patterns, loops, Add to song |
 | [radio.md](radio.md) | The director, sessions, knobs, transitions, compilation, curves |
 | [radio-commands.md](radio-commands.md) | Every console command, when it applies, what it changes |
+| [ai-assistant.md](ai-assistant.md) | Typed requests in the console: the command registry, engines, guards, `docs/AGENT-API.md` |
 | [artists.md](artists.md) | Artist files, how each field steers the director, random artists |
 | [voice.md](voice.md) | Spoken tracks: opening, passage, refrain, chop |
 | [narrator.md](narrator.md) | Spoken step comments, speakers, explain or poetic |

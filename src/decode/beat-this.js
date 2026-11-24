@@ -1,13 +1,13 @@
 // The learned beat tracker for level B (decode-beat-tracker, round 10): Beat This! (Foscarin, Schlüter, Widmer, ISMIR
-// 2024; code and weights MIT, Institute of Computational Perception, JKU Linz), run with ONNX Runtime. Bench only for
-// now: tools/beat-this-node.mjs runs it in Node for decode-bench.cjs --beat-this; the app does not offer it (the round 10
-// verdict: on the real tracks it moved three files' band error by more than 0.5 dB; the in-app download was specified
-// and built, then left out). This file is pure (no runtime, no network): the files and their pins, the resampling to the
+// 2024; code and weights MIT, Institute of Computational Perception, JKU Linz), run with ONNX Runtime. In Node for the
+// bench (tools/beat-this-node.mjs, decode-bench.cjs --beat-this); in the app an option of Settings, off by default
+// (decode round 12: the round 10 verdict, three real files' band error worse by more than 0.5 dB, keeps it from being
+// the default; beat-this-store.js holds the download). This file is pure (no runtime, no network): the files and their pins, the resampling to the
 // model's rate, the chunks the model reads, the "minimal" post-processing of the reference code
 // (beat_this/model/postprocessor.py) and the beat grid level B takes from the beats. engine-beat-this.js runs the model.
 
 // the files, pinned: a format conversion of the official final0 checkpoint (and its log-mel front end) published on a
-// model hub at a fixed revision. Each file's SHA-256 is checked before every load; a file that does not match is refused. Verified (decode round 10): the model's ONNX Runtime output equals the official
+// model hub at a fixed revision. Each file's SHA-256 is checked after the download and again before every load; a file that does not match is refused. Verified (decode round 10): the model's ONNX Runtime output equals the official
 // checkpoint run in PyTorch within 1e-4 on a bench song, and the front end equals the reference LogMelSpect within 2e-4.
 export const BEAT_THIS_REVISION = '0d66b58ee1b3b42ec5e82334949626295f3ed82b';
 const HUB = `https://huggingface.co/nilsbc/beat-this-onnx/resolve/${BEAT_THIS_REVISION}`;

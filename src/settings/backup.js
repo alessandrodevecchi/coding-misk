@@ -14,8 +14,10 @@ export const BACKUP_FORMAT = 'coding-misk/backup';
 export const PREFIX = 'coding-misk-';
 // working state that does not belong in a backup
 // (coding-misk-artist-voice: the old voice of the next song by an artist, no longer read since new-song-panel D9)
-const SKIP = new Set(['coding-misk-draft', 'coding-misk-tab', 'coding-misk-panel', 'coding-misk-code-w', 'coding-misk-code-collapsed', 'coding-misk-artist-voice', 'coding-misk-cw-open', 'coding-misk-sw-open', 'coding-misk-voices-sub']);
+const SKIP = new Set(['coding-misk-draft', 'coding-misk-tab', 'coding-misk-panel', 'coding-misk-code-w', 'coding-misk-code-collapsed', 'coding-misk-artist-voice', 'coding-misk-cw-open', 'coding-misk-sw-open', 'coding-misk-voices-sub', 'coding-misk-beat-this']);
 // (coding-misk-voices-sub: the section of the Voci tab open last, my-phrases D9)
+// (coding-misk-beat-this: the beat tracker's files are downloaded on this device, decode-beat-tracker; the choice to use
+// it, coding-misk-beat-this-opt, is kept)
 
 // entries: [[key, value]] of the browser storage (values parsed). Returns the backup object.
 // decodes: the decoded tracks (track-to-code D3, IndexedDB), carried without their file handles (by default the 100

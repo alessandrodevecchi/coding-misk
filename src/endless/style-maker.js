@@ -137,6 +137,9 @@ function some(r, list, [lo, hi]) {
 function trimInstrument(r, part) {
   const out = clone(part);
   for (const [k, lim] of Object.entries(TRIM)) if (Array.isArray(out[k])) out[k] = some(r, out[k], lim);
+  // (random-sound-params: an invented style leaves out the lent part's drum tones and variation, so its fixtures stay;
+  // its songs use the defaults at sound 1)
+  if (out.material && typeof out.material === 'object') { delete out.material.tones; delete out.material.variation; }
   return out;
 }
 const gap = (a, b) => Math.max(0, Math.max(a[0], b[0]) - Math.min(a[1], b[1]));

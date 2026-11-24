@@ -40,7 +40,7 @@
     "max": 7
   },
   "drums": {
-    "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "euclid"] },
+    "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "euclid"], "tones": {"kick": {"decay": [0.25, 0.5], "tune": [-2, 0]}, "snare": {"decay": [0.1, 0.3]}, "hats": {"decay": [0.03, 0.12], "cutoff": [8000, 16000]}}, "variation": { "amount": 0.35, "targets": ["crush", "distort", "pan"] } },
     "kits": [
       "RolandTR909",
       "OberheimDMX",
@@ -65,7 +65,7 @@
     }
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.4, "rules": ["rolling", "gallop", "sixteenths", "fifths"] },
+    "material": { "source": "mix", "share": 0.4, "rules": ["rolling", "gallop", "sixteenths", "fifths"], "variation": { "amount": 0.25, "targets": ["lpf", "crush"] } },
     "presets": [
       "tritono",
       "mirino",
@@ -84,7 +84,7 @@
     }
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["polymeter", "tail", "dark"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["polymeter", "tail", "dark"], "variation": { "amount": 0.3, "targets": ["distort", "crush", "lpf"] } },
     "presets": [
       "allarme",
       "boss",

@@ -41,7 +41,7 @@
     "max": 7
   },
   "drums": {
-    "material": { "source": "mix", "share": 0.3, "families": ["four-floor"] },
+    "material": { "source": "mix", "share": 0.3, "families": ["four-floor"], "tones": {"kick": {"decay": [0.25, 0.5], "tune": [-2, 0], "drive": [0.2, 0.6]}, "snare": {"decay": [0.1, 0.3], "drive": [0.2, 0.6]}, "hats": {"decay": [0.03, 0.12], "drive": [0.05, 0.25], "cutoff": [8000, 16000]}}, "variation": { "amount": 0.25, "targets": ["decay", "gain", "pan"] } },
     "kits": [
       "RolandTR909",
       "OberheimDMX",
@@ -64,7 +64,7 @@
     }
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "offbeat", "pulse", "octaves"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "offbeat", "pulse", "octaves"], "variation": { "amount": 0.2, "targets": ["lpf"] } },
     "presets": [
       "rolling",
       "rumble",
@@ -88,7 +88,7 @@
     }
   },
   "arp": {
-    "material": { "source": "mix", "share": 0.4, "rules": ["pedal", "skips", "random"] },
+    "material": { "source": "mix", "share": 0.4, "rules": ["pedal", "skips", "random"], "variation": { "amount": 0.25, "targets": ["lpf", "pan", "delay"] } },
     "presets": [
       "acid",
       "pedale",
@@ -114,7 +114,7 @@
     }
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["polymeter", "tail", "dark"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["polymeter", "tail", "dark"], "variation": { "amount": 0.25, "targets": ["lpf", "pan", "delay"] } },
     "presets": [
       "colpi",
       "segnale",
@@ -137,7 +137,7 @@
     }
   },
   "pad": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"], "variation": { "amount": 0.25, "targets": ["lpf", "pan", "delay"] } },
     "presets": [
       "pad",
       "stab"

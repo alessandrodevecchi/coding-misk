@@ -3,6 +3,8 @@
 import { makeBackup, mergeBackup, backupParts } from './backup.js';
 import { DECODES_KEY, BACKUP_RECENT } from '../decode/store.js';
 import { MIXTAPES_KEY } from '../decode/mixtapes.js';
+import { beatThisStatus, downloadBeatThis, removeBeatThis, beatThisChosen, setBeatThisChosen, beatThisInstalled } from '../decode/beat-this-store.js';
+import { BEAT_THIS_BYTES } from '../decode/beat-this.js';
 import { pickJsonFiles } from '../library/library.js';
 import { TRANSITION_KINDS, HARMONY_MODES } from '../endless/artist.js';
 import { OWN_IDS, STRUDEL_IDS, FONTS, SIZES, themeName, fontName } from '../code-themes/themes.js';
@@ -30,6 +32,8 @@ import { AW_KEY, APP_WIDGETS, APP_WIDGET_NAMES, appWidgetSettings, widgetFrame, 
 import { HG_LIMITS } from '../widgets/hitgrid.js';
 import { TC_LIMITS } from '../widgets/tonecloud.js';
 import { overRoles } from '../code-themes/themes.js';
+import { AREAS, areaSettings, setArea, engineFor } from '../ai/areas.js';
+import { initialPrompts } from '../ai/generate.js';
 
 // the app widgets' previews (code-over-visual D13): a few bars of drums, bass and pad chords, the same every time
 const DEMO = (() => {
@@ -124,6 +128,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setScope'), `<select data-radio-opt="scope" data-no-knob>${opt('song', r.scope, t('steerScopeSong'))}${opt('session', r.scope, t('steerScopeSession'))}</select>`, t('helpRadioScope'))}
           ${row(t('matDefault'), `<select data-radio-opt="material" data-no-knob>${['mix', 'patterns', 'varied', 'composed'].map(k => opt(k, r.material || 'mix', t(`mat:${k}`))).join('')}</select>`, t('helpRadioMaterial'))}
         </div>
+        ${aiCard()}
         <div class="card set-card" id="set-library"><h3>${esc(t('setLibrary'))}</h3>
           <p class="muted">${esc(t('setLibraryIntro'))}</p>
           <div class="actions">${app.hiddenSongs && app.hiddenSongs() ? `<button class="btn" id="set-show-hidden">${esc(t('setShowHidden', { n: app.hiddenSongs() }))}</button>` : `<span class="muted">${esc(t('setHiddenNone'))}</span>`}</div>
@@ -132,6 +137,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
         ${codeOverCard()}
         ${stageCard()}
         ${stageVideosCard()}
+        ${beatTrackerCard()}
         ${oscilloscopeCard()}
         <div class="card set-card" id="set-advanced"><h3>${esc(t('setAdvanced'))}</h3>
           <p class="muted">${esc(t('setAdvancedIntro'))}</p>
@@ -156,6 +162,32 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (app.fragPreview) app.fragPreview(root.querySelector('#set-frag-preview'), () => { const x = { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), stageRatio: app.stageRatio ? app.stageRatio() : 2.4 }; return { ...x, size: fragmentSize(x), next: store.get('coding-misk-fragment-n', 1) }; });
   }
 
+  // the AI card (ai-assistant D2, D4): per area the engine, the model and the mode; only the built-in engine for now
+  function aiCard() {
+    const r = areaSettings(store, 'radio');
+    const engines = `<select data-ai-engine="radio" data-no-knob>${AREAS.radio.engines.map(id => opt(id, r.engine, t(`aiEngine:${id}`))).join('')}${AREAS.radio.coming.map(id => `<option value="${id}" disabled>${esc(t(`aiEngine:${id}`))} · ${esc(t('aiComing'))}</option>`).join('')}</select>`;
+    const mode = `<select data-ai-apply="radio" data-no-knob>${['now', 'ask'].map(m => opt(m, r.apply, t(`aiMode:${m}`))).join('')}</select>`;
+    setTimeout(aiStatus, 0);
+    return `<div class="card set-card" id="set-ai"><h3>${esc(t('setAi'))}</h3>
+          <p class="muted">${esc(t('setAiIntro'))}</p>
+          <h4>${esc(t('setAiRadio'))}</h4>
+          ${row(t('aiEngineLbl'), engines, t('setAiEngineHint'))}
+          ${row(t('aiModelLbl'), `<span>${esc(t('aiModel:built-in'))}</span>`)}
+          ${row(t('aiStatusLbl'), '<span id="set-ai-status" class="muted">…</span>')}
+          ${row(t('aiMode'), mode, t('aiModeHint'))}
+          <h4>${esc(t('setAiCompose'))}</h4>
+          <p class="hint muted">${esc(t('setAiComposeSoon'))}</p>
+        </div>`;
+  }
+  async function aiStatus() {
+    const box = root.querySelector('#set-ai-status'), e = engineFor(store, 'radio');
+    if (!box) return;
+    const s = e ? await e.status() : { state: 'unavailable', detail: 'none' };
+    if (!root.contains(box)) return;
+    box.innerHTML = s.state === 'download' ? `${esc(t('aiState:download'))} <button class="btn small" id="set-ai-download">${esc(t('aiDownload'))}</button>`
+      : s.state === 'unavailable' ? esc(t(`aiUnavailable:${s.detail || 'device'}`)) : esc(t(`aiState:${s.state}`, { p: e && e.progress != null ? e.progress : 0 }));
+  }
+
   // code themes (code-themes D6): theme, font, size and the dimmed muted lines, in the Appearance card
   function codeRows() {
     if (!app.codeTheme) return '';
@@ -166,6 +198,36 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setCodeSize'), seg('data-set-code-size', Object.keys(SIZES).map(k => [k, t(`codeSize:${k}`)]), C.size), t('setCodeSizeHint'))}
           ${row(t('setCodeDim'), seg('data-set-code-dim', [['1', t('cwYes')], ['0', t('cwNo')]], C.dim ? '1' : '0'), t('setCodeDimHint'))}
           ${row(t('setCodeLit'), seg('data-set-code-lit', [['outline', t('codeLit:outline')], ['fill', t('codeLit:fill')], ['underline', t('codeLit:underline')]], C.lit || 'outline'), t('setCodeLitHint'))}`;
+  }
+
+  // the "Deep beat analysis" card (decode-beat-tracker, decode round 12): the option, off by default (on with the local
+  // build flag, beat-this-store.js), its disclaimer, and while it is on the download with its progress, Cancel and
+  // Remove. Off, the cache is not even opened; on, it is read once per page (status null: not read yet)
+  const bt = { status: null, pct: null, ctrl: null, msg: '' };
+  const mb = n => Math.round(n / 1e6);
+  function beatTrackerCard() {
+    const on = beatThisChosen(), busy = bt.pct !== null;
+    if (on && bt.status === null) { bt.status = { reading: true }; beatThisStatus().then(x => { bt.status = x; render(); }); }
+    const S = on ? bt.status : null;
+    let state = '', actions = '';
+    if (busy) { state = t('btDownloading', { pct: bt.pct }); actions = `<button class="btn" id="bt-cancel">${esc(t('dcCancel'))}</button>`; }
+    else if (!on) {
+      const kept = beatThisInstalled();
+      state = kept ? t('btOffKept', { mb: mb(BEAT_THIS_BYTES) }) : '';
+      if (kept) actions = `<button class="btn danger" id="bt-remove">${BIN}<span>${esc(t('btRemove'))}</span></button>`;
+    } else if (!S.reading) {
+      if (S.supported === false) state = t('btNoCache');
+      else if (S.installed) { state = t('btInstalled', { mb: mb(S.bytes) }); actions = `<button class="btn danger" id="bt-remove">${BIN}<span>${esc(t('btRemove'))}</span></button>`; }
+      else { state = t('btMissing'); actions = `<button class="btn primary" id="bt-download">${esc(t('btDownload', { mb: mb(BEAT_THIS_BYTES) }))}</button>`; }
+    }
+    return `<div class="card set-card" id="set-beat-tracker"><h3>${esc(t('setBt'))}</h3>
+      <p class="muted">${esc(t('btIntro'))}</p>
+      <p class="hint muted bt-third">${esc(t('btThirdParty'))}</p>
+      <p class="hint muted">${esc(t('btSize', { mb: mb(BEAT_THIS_BYTES) }))}</p>
+      ${row(t('btUse'), seg('data-bt-use', [['off', t('btOff')], ['on', t('btOn')]], on ? 'on' : 'off'), t('btUseHint'))}
+      <p class="bt-state" id="bt-state" aria-live="polite">${esc(state)}${busy ? ` <progress max="100" value="${bt.pct}"></progress>` : ''}</p>
+      ${bt.msg ? `<p class="hint bt-msg" id="bt-msg">${esc(bt.msg)}</p>` : ''}
+      ${actions ? `<div class="actions">${actions}</div>` : ''}</div>`;
   }
 
   // the "Stage videos" card (stage-video D7, D10): the folders of the Video look, their access and the size mode
@@ -379,6 +441,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
+    // the built-in model's download starts from this click (the API needs a user activation)
+    if (b.id === 'set-ai-download') { const en = engineFor(store, 'radio'); if (!en) return; const off = en.onProgress(() => aiStatus()); b.disabled = true; en.download(initialPrompts()).catch(() => {}).then(() => { off(); aiStatus(); }); return; }
     if (b.dataset.setUiFollow) { app.setUiFollow(b.dataset.setUiFollow === '1'); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
     // the "Stage videos" card: the picker and the permission only inside this click
@@ -386,6 +450,20 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       app.stageVideos.add().then(r => { svMsg = r.kind === 'dup' ? t('svDup', { name: r.name }) : r.kind === 'added' ? t('svAdded', { name: r.name, n: r.count }) : r.kind === 'error' ? t('svAddError') : ''; render(); });
       return;
     }
+    if (b.dataset.btUse) {
+      if (bt.pct !== null) return;
+      setBeatThisChosen(b.dataset.btUse === 'on'); bt.status = null; bt.msg = ''; return render();
+    }
+    if (b.id === 'bt-download') {
+      bt.ctrl = new AbortController(); bt.pct = 0; bt.msg = ''; render();
+      let shown = 0;
+      downloadBeatThis({ signal: bt.ctrl.signal, onProgress: (got, all) => { const p = Math.floor((got / all) * 100); if (p !== shown) { shown = p; bt.pct = p; const el = root.querySelector('#bt-state'); if (el) el.innerHTML = `${esc(t('btDownloading', { pct: p }))} <progress max="100" value="${p}"></progress>`; } } })
+        .then(() => { bt.msg = t('btDone'); }, e => { bt.msg = e && e.name === 'AbortError' ? t('btCancelled') : t('btFailed', { why: String((e && e.message) || e) }); })
+        .finally(() => { bt.pct = null; bt.ctrl = null; bt.status = null; render(); });
+      return;
+    }
+    if (b.id === 'bt-cancel') { if (bt.ctrl) bt.ctrl.abort(); return; }
+    if (b.id === 'bt-remove') { if (!confirmTwice('bt-remove', t('btRemoveConfirm'))) return; removeBeatThis().then(() => { bt.status = null; bt.msg = t('btRemoved'); render(); }); return; }
     if (b.dataset.svAllow) { svMsg = ''; app.stageVideos.allow(b.dataset.svAllow).then(() => render()); return; }
     if (b.dataset.svRemove) {
       const f = app.stageVideos.list().find(x => x.id === b.dataset.svRemove);
@@ -476,7 +554,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
       const keys = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('coding-misk-')) keys.push(k); }
       keys.forEach(k => { try { localStorage.removeItem(k); } catch (err) {} });
       // the stage video folders go too (stage-video D10: a reset clears the folders and the size mode)
-      Promise.resolve(app.stageVideos ? app.stageVideos.clear() : null).catch(() => {}).finally(() => location.reload());
+      // and the beat tracker's files (decode-beat-tracker)
+      Promise.all([Promise.resolve(app.stageVideos ? app.stageVideos.clear() : null).catch(() => {}), removeBeatThis().catch(() => {})]).finally(() => location.reload());
     }
   });
   // the oscilloscope's sliders: the stage follows while dragging, the card is not drawn again
@@ -486,6 +565,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   root.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.swSec) { const open = new Set(store.get(SW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.swSec); else open.delete(d.dataset.swSec); store.set(SW_OPEN, [...open]); return; } if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
   root.addEventListener('change', e => {
     if (oscHandle(e, store, 'card')) return;
+    if (e.target.dataset && e.target.dataset.aiApply) { setArea(store, e.target.dataset.aiApply, { apply: e.target.value }); return; }
+    if (e.target.dataset && e.target.dataset.aiEngine) { setArea(store, e.target.dataset.aiEngine, { engine: e.target.value }); return render(); }
     if (e.target.matches && e.target.matches('[data-ph-set-temp]')) { app.phrases.set({ temp: e.target.value }); return render(); }
     { const x = e.target, d = x.dataset || {};
       if (d.capSkip !== undefined && app.capsSkipNext) { app.capsSkipNext(x.checked); return; }

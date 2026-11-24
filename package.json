@@ -51,12 +51,16 @@
     "check:one-row-roll": "node --no-warnings tools/check-one-row-roll.mjs",
     "check:render-styles": "node --no-warnings tools/check-render-styles.mjs",
     "check:line-names": "node --no-warnings tools/check-line-names.mjs",
+    "agent-api": "node --no-warnings tools/agent-api.mjs",
+    "check:agent-api": "node --no-warnings tools/check-agent-api.mjs",
+    "check:ai": "node --no-warnings tools/check-ai.mjs",
     "check:sound-guard": "node --no-warnings tools/check-sound-guard.mjs",
     "catalog:strudel": "node --no-warnings tools/strudel-catalog.mjs",
     "check:strudel": "node --no-warnings tools/check-strudel.mjs",
     "check:ideas": "node --no-warnings tools/check-idea-writer.mjs",
     "check:functions": "node --no-warnings tools/check-functions.mjs",
     "check:material": "node --no-warnings tools/check-material.mjs",
+    "check:sound-params": "node --no-warnings tools/check-sound-params.mjs",
     "check:patterns": "node --no-warnings tools/check-patterns.mjs",
     "check:preview": "node --no-warnings tools/check-preview.mjs",
     "check:fm-lab": "node --no-warnings tools/check-fm-lab.mjs",
@@ -79,10 +83,10 @@
     "@mediabunny/mp3-encoder": "^1.61.3",
     "@strudel/repl": "1.3.0",
     "essentia.js": "0.1.3",
-    "mediabunny": "^1.61.3"
+    "mediabunny": "^1.61.3",
+    "onnxruntime-web": "1.31.1"
   },
   "devDependencies": {
-    "onnxruntime-web": "1.31.1",
     "vite": "8.3.2"
   }
 }

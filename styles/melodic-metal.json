@@ -55,7 +55,7 @@
     ]
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["gallop", "sixteenths", "pulse", "roots"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["gallop", "sixteenths", "pulse", "roots"], "variation": { "amount": 0.15, "targets": ["lpf"] } },
     "presets": [
       "galoppo",
       "ottavi",
@@ -66,7 +66,7 @@
     ]
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response", "dark"] },
+    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response", "dark"], "variation": { "amount": 0.15, "targets": ["pan", "lpf"] } },
     "presets": [
       "eroico",
       "assolo",
@@ -83,7 +83,7 @@
     ]
   },
   "pad": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"], "variation": { "amount": 0.15, "targets": ["pan", "lpf"] } },
     "presets": [
       "pad",
       "ring"

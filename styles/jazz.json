@@ -62,7 +62,7 @@
     }
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["pulse", "half", "roots", "fifths"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["pulse", "half", "roots", "fifths"], "variation": { "amount": 0.15, "targets": ["decay"] } },
     "presets": [
       "walking",
       "twoFeel"
@@ -72,7 +72,7 @@
     ]
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response"] },
+    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response"], "variation": { "amount": 0.15, "targets": ["decay"] } },
     "presets": [
       "anima",
       "domanda",
@@ -92,7 +92,7 @@
     ]
   },
   "pad": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"], "variation": { "amount": 0.15, "targets": ["decay"] } },
     "presets": [
       "comp",
       "synco"

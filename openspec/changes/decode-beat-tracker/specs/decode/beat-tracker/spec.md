@@ -8,12 +8,17 @@ An optional learned beat tracker for level B of the Decode tab: downloaded only 
 
 ### Requirement: Opt-in download
 
-The beat tracker SHALL NOT be downloaded unless the user starts the download from its Settings card. The card SHALL say that the model is a third-party model, its licence (MIT), that its training data include copyrighted recordings, its download size, the host it comes from, and that the audio never leaves the device. The download SHALL show its progress and SHALL be cancellable. Once downloaded, the card SHALL show the size on disk and a Remove button that deletes the files.
+The beat tracker SHALL be an option of Settings, off by default; a build-time flag set only in a local configuration MAY make it start on. The beat tracker SHALL NOT be downloaded or loaded unless the user turns the option on and starts the download from its Settings card. The card SHALL say that the model is a third-party model, its licence (MIT), that its training data include copyrighted recordings, its download size, the host it comes from, and that the audio never leaves the device. The download SHALL show its progress and SHALL be cancellable. Once downloaded, the card SHALL show the size on disk and a Remove button that deletes the files.
 
 #### Scenario: Nothing without a click
 
 - **WHEN** the user opens the Decode tab and runs Full without having downloaded the model
 - **THEN** no request for the model files is made and Full runs with the free engines
+
+#### Scenario: Off by default
+
+- **WHEN** the user has never changed the option and the build has no local flag
+- **THEN** the option is off, the card offers no download, and Full runs without the tracker even when its files are present
 
 #### Scenario: Remove
 

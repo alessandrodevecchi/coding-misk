@@ -10,6 +10,8 @@ import { checkGrowthShape } from './shapes.js';
 import { VOICE_PHRASES, VOICE_KINDS, VOICE_WAYS } from '../endless/voice-options.js';
 import { checkSpokenPattern, checkNarrator } from './spoken.js';
 import { checkConfig } from '../live/song-config.js';
+import { toneErrors } from '../material/tone.js';
+import { varyErrors, varySkips } from '../material/variation.js';
 // built-in synths of superdough (oscillators, noise, ZzFX)
 export const SYNTHS = ['sawtooth', 'saw', 'square', 'sqr', 'triangle', 'tri', 'sine', 'sin', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle', 'zzfx', 'z_sine', 'z_sawtooth', 'z_triangle', 'z_square', 'z_tan', 'z_noise'];
 
@@ -125,8 +127,34 @@ export function validateSong(song, opts = {}) {
     if (!TYPES.includes(tr.type)) { err(`${p}.type`, `one of ${TYPES.join(', ')}`); return; }
     checkSettings(tr.type, tr.settings || {}, `${p}.settings`, err, warn);
     if (tr.rack !== undefined) checkRack(tr.rack, `${p}.rack`, err, warn);
+    // variation left out by the writer (random-sound-params D4): an automated target, one a rack device writes later on
+    // the line, or one an idea's random values write too
+    const vary = (tr.settings || {}).vary;
+    if (Array.isArray(vary)) {
+      const skips = varySkips(tr.type, tr.settings, tr.rack), randoms = new Set(Object.values(tr.patterns || {}).map(x => x && x.idea && x.idea.random && x.idea.random.on).filter(Boolean));
+      vary.forEach((e, i) => {
+        if (!e || !skips[e.on]) { if (e && randoms.has(e.on)) warn(`${p}.settings.vary[${i}]`, `an idea's random values write ${e.on} too: the variation is left out`); return; }
+        warn(`${p}.settings.vary[${i}]`, `the variation is left out: ${skips[e.on]}`);
+      });
+    }
     for (const k of ['mute', 'solo']) if (tr[k] !== undefined && typeof tr[k] !== 'boolean') err(`${p}.${k}`, 'true or false');
     if (tr.pinned !== undefined && (!Array.isArray(tr.pinned) || tr.pinned.some(k => !SETTING_FIELDS[tr.type].includes(k)))) err(`${p}.pinned`, `settings fixed against the live build steps, from: ${SETTING_FIELDS[tr.type].join(', ')}`);
+    // the sounds the dice rolled on the track in Compose (random-sound-params D10): { cur, rolls: [{ n, settings, rack, fm }] }
+    if (tr.soundRolls !== undefined) {
+      const h = tr.soundRolls, hp = `${p}.soundRolls`, isN = x => Number.isInteger(x) && x >= 1 && x <= 9999;
+      if (!h || typeof h !== 'object' || Array.isArray(h) || !Array.isArray(h.rolls)) err(hp, 'an object { "cur": 1, "rolls": [{ "n": 1, "settings": {}, "rack": [] }] }');
+      else {
+        if (h.cur !== null && h.cur !== undefined && !isN(h.cur)) err(`${hp}.cur`, 'a whole number from 1 to 9999, or null');
+        if (h.rolls.length > 12) warn(`${hp}.rolls`, 'more than 12 sounds: Compose keeps the last 12');
+        h.rolls.forEach((r, i) => {
+          const rp = `${hp}.rolls[${i}]`;
+          if (!r || typeof r !== 'object' || !isN(r.n)) { err(rp, 'an entry { "n": 1, "settings": {}, "rack": [] } with n from 1 to 9999'); return; }
+          if (!r.settings || typeof r.settings !== 'object' || Array.isArray(r.settings)) err(`${rp}.settings`, 'an object of settings');
+          if (!Array.isArray(r.rack)) err(`${rp}.rack`, 'a list of rack devices');
+        });
+        if (isN(h.cur) && !h.rolls.some(r => r && r.n === h.cur)) warn(`${hp}.cur`, `no entry has number ${h.cur}`);
+      }
+    }
     // the voice instrument options a spoken track was written with in Compose (voice-placement)
     if (tr.voiceOptions !== undefined) {
       const v = tr.voiceOptions, vp = `${p}.voiceOptions`;
@@ -212,6 +240,9 @@ function checkSettings(type, set, p, err, warn) {
     if (k === 'mode' && !MODES.some(([m]) => m === v)) err(`${p}.mode`, `one of ${MODES.map(([m]) => m).join(', ')}`);
     if (k === 'speaker' && v !== '' && !SPEAKERS.includes(v)) warn(`${p}.speaker`, REMOVED_SPEAKERS.includes(v) ? `removed speaker: the default voice speaks; speakers: ${SPEAKERS.join(', ')}` : `unknown speaker; speakers: ${SPEAKERS.join(', ')} (or "" for the default voice)`);
     if (k === 'visual' && !VISUALS.includes(v)) warn(`${p}.visual`, `the visuals know: ${VISUALS.join(', ')}`);
+    // composed drum tones and variation (random-sound-params): null is the default (none)
+    if (k === 'tone' && v !== null) for (const [q, m] of toneErrors(v)) err(`${p}.tone${q}`, m);
+    if (k === 'vary' && v !== null) for (const [q, m, kind] of varyErrors(v, type)) (kind === 'warn' ? warn : err)(`${p}.vary${q}`, m);
   }
 }
 

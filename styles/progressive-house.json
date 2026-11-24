@@ -42,7 +42,7 @@
     "max": 7
   },
   "drums": {
-    "material": { "source": "mix", "share": 0.2, "families": ["four-floor"] },
+    "material": { "source": "mix", "share": 0.2, "families": ["four-floor"], "tones": {"kick": {"decay": [0.3, 0.55], "drive": [0, 0.3]}, "snare": {"decay": [0.12, 0.3], "drive": [0, 0.3]}, "hats": {"decay": [0.04, 0.14], "drive": [0, 0.1], "cutoff": [9000, 18000]}}, "variation": { "amount": 0.2, "targets": ["pan", "gain", "decay"] } },
     "kits": [
       "RolandTR909",
       "KorgM1",
@@ -56,7 +56,7 @@
     ]
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["offbeat", "rolling", "octaves"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["offbeat", "rolling", "octaves"], "variation": { "amount": 0.2, "targets": ["lpf"] } },
     "presets": [
       "offbeat",
       "pumping",
@@ -74,7 +74,7 @@
     }
   },
   "arp": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["up", "updown", "pedal", "random"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["up", "updown", "pedal", "random"], "variation": { "amount": 0.2, "targets": ["pan", "lpf"] } },
     "presets": [
       "sugiu",
       "su",
@@ -97,7 +97,7 @@
     }
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["polymeter", "tail", "call-response"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["polymeter", "tail", "call-response"], "variation": { "amount": 0.2, "targets": ["pan", "lpf"] } },
     "presets": [
       "eroico",
       "orizzonte",
@@ -115,7 +115,7 @@
     ]
   },
   "pad": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"], "variation": { "amount": 0.2, "targets": ["pan", "lpf"] } },
     "presets": [
       "sidechain",
       "pump",

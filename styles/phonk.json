@@ -51,7 +51,7 @@
     }
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.4, "rules": ["half", "rolling", "octaves"] },
+    "material": { "source": "mix", "share": 0.4, "rules": ["half", "rolling", "octaves"], "variation": { "amount": 0.2, "targets": ["lpf", "crush"] } },
     "presets": [
       "sub",
       "tritono",
@@ -69,7 +69,7 @@
     }
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["tail", "call-response", "dark"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["tail", "call-response", "dark"], "variation": { "amount": 0.25, "targets": ["crush", "lpf", "pan"] } },
     "presets": [
       "phonk",
       "colpi",
@@ -86,7 +86,7 @@
     ]
   },
   "pad": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"], "variation": { "amount": 0.25, "targets": ["crush", "lpf", "pan"] } },
     "presets": [
       "stab",
       "pad"

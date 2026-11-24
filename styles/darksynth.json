@@ -41,7 +41,7 @@
     "max": 7
   },
   "drums": {
-    "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "half-time"] },
+    "material": { "source": "mix", "share": 0.3, "families": ["four-floor", "half-time"], "tones": {"kick": {"decay": [0.25, 0.5], "tune": [-2, 0], "drive": [0.2, 0.6]}, "snare": {"decay": [0.1, 0.3], "drive": [0.2, 0.6]}, "hats": {"decay": [0.03, 0.12], "drive": [0.05, 0.25], "cutoff": [8000, 16000]}}, "variation": { "amount": 0.25, "targets": ["decay", "pan", "distort"] } },
     "kits": [
       "LinnDrum",
       "OberheimDMX",
@@ -61,7 +61,7 @@
     }
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "gallop", "sixteenths", "octaves"], "sounds": ["growl", "dirty", "reese"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["rolling", "gallop", "sixteenths", "octaves"], "sounds": ["growl", "dirty", "reese"], "variation": { "amount": 0.2, "targets": ["lpf"] } },
     "presets": [
       "ottaveArcade",
       "spirale",
@@ -85,7 +85,7 @@
     }
   },
   "arp": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["up", "pedal", "skips", "random"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["up", "pedal", "skips", "random"], "variation": { "amount": 0.25, "targets": ["lpf", "distort", "pan"] } },
     "presets": [
       "acid",
       "pulsar"
@@ -100,7 +100,7 @@
     "weight": 0.6
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response", "dark"] },
+    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response", "dark"], "variation": { "amount": 0.25, "targets": ["lpf", "distort", "pan"] } },
     "presets": [
       "neon",
       "boss",
@@ -118,7 +118,7 @@
     ]
   },
   "pad": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"], "variation": { "amount": 0.25, "targets": ["lpf", "distort", "pan"] } },
     "presets": [
       "sidechain",
       "stab",
