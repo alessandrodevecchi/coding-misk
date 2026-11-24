@@ -229,6 +229,54 @@ What the installed superdough (1.3.0) offers, read for this step:
 - `check:modulation` (Node): the code of every new target and argument, phase 0 writing nothing, the filter's generic form with a phase, the Gate's runs and periods, the trapezoid sampled with a model of the LFO worklet at 64 points a bar against the pattern (closed steps at `1 - depth`, open steps at 1, never above 1), the validator's new errors and warnings, Strudel in Node evaluating every line, and the existing songs' code unchanged (`check:code`).
 - `tools/check-modulation.cjs` (browser): an example song with a Gate, a tremolo, a vibrato and a phased Pump plays with no error; levels with and without (never louder); the envelope of the Gate and of the phased dip in playback against the fast export, aligned within a 32nd.
 
+## Path engine (D14 and D15, spec only)
+
+### D14. Path engine ("Percorso")
+
+- **Why.** Decode will write movement it measures in real tracks: the fade-in of a quiet intro, the fade-out of an ending, a filter that opens unevenly. A Sweep is one straight ramp and an LFO repeats; neither fits. The knobs' recorded gesture (D7) is the same thing: a value that follows a curve. So the engine comes first, as an ordinary movement device usable without any knob, and the knobs (section 6 of the tasks) build on it.
+- **The device.** `{ "device": "path", "target": "filter", "points": [[0, 400], [2.5, 900], [4, 3000]], "smooth": "linear" }`:
+
+| Argument | Values | Default |
+| --- | --- | --- |
+| target | `filter`, `hpf`, `volume`, `room`, `delay`, `pan` | `filter` |
+| points | `[bar, value]` pairs, bars from the song's start, increasing; values in the target's range (filters 60-18000 Hz, volume 0-1 of the track's gain, sends 0-1, pan 0-1) | none (the device needs points) |
+| smooth | `linear` (straight lines between points), `step` (each value held until the next point, edges of 5 ms) | `linear` |
+
+  Before the first point the value is the first point's, after the last the last one's. Pitch is not a path target in this step: a pitch curve needs the source's frequency, whose unit depends on the sound (D12).
+- **How it moves a held note.** Inside a note only a modulator moves a value (Context). The engine uses Strudel's bus: a path line plays Strudel's constant sound `one` (a `ConstantSourceNode`) into a bus with no dry output, and the moved line reads that bus with `.bmod({ b: N, c, da })` over a base value. Each point is a short note of `one`; with `linear` its gain envelope is a triangle from the previous point's time to the next point's (linear attack and decay), and overlapping triangles sum to the straight line through the points. With `step` each note holds its value until the next point. For example, a volume path on a pad:
+
+  ```js
+  $: s("one").struct("x*4").gain("<[0 .25 .5 .75] [1 1 1 1]>").attack(.5).decay(.5).sustain(0).bus(1).dry(0)   // percorso: volume
+  $: note("<[c3,e3,g3]>").s("supersaw").gain(.05).bmod({ b: 1, c: 'gain', da: .075 })…
+  ```
+
+  The exact calls (the triangle's start, the gain curve, the depth factor) are fixed by task 8.1's measures; the shape above is the plan.
+- **Encoding.** The bus carries 0 to 1, the path between its lowest and highest value; the moved line's base is the lowest value and `da` is the span, times the bus modulator's factor (superdough divides the depth by 0.3) and through the inverse of the gain curve `one`'s notes pass (`applyGainCurve`). A filter path is linear in Hz between points; Decode writes more points where an opening is steep, so the ear hears no corner.
+- **Same everywhere.** Both lines are plain Strudel, so the sound is the same in the page, in the real-time export (it records the page), in the fast export (the render page plays every hap through its own controller, which makes the bus on first use) and in code copied out of the app, which holds the path line as written with a comment naming it (`// percorso: filtro, 24 punti`).
+- **Limits.**
+  - At most 16 points a bar (a sixteenth, the knob's resolution in D7) and at most 256 points a path. `thinPath` drops a point that lies on the straight line through its neighbours within 1 % of the path's span, before the cap.
+  - At most 8 paths in a song, on buses 1 to 8 in track order (the knobs' live buses take 9 and up, D15).
+  - A path counts as one of the two movement devices of a track; one path per target per track.
+  - A path and a Sweep on the same target is an error (both write the base). A path and an LFO on the same target is fine: the LFO sways around the path.
+  - Volume values are shares of the track's gain from 0 to 1, so a volume path never makes a track louder than its own gain.
+- **Cost.** One `one` note per point, at most 16 a bar per path, plus one bus connection per moved note: lighter than a Gate's LFOs.
+- **Bus lifetime.** `controller.reset()` drops every bus on Stop, Play and some evaluations. The path line and the moved line make the bus again on their next notes, so the path resumes from the next note; a note held through a reset plays at its base until its next onset. Task 8.4 measures it.
+- **In the song's code.** The path line opens the track's block, so a live build or a growth that types the track's lines never plays the moved line before its path (that would leave it at the base). The path line is muted, soloed out and hushed with its track. The hit grid, the tone cloud, the level checks and the hidden mixer skip `s("one")` lines.
+- **No knob, no recording here.** The Compose card shows the path read-only: the target, the number of points, the bars it spans and a small drawn curve. Points come from the song file or from a writer; editing them by hand in the page comes with the knobs.
+- **How Decode will call it.** `pathDevice(target, points, { perBar = 4, smooth = 'linear' })` in `movement.js`: clamps values to the target's range, rounds bars to `1 / perBar` (`perBar` at most 16), drops repeated bars, thins, cuts at 256 points and returns a rack device, or `null` when the path is flat within 1 %. The level B writer appends it to a track's rack; the validator checks it like any device. Examples:
+  - a quiet intro: `pathDevice('volume', [[0, 0.1], [8, 1]])` on each track that plays in the first 8 bars;
+  - an ending that fades: `pathDevice('volume', [[120, 1], [128, 0]])`;
+  - a filter that opens unevenly: one point per bar from the measured brightness, `perBar: 1`, or 4 where it moves fast.
+  
+  The truth for Decode's bench reads paths with `modTruth` like the other devices.
+
+### D15. Knobs on top of the path engine (revises D7)
+
+- A knob's recorded gesture is saved as the device's `path` of offsets from the set value, in the same format as D14, and plays through the same engine on its own bus. This replaces D7's playback with `setValueAtTime` and the fast export's scheduling on the render page.
+- The page's `ConstantSourceNode` stays only for the hand on the knob: the live offset while the user turns it, on buses 9 and up.
+- Code copied out of the app keeps the gesture as its path line (plain Strudel), not as values per bar; D7's "steps per bar" and its comment go.
+- Decode and the generator write Path devices (D14), never a knob's gesture.
+
 ## Owner tests (checklist)
 
 1. **Pad che si apre (Sweep).** Dove: Compose, un brano con un pad tenuto (per esempio `luci-rosse`), pannello della traccia pad, rack. Cosa fare: aggiungi "Apertura", lascia filtro da 400 a 4000 in 8 battute, premi Play. Cosa deve succedere: il pad parte scuro e diventa brillante in 8 battute, in modo continuo anche dentro ogni accordo tenuto, senza scatti a ogni battuta. Perché: è il movimento dentro la nota che oggi manca.
@@ -277,4 +325,5 @@ In agent hours:
 - Later phase, knobs (D7, D8): about 8 (bus driver and reset 2, Compose card and path 2, fast export and copied code 1.5, radio row 1, code widget 1, checks 0.5).
 
 This change, without the later phase: about 10.
+- Path engine (D14), without knobs: about 6 (measures of the bus, gain curve and depth factor 1, device, writer and `pathDevice` 1.5, compiler, bus numbers, growth and widgets 1.5, fast export and copied code 0.5, checks 1, docs 0.5). The knobs on top (D15) drop to about 6.
 - Movement parameters (D11 to D13): about 4 (phase and the filter's generic form 0.5, volume and pitch 0.5, Gate with its step row and smoothing 1.5, checks in Node and in the browser 1, docs, guide and knowledge 0.5).

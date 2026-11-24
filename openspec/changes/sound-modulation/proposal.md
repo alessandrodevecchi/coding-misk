@@ -33,6 +33,7 @@ Decode needs the same words: it cannot write a pumping pad until the app can pla
   - **Two new Oscillazione targets:** volume (tremolo, the same Strudel calls as the existing Tremolo device) and pitch (vibrato, Strudel's `vib` and `vibmod`).
   - **Gate ritmico** ("Rhythmic gate"): a fourth movement device that cuts the sound on a pattern of 16 steps per bar (trance gate), with presets, depth, smoothing of the edges and phase.
   - The rule "at most two movement devices per track" stays. Old songs compile byte for byte as before: every new value is neutral by default.
+- **Path engine (spec only, design D14 and D15):** a Path device ("Percorso") makes a value follow points written per bar, inside held notes, through Strudel's bus and its constant sound `one`, the same in the app, both exports and copied code. It needs no knob, so Decode can write measured fades and filter openings; the knobs later record their gesture into it.
 
 ## Out of scope (future work)
 
@@ -46,6 +47,7 @@ Decode needs the same words: it cannot write a pumping pad until the app can pla
 - `app/modulation-devices`: Sweep, LFO, Pump and Gate in the rack: arguments, phase, code, level rule, how they meet track settings and #94's `vary`.
 - `app/device-knobs` (later phase): the main knob of each movement device, the bus, the knob in Compose, radio and code, the recorded path and what export does with it.
 - `app/decode-modulation-bench`: the modulated test songs, the truth reader and the envelope error.
+- `app/movement-paths` (spec only in this step): the path engine, a Path device whose value follows points inside held notes, in both exports and in copied code, without a knob; Decode and the knobs write into it.
 
 ### Modified Capabilities
 
