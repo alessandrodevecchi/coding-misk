@@ -3,7 +3,7 @@
 // console's rebuilds (mount puts it back in the slot, focus and text kept).
 //   radio: { ready(), state(), ctx(), api, label(cmd) } from src/radio/radio.js: the song on air for the prompt, the
 //   validation context (playing tracks, fitting patterns, the console's reasons) and the buttons' functions
-import { precheck, readAnswer, applyItems } from './commands.js';
+import { precheck, readAnswer, applyItems, reviewAnswer, directAnswer } from './commands.js';
 import { answerSchema, initialPrompts, requestText, fitPrompt } from './generate.js';
 import { areaSettings, setArea, engineFor } from './areas.js';
 import { deadline, TIMEOUT_MS, FIRST_TIMEOUT_MS } from './engine.js';
@@ -59,11 +59,12 @@ export function createAskRow({ t, esc, store, getLang, openSettings = () => {}, 
       return `<span class="chip small ask-chip ${state}" title="${esc(why || t(`aiChip:${state}`))}">${esc(labelOf(it))}${why ? ` <small>· ${esc(why)}</small>` : ''}${drop}</span>`;
     }).join('');
   }
-  function showResult(r, mode, vague) {
+  // flag: 'vague' (a vague request) or 'check' (the answer may not match the request, D4 checks 4 and 5)
+  function showResult(r, mode, flag) {
     const note = r.note ? `<span class="ask-note muted">${esc(r.note)}</span>` : '';
     if (mode === 'ask') {
       const any = r.items.some(it => it.cmd && !it.why && !it.error);
-      last = `${vague ? `<span class="ask-vague">${esc(t('aiVague'))}</span>` : ''}${chips(r.items, 'ask')}${note}${any ? `<button class="btn small primary" data-ask-apply title="Enter">${esc(t('aiApply'))}</button>` : ''}<button class="btn small" data-ask-dismiss title="Escape">${esc(t('aiDismiss'))}</button>`;
+      last = `${flag ? `<span class="ask-vague">${esc(t(flag === 'check' ? 'aiCheck' : 'aiVague'))}</span>` : ''}${chips(r.items, 'ask')}${note}${any ? `<button class="btn small primary" data-ask-apply title="Enter">${esc(t('aiApply'))}</button>` : ''}<button class="btn small" data-ask-dismiss title="Escape">${esc(t('aiDismiss'))}</button>`;
     } else last = `${chips(r.items, 'now')}${note}`;
     paint();
     if (mode === 'ask') { const b = answer.querySelector('[data-ask-apply]') || answer.querySelector('[data-ask-dismiss]'); if (b) b.focus(); }
@@ -77,6 +78,15 @@ export function createAskRow({ t, esc, store, getLang, openSettings = () => {}, 
     proposal = null;
     const ctx = radio.ctx(), pre = precheck(text, ctx);
     if (pre.cannot) { last = `<span class="ask-note">${esc(t('aiCannot', { note: pre.cannot }))}</span>`; return paint(); }
+    // a spoken line after a colon or in quotes: the app's own answer, no engine (D4 check 6)
+    if (pre.say) {
+      const json = directAnswer(text), r = readAnswer(json, ctx);
+      lastSent = '';
+      if (settings().apply === 'ask') { proposal = { json, flag: null }; showResult(r, 'ask', null); return; }
+      applyItems(r.items, radio.api);
+      showResult(r, 'now', null);
+      return;
+    }
     const st = await refreshStatus(true);
     if (st.state !== 'ready') return;
     const e = engine(), state = radio.state(), window = e.window || 9216, fit = fitPrompt(window, state, text);
@@ -89,13 +99,15 @@ export function createAskRow({ t, esc, store, getLang, openSettings = () => {}, 
     d.done(); busy = null;
     if (failed) { last = failed.name === 'AbortError' && ctrl.signal.aborted && !(ctrl.signal.reason && ctrl.signal.reason.name === 'TimeoutError') ? esc(t('aiCancelled')) : `${esc(t(failed.name === 'TimeoutError' ? 'aiTimeout' : 'aiFailed'))} <button class="btn small" data-ask-retry>${esc(t('aiRetry'))}</button>`; return paint(); }
     if (!radio.ready()) { last = esc(t('aiNoSong')); return paint(); }
-    const r = readAnswer(res.json, radio.ctx());
+    const now = radio.ctx(), review = reviewAnswer(text, res.json, now);
+    const r = readAnswer(review.json, now);
     if (r.invalid) { last = `${esc(t('aiNotUnderstood'))} <button class="btn small" data-ask-retry>${esc(t('aiRetry'))}</button>`; return paint(); }
     if (r.cannot) { last = `<span class="ask-note">${esc(t('aiCannot', { note: r.note || t('aiCannotDefault') }))}</span>`; return paint(); }
-    const mode = pre.vague ? 'ask' : settings().apply;
-    if (mode === 'ask') { proposal = { json: res.json, vague: pre.vague }; showResult(r, 'ask', pre.vague); return; }
+    const flag = pre.vague ? 'vague' : review.check ? 'check' : null;
+    const mode = flag ? 'ask' : settings().apply;
+    if (mode === 'ask') { proposal = { json: review.json, flag }; showResult(r, 'ask', flag); return; }
     applyItems(r.items, radio.api);
-    showResult(r, 'now', false);
+    showResult(r, 'now', null);
   }
   // Apply on a proposal: checked again against the song as it is now (D4)
   function applyProposal() {
@@ -103,7 +115,7 @@ export function createAskRow({ t, esc, store, getLang, openSettings = () => {}, 
     const r = readAnswer(proposal.json, radio.ctx());
     proposal = null;
     applyItems(r.items, radio.api);
-    showResult(r, 'now', false);
+    showResult(r, 'now', null);
   }
   function openMenu(open) {
     menu.hidden = !open; menuBtn.setAttribute('aria-expanded', String(open));
@@ -132,7 +144,7 @@ export function createAskRow({ t, esc, store, getLang, openSettings = () => {}, 
       const i = +b.dataset.askDrop; proposal.json = { ...proposal.json, commands: proposal.json.commands.filter((_, k) => k !== i) };
       const r = readAnswer(proposal.json, radio.ctx());
       if (!r.items.length) { proposal = null; last = null; return paint(); }
-      return showResult(r, 'ask', proposal.vague);
+      return showResult(r, 'ask', proposal.flag);
     }
     if (b.dataset.askMode) { setArea(store, 'radio', { apply: b.dataset.askMode }); return openMenu(true); }
     if (b.dataset.askSent !== undefined) { const p = menu.querySelector('.ask-sent'); p.textContent = lastSent; p.hidden = !p.hidden; return; }

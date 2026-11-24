@@ -136,7 +136,7 @@ export const ENTRIES = [
   {
     kind: 'say-live', button: 'Say now', description: 'the voice track speaks a line now, at most 12 words',
     args: { properties: { text: S({ maxLength: 120, description: 'the line to say, as the listener wrote it' }) }, required: ['text'] },
-    words: ['say', 'spoken line', 'speak', 'line', 'announce'],
+    words: ['say', 'spoken line', 'speak', 'announce'],
     map: (a, ctx) => {
       const text = String(a.text || '').trim().replace(/\s+/g, ' ');
       if (!text) return err('bad-arg', { arg: 'text' });
@@ -256,6 +256,8 @@ export const INSTRUMENT_WORDS = ['kick', 'kicks', 'beat', 'drum', 'drums', 'hat'
 const has = (text, w) => new RegExp(`(^| )${norm(w).replace(/ /g, ' ')}( |$)`).test(text);
 export function precheck(request, ctx = {}) {
   const raw = String(request ?? '').toLowerCase(), text = norm(request);
+  const say = sayText(request);
+  if (say) return { vague: false, say };
   for (const c of CANNOT) if (c.re.test(raw)) return { cannot: c.note, id: c.id };
   const words = ENTRIES.flatMap(e => e.words).concat(INSTRUMENT_WORDS);
   if (words.some(w => has(text, w))) return { vague: false };
@@ -263,6 +265,115 @@ export function precheck(request, ctx = {}) {
   const req = tokens(request);
   if ((ctx.patterns || []).some(p => { const c = tokens(p.name || p.id); return c.length && c.every(w => best(w, req) >= 0.8); })) return { vague: false };
   return { vague: true };
+}
+
+// ---------- the checks against the request (D4 checks 4 to 6, from probe v3) ----------
+
+// D4 check 6: "say: …", "add a spoken line: …", "announce \"…\"" become the line itself, before the engine and before
+// the "cannot" list (a line may say "faster"). The text as typed; the entry's map applies the 12 words and the helper
+export const SAY_REQUEST = /\b(say|speak|spoken|announce|dici|frase|annuncia)\b/i;
+export function sayText(request) {
+  const raw = String(request ?? '');
+  const m = SAY_REQUEST.exec(raw);
+  if (!m) return null;
+  const rest = raw.slice(m.index + m[0].length);
+  const q = /["“«]([^"”»]+)["”»]/.exec(rest);
+  const c = /:\s*(.+)$/.exec(rest);
+  const text = (q && (!c || q.index < c.index) ? q[1] : c ? c[1] : '').trim().replace(/^["“«]+|["”»]+$/g, '').trim();
+  return text || null;
+}
+// the answer the app gives without the engine, or null
+export function directAnswer(request) {
+  const text = sayText(request);
+  return text ? { note: '', commands: [{ kind: 'say-live', text }] } : null;
+}
+
+// a word of the request against a word of a name: the per-word score of guard 1 (prefixes count)
+const covered = (nameWords, reqWords, min = 0.8) => (nameWords.length ? nameWords.filter(w => best(w, reqWords) >= min).length / nameWords.length : 0);
+const strictSim = (a, b) => 1 - lev(a, b) / Math.max(a.length, b.length);
+const STOP = new Set(['the', 'my', 'a', 'an', 'with', 'of', 'in', 'on', 'for', 'add', 'use', 'put', 'play', 'replace', 'saved', 'pattern', 'patterns', 'and', 'to', 'instead', 'place', 'please', 'called', 'named', 'by']);
+// the saved pattern name the request itself writes: in quotes, after "pattern", or before it; null when it writes none
+export function requestPatternName(request) {
+  const raw = String(request ?? '');
+  const q = /["“«]([^"”»]+)["”»]/.exec(raw);
+  if (q && q[1].trim()) return q[1].trim();
+  const words = raw.split(/\s+/).filter(Boolean);
+  const isPat = w => /^patterns?$/i.test(w.replace(/[^\w]/g, ''));
+  const at = words.findIndex(isPat);
+  if (at < 0) return null;
+  const clean = w => w.replace(/^[^\w]+|[^\w]+$/g, '');
+  const after = [];
+  for (let i = at + 1; i < words.length; i++) { const w = clean(words[i]); if (!w || STOP.has(w.toLowerCase())) { if (after.length || !['called', 'named'].includes(w.toLowerCase())) break; continue; } after.push(w); }
+  if (after.length) return after.join(' ');
+  const before = [];
+  for (let i = at - 1; i >= 0; i--) { const w = clean(words[i]); if (!w || STOP.has(w.toLowerCase())) break; before.unshift(w); }
+  return before.length ? before.join(' ') : null;
+}
+// a saved pattern whose words all appear in the request (strict per-word score, names of two words or more, one only)
+function patternWrittenOut(request, patterns) {
+  const req = tokens(request);
+  const hits = patterns.filter(p => { const c = tokens(p.name || p.id); return c.length >= 2 && c.every(w => req.some(r => strictSim(w, r) >= 0.8)); });
+  return hits.length === 1 ? hits[0] : null;
+}
+// the pattern the request names: { item } | { name } (named but not saved, or two alike) | null (names none)
+export function requestPattern(request, patterns) {
+  const shown = requestPatternName(request);
+  if (shown) { const m = matchPattern(shown, patterns); return m.item ? { item: m.item, name: shown } : { name: shown }; }
+  const p = patternWrittenOut(request, patterns);
+  return p ? { item: p, name: p.name || p.id } : null;
+}
+// the model's pattern name is supported when most of its words are in the request (near spellings pass)
+export const SUPPORT = 0.6;
+export const nameInRequest = (name, request) => covered(tokens(name), tokens(request)) >= SUPPORT;
+
+// D4 check 5: the commands whose `words` the request uses, counting only words that belong to one command; an answered
+// command of the same family satisfies it (ALIKE)
+const WORD_OWNERS = (() => { const m = new Map(); for (const e of ENTRIES) for (const w of new Set(e.words)) m.set(w, (m.get(w) || 0) + 1); return m; })();
+export const ALIKE = {
+  more: ['unmute', 'pattern'], less: ['mute'], mute: ['less', 'volume'], unmute: ['more', 'volume'], volume: ['mute', 'unmute'],
+  lock: ['lock-part'], 'lock-part': ['lock'], unlock: ['unlock-part'], 'unlock-part': ['unlock'],
+  swap: ['pattern', 'instrument', 'vary'], vary: ['swap'], instrument: ['swap'], extend: ['stay'], stay: ['extend'], drop: ['less', 'mute'],
+};
+export function kindsNamed(request) {
+  const text = norm(request);
+  return ENTRIES.filter(e => e.words.some(w => WORD_OWNERS.get(w) === 1 && has(text, w))).map(e => e.kind);
+}
+// the answer read against the request: { json, check: null | 'pattern' | 'words', fixed: [what was changed] }. json is
+// a copy with pattern names replaced or set to the request's name; check asks for a proposal even in "Apply at once"
+export function reviewAnswer(request, json, ctx = {}) {
+  if (!json || typeof json !== 'object' || !Array.isArray(json.commands) || !json.commands.length) return { json, check: null, fixed: [] };
+  const patterns = ctx.patterns || [], fixed = [];
+  let check = null, named;
+  const want = () => (named === undefined ? (named = requestPattern(request, patterns)) : named);
+  // the model's track stays only when the request names it (its id, name or instrument), else the pattern is a new track
+  const text = norm(request);
+  const keepTrack = c => {
+    if (c.track === undefined) return c;
+    const x = (ctx.tracks || []).find(t => t.id === c.track);
+    if ([c.track, x && x.name, x && x.instrument, x && x.type].some(w => w && has(text, w))) return c;
+    const { track, ...rest } = c;
+    return rest;
+  };
+  const commands = json.commands.map(c => {
+    if (!c || c.kind !== 'pattern' || nameInRequest(c.name, request)) return c;
+    const r = want();
+    if (r && r.item) { fixed.push({ from: c.name, to: r.item.name || r.item.id }); return keepTrack({ ...c, name: r.item.name || r.item.id }); }
+    if (r && r.name) { fixed.push({ from: c.name, to: r.name, unknown: true }); return keepTrack({ ...c, name: r.name }); }
+    check = 'pattern';
+    return c;
+  });
+  const out = { ...json, commands };
+  if (!check) {
+    const kinds = commands.map(c => c && c.kind);
+    const hasPattern = kinds.includes('pattern');
+    const named1 = kindsNamed(request);
+    if (named1.length === 1 && !hasPattern) {
+      const k = named1[0], ok = [k, ...(ALIKE[k] || [])];
+      if (!kinds.some(x => ok.includes(x))) check = 'words';
+    }
+    if (!check && !hasPattern) { const p = patternWrittenOut(request, patterns); if (p) check = 'words'; }
+  }
+  return { json: out, check, fixed };
 }
 
 // one command of an answer: { kind, args } to { entry, args, cmd } or { entry, args, error, vars } or { ..., cmd, why }

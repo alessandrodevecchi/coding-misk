@@ -1,7 +1,7 @@
 // Everything an engine or an agent sees of the Radio console, generated from the command registry (ai-assistant D0, D3):
 // the built-in model's system prompt, initial prompts and answer schema, the text of one request, the tool definitions
 // of the online engines, the MCP tools (#26) and docs/AGENT-API.md. No DOM: Node checks and the probe bench import it.
-import { ENTRIES, LEFT_OUT, CANNOT, PATTERN_MATCH, REGISTRY_VERSION } from './commands.js';
+import { ENTRIES, LEFT_OUT, CANNOT, PATTERN_MATCH, REGISTRY_VERSION, SUPPORT } from './commands.js';
 
 // the arguments of an entry for one request: `fill` arguments get the request's values (track: the playing ids); an
 // entry whose filled argument is required and has no value is left out of the schema
@@ -49,14 +49,16 @@ const argLists = () => {
   return [...seen.values()];
 };
 
-// the six examples of the system prompt (D3): one of them a request the console cannot do
+// the seven examples of the system prompt (D3): one of them a request the console cannot do; "more energy" and the
+// spoken line from probe v3 (D4 checks 5 and 6)
 export const EXAMPLES = [
-  ['a bit more energy', { note: '', commands: [{ kind: 'energy-up' }] }],
+  ['more energy', { note: '', commands: [{ kind: 'energy-up' }] }],
   ['add a second pad and make it brighter', { note: '', commands: [{ kind: 'more', part: 'pad' }, { kind: 'brighter' }] }],
   ['turn the bass down to half', { note: '', commands: [{ kind: 'volume', track: 'bass', value: 0.5 }] }],
   ['vary the arp', { note: '', commands: [{ kind: 'vary', type: 'arp' }] }],
   ['make it faster', { note: 'The console cannot change the tempo.', commands: [] }],
   ['use my Rolling Sub pattern instead of the bass', { note: '', commands: [{ kind: 'pattern', name: 'Rolling Sub', track: 'bass' }] }],
+  ['add a spoken line: stay with us', { note: '', commands: [{ kind: 'say-live', text: 'stay with us' }] }],
 ];
 
 // the system prompt (D3): role, one line per entry, argument lists, rules
@@ -139,7 +141,10 @@ export function agentApiDoc() {
   md.push('## Guards', '');
   md.push(`- **Pattern names.** \`name\` is free text. The app matches it against the saved patterns that fit the song: case, accents, punctuation and filler words ignored, exact first, then a fuzzy score per word with a threshold of ${PATTERN_MATCH.threshold}. No match, or two matches within ${PATTERN_MATCH.tie}, is rejected with a clear message.`);
   md.push(`- **Cannot.** These requests are answered "cannot" before any engine is asked: ${CANNOT.map(c => c.note.replace(/^The console cannot /, '').replace(/\.$/, '')).join('; ')}.`);
-  md.push('- **Vague requests.** A request that names no command word, instrument, playing track or saved pattern is shown as a proposal before anything applies.', '');
+  md.push('- **Vague requests.** A request that names no command word, instrument, playing track or saved pattern is shown as a proposal before anything applies.');
+  md.push(`- **The pattern the request names.** A \`pattern\` command is kept when at least ${Math.round(SUPPORT * 100)} % of its name's words appear in the request. Otherwise the app uses the saved pattern the request itself names (in quotes, after or before "pattern", or every word of a name), rejects the request's name when no saved pattern matches it, or shows the answer as a proposal.`);
+  md.push('- **The command the request names.** When the request uses a word that belongs to exactly one command and the answer has neither that command nor a close one, or the request names a saved pattern in full and the answer has no pattern, the answer is shown as a proposal.');
+  md.push('- **Spoken lines.** A request to say, speak or announce a line, with the line after a colon or in quotes, becomes `say-live` with that line without asking an engine.', '');
   md.push('## Tools', '');
   md.push(`Online engines get one tool per command, named \`console_<kind>\` with \`-\` as \`_\` (for example \`console_energy_up\`), whose input schema is the command's arguments. The MCP server's tools have the same names, descriptions and schemas (\`inputSchema\`).`, '');
   return md.join('\n');

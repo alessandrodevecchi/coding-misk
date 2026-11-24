@@ -68,6 +68,9 @@ An engine answers with one JSON object: `note` (required, first: empty when the 
 - **Pattern names.** `name` is free text. The app matches it against the saved patterns that fit the song: case, accents, punctuation and filler words ignored, exact first, then a fuzzy score per word with a threshold of 0.75. No match, or two matches within 0.05, is rejected with a clear message.
 - **Cannot.** These requests are answered "cannot" before any engine is asked: change the tempo; change the time signature; play the song backwards.
 - **Vague requests.** A request that names no command word, instrument, playing track or saved pattern is shown as a proposal before anything applies.
+- **The pattern the request names.** A `pattern` command is kept when at least 60 % of its name's words appear in the request. Otherwise the app uses the saved pattern the request itself names (in quotes, after or before "pattern", or every word of a name), rejects the request's name when no saved pattern matches it, or shows the answer as a proposal.
+- **The command the request names.** When the request uses a word that belongs to exactly one command and the answer has neither that command nor a close one, or the request names a saved pattern in full and the answer has no pattern, the answer is shown as a proposal.
+- **Spoken lines.** A request to say, speak or announce a line, with the line after a colon or in quotes, becomes `say-live` with that line without asking an engine.
 
 ## Tools
 

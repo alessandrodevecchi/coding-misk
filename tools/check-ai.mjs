@@ -2,9 +2,11 @@
 // with eight playing tracks, the answer schema (note first and required, one branch per entry, no list of pattern
 // names), the three guards (pattern names exact, near, unknown and ambiguous; the "cannot" list; vague and precise
 // requests) and the validator on fixture answers with a fake console (good, partly wrong, unknown kinds, bad tracks,
-// values out of range, invalid JSON, a disabled command, apply through the buttons' paths in order).
+// values out of range, invalid JSON, a disabled command, apply through the buttons' paths in order), and the checks after
+// the engine (D4 checks 4 to 6) on the three probe v3 failures with the model's answers from its log, plus the v3 answers
+// that were right (none may turn into a proposal).
 //   npm run check:ai
-import { ENTRIES, matchPattern, precheck, readAnswer, applyItems } from '../src/ai/commands.js';
+import { ENTRIES, matchPattern, precheck, readAnswer, applyItems, reviewAnswer, directAnswer } from '../src/ai/commands.js';
 import { answerSchema, systemPrompt, initialPrompts, requestText, promptSize, fitPrompt } from '../src/ai/generate.js';
 
 const problems = [];
@@ -115,6 +117,85 @@ const run = (json) => { calls.length = 0; const r = readAnswer(json, ctx); if (!
 }
 for (const bad of [null, 'text', {}, { commands: 'x' }]) expect(readAnswer(bad, ctx).invalid, `an invalid answer (${JSON.stringify(bad)}) is not refused`);
 
+// ---------- checks after the engine (D4 checks 4 to 6, probe v3) ----------
+expect(ip.some(x => x.role === 'user' && x.content === 'Request: more energy') && ip.some(x => x.role === 'assistant' && /"kind":"say-live"/.test(x.content)), 'the examples have no "more energy" or no spoken line');
+// what the app does with a request and the model's answer: { mode: 'now' | 'ask', calls, items }
+const flow = (q, json, c = ctx) => {
+  calls.length = 0;
+  const pre = precheck(q, c);
+  if (pre.cannot) return { mode: 'cannot', calls: [], items: [] };
+  if (pre.say) { const r = readAnswer(directAnswer(q), c); applyItems(r.items, api); return { mode: 'direct', calls: [...calls], items: r.items }; }
+  const rv = reviewAnswer(q, json, c), r = readAnswer(rv.json, c);
+  if (pre.vague || rv.check) return { mode: 'ask', check: rv.check, calls: [], items: r.items };
+  applyItems(r.items, api);
+  return { mode: 'now', calls: [...calls], items: r.items };
+};
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+{ // v3 23:58:21 "more energy" -> more pad, brighter
+  const f = flow('more energy', { note: '', commands: [{ kind: 'more', part: 'pad' }, { kind: 'brighter' }] });
+  expect(f.mode === 'ask' && f.check === 'words' && !f.calls.length, `"more energy" answered "+ Pad, Brighter" is applied (${f.mode})`);
+}
+{ // v3 23:59:31 "play Glass Arp" -> Rolling Sub on the bass
+  const f = flow('play Glass Arp', { note: '', commands: [{ kind: 'pattern', name: 'Rolling Sub', track: 'bass' }] });
+  expect(f.mode === 'now' && same(f.calls, [['pattern', 'new', 'Glass Arp', '']]), `"play Glass Arp" answered "Rolling Sub": ${f.mode} ${JSON.stringify(f.calls)}`);
+}
+{ // v3 23:59:18 "replace the bass with the acid line pattern" -> Rolling Sub on the bass
+  const f = flow('replace the bass with the acid line pattern', { note: '', commands: [{ kind: 'pattern', name: 'Rolling Sub', track: 'bass' }] });
+  expect(f.mode === 'now' && same(f.calls, [['pattern', 'replace', 'Acid Line 303', 'bass']]), `"replace the bass with the acid line pattern" answered "Rolling Sub": ${f.mode} ${JSON.stringify(f.calls)}`);
+}
+{ // v3 23:59:21 "add a spoken line: welcome to the night shift" -> refused by the model
+  const f = flow('add a spoken line: welcome to the night shift', { note: 'Adding a spoken line is not possible.', commands: [] });
+  expect(f.mode === 'direct' && same(f.calls, [['say', 'welcome to the night shift']]), `the spoken line: ${f.mode} ${JSON.stringify(f.calls)}`);
+  for (const [q, text] of [['say "we go faster now"', 'we go faster now'], ['announce: next up, the night shift', 'next up, the night shift'], ['speak this line “good night”', 'good night']]) {
+    const g = flow(q, null);
+    expect(g.mode === 'direct' && same(g.calls, [['say', text]]), `"${q}": ${g.mode} ${JSON.stringify(g.calls)}`);
+  }
+  const long = flow('say: one two three four five six seven eight nine ten eleven twelve thirteen', null);
+  expect(long.mode === 'direct' && !long.calls.length && long.items[0].error === 'too-long', 'a spoken line of 13 words is not refused as too long');
+  const mute = flow('add a spoken line: hello', null, { ...ctx, voiceHelper: false });
+  expect(!mute.calls.length && mute.items[0].error === 'no-voice-helper', 'a spoken line without the voice helper is not refused');
+  expect(!precheck('say something nice', ctx).say && !precheck('make the bass line darker', ctx).say, 'a request without a colon or quotes is answered without the engine');
+}
+{ // a pattern the listener does not have, while the model picks an existing one
+  const f = flow('add my saved pattern Sunset Lead', { note: '', commands: [{ kind: 'pattern', name: 'Rolling Sub' }] });
+  expect(f.mode === 'now' && !f.calls.length && f.items[0].error === 'no-pattern' && f.items[0].vars.name === 'Sunset Lead', `"Sunset Lead" answered "Rolling Sub": ${JSON.stringify(f.items.map(x => x.error || x.cmd))}`);
+}
+{ // a pattern the request does not name at all
+  const f = flow('add a new groove', { note: '', commands: [{ kind: 'pattern', name: 'Midnight Groove' }] });
+  expect(f.mode === 'ask' && f.check === 'pattern', `a pattern the request does not name is applied (${f.mode})`);
+}
+{ // a saved pattern named in full, answered without a pattern (v3 23:59:36 "add neon hook" -> + Hook)
+  const f = flow('add neon hook', { note: '', commands: [{ kind: 'more', part: 'hook' }] });
+  expect(f.mode === 'ask' && f.check === 'words', `"add neon hook" answered "+ Hook" is applied (${f.mode})`);
+}
+// no regression: the v3 answers that were right stay applied at once (near names, two-step, single), Italian stays vague
+for (const [q, json, want] of [
+  ['add my pattern Dusty Break', { note: '', commands: [{ kind: 'pattern', name: 'Dusty Break', track: 'arp' }] }, [['pattern', 'replace', 'Dusty Breaks', 'arp']]],
+  ['use the tape chord pattern instead of the pad', { note: '', commands: [{ kind: 'pattern', name: 'Tape Chord', track: 'pad' }] }, [['pattern', 'replace', 'Tape Chords', 'pad']]],
+  ['add my saved pattern Midnight Groove', { note: '', commands: [{ kind: 'pattern', name: 'Midnight Groove', track: 'bass' }] }, [['pattern', 'replace', 'Midnight Groove', 'bass']]],
+  ['put the Dark Choir Pad pattern in place of the pad', { note: '', commands: [{ kind: 'pattern', name: 'Dark Choir Pad', track: 'pad' }] }, [['pattern', 'replace', 'Dark Choir Pad', 'pad']]],
+  ['more energy and add a second arp', { note: '', commands: [{ kind: 'more', part: 'arp' }, { kind: 'energy-up' }] }, [['pend', 'more', 'arp'], ['command', 'energy-up']]],
+  ['simplify it and stay on this part a bit longer', { note: '', commands: [{ kind: 'stay' }] }, [['command', 'stay']]],
+  ['make it darker and calmer', { note: '', commands: [{ kind: 'darker' }] }, [['command', 'darker']]],
+  ['bring the energy down a bit', { note: '', commands: [{ kind: 'energy-down' }] }, [['command', 'energy-down']]],
+  ['take one arp away', { note: '', commands: [{ kind: 'less', part: 'arp' }] }, [['pend', 'less', 'arp']]],
+  ['lock the kick so the director leaves it alone', { note: '', commands: [{ kind: 'lock-part', part: 'hook' }] }, [['pendLock', 'p.hook', 'lock-part']]],
+  ['put a riser before the next part', { note: 'riser added', commands: [{ kind: 'riser' }] }, [['command', 'riser']]],
+  ['the pad should play in thirds', { note: '', commands: [{ kind: 'voicing', type: 'pad', treatment: 'thirds' }] }, [['command', 'voicing']]],
+  ['set the pad volume to 30 percent', { note: '', commands: [{ kind: 'volume', track: 'pad', value: 0.3 }] }, [['command', 'volume']]],
+  ['swap the lead for something else', { note: '', commands: [{ kind: 'swap', type: 'lead' }] }, [['command', 'swap']]],
+  ['remove the hats', { note: '', commands: [{ kind: 'mute', track: 'hats' }] }, [['command', 'mute']]],
+  ['change the bass line', { note: '', commands: [{ kind: 'vary', type: 'bass' }] }, [['command', 'vary']]],
+  ['vai al drop', { note: '', commands: [{ kind: 'drop' }] }, []], // applied at once, struck by the console's reason (no-drop)
+]) {
+  const f = flow(q, json);
+  expect(f.mode === 'now' && same(f.calls, want), `"${q}": ${f.mode}${f.check ? ` (${f.check})` : ''} ${JSON.stringify(f.calls)} instead of applied ${JSON.stringify(want)}`);
+}
+for (const [q, json] of [['più energia e togli un basso', { note: '', commands: [{ kind: 'energy-up' }, { kind: 'less', part: 'bass' }] }], ['rendilo più scuro', { note: '', commands: [{ kind: 'darker' }] }]]) {
+  const f = flow(q, json);
+  expect(f.mode === 'ask' && !f.check && f.items.every(x => x.cmd), `Italian "${q}": ${f.mode} ${f.check || ''}`);
+}
+
 for (const p of problems) console.log(`FAIL  ${p}`);
-console.log(problems.length ? `${problems.length} problems` : `ok    ai: prompt ${size} tokens with 8 tracks, schema, pattern names, cannot, vague, validator and apply`);
+console.log(problems.length ? `${problems.length} problems` : `ok    ai: prompt ${size} tokens with 8 tracks, schema, pattern names, cannot, vague, validator and apply, checks after the engine`);
 process.exit(problems.length ? 1 : 0);
