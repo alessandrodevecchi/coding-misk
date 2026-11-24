@@ -56,7 +56,7 @@ OpenSpec changes not archived: 134. With open tasks: 46. All tasks ticked, waiti
 | [random-sound-params](../../openspec/changes/random-sound-params/tasks.md) | 1 | 31 |
 | [settings-polish](../../openspec/changes/settings-polish/tasks.md) | 1 | 14 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
-| [sound-modulation](../../openspec/changes/sound-modulation/tasks.md) | 15 | 40 |
+| [sound-modulation](../../openspec/changes/sound-modulation/tasks.md) | 8 | 40 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [track-to-code](../../openspec/changes/track-to-code/tasks.md) | 11 | 42 |
 | [varied-openings](../../openspec/changes/varied-openings/tasks.md) | 1 | 28 |

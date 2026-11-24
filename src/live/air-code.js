@@ -14,6 +14,9 @@ import { toDollar, isLine } from '../song/line-names.js';
 // the orbits of a song that is not on air: its own orbits moved up, past the voice instrument (13, 14) and the
 // narrator (15 and up)
 export const HIDDEN_ORBIT = 20;
+// a Path's bus (sound-modulation D14) in a song next to the song on air moves up too, so the two songs never drive one
+// bus (buses are keys: 1 to 8 for a song's paths, 9 and up for the knobs' live buses)
+export const HIDDEN_BUS = 100;
 // the line that starts the next song in the panel when it is visible
 export const NEXT_MARK = '// ==> ';
 
@@ -67,11 +70,12 @@ function renameWords(code, names, to) {
   return code.split(/("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`[^`]*`)/).map((p, i) => (i % 2 ? p : p.replace(re, m => to(m)))).join('');
 }
 // a song's code made to sit next to the song on air: no tempo and no sections table (the song on air sets them), its
-// constants renamed with `tag`, its orbits moved up
+// constants renamed with `tag`, its orbits and its paths' buses moved up
 export function apart(code, tag) {
   const kept = code.split('\n').filter(l => !/^setcpm\(/.test(l) && !/^const (SECTIONS|TEMPO) =/.test(l)).join('\n');
   const names = [...new Set([...kept.matchAll(/^const (\w+) =/gm)].map(m => m[1]))];
-  return localSolo(renameWords(kept, names, n => `${tag}${n}`).replace(/\.orbit\((\d+)\)/g, (_, o) => `.orbit(${+o + HIDDEN_ORBIT})`));
+  return localSolo(renameWords(kept, names, n => `${tag}${n}`).replace(/\.orbit\((\d+)\)/g, (_, o) => `.orbit(${+o + HIDDEN_ORBIT})`)
+    .replace(/\.bus\((\d+)\)/g, (_, b) => `.bus(${+b + HIDDEN_BUS})`).replace(/\.bmod\(\{ b: (\d+),/g, (_, b) => `.bmod({ b: ${+b + HIDDEN_BUS},`));
 }
 // a line played alone (S$:, a growth's opening) silences every other line of the code evaluated: in a song that is
 // not on air it is played alone within its own song only (its other lines muted, _$:), never against the song on air

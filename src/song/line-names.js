@@ -26,6 +26,11 @@ export const LABEL_SPACE = /^\s*[_S]?(?:\$|[a-z][A-Za-z0-9]*):\s*/;
 const LABEL = /^(\s*)([_S]?)(\$|[a-z][A-Za-z0-9]*):(?=\s|$)/;
 const LABEL_ALL = /^(\s*)([_S]?)(\$|[a-z][A-Za-z0-9]*):(?=\s|$)/gm;
 export const isLine = l => LINE.test(l);
+// a Path's line (sound-modulation D14): Strudel's constant sound `one` played into a bus, no instrument of its own; the
+// code widgets, line names, level and opening readers skip it, and its haps light no instrument
+export const PATH_LINE = /\.s\(\s*["']one["']\s*\)\.bus\(\d+\)/;
+export const isPathLine = l => PATH_LINE.test(l);
+export const isPathHap = v => !!v && v.s === 'one' && v.bus !== undefined;
 export const isMuted = l => { const m = LABEL.exec(l); return !!m && m[2] === '_'; };
 export const isAlone = l => { const m = LABEL.exec(l); return !!m && m[2] === 'S'; };
 // whether a code has a pattern line that plays alone
@@ -109,7 +114,8 @@ export function nameLines(code, { hints = null, style = 'instrument', headers = 
     // (`$: silence`, the placeholder of an empty code, stays as it is)
     if (/^\s*\$:\s*silence\s*$/.test(lines[i])) continue;
     const head = header || (headers && headers[k]) || '';
-    const name = unique((style === 'track' && !/\bsay_/.test(chain) && trackName(head)) || baseName(chain, head, hints));
+    // (a Path's line: `<track>Path`, so it never takes the name of the line it moves)
+    const name = unique(isPathLine(chain) ? `${trackName(head) || 'track'}Path` : (style === 'track' && !/\bsay_/.test(chain) && trackName(head)) || baseName(chain, head, hints));
     lines[i] = `${lb.indent}${lb.mark}${name}:${lines[i].slice(lb.length)}`;
   }
   return lines.join('\n');

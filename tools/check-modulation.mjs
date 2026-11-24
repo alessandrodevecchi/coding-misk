@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
 import { DEVICES, deviceArgs, rackCode } from '../src/song/rack.js';
-import { MOVE_DEVICES, sweepCode, lfoCode, duckCode, moveFor, movePreview, LPDEPTH_SCALE, gateRuns, gateCode, pumpDipCode, tremoloCode, phaseOffset, GATE_PRESETS } from '../src/song/movement.js';
+import { MOVE_DEVICES, sweepCode, lfoCode, duckCode, moveFor, movePreview, LPDEPTH_SCALE, gateRuns, gateCode, pumpDipCode, tremoloCode, phaseOffset, GATE_PRESETS, pathDevice, thinPath, pathAt, pathPoints, pathLine, pathMove, PATH_EDGE } from '../src/song/movement.js';
 import { varySkips } from '../src/material/variation.js';
 import { strudelInNode } from './mixer-checks.mjs';
 
@@ -329,13 +329,163 @@ await check('vary on room with an LFO on room: one .room (the varied one) and th
   assert(count(l, 'room') === 1 && l.includes('.room(rand.range') && l.includes("c: 'room'"), l);
 });
 
+// ---------- Path (D14) ----------
+// the bus a path line drives, from its haps: superdough's linear ADSR (synth.mjs, getParamADSR) on every note, release
+// 10 ms (the shortest), each note's gain times its envelope summed; bars of `sec` seconds
+const busModel = (haps, sec) => {
+  const notes = haps.map(h => { const v = h.value, b = h.whole.begin.valueOf() * sec, d = (h.whole.end.valueOf() - h.whole.begin.valueOf()) * sec; return { b, d, g: v.gain, a: Math.max(v.attack, 0.001), dc: Math.max(v.decay, 0.001), s: v.sustain, r: PATH_EDGE }; });
+  const env = (n, t) => {
+    const x = t - n.b, end = n.d;
+    if (x < 0) return 0;
+    const at = y => (y < n.a ? y / n.a : Math.max(n.s, 1 - (1 - n.s) * (y - n.a) / n.dc));
+    if (x <= end) return at(x);
+    const top = n.a > end ? end / n.a : n.a + n.dc > end ? at(end) : n.s;
+    return x - end < n.r ? top * (1 - (x - end) / n.r) : 0;
+  };
+  return t => notes.reduce((acc, n) => acc + n.g * env(n, t), 0);
+};
+await check('Path device: defaults, labels, six targets, no knob; the card preview evaluates', async () => {
+  assert(DEVICES.path && DEVICES.path.kind === 'move' && MOVE_DEVICES.path.label.it === 'Percorso', 'device');
+  assert(JSON.stringify(deviceArgs({ device: 'path' })) === JSON.stringify({ target: 'filter', points: [], smooth: 'linear' }), JSON.stringify(deviceArgs({ device: 'path' })));
+  assert(MOVE_DEVICES.path.args[0][3].join() === 'filter,hpf,volume,room,delay,pan', 'targets');
+  for (const target of ['filter', 'hpf', 'volume', 'room', 'delay', 'pan']) await hapsOf(`note("c e g").s("sawtooth").postgain(.5)${movePreview({ device: 'path', target, points: [[0, target === 'filter' || target === 'hpf' ? 400 : 0], [4, target === 'filter' || target === 'hpf' ? 3000 : 1]] }, 'pad')}`, 0, 1);
+});
+await check('pathDevice: flat is null, a measured fade-out validates, values clamped, bars rounded, thinned, at most 256 points', () => {
+  assert(pathDevice('volume', [[0, 1], [8, 1]]) === null && pathDevice('filter', [[0, 1000], [8, 1005]]) === null && pathDevice('pitch', [[0, 0], [1, 1]]) === null, 'flat or unknown');
+  const fo = pathDevice('volume', [[120, 1], [124, 0.6], [128, 0]], { perBar: 1 });
+  assert(fo && fo.device === 'path' && fo.target === 'volume' && fo.points.length === 3, JSON.stringify(fo));
+  assert(issues(song([pad([fo])], [{ name: 'A', bars: 128, bpm: 120 }])).errors.length === 0, JSON.stringify(issues(song([pad([fo])], [{ name: 'A', bars: 128, bpm: 120 }]))));
+  const c = pathDevice('filter', [[0, 10], [1.13, 40000], [1.2, 900]], { perBar: 4 });
+  assert(JSON.stringify(c.points) === JSON.stringify([[0, 60], [1.25, 18000]]), `clamped, rounded, repeated bar kept once: ${JSON.stringify(c.points)}`);
+  const line = pathDevice('volume', Array.from({ length: 33 }, (_, i) => [i / 4, i / 32]), { perBar: 4 });
+  assert(line.points.length === 2, `a straight ramp thins to its ends: ${line.points.length}`);
+  const wobble = pathDevice('filter', Array.from({ length: 2000 }, (_, i) => [i / 16, 1000 + 800 * Math.sin(i * 1.7)]), { perBar: 16 });
+  assert(wobble.points.length <= 256 && issues(song([pad([wobble])], [{ name: 'A', bars: 128, bpm: 120 }])).errors.length === 0, `cap: ${wobble.points.length}`);
+  assert(pathDevice('volume', [[0, 0], [4, 1]], { smooth: 'step' }).smooth === 'step', 'step');
+  assert(thinPath([[0, 0], [1, 0.5], [2, 1], [3, 0]], 0.01).length === 3, 'thinPath keeps a corner');
+});
+await check('Path validator: 16 points a bar, 256 points, 8 a song, one per target, path with sweep, volume 0-1, increasing bars', () => {
+  const e = s => issues(s).errors.map(x => `${x.path}: ${x.msg}`);
+  const dense = e(song([pad([{ device: 'path', target: 'filter', points: Array.from({ length: 20 }, (_, i) => [i / 20, 400 + i * 10]) }])]));
+  assert(dense.some(x => x.startsWith('tracks[0].rack[0].points: 20 points in bar 1')), dense.join(' | '));
+  const many = e(song([pad([{ device: 'path', target: 'filter', points: Array.from({ length: 257 }, (_, i) => [i / 16, 400 + i]) }])], [{ name: 'A', bars: 32, bpm: 120 }]));
+  assert(many.some(x => x.startsWith('tracks[0].rack[0].points: 257 points')), many.join(' | '));
+  const ps = e(song([pad([{ device: 'path', target: 'filter', points: [[0, 400], [4, 3000]] }, { device: 'sweep' }])]));
+  assert(ps.some(x => x.startsWith('tracks[0].rack[1]: a path and a sweep both write the filter')), ps.join(' | '));
+  const sp = e(song([pad([{ device: 'sweep' }, { device: 'path', target: 'filter', points: [[0, 400], [4, 3000]] }])]));
+  assert(sp.some(x => x.startsWith('tracks[0].rack[1]: a path and a sweep')), sp.join(' | '));
+  assert(e(song([pad([{ device: 'path', target: 'room', points: [[0, 0], [4, 0.5]] }, { device: 'sweep' }])])).length === 0, 'path and sweep on two targets');
+  assert(e(song([pad([{ device: 'path', target: 'filter', points: [[0, 400], [4, 3000]] }, { device: 'lfo' }])])).length === 0, 'path and LFO on one target are fine');
+  const two = e(song([pad([{ device: 'path', target: 'pan', points: [[0, 0], [4, 1]] }, { device: 'path', target: 'pan', points: [[0, 1], [4, 0]] }])]));
+  assert(two.some(x => x.startsWith('tracks[0].rack[1]: at most one path on pan')), two.join(' | '));
+  const three = e(song([pad([{ device: 'path', target: 'pan', points: [[0, 0], [4, 1]] }, { device: 'lfo' }, { device: 'pump' }])]));
+  assert(three.some(x => x.startsWith('tracks[0].rack[2]: at most 2 movement devices')), three.join(' | '));
+  const vol = e(song([pad([{ device: 'path', target: 'volume', points: [[0, 0], [4, 1.5]] }])]));
+  assert(vol.some(x => x.startsWith('tracks[0].rack[0].points[1]: a value from 0 to 1')), vol.join(' | '));
+  const back = e(song([pad([{ device: 'path', target: 'volume', points: [[2, 0], [1, 1]] }])]));
+  assert(back.some(x => x.startsWith('tracks[0].rack[0].points[1]: bars must increase')), back.join(' | '));
+  assert(e(song([pad([{ device: 'path', target: 'volume', points: [] }])])).some(x => x.startsWith('tracks[0].rack[0].points')), 'empty');
+  const nine = song(Array.from({ length: 5 }, (_, k) => pad([{ device: 'path', target: 'volume', points: [[0, 0], [4, 1]] }, { device: 'path', target: 'pan', points: [[0, 0], [4, 1]] }], {}, `pad${k}`)));
+  const ne = e(nine);
+  assert(ne.some(x => x.startsWith('tracks[4].rack[0]: at most 8 paths')) && !ne.some(x => x.startsWith('tracks[3]')), ne.join(' | '));
+  assert(issues(song([pad([{ device: 'path', target: 'volume', points: [[0.1, 0], [4, 1]] }])])).warnings.some(x => x.path === 'tracks[0].rack[0].points'), 'off the grid warns');
+});
+await check('Path code: the path line opens its track block, buses in track order, muted and hushed with the track', async () => {
+  const fp = { device: 'path', target: 'filter', points: [[0, 400], [2.5, 900], [4, 3000]] }, vp = { device: 'path', target: 'volume', points: [[0, 0], [8, 1]] };
+  const c = compileSong(song([drums(), pad([fp, vp]), arp([{ device: 'path', target: 'pan', points: [[0, 0], [8, 1]] }])]));
+  const L = c.split('\n'), h = L.findIndex(l => l.startsWith('// ========== pad'));
+  assert(L[h + 1].includes('.s("one").bus(1).dry(0)') && L[h + 1].endsWith('// path: filter, 3 points') && L[h + 2].includes('.bus(2).dry(0)') && L[h + 2].endsWith('// path: volume, 2 points'), L.slice(h, h + 3).join('\n'));
+  const [, , pl] = block(c, 'pad');
+  assert(pl.includes(".lpf(400).bmod({ b: 1, c: 'lpf', da: 2600 })") && count(pl, 'lpf') === 1 && /\.mul\(postgain\(\.001\)\)\.bmod\(\{ b: 2, c: 'postgain', dep: 1000 \}\)\.orbit\(/.test(pl), pl);
+  assert(block(c, 'arp')[0].includes('.bus(3)') && block(c, 'arp')[1].includes(".pan(0).bmod({ b: 3, c: 'pan', da: 2 })"), block(c, 'arp').join('\n'));
+  // muted: no path line, the others keep their bus
+  const m = compileSong(song([drums(), { ...pad([fp]), mute: true }, arp([{ device: 'path', target: 'pan', points: [[0, 0], [8, 1]] }])]));
+  assert(!m.includes('.bus(1)') && block(m, 'arp')[0].includes('.bus(2)'), 'muted');
+  // hushed (growth-shapes): the path line is hushed with its track
+  const hu = compileSong(song([drums(), { ...pad([fp]), hush: true }]));
+  assert(block(hu, 'pad').every(l => l.startsWith('_$:')), block(hu, 'pad').join('\n'));
+  // a guitar's gated postgain is set before the volume path scales it
+  const g = compileSong(song([{ id: 'gtr', type: 'guitar', settings: {}, patterns: { P: { preset: 'chug' } }, clips: [{ section: 'A', pattern: 'P' }], rack: [vp] }]));
+  const [, gl] = block(g, 'gtr');
+  assert(gl.indexOf('.postgain(section1') >= 0 && gl.indexOf('.postgain(section1') < gl.indexOf('.mul(postgain(') && gl.indexOf('.mul(postgain(') < gl.indexOf(".bmod({ b: 1, c: 'postgain'"), gl);
+  const hp = await hapsOf(gl.replace(/postgain\(section1/, 'postgain(pure(1)'), 0, 1);
+  assert(hp.length && Math.abs(hp[0].value.postgain - 0.0005) < 1e-9 && hp[0].value.bmod[0].depth === 1000, JSON.stringify(hp[0] && hp[0].value));
+});
+await check('Path line: the bus model of every note sums to the drawn path at 64 points a bar (linear, step, two tempos)', async () => {
+  const cases = [
+    [{ target: 'volume', points: [[0, 0], [2, 1], [2.5, 0.3], [4, 0.3], [6, 1], [6.25, 0.1]] }, 120],
+    [{ target: 'filter', points: [[1, 400], [4.75, 3000], [6, 1000]] }, 90],
+    [{ target: 'volume', points: [[0, 0.2], [1, 1], [2.5, 0.5], [4, 1]], smooth: 'step' }, 120],
+  ];
+  for (const [a, bpm] of cases) {
+    const sec = 240 / bpm, line = pathLine({ device: 'path', ...a }, { bus: 1, total: 8, barSec: sec });
+    const haps = (await S.evaluate(line.replace(/^\$:\s*/, '').replace(/\s+\/\/.*$/, ''))).queryArc(0, 8).filter(h => h.hasOnset());
+    const bus = busModel(haps, sec), pts = pathPoints(a), vals = pts.map(p => p[1]), lo = Math.min(...vals), span = Math.max(...vals) - lo;
+    let worst = 0, at = 0;
+    for (let i = 0; i < 8 * 64; i++) {
+      const x = i / 64 + 1 / 128, t = x * sec;
+      // the step path's edges cross over 10 ms: skip the samples inside them
+      if (a.smooth === 'step' && pts.some(p => p[0] * sec <= t && t < p[0] * sec + PATH_EDGE)) continue;
+      const err = Math.abs(bus(t) - (pathAt(pts, x, a.smooth) - lo) / span);
+      if (err > worst) { worst = err; at = x; }
+    }
+    assert(worst < 0.005, `${a.target} ${a.smooth || 'linear'} at ${bpm}: worst ${worst.toFixed(4)} at bar ${at.toFixed(3)}`);
+  }
+  // the same path in a song with two tempos: each bar's notes take that bar's seconds
+  const s = song([pad([{ device: 'path', target: 'volume', points: [[0, 0], [8, 1]] }])], [{ name: 'A', bars: 4, bpm: 120 }, { name: 'B', bars: 4, bpm: 90 }]);
+  s.tracks[0].clips = [{ start: 0, bars: 8, pattern: 'P' }];
+  const pl = compileSong(s).split('\n').find(l => l.includes('.bus(1)'));
+  assert(pl.includes(':2:0:1') && pl.includes(':2.6667:0:1'), pl);
+});
+await check('Path line in the readers: no mask idea, its own name, buses apart on air, out of the preview, base never hidden', async () => {
+  const { nameLines, isPathLine, isPathHap } = await import('../src/song/line-names.js');
+  const { apart } = await import('../src/live/air-code.js');
+  const { previewExpression } = await import('../src/player/preview.js');
+  const fp = { device: 'path', target: 'filter', points: [[0, 400], [4, 3000]] };
+  const mi = compileSong(song([drums(), { ...pad([fp]), maskIdea: '<1 0>' }]));
+  const [pl, ml] = block(mi, 'pad');
+  assert(isPathLine(pl) && !pl.includes('.mask("<1 0>")') && ml.includes('.mask("<1 0>")'), `${pl}\n${ml}`);
+  const named = nameLines(compileSong(song([pad([fp])])));
+  assert(/^padPath: stack\(/m.test(named) && /^pad: note\(/m.test(named), named);
+  const ap = apart(compileSong(song([pad([fp])])), 'z');
+  assert(ap.includes('.bus(101)') && ap.includes('.bmod({ b: 101,') && !/\.bus\(1\)/.test(ap), 'apart');
+  const pv = previewExpression(compileSong(song([pad([fp, { device: 'path', target: 'volume', points: [[0, 0], [4, 1]] }])])));
+  assert(!pv.includes('"one"') && !pv.includes('bmod') && !pv.includes('mul(postgain') && pv.includes('.lpf(400)'), pv);
+  assert(isPathHap({ s: 'one', bus: 1 }) && !isPathHap({ s: 'one' }) && !isPathHap({ s: 'bd', bus: 1 }), 'isPathHap');
+  const hid = compileSong(song([{ ...pad([fp]), hidden: ['cutoff', 'room'] }]));
+  const [, hl] = block(hid, 'pad');
+  assert(hl.includes(".lpf(400).bmod({ b: 1, c: 'lpf'") && !hl.includes('.room('), hl);
+});
+await check('copied code with paths evaluates in plain Strudel (core, mini-notation and the transpiler, no app helper)', async () => {
+  // (Strudel in Node with the app's helpers is loaded first, above: a plain repl on the same Strudel copy, no helpers
+  // installed on it; the path lines and their bmod use only Strudel's own functions)
+  const core = await import('@strudel/core'), { transpiler } = await import('@strudel/transpiler');
+  let error = null;
+  const R = core.repl({ transpiler, defaultOutput: () => {}, getTime: () => 0, onEvalError: e => { error = e; } });
+  const code = compileSong(JSON.parse(fs.readFileSync('songs/examples/11-path.json', 'utf8')));
+  const helpers = ['vox(', 'melody(', 'miskMix', 'K('].filter(h => code.includes(h));
+  assert(!helpers.length, `app helpers in the code: ${helpers.join(' ')}`);
+  const p = await R.evaluate(code, false);
+  assert(p && !error, error && error.message);
+  const h = p.queryArc(0, 16).filter(x => x.hasOnset()).map(x => x.value);
+  const one = h.filter(v => v.s === 'one'), moved = h.filter(v => v.bmod);
+  assert([1, 2, 3, 4].every(b => one.some(v => v.bus === b && v.dry === 0)) && moved.some(v => v.bmod[0].control === 'cutoff' && v.bmod[0].bus === 2) && moved.some(v => Object.values(v.bmod).some(m => m && m.control === 'postgain' && m.bus === 4)), `${one.length} bus notes, ${moved.length} moved notes`);
+});
+await check('pathMove: bases and depths per target', () => {
+  const m = (target, points, smooth) => pathMove({ target, points, smooth }, 5);
+  assert(m('hpf', [[0, 200], [4, 1200]]).code === ".hpf(200).bmod({ b: 5, c: 'hpf', da: 1000 })", m('hpf', [[0, 200], [4, 1200]]).code);
+  assert(m('room', [[0, 0], [4, 0.6]]).code === ".room(0.001).bmod({ b: 5, c: 'room', da: 0.599 })", m('room', [[0, 0], [4, 0.6]]).code);
+  assert(m('volume', [[0, 0.5], [4, 1]]).post === ".mul(postgain(.5)).bmod({ b: 5, c: 'postgain', dep: 1 })", m('volume', [[0, 0.5], [4, 1]]).post);
+  assert(m('volume', [[0, 0.5]]).post === '.mul(postgain(.5))' && pathLine({ target: 'volume', points: [[0, 0.5]] }, { bus: 5, total: 8, barSec: 2 }) === null, 'a flat path: its base alone');
+});
+
 // ---------- determinism, examples ----------
 await check('a song with a Sweep, an LFO and a Pump compiles byte for byte the same twice', () => {
   const s = song([drums(), pad([{ device: 'sweep' }, { device: 'pump' }]), arp([{ device: 'lfo', target: 'pan' }])]);
   assert(compileSong(s) === compileSong(JSON.parse(JSON.stringify(s))), 'differs');
 });
 await check('the example songs validate and every line evaluates in Strudel', async () => {
-  for (const f of ['07-pump', '08-sweep', '09-sway', '10-gate']) {
+  for (const f of ['07-pump', '08-sweep', '09-sway', '10-gate', '11-path']) {
     const s = JSON.parse(fs.readFileSync(`songs/examples/${f}.json`, 'utf8'));
     assert(issues(s).errors.length === 0 && issues(s).warnings.length === 0, `${f}: ${JSON.stringify(issues(s))}`);
     const code = compileSong(s);

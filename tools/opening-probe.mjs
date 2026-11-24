@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { sessionItems } from '../src/endless/items.js';
 import { liveCode } from '../src/live/live-code.js';
 import { resolveProfile } from '../src/live/profiles.js';
-import { toDollar } from '../src/song/line-names.js';
+import { toDollar, isPathLine } from '../src/song/line-names.js';
 import { validateRecipe } from '../src/endless/recipe.js';
 import * as shapes from '../src/song/shapes.js';
 import { loadStyles } from './styles-dir.mjs';
@@ -46,11 +46,11 @@ const KICK_LED = ['slow', 'full-kick', 'filtered', 'broken'];
 const LEAD = shapes.LEAD_OPENINGS || ['slow', 'full-kick', 'filtered', 'broken', 'melodic', 'pad', 'bass', 'chord', 'top'];
 const how = { transition: 'artist', harmony: 'artist' };
 
-// the first sounding line of a build: the first "$:" line that is not silence, in the first 40 bars
+// the first sounding line of a build: the first "$:" line that is not silence nor a Path's bus line, in the first 40 bars
 function firstLine(song, C) {
   const L = liveCode(song, C, { cols: () => 80 });
   for (let b = 0; b < 40; b++) {
-    const line = toDollar(L.codeAt(b) || '').split('\n').map(l => l.trim().replace(/^S\$:/, '$:')).find(l => /^\$:/.test(l) && !/^\$:\s*silence/.test(l));
+    const line = toDollar(L.codeAt(b) || '').split('\n').map(l => l.trim().replace(/^S\$:/, '$:')).find(l => /^\$:/.test(l) && !/^\$:\s*silence/.test(l) && !isPathLine(l));
     if (line) return line;
   }
   return null;

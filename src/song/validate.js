@@ -3,6 +3,7 @@
 import { KEYS, PROGS, METERS, meterSteps, BASS, ARPS, HOOKS, PADS, GUITAR_PATTERNS, GUITAR_TYPES, TEX_RHYTHMS, KITS, MODES, ROWS, LOOKS, WAVES } from '../music.js';
 import { FORMAT, VERSION, GENRES, TAG_KINDS, ORIGINS, TYPES, PATTERN_FIELDS, SETTING_FIELDS, VISUALS } from './format.js';
 import { checkRack } from './rack.js';
+import { PATH_MAX_SONG } from './movement.js';
 import { checkBuild, buildMap, SPEAKERS, REMOVED_SPEAKERS } from './build.js';
 import { MACHINES } from '../sounds/machines.js';
 import { checkIdea, checkShared, sharedIsChords } from './ideas.js';
@@ -222,6 +223,11 @@ export function validateSong(song, opts = {}) {
   const peak = Math.max(0, ...playing);
   if (peak > 15) warn('tracks', `${peak} tracks play at the same time; above about 15 the browser may drop notes`);
   else if (peak > 6) warn('tracks', `${peak} tracks play at the same time; the owner prefers 4 to 5 layers per section`);
+  // paths (sound-modulation D14): at most 8 in a song, one bus each
+  let paths = 0;
+  tracks.forEach((tr, ti) => (tr && Array.isArray(tr.rack) ? tr.rack : []).forEach((d, di) => {
+    if (d && d.device === 'path' && d.on !== false && ++paths > PATH_MAX_SONG) err(`tracks[${ti}].rack[${di}]`, `at most ${PATH_MAX_SONG} paths in a song (one bus each)`);
+  }));
   checkBuild(song, total, err, warn);
   return { errors, warnings };
 }

@@ -850,12 +850,17 @@ if (process.argv.includes('--app')) {
 // ---------- modulated songs at the bench (sound-modulation D9, #95) ----------
 {
   const DS = await import('./decode-songs.mjs'), HD = await import('./decode-hits.mjs');
-  check(DS.MOD_SONGS.length === 10 && DS.MOD.every(id => DS.VALIDATION.includes(id)) && DS.MOD_SONGS.every(s => validateSong(s).errors.length === 0), 'modulated songs: five kinds in two takes, held out in VALIDATION, valid');
+  check(DS.MOD_SONGS.length === 12 && DS.MOD.every(id => DS.VALIDATION.includes(id)) && DS.MOD_SONGS.every(s => validateSong(s).errors.length === 0), 'modulated songs: six kinds (with the paths) in two takes, held out in VALIDATION, valid');
   const t = DS.modTruth(DS.MOD_SONGS.find(s => s.id === 'mod-pump'));
   check(JSON.stringify(t) === JSON.stringify({ pad: [{ device: 'pump', depth: 0.6, recover: 0.15 }] }), 'modTruth reads mod-pump\'s pad: { device: pump, depth 0.6, recover 0.15 }', JSON.stringify(t));
   const gate = DS.modTruth(DS.MOD_SONGS.find(s => s.id === 'mod-gate'));
   check(gate.pad[0].rate === 0.125, 'modTruth: a Pump without a kick counts its rate (the gate)', JSON.stringify(gate));
-  check(DS.MOD_SONGS.every(s => { const r = DS.modTruth(s), a = DS.modScore(r, r), b = DS.modScore(r, {}); return a.devices === 1 && a.recovered === 1 && b.recovered === 0; }), 'modScore: the truth against itself recovers every device, an empty measure none');
+  check(DS.MOD_SONGS.every(s => { const r = DS.modTruth(s), a = DS.modScore(r, r), b = DS.modScore(r, {}); const n = s.id.startsWith('mod-path') ? 2 : 1; return a.devices === n && a.recovered === n && b.recovered === 0; }), 'modScore: the truth against itself recovers every device, an empty measure none');
+  const pt = DS.modTruth(DS.MOD_SONGS.find(s => s.id === 'mod-path'));
+  check(pt.pad.length === 2 && pt.pad[0].device === 'path' && pt.pad[0].target === 'volume' && pt.pad[1].target === 'filter' && pt.pad[1].points.length === 5, 'modTruth reads mod-path\'s two Paths: a volume fade-in and a filter path', JSON.stringify(pt));
+  const near = { pad: [{ device: 'path', target: 'volume', points: [[0, 0.15], [8, 0.95]] }, { device: 'path', target: 'filter', points: [[0, 500], [6, 3000], [12, 1500], [16, 4000]] }] };
+  const far = { pad: [{ device: 'path', target: 'volume', points: [[0, 1], [8, 0.1]] }, { device: 'path', target: 'pan', points: [[0, 500], [16, 4000]] }] };
+  check(DS.modScore(pt, near).recovered === 2 && DS.modScore(pt, far).recovered === 0, 'modScore: a Path near the truth counts, a reversed fade or another target does not', `${DS.pathError(pt.pad[0], near.pad[0]).toFixed(3)} ${DS.pathError(pt.pad[1], near.pad[1]).toFixed(3)}`);
   check(DS.modScore(t, { pad: [{ device: 'pump', depth: 0.5 }] }).recovered === 1 && DS.modScore(t, { pad: [{ device: 'pump', depth: 0.4 }] }).recovered === 0, 'modScore: depth within 0.15 counts, 0.2 off does not');
   // the envelope error on features built by hand: 21 frames a beat, a flat band against a band that dips after the beat
   const frames = (dip, beats = 64) => ({ hop: 0.5 / 21, fr: Array.from({ length: beats * 21 }, (_, i) => { const ph = (i % 21) / 21, g = dip ? 1 - 0.8 * Math.max(0, 1 - ph / 0.4) : 1; return { low: 0.5, mid: g, high: 0.1 * g }; }) });

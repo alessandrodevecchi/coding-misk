@@ -13,6 +13,8 @@ const r3 = x => String(Math.round(x * 1000) / 1000);
 const r5 = x => String(Math.round(x * 100000) / 100000);
 export const MOVE_TYPES = ['bass', 'guitar', 'arp', 'hook', 'pad', 'code'];
 export const MOVE_MAX = 2;
+// the devices a track counts in its two movement devices
+const MOVE_NAMES = 'sweep, lfo, pump, gate, path';
 // the control each target writes
 export const MOVE_CONTROL = { filter: 'lpf', hpf: 'hpf', room: 'room', delay: 'delay', pan: 'pan' };
 // the calls an LFO on volume writes (the Tremolo device's): it takes them out of the line before it (D12)
@@ -25,6 +27,11 @@ export const SWEEP_DEFAULTS = { filter: { from: 400, to: 4000, curve: 'exp' }, h
 const BAR_LABELS = { 0.0625: ['1/16 bar', '1/16 battuta'], 0.125: ['1/8 bar', '1/8 battuta'], 0.25: ['1/4 bar', '1/4 battuta'], 0.5: ['1/2 bar', '1/2 battuta'], 1: ['1 bar', '1 battuta'], 2: ['2 bars', '2 battute'], 4: ['4 bars', '4 battute'] };
 const barLabels = list => Object.fromEntries(list.map(v => [v, { en: BAR_LABELS[v][0], it: BAR_LABELS[v][1] }]));
 const TARGET_LABELS = { filter: { en: 'Filter', it: 'Filtro' }, hpf: { en: 'High-pass', it: 'Passa-alto' }, room: { en: 'Reverb send', it: 'Mandata riverbero' }, delay: { en: 'Delay send', it: 'Mandata delay' }, pan: { en: 'Pan', it: 'Panorama' }, volume: { en: 'Volume (tremolo)', it: 'Volume (tremolo)' }, pitch: { en: 'Pitch (vibrato)', it: 'Intonazione (vibrato)' } };
+// Path (D14): targets, their ranges, the limits
+export const PATH_TARGETS = ['filter', 'hpf', 'volume', 'room', 'delay', 'pan'];
+export const PATH_RANGE = { filter: [60, 18000], hpf: [60, 18000], volume: [0, 1], room: [0, 1], delay: [0, 1], pan: [0, 1] };
+const PATH_LABELS = { filter: TARGET_LABELS.filter, hpf: TARGET_LABELS.hpf, volume: { en: 'Volume', it: 'Volume' }, room: TARGET_LABELS.room, delay: TARGET_LABELS.delay, pan: TARGET_LABELS.pan };
+export const PATH_PER_BAR = 16, PATH_MAX_POINTS = 256, PATH_MAX_SONG = 8;
 const pickLabels = keys => Object.fromEntries(keys.map(k => [k, TARGET_LABELS[k]]));
 // the filter LFO's depth: lpdepth is a share of the cutoff, peak to peak (superdough createFilter: depth × frequency,
 // centred), clamped to 30-20000 Hz; depth 1 sways from 0.1 to 1.9 times the cutoff
@@ -69,6 +76,10 @@ export const MOVE_DEVICES = {
     args: [['pattern', 'steps', 'x.x.x.x.x.x.x.x.', GATE_PRESETS], ['depth', 'num', 0.8, 0, 1, 0.05],
       ['smooth', 'choice', 0.1, [0, 0.1, 0.25, 0.5], { 0: { en: 'Hard', it: 'Netta' }, 0.1: { en: 'Short', it: 'Breve' }, 0.25: { en: 'Medium', it: 'Media' }, 0.5: { en: 'Soft', it: 'Morbida' } }],
       PHASE_ARG] },
+  // Path (D14): a value that follows [bar, value] points from the song's start, inside held notes, through a bus
+  path: { kind: 'move', label: { en: 'Path', it: 'Percorso' }, knob: null,
+    args: [['target', 'choice', 'filter', PATH_TARGETS, PATH_LABELS], ['points', 'points', []],
+      ['smooth', 'choice', 'linear', ['linear', 'step'], { linear: { en: 'Lines', it: 'Linee' }, step: { en: 'Steps', it: 'Gradini' } }]] },
 };
 export const isMove = d => !!(d && MOVE_DEVICES[d.device]);
 const argsOf = d => Object.fromEntries(MOVE_DEVICES[d.device].args.map(([k, , def]) => [k, d[k] ?? def]));
@@ -195,16 +206,187 @@ export function duckCode(pumps) {
   return `.duck(${one ? pumps[0].orbit : `"${pumps.map(p => p.orbit).join(':')}"`}).duckdepth(${j('depth')}).duckattack(${j('recover')})`;
 }
 
+// ---------- Path ("Percorso", D14) ----------
+// A path line plays Strudel's constant sound `one` into a bus with no dry output; the moved line reads the bus with
+// .bmod over a base value. The bus carries 0 to 1 (the path between its lowest and highest value), cut at every point
+// and every bar line into pieces, each piece one or two notes of `one` (their gain envelopes are linear):
+//   hold x:      gain x, attack E, sustain 1                       (x until the piece's end, then a release of E)
+//   ramp x → y:  fall: gain x (1 - E/d), attack E, decay d - E, sustain 0   rise: gain y, attack d, sustain 1
+// E is superdough's shortest release (10 ms): every note that ends at a piece's end falls to 0 over E while the next
+// piece's first note rises over E, so the two sum to a straight crossfade and a held value never dips or bumps. The
+// fall note's gain is scaled so the fall and the rise sum to the straight line from x to y once its attack is over.
+// Pieces never cross a bar line, so a start in the middle of the song, or a bus made again after a reset, follows the
+// path from the next bar (or the next point).
+export const PATH_EDGE = 0.01;
+const PATH_GRID = 16;
+const q16 = b => Math.round(b * PATH_GRID) / PATH_GRID;
+const r4 = x => { const v = Math.round(x * 10000) / 10000; return String(v === 0 ? 0 : v).replace(/^0\./, '.').replace(/^-0\./, '-.'); };
+// the points of a path as numbers, bars on the sixteenth grid, sorted (the validator reports what is off)
+export const pathPoints = a => (Array.isArray(a && a.points) ? a.points : [])
+  .filter(p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]))
+  .map(([b, v]) => [q16(Math.max(0, b)), v]).sort((x, y) => x[0] - y[0]);
+// the lowest and highest value of a path
+export const pathSpan = pts => { const v = pts.map(p => p[1]); return v.length ? [Math.min(...v), Math.max(...v)] : [0, 0]; };
+// the value of a path at bar t: the first point's before it, the last one's after it, straight lines (linear) or held
+// values (step) between points
+export function pathAt(pts, t, smooth = 'linear') {
+  if (!pts.length) return 0;
+  if (t <= pts[0][0]) return pts[0][1];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    if (pts[i][0] <= t) {
+      const n = pts[i + 1];
+      if (!n || smooth === 'step' || n[0] === pts[i][0]) return pts[i][1];
+      return pts[i][1] + (n[1] - pts[i][1]) * (t - pts[i][0]) / (n[0] - pts[i][0]);
+    }
+  }
+  return pts[0][1];
+}
+// drops each point that lies on the straight line through its neighbours within `tol` (the first and last stay)
+export function thinPath(pts, tol) {
+  if (pts.length <= 2) return pts.slice();
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = out[out.length - 1], c = pts[i + 1], b = pts[i];
+    const line = a[1] + (c[1] - a[1]) * (b[0] - a[0]) / ((c[0] - a[0]) || 1);
+    if (Math.abs(b[1] - line) > tol) out.push(b);
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+// A Path device from measured points (D14), for Decode and other writers: values clamped to the target's range, bars
+// rounded to 1/perBar (at most 16 a bar), a repeated bar kept once (its first value), points on a straight line within
+// 1 % of the span dropped, at most 256 points; null when the path is flat within 1 % (of the lowest value for the
+// filters, of the range for the others)
+export function pathDevice(target, points, { perBar = 4, smooth = 'linear' } = {}) {
+  const range = PATH_RANGE[target];
+  if (!range || !Array.isArray(points)) return null;
+  const per = Math.max(1, Math.min(PATH_PER_BAR, Math.round(perBar) || 4)), fmt = FREQ(target) ? r0 : r3;
+  const seen = new Set(), pts = [];
+  for (const p of points.filter(p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])).sort((x, y) => x[0] - y[0])) {
+    const b = Math.round(Math.max(0, p[0]) * per) / per;
+    if (seen.has(b)) continue;
+    seen.add(b); pts.push([b, +fmt(Math.max(range[0], Math.min(range[1], p[1])))]);
+  }
+  if (!pts.length) return null;
+  const [lo, hi] = pathSpan(pts), span = hi - lo;
+  // flat: a frequency within 1 % of its lowest value, any other value within 1 % of its range
+  if (FREQ(target) ? hi <= lo * 1.01 : span <= 0.01 * (range[1] - range[0])) return null;
+  let tol = 0.01 * span, out = thinPath(pts, tol);
+  while (out.length > PATH_MAX_POINTS) { tol *= 2; out = thinPath(pts, tol); }
+  return { device: 'path', target, points: out, ...(smooth === 'step' ? { smooth: 'step' } : {}) };
+}
+
+// The presets of a Path's Compose card (D14: the card shows a path read-only; points come from the song file, a writer
+// or one of these): over the first or last 8 bars (fewer on a shorter span) of the bars [s, e) the track plays
+export const PATH_PRESETS = {
+  fadein: { en: 'Fade in', it: 'Entrata in dissolvenza' }, fadeout: { en: 'Fade out', it: 'Uscita in dissolvenza' },
+  open: { en: 'Filter opens', it: 'Filtro che si apre' }, close: { en: 'Filter closes', it: 'Filtro che si chiude' },
+};
+export function pathPreset(name, s, e) {
+  const n = Math.max(1, Math.min(8, e - s));
+  const pts = { fadein: ['volume', [[s, 0], [s + n, 1]]], fadeout: ['volume', [[e - n, 1], [e, 0]]], open: ['filter', [[s, 400], [s + n, 4000]]], close: ['filter', [[e - n, 4000], [e, 400]]] }[name];
+  return pts ? { device: 'path', target: pts[0], points: pts[1] } : null;
+}
+
+// The path line of one Path (D14): the bus's notes for the whole song. opts: { bus, total (bars), barSec (seconds of
+// each bar), label (the line's comment) } → a `$:` line, or null for a flat path (its base alone holds the value)
+export function pathLine(a, { bus, total, barSec, label = '' }) {
+  const pts = pathPoints(a), [lo, hi] = pathSpan(pts), span = hi - lo;
+  if (!pts.length || !(span > 0) || !(total > 0)) return null;
+  const smooth = a.smooth === 'step' ? 'step' : 'linear', E = PATH_EDGE;
+  const v = t => (pathAt(pts, t, smooth) - lo) / span;
+  const A = [], B = [];
+  for (let k = 0; k < total; k++) {
+    const sec = Array.isArray(barSec) ? barSec[k] || barSec[barSec.length - 1] : barSec;
+    const cuts = [...new Set([k, ...pts.map(p => p[0]).filter(b => b > k && b < k + 1), k + 1])].sort((x, y) => x - y);
+    const pieces = [];
+    for (let i = 0; i + 1 < cuts.length; i++) {
+      const x = v(cuts[i]), y = smooth === 'step' ? x : v(cuts[i + 1]), w = Math.round((cuts[i + 1] - cuts[i]) * PATH_GRID);
+      const last = pieces[pieces.length - 1];
+      // two held pieces of the same value are one
+      if (last && last.x === last.y && x === y && last.y === x) { last.w += w; continue; }
+      pieces.push({ x, y, w });
+    }
+    const fa = [], fb = [];
+    for (const { x, y, w } of pieces) {
+      const d = w / PATH_GRID * sec;
+      if (Math.abs(x - y) < 1e-6 || d <= 2 * E) {
+        const h = (x + y) / 2;
+        fa.push([h > 0 ? `${r4(h)}:${r4(E)}:0:1` : '~', w]); fb.push(['~', w]);
+      } else {
+        fa.push([x > 0 ? `${r4(x * (1 - E / d))}:${r4(E)}:${r4(d - E)}:0` : '~', w]);
+        fb.push([y > 0 ? `${r4(y)}:${r4(d)}:0:1` : '~', w]);
+      }
+    }
+    A.push(barTokens(fa)); B.push(barTokens(fb));
+  }
+  const la = cycleList(A), lb = B.every(x => x === '~') ? null : cycleList(B);
+  return `$: ${lb ? `stack(${la}, ${lb})` : la}.as("gain:attack:decay:sustain").s("one").bus(${bus}).dry(0)${label ? `  // ${label}` : ''}`;
+}
+// one bar's notes: "[a@4 ~@12]", rests merged, a single note alone
+function barTokens(list) {
+  const m = [];
+  for (const [t, w] of list) { const l = m[m.length - 1]; if (l && l[0] === '~' && t === '~') l[1] += w; else m.push([t, w]); }
+  if (m.length === 1) return m[0][0];
+  return `[${m.map(([t, w]) => (w === 1 ? t : `${t}@${w}`)).join(' ')}]`;
+}
+// a value per bar as "<a!3 b>" (one value alone as "a")
+function cycleList(vals) {
+  const out = [];
+  for (let i = 0; i < vals.length;) { let j = i; while (j < vals.length && vals[j] === vals[i]) j++; out.push(j - i > 1 ? `${vals[i]}!${j - i}` : vals[i]); i = j; }
+  return out.length === 1 && !out[0].includes('!') ? `"${out[0]}"` : `"<${out.join(' ')}>"`;
+}
+// The moved line's code for one Path (D14): the base and the bus modulator. Filters, sends and pan: the base at the
+// path's lowest value (a send at least .001 so its node exists) and an absolute depth `da` of the span (pan's panner
+// runs from -1 to 1: twice the span). Volume: the line's postgain times the lowest share (at least .001), and a depth
+// relative to it (`dep`, span / share), so the path scales whatever postgain the line plays (shapes, a guitar's gate)
+// and stays apart from the gain a Gate or a Pump dips. superdough's bmod divides its depth by .3, the gain `one`'s
+// notes pass at: the bus's 0 to 1 arrives as 0 to 1 times the depth. A base value must come before its bmod on the
+// line: superdough reads a postgain set after the bmod with the wrong depth (measured 4 to 8 times too deep), so the
+// volume's calls go together at the line's end, before its orbit.
+export function pathMove(a, bus) {
+  const pts = pathPoints(a);
+  if (!pts.length) return null;
+  const [lo, hi] = pathSpan(pts), span = hi - lo, flat = !(span > 0);
+  if (a.target === 'volume') {
+    const m = Math.max(lo, 0.001);
+    return { code: '', post: `.mul(postgain(${r4(m)}))${flat ? '' : `.bmod({ b: ${bus}, c: 'postgain', dep: ${r4(span / m)} })`}`, base: {}, replace: [] };
+  }
+  const c = MOVE_CONTROL[a.target] || 'lpf';
+  const send = c === 'room' || c === 'delay';
+  const b = send ? Math.max(lo, 0.001) : lo, fmt = FREQ(a.target) ? r0 : r3;
+  const da = c === 'pan' ? 2 * span : hi - b;
+  return { code: `.${c}(${fmt(b)})${flat ? '' : `.bmod({ b: ${bus}, c: '${c}', da: ${fmt(da)} })`}`, base: {}, replace: [c] };
+}
+// the paths of a song on buses 1 to 8 in track order and rack order, whether or not the track plays (so a track that
+// comes in later never moves another's bus): [{ track (index), device (index in the rack), bus }]
+export function pathBuses(tracks) {
+  const out = [];
+  (tracks || []).forEach((tr, ti) => (Array.isArray(tr && tr.rack) ? tr.rack : []).forEach((d, di) => {
+    if (d && d.device === 'path' && d.on !== false && MOVE_TYPES.includes(tr.type) && out.length < PATH_MAX_SONG) out.push({ track: ti, device: di, bus: out.length + 1 });
+  }));
+  return out;
+}
+
 // The movement of one clip piece of a track. ctx: { st (the clip's state), a, b, clipStart, clipBars, barSec, steps,
-// kick (the section plays a kick), rack } → { code, base: { control: value }, replace: [control] } or null
+// kick (the section plays a kick), rack, paths ({ target: bus } of the track's Paths) } → { code, base: { control:
+// value }, replace: [control], post, keep: [control] } or null; keep: the controls a Path's base writes, which a growth
+// never hides or comments out (its bmod needs them); post: calls that go at the end of the line, before its orbit (a volume
+// path's postgain, after any postgain the line sets)
 export function moveFor(type, rack, ctx) {
   const moves = movesOf(rack);
   if (!moves.length || !MOVE_TYPES.includes(type)) return null;
   const ch = (ctx.st && ctx.st[type]) || {};
   const held = heldPad(type, ctx.st, rack);
-  let code = '';
-  const base = {}, replace = [];
+  let code = '', post = '';
+  const base = {}, replace = [], keep = [];
   for (const m of moves) {
+    if (m.device === 'path') {
+      const bus = ctx.paths && ctx.paths[m.target];
+      const pm = bus ? pathMove(m, bus) : null;
+      if (pm) { code += pm.code; replace.push(...pm.replace); keep.push(...pm.replace); post += pm.post || ''; }
+      continue;
+    }
     if (m.device === 'sweep') { code += sweepCode(m, { ...ctx, held }); replace.push(MOVE_CONTROL[m.target] || 'lpf'); }
     if (m.device === 'lfo') {
       const c = MOVE_CONTROL[m.target];
@@ -224,7 +406,7 @@ export function moveFor(type, rack, ctx) {
   }
   // a Sweep wins over an LFO on the same control's base
   for (const c of replace) delete base[c];
-  return code ? { code, base, replace } : null;
+  return code || post ? { code, base, replace, post, keep } : null;
 }
 // the gain the line plays at (a Pump's dip and a Gate go down from it): the track's (the lower end of a ramp), the
 // guitar's fixed .gain(.8) before its post gain, a code track's own .gain(n) or 1
@@ -249,8 +431,10 @@ const strip = (text, names) => {
 // the calls of the controls a Sweep writes are taken out before it (a code track keeps its own code: the later call
 // wins there), and a base value goes before it for each control the layer does not write yet
 export function applyMove(lines, mv, { code = false } = {}) {
-  if (!mv || !mv.code) return lines;
+  if (!mv || (!mv.code && !mv.post)) return lines;
   const out = lines.slice();
+  // a volume path alone: its calls before the orbit of every layer
+  if (!mv.code) return out.map(l => { const o = l.indexOf('.orbit('); return o >= 0 ? l.slice(0, o) + mv.post + l.slice(o) : l; });
   for (let i = 0; i < out.length; i++) {
     const at = out[i].indexOf(mv.code);
     if (at < 0) continue;
@@ -264,6 +448,12 @@ export function applyMove(lines, mv, { code = false } = {}) {
     const pos = out[i].indexOf(mv.code), before = out.slice(s, i).join('\n') + out[i].slice(0, pos);
     const add = Object.entries(mv.base).filter(([c]) => !before.includes(`.${c}(`)).map(([c, v]) => `.${c}(${v})`).join('');
     if (add) out[i] = out[i].slice(0, pos) + add + out[i].slice(pos);
+    // a volume path's postgain goes before the line's orbit, after any postgain the line sets (a guitar's gate)
+    if (mv.post) {
+      const end = out[i].indexOf(mv.code) + mv.code.length, o = out[i].indexOf('.orbit(', end - 1);
+      const at = o >= 0 ? o : end;
+      out[i] = out[i].slice(0, at) + mv.post + out[i].slice(at);
+    }
   }
   return out;
 }
@@ -274,7 +464,7 @@ export function checkMoves(rack, p, err, warn, type = null, settings = {}) {
   const moves = rack.map((d, i) => [d, i]).filter(([d]) => isMove(d));
   if (!moves.length) return;
   if (type && !MOVE_TYPES.includes(type)) for (const [d, i] of moves) err(`${p}[${i}]`, `${d.device} moves melodic tracks only (${MOVE_TYPES.join(', ')})`);
-  moves.forEach(([, i], k) => { if (k >= MOVE_MAX) err(`${p}[${i}]`, `at most ${MOVE_MAX} movement devices (sweep, lfo, pump) on a track`); });
+  moves.forEach(([, i], k) => { if (k >= MOVE_MAX) err(`${p}[${i}]`, `at most ${MOVE_MAX} movement devices (${MOVE_NAMES}) on a track`); });
   const seen = new Set();
   for (const [d, i] of moves) {
     const a = argsOf(d), key = d.device === 'pump' || d.device === 'gate' ? d.device : `${d.device}|${a.target}`;
@@ -286,6 +476,8 @@ export function checkMoves(rack, p, err, warn, type = null, settings = {}) {
       if (n > GATE_MAX_RUNS) warn(`${p}[${i}].pattern`, `${n} closed runs that do not repeat: each is one or two LFOs on every note, heavy on the CPU (at most ${GATE_MAX_RUNS} advised)`);
       continue;
     }
+    if (d.device === 'path') { checkPath(d, `${p}[${i}]`, err, warn); if (rack.some((x, j) => j < i && isMove(x) && x.device === 'sweep' && argsOf(x).target === a.target)) err(`${p}[${i}]`, `a path and a sweep both write the ${a.target}: use one of them`); continue; }
+    if (d.device === 'sweep' && rack.some((x, j) => j < i && isMove(x) && x.device === 'path' && argsOf(x).target === a.target)) err(`${p}[${i}]`, `a path and a sweep both write the ${a.target}: use one of them`);
     if (d.device === 'lfo' && a.target === 'pitch') {
       if (a.shape !== 'sine') warn(`${p}[${i}].shape`, 'the vibrato is always a sine: shape does nothing on pitch');
       if (a.phase) warn(`${p}[${i}].phase`, 'the vibrato starts with each note: phase does nothing on pitch');
@@ -301,11 +493,34 @@ export function checkMoves(rack, p, err, warn, type = null, settings = {}) {
   }
 }
 
+// A Path's points (D14): [bar, value] pairs, bars from the song's start increasing on the sixteenth grid, at most 16 a
+// bar and 256 in all, values in the target's range
+export function checkPath(d, p, err, warn) {
+  const pts = d.points, range = PATH_RANGE[d.target || 'filter'] || PATH_RANGE.filter;
+  if (!Array.isArray(pts) || !pts.length) { err(`${p}.points`, 'a list of [bar, value] points, for example [[0, 400], [8, 4000]]'); return; }
+  if (pts.length > PATH_MAX_POINTS) err(`${p}.points`, `${pts.length} points: at most ${PATH_MAX_POINTS} on a path`);
+  const perBar = new Map();
+  let prev = -Infinity, offGrid = false;
+  pts.forEach((pt, k) => {
+    if (!Array.isArray(pt) || pt.length !== 2 || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1])) { err(`${p}.points[${k}]`, 'a [bar, value] pair of numbers'); return; }
+    const [b, v] = pt;
+    if (b < 0) err(`${p}.points[${k}]`, 'a bar from 0 (the song\'s start)');
+    else if (b <= prev) err(`${p}.points[${k}]`, 'bars must increase from one point to the next');
+    if (v < range[0] || v > range[1]) err(`${p}.points[${k}]`, `a value from ${range[0]} to ${range[1]} for target ${d.target || 'filter'}${d.target === 'volume' ? ' (a share of the track\'s gain)' : ''}`);
+    if (Math.abs(b * PATH_GRID - Math.round(b * PATH_GRID)) > 1e-6) offGrid = true;
+    const bar = Math.floor(b); perBar.set(bar, (perBar.get(bar) || 0) + 1);
+    prev = Math.max(prev, b);
+  });
+  for (const [bar, n] of perBar) if (n > PATH_PER_BAR) { err(`${p}.points`, `${n} points in bar ${bar + 1}: at most ${PATH_PER_BAR} a bar`); break; }
+  if (offGrid) warn(`${p}.points`, 'bars are rounded to the sixteenth (1/16 of a bar)');
+}
+
 // The preview of a device's code on its Compose card: the code of a clip of 8 bars at 120 BPM from bar 1
 export function movePreview(d, type) {
   const a = { device: d.device, ...argsOf(d) };
   if (a.device === 'sweep') return sweepCode(a, { clipStart: 0, clipBars: Math.max(8, a.bars), barSec: 2, held: type === 'pad', steps: 16 });
   if (a.device === 'lfo') return lfoCode(a, { barSec: 2, cutoff: 2000 });
   if (a.device === 'gate') return gateCode(a, 1);
+  if (a.device === 'path') { const pm = pathMove(a, 1); return pm ? pm.code + (pm.post || '') : ''; }
   return `${duckCode([{ orbit: 'n', depth: a.depth, recover: a.recover }]).replace('.duck(n)', '.duck(…)')} · ${pumpDipCode(a, 1)}`;
 }

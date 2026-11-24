@@ -4,6 +4,7 @@
 
 import { ORBIT_OF } from '../music.js';
 import { extraOrbits } from '../song/compile.js';
+import { isPathLine } from '../song/line-names.js';
 
 // its own orbit, above the song's, so its delay and reverb never retune the song's (design D3): the compiler gives 1-8
 // by type and extra tracks 9 and up, spoken tracks 13 and 14, voice tracks (the narrator) 15 and up
@@ -25,7 +26,7 @@ export function previewOrbit(tracks = []) {
 }
 
 // the compiled code of a pattern's loop song (src/library/patterns.js loopSong, compiled with compileSong) → one Strudel
-// expression: the `$:` lines joined in a stack, without setcpm, the section lanes, .analyze (the visuals stay dark) and
+// expression: the `$:` lines joined in a stack, without setcpm, the section lanes, a Path's bus line and bmod, .analyze (the visuals stay dark) and
 // the track's orbit, which becomes the preview's. Continuation lines (starting with a dot) join their line.
 // analyze: an analyser id kept on the expression (the FM lab's scope, fm-groove-lab D6); none by default, so the
 // visuals stay dark for the Compose and radio previews
@@ -45,8 +46,11 @@ export function previewExpression(code, { orbit = PREVIEW_ORBIT, analyze = null 
     .replace(/\.(mask|velocity)\(section\d+\)/g, '')
     .replace(/section\d+\.mul\(([^()]*)\)/g, '$1')
     .replace(/\bsection\d+\b/g, 'pure(1)')
+    .replace(/\.bmod\(\{[^{}]*\}\)/g, '').replace(/\.mul\(postgain\([^()]*\)\)/g, '')
     .replace(/\.orbit\([^()]*\)/g, '') + `.orbit(${orbit})`;
-  const parts = blocks.map(clean).filter(b => b !== `.orbit(${orbit})`).map(b => (analyze ? `${b}.analyze("${analyze}")` : b));
+  // (a Path's bus line and its bmod calls stay out: its points follow the song's bars, not the loop, and its bus is the
+  // song's; the moved line plays at the path's base)
+  const parts = blocks.filter(b => !isPathLine(b)).map(clean).filter(b => b !== `.orbit(${orbit})`).map(b => (analyze ? `${b}.analyze("${analyze}")` : b));
   if (!parts.length) return null;
   return parts.length === 1 ? parts[0] : `stack(${parts.join(', ')})`;
 }

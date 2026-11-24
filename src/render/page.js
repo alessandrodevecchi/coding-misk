@@ -21,6 +21,7 @@ import { loadLimiter, setMasterLevel, limiterDelay } from '../sounds/limiter.js'
 import { noteOf, stageInstOf } from '../visuals/stage-feed.js';
 import { codeBus } from '../decode/mix.js';
 import { rollNotesOf, rollShape } from '../live/widgets.js';
+import { isPathHap } from '../song/line-names.js';
 
 const post = (m, transfer = []) => parent.postMessage({ codingMiskRender: true, ...m }, location.origin, transfer);
 // superdough's deprecation notices come once per voice: thousands of console lines slow the render down
@@ -197,12 +198,23 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
         if (!ok) { const id = `${v.bank ? `${v.bank}_` : ''}${v.s}${v.n !== undefined ? `:${v.n}` : ''}`; if (!skipped.has(id)) { skipped.add(id); console.warn(`[render] sound ${id} did not load, skipped`); } }
       } catch (e) { console.warn('[render]', e); }
       // onsets once: the lead in of a block belongs to the block before
-      if (t >= keepFrom) { const key = v.analyze || v.s || 'other'; (onsets[key] = onsets[key] || []).push([+t.toFixed(4), +d.toFixed(4), +((v.gain ?? 1) * (v.velocity ?? 1)).toFixed(3)]); }
+      // (a Path's bus notes are no instrument, sound-modulation D14)
+      if (t >= keepFrom && !isPathHap(v)) { const key = v.analyze || v.s || 'other'; (onsets[key] = onsets[key] || []).push([+t.toFixed(4), +d.toFixed(4), +((v.gain ?? 1) * (v.velocity ?? 1)).toFixed(3)]); }
     }
   }
   await schedule(W);
-  for (let s = W / 2; s < length; s += W / 2) {
-    ctx.suspend(s).then(async () => { await schedule(s + W); post({ progress: s / length, phase: 'render' }); ctx.resume(); });
+  // pauses of the render, on render quanta (two suspends on one quantum throw): every W/2 seconds the next window is
+  // scheduled; one quantum after each onset of a note with a bus modulator (.bmod, a Path, sound-modulation D14) the
+  // render stops so its connection happens there: superdough connects a bus modulator from a source node's `ended`
+  // event, which an offline context only delivers when its render pauses (up to W/2 late without these stops)
+  const Q = 128 / sampleRate, quant = x => Math.ceil(x / Q - 1e-9) * Q, stops = new Map();
+  for (let s = W / 2; s < length; s += W / 2) stops.set(quant(s), s);
+  for (const { hap, t } of all) if (hap.value.bmod && t - from + Q < length) { const q = quant(t - from + Q); if (!stops.has(q)) stops.set(q, null); }
+  for (const [q, s] of stops) {
+    ctx.suspend(q).then(async () => {
+      if (s !== null) { await schedule(s + W); post({ progress: s / length, phase: 'render' }); } else await new Promise(r => setTimeout(r, 0));
+      ctx.resume();
+    });
   }
   const buf = await ctx.startRendering();
   const channels = [buf.getChannelData(0).slice(lag), buf.getChannelData(1).slice(lag)];
