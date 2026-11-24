@@ -32,6 +32,8 @@ import { AW_KEY, APP_WIDGETS, APP_WIDGET_NAMES, appWidgetSettings, widgetFrame, 
 import { HG_LIMITS } from '../widgets/hitgrid.js';
 import { TC_LIMITS } from '../widgets/tonecloud.js';
 import { overRoles } from '../code-themes/themes.js';
+import { AREAS, areaSettings, setArea, engineFor } from '../ai/areas.js';
+import { initialPrompts } from '../ai/generate.js';
 
 // the app widgets' previews (code-over-visual D13): a few bars of drums, bass and pad chords, the same every time
 const DEMO = (() => {
@@ -126,6 +128,7 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
           ${row(t('setScope'), `<select data-radio-opt="scope" data-no-knob>${opt('song', r.scope, t('steerScopeSong'))}${opt('session', r.scope, t('steerScopeSession'))}</select>`, t('helpRadioScope'))}
           ${row(t('matDefault'), `<select data-radio-opt="material" data-no-knob>${['mix', 'patterns', 'varied', 'composed'].map(k => opt(k, r.material || 'mix', t(`mat:${k}`))).join('')}</select>`, t('helpRadioMaterial'))}
         </div>
+        ${aiCard()}
         <div class="card set-card" id="set-library"><h3>${esc(t('setLibrary'))}</h3>
           <p class="muted">${esc(t('setLibraryIntro'))}</p>
           <div class="actions">${app.hiddenSongs && app.hiddenSongs() ? `<button class="btn" id="set-show-hidden">${esc(t('setShowHidden', { n: app.hiddenSongs() }))}</button>` : `<span class="muted">${esc(t('setHiddenNone'))}</span>`}</div>
@@ -157,6 +160,32 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
     if (app.coPreview) app.coPreview(root.querySelector('#set-co-preview'));
     drawAwPreviews(); if (!awTimer) awTimer = setInterval(drawAwPreviews, 100);
     if (app.fragPreview) app.fragPreview(root.querySelector('#set-frag-preview'), () => { const x = { ...fragmentOpts(store.get('coding-misk-fragments', {}) || {}), stageRatio: app.stageRatio ? app.stageRatio() : 2.4 }; return { ...x, size: fragmentSize(x), next: store.get('coding-misk-fragment-n', 1) }; });
+  }
+
+  // the AI card (ai-assistant D2, D4): per area the engine, the model and the mode; only the built-in engine for now
+  function aiCard() {
+    const r = areaSettings(store, 'radio');
+    const engines = `<select data-ai-engine="radio" data-no-knob>${AREAS.radio.engines.map(id => opt(id, r.engine, t(`aiEngine:${id}`))).join('')}${AREAS.radio.coming.map(id => `<option value="${id}" disabled>${esc(t(`aiEngine:${id}`))} · ${esc(t('aiComing'))}</option>`).join('')}</select>`;
+    const mode = `<select data-ai-apply="radio" data-no-knob>${['now', 'ask'].map(m => opt(m, r.apply, t(`aiMode:${m}`))).join('')}</select>`;
+    setTimeout(aiStatus, 0);
+    return `<div class="card set-card" id="set-ai"><h3>${esc(t('setAi'))}</h3>
+          <p class="muted">${esc(t('setAiIntro'))}</p>
+          <h4>${esc(t('setAiRadio'))}</h4>
+          ${row(t('aiEngineLbl'), engines, t('setAiEngineHint'))}
+          ${row(t('aiModelLbl'), `<span>${esc(t('aiModel:built-in'))}</span>`)}
+          ${row(t('aiStatusLbl'), '<span id="set-ai-status" class="muted">…</span>')}
+          ${row(t('aiMode'), mode, t('aiModeHint'))}
+          <h4>${esc(t('setAiCompose'))}</h4>
+          <p class="hint muted">${esc(t('setAiComposeSoon'))}</p>
+        </div>`;
+  }
+  async function aiStatus() {
+    const box = root.querySelector('#set-ai-status'), e = engineFor(store, 'radio');
+    if (!box) return;
+    const s = e ? await e.status() : { state: 'unavailable', detail: 'none' };
+    if (!root.contains(box)) return;
+    box.innerHTML = s.state === 'download' ? `${esc(t('aiState:download'))} <button class="btn small" id="set-ai-download">${esc(t('aiDownload'))}</button>`
+      : s.state === 'unavailable' ? esc(t(`aiUnavailable:${s.detail || 'device'}`)) : esc(t(`aiState:${s.state}`, { p: e && e.progress != null ? e.progress : 0 }));
   }
 
   // code themes (code-themes D6): theme, font, size and the dimmed muted lines, in the Appearance card
@@ -412,6 +441,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   root.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.setUi) { app.setUi(b.dataset.setUi); return render(); }
+    // the built-in model's download starts from this click (the API needs a user activation)
+    if (b.id === 'set-ai-download') { const en = engineFor(store, 'radio'); if (!en) return; const off = en.onProgress(() => aiStatus()); b.disabled = true; en.download(initialPrompts()).catch(() => {}).then(() => { off(); aiStatus(); }); return; }
     if (b.dataset.setUiFollow) { app.setUiFollow(b.dataset.setUiFollow === '1'); return render(); }
     if (b.dataset.setLang) { app.setLang(b.dataset.setLang); return render(); }
     // the "Stage videos" card: the picker and the permission only inside this click
@@ -534,6 +565,8 @@ export function createSettings({ root, t, tx, esc, store, looks, app, toast, con
   root.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.swSec) { const open = new Set(store.get(SW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.swSec); else open.delete(d.dataset.swSec); store.set(SW_OPEN, [...open]); return; } if (!d.dataset || !d.dataset.cwSec) return; const open = new Set(store.get(CW_OPEN, ['general']) || []); if (d.open) open.add(d.dataset.cwSec); else open.delete(d.dataset.cwSec); store.set(CW_OPEN, [...open]); }, true);
   root.addEventListener('change', e => {
     if (oscHandle(e, store, 'card')) return;
+    if (e.target.dataset && e.target.dataset.aiApply) { setArea(store, e.target.dataset.aiApply, { apply: e.target.value }); return; }
+    if (e.target.dataset && e.target.dataset.aiEngine) { setArea(store, e.target.dataset.aiEngine, { engine: e.target.value }); return render(); }
     if (e.target.matches && e.target.matches('[data-ph-set-temp]')) { app.phrases.set({ temp: e.target.value }); return render(); }
     { const x = e.target, d = x.dataset || {};
       if (d.capSkip !== undefined && app.capsSkipNext) { app.capsSkipNext(x.checked); return; }

@@ -5912,6 +5912,8 @@ radio = createRadio({
   userPatterns: () => forRadio(patternsStore.list(), { meta: true }),
   // a saved pattern queued from the console (Add as a new track, Replace) counts as one use
   onPatternUsed: id => patternsStore.markUsed(id),
+  // the assistant's menu and its unavailable line open Settings → AI (ai-assistant D5)
+  openSettings: () => { showTab('impostazioni'); requestAnimationFrame(() => { const c = $('#set-ai'); if (c) { c.scrollIntoView({ block: 'start', behavior: 'smooth' }); c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 1200); } }); },
   // the samples of the lines typed in the console (voice-full-controls D10): read again once the voice helper made them
   reloadSamples: bank => reloadSamples(bank),
   // the samples manifest, for the voices of Next changes (after-tests-oct28 D2)

@@ -21,6 +21,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - `tools/endless.mjs --sound` to turn on composed drum tones and variation.
 - `npm run check:sound-params`, `tools/check-sound-dice.cjs` and `tools/check-sound-levels.cjs`.
 - Guide: "Sound dice" card.
+- Radio: a request row at the top of the console turns a typed request into console commands with the browser's built-in model, applied at once or proposed first.
+- Radio: requests name saved patterns by name, refuse unknown or unclear names, answer "cannot" for tempo, time signature and playing backwards, and show vague requests as a proposal.
+- Settings: AI assistant card with the engine, model, status, download and mode per area.
+- `docs/AGENT-API.md`: every console command an AI engine or agent may give, generated from the command registry.
+- `npm run agent-api`, `npm run check:agent-api`, `npm run check:ai` and `tools/check-ai.cjs`: the command registry, its document and the console assistant.
+- Guide: "Ask the console" part in the Radio card.
 - Code: Instrument name option (Random per song, `$:`, name at line start) and Names from option (instrument or track), in Compose's code options, the radio's Custom section and the Decode tab's Options.
 - `tools/check-light-start.cjs`: browser check of a light start (no Sounds photo at startup, layout shift under 0.1 at desktop and phone width).
 - `tools/decode-hits.mjs`: hit density per band and per part for the Decode bench, with six songs built for repeated chords and basses (`tools/decode-export.cjs --hits`, `tools/decode-bench.cjs --set hits`).

@@ -1025,6 +1025,27 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 /* radio console (#24) */
 .radio-steer { margin-top: 16px; display: grid; gap: 10px; }
 .steer-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+/* the assistant's row (ai-assistant D5): one line at the top of the console, the answer line under it */
+.ask-row { display: grid; gap: 6px; min-width: 0; }
+.ask-line { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.ask-input { flex: 1 1 auto; min-width: 0; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; }
+.ask-input:disabled { opacity: .6; }
+.ask-menu-btn { flex: 0 0 auto; display: inline-grid; place-items: center; }
+.ask-spin { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: grow-turn .8s linear infinite; }
+.ask-menu { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 13px; }
+.ask-menu[hidden], .ask-answer[hidden], .ask-sent[hidden] { display: none; }
+.ask-menu-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ask-sent { max-height: 220px; overflow: auto; margin: 0; white-space: pre-wrap; font: 11px/1.4 var(--mono); }
+.ask-answer { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 13px; min-height: 24px; }
+.ask-answer progress { width: 120px; }
+.ask-close { margin-left: auto; }
+.ask-chip.applied { border-color: var(--a1); }
+.ask-chip.struck { text-decoration: line-through; opacity: .75; }
+.ask-chip.struck small { text-decoration: none; display: inline; }
+.ask-chip.proposed { border-style: dashed; }
+.ask-drop { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 0 0 4px; font: inherit; }
+.ask-vague { color: var(--a2); }
+.ask-note { color: var(--muted); }
 .steer-console { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 16px; }
 .steer-group { display: grid; gap: 6px; align-content: start; }
 .steer-btns { display: flex; flex-wrap: wrap; gap: 6px; }

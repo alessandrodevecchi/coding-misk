@@ -68,8 +68,9 @@ A new console command that rewrites the song on air ([radio-commands.md](radio-c
 2. Write the rewrite as steps added to the song from the boundary. Draw randomness from a stream named after the command and the song (`vary:<song>:<index>`), so replay and cancel give the same song. On a grown song the command becomes a waypoint by itself (`src/endless/waypoints.js` types the moves from the code on air to the rewrite); add a rule there only when the moves must be typed in another way (as mute types `_$:`).
 3. Give `whyNot` a reason when it cannot apply (`not-playing`, `locked`).
 4. Add the button, a key, a drawn icon, the texts and the Guide line.
+5. Give the assistant an entry in `src/ai/commands.js` (description, argument schema, words, `map`, `apply` through the button's own function), or list it in `LEFT_OUT` with a reason; then `npm run agent-api` ([ai-assistant.md](ai-assistant.md)).
 
-**Checks:** `npm run check:endless`, `npm run check:radio-profiles` (the command on grown songs: past kept, typing, arrival), `npm run check:guide`, `node tools/check-steering.cjs`, `node tools/check-radio.cjs`, `node tools/check-transitions.cjs` (dev server).
+**Checks:** `npm run check:agent-api`, `npm run check:ai`, `npm run check:endless`, `npm run check:radio-profiles` (the command on grown songs: past kept, typing, arrival), `npm run check:guide`, `node tools/check-steering.cjs`, `node tools/check-radio.cjs`, `node tools/check-transitions.cjs` (dev server).
 
 **Mistakes:** a command that changes songs without commands (fixtures move); sessions saved with the command that now sound different without a `DIRECTOR_VERSION` bump; emoji icons.
 
