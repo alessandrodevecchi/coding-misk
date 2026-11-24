@@ -10,12 +10,16 @@
 // Round 4 (probeVersion 4, the default): round 3 plus the checks after the engine (D4 checks 4 to 6: the pattern the
 // request names, the command the request names, spoken lines without the model); each request also records what the app
 // does (applied, proposal, rejected, cannot) and the summary compares with the v3 run.
-// Results: notes/nano-probe-results-v4-<time>.json. ?round2 runs round 2 as it was (with ?all its extra tests).
+// Round 5 (probeVersion 5, the default): round 4 plus check 7 (a "cannot" answer to a request that names one command
+// becomes a proposal of it); the same per-request fields, and the summary also compares with the v4 run. ?autorun=1
+// starts the run by itself after load when the model is "available" (no click; a create() that wants a user gesture is
+// logged and the run stops).
+// Results: notes/nano-probe-results-v5-<time>.json. ?round2 runs round 2 as it was (with ?all its extra tests).
 
 const $ = s => document.querySelector(s);
 const ROUND2 = new URLSearchParams(location.search).has('round2');
-const runId = `${ROUND2 ? 'v2' : 'v4'}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`;
-const R = { runId, probeVersion: ROUND2 ? 2 : 4, started: new Date().toISOString(), finished: null, imports: {}, tests: {}, errors: [], log: [] };
+const runId = `${ROUND2 ? 'v2' : 'v5'}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`;
+const R = { runId, probeVersion: ROUND2 ? 2 : 5, started: new Date().toISOString(), finished: null, imports: {}, tests: {}, errors: [], log: [] };
 const now = () => performance.now();
 const clone = o => JSON.parse(JSON.stringify(o));
 
@@ -622,6 +626,11 @@ const applied = r => r.items.filter(it => it.cmd && !it.error && !it.why).map(it
 // v3 on the owner's Chrome (notes/nano-probe-results-v3-2026-11-23T23-44-19.json), the grades that were not exact
 const V3_NOT_EXACT = { 'more energy': 'wrong', 'make it darker and calmer': 'partial', 'it feels too busy': 'wrong', 'simplify it and stay on this part a bit longer': 'partial', 'replace the bass with the acid line pattern': 'partial', 'add a spoken line: welcome to the night shift': 'wrong', 'play Glass Arp': 'partial', 'add neon hook': 'wrong', 'make it more intense': 'wrong', 'give it some air': 'partial', 'it is getting boring': 'wrong', 'make it warmer and softer': 'wrong' };
 const V3_SUMMARY = { english: { exact: 26, partial: 5, wrong: 7 }, latencyMs: { median: 2462 } };
+// v4 on the owner's Chrome (notes/nano-probe-results-v4-2026-11-24T00-46-58.json): the grades that were not exact, the app
+// outcome of every request, the summary
+const V4_NOT_EXACT = { 'go to the drop': 'wrong', 'make it darker and calmer': 'partial', 'it feels too busy': 'wrong', 'simplify it and stay on this part a bit longer': 'partial', 'più energia e togli un basso': 'partial', 'add neon hook': 'wrong', 'make it more intense': 'wrong', 'give it some air': 'wrong' };
+const V4_APP_NOT_APPLIED = { 'go to the drop': 'cannot', 'it feels too busy': 'cannot', 'change the tempo to 140 bpm': 'cannot', 'play the whole song backwards': 'cannot', 'più energia e togli un basso': 'proposal', 'rendilo più scuro': 'proposal', 'add neon hook': 'proposal', 'add my saved pattern Sunset Lead': 'rejected', 'make it more intense': 'proposal', 'give it some air': 'cannot', 'it is getting boring': 'proposal', 'make it warmer and softer': 'proposal' };
+const V4_SUMMARY = { english: { exact: 31, partial: 2, wrong: 5 }, app: { applied: 29, cannot: 5, proposal: 6, rejected: 1 }, wrongAndApplied: ['make it darker and calmer', 'simplify it and stay on this part a bit longer'], latencyMs: { median: 2817, max: 3555, min: 2412 } };
 
 // what the app does with a request after every guard: applied (at once), proposal (shown first), rejected (nothing
 // valid to apply), cannot (a note, nothing applies)
@@ -632,18 +641,22 @@ function appOutcome(pre, review, read) {
 }
 
 async function runRadioV3() {
-  const T = R.tests.radioV4 = { mode: 'registry+checks' };
+  const T = R.tests.radioV5 = { mode: 'registry+checks+cannot' };
   const G = M.generate, Reg = M.registry, ctx = V3_CTX(), state = V3_STATE();
   const initial = G.initialPrompts(), schema = G.answerSchema(ctx);
   T.prompt = { initial, schema, state, registryVersion: Reg.REGISTRY_VERSION, sizeTokens: G.promptSize(state) };
-  const cr = await timed(() => create({ initialPrompts: initial }, 'radio-v4'));
-  if (!cr.ok) { T.createError = cr.error; log(`radio v4: session failed ${cr.error.name}: ${cr.error.message}`, 'bad'); RADIO_REQUESTS.forEach(step); return; }
+  const cr = await timed(() => create({ initialPrompts: initial }, 'radio-v5'));
+  if (!cr.ok) {
+    T.createError = cr.error; log(`radio v5: session failed ${cr.error.name}: ${cr.error.message}`, 'bad');
+    if (R.autorun && cr.error.name === 'NotAllowedError') { R.autorun.needsGesture = true; log('autorun: create() needs a user gesture; the run stops, press Run all tests', 'bad'); }
+    RADIO_REQUESTS.forEach(step); return;
+  }
   const base = cr.value.s;
   T.createMs = cr.value.ms; T.usageSystemAndExamples = await usageOf(base); T.window = ctxWindow(base);
-  log(`radio v4: base session ${T.createMs} ms, usage ${T.usageSystemAndExamples} of ${T.window}, prompt ${T.prompt.sizeTokens} tokens`);
+  log(`radio v5: base session ${T.createMs} ms, usage ${T.usageSystemAndExamples} of ${T.window}, prompt ${T.prompt.sizeTokens} tokens`);
   T.results = [];
   for (const req of RADIO_REQUESTS) {
-    status(`Radio console (v4): ${T.results.length + 1}/${RADIO_REQUESTS.length}`);
+    status(`Radio console (v5): ${T.results.length + 1}/${RADIO_REQUESTS.length}`);
     const pre = Reg.precheck(req.q, ctx);
     let row;
     if (pre.cannot) row = { q: req.q, cat: req.cat, expected: req.exp, guard: 'cannot', note: pre.cannot, ms: 0, validJson: true, applied: [], app: 'cannot', ...score({ commands: [] }, req.exp) };
@@ -666,7 +679,7 @@ async function runRadioV3() {
       row = { q: req.q, cat: req.cat, expected: req.exp, raw: r.ok ? r.value : undefined, json, parseError, error: r.error, ms: r.ms, validJson: !!json, note: read.note, cannot: !!read.cannot, check: review && review.check, fixed: review ? review.fixed : [], rejected, applied: app, modelGrade, app: read.invalid ? 'rejected' : appOutcome(pre, review, read), ...(app ? score({ commands: app }, req.exp) : { grade: 'invalid' }) };
       try { sess.destroy(); } catch (e) { /* ignore */ }
     }
-    row.vague = !!pre.vague; row.v3 = V3_NOT_EXACT[req.q] || 'exact';
+    row.vague = !!pre.vague; row.v3 = V3_NOT_EXACT[req.q] || 'exact'; row.v4 = V4_NOT_EXACT[req.q] || 'exact'; row.v4app = V4_APP_NOT_APPLIED[req.q] || 'applied';
     T.results.push(row);
     const extra = [row.fixed && row.fixed.length ? `fixed: ${row.fixed.map(f => `${f.from} -> ${f.to}${f.unknown ? ' (not saved)' : ''}`).join('; ')}` : '', row.check ? `check: ${row.check}` : '', row.rejected && row.rejected.length ? `rejected: ${row.rejected.join('; ')}` : ''].filter(Boolean).join('  ');
     log(`${row.grade.padEnd(7)} ${row.app.padEnd(8)} ${row.ms} ms ${row.vague ? '[vague] ' : ''}${row.guard === 'cannot' ? '[cannot before the model] ' : row.guard === 'say' ? '[spoken line without the model] ' : ''}"${req.q}" -> ${row.raw ?? (row.json ? JSON.stringify(row.json) : row.note ?? '')}${extra ? `  ${extra}` : ''}`, row.grade === 'exact' ? 'ok' : row.grade === 'partial' ? '' : 'bad');
@@ -680,6 +693,9 @@ async function runRadioV3() {
     app: countBy(rows, 'app'),
     appByRequest: Object.fromEntries(rows.map(x => [x.q, `${x.app} (${x.grade})`])),
     vsV3: { better: rows.filter(x => V3_NOT_EXACT[x.q] && x.grade === 'exact').map(x => x.q), worse: rows.filter(x => !V3_NOT_EXACT[x.q] && x.cat !== 'italian' && x.grade !== 'exact').map(x => x.q) },
+    v4: V4_SUMMARY,
+    vsV4: { better: rows.filter(x => V4_NOT_EXACT[x.q] && x.grade === 'exact').map(x => x.q), worse: rows.filter(x => !V4_NOT_EXACT[x.q] && x.grade !== 'exact').map(x => x.q), appChanged: rows.filter(x => x.app !== x.v4app).map(x => `${x.q}: ${x.v4app} -> ${x.app}`) },
+    cannotTurnedIntoProposal: rows.filter(x => x.check === 'cannot').map(x => x.q),
     wrongButNotApplied: rows.filter(x => x.grade !== 'exact' && x.app !== 'applied').map(x => `${x.q}: ${x.app}`),
     wrongAndApplied: rows.filter(x => x.grade !== 'exact' && x.app === 'applied').map(x => x.q),
     cannotBeforeModel: rows.filter(x => x.guard === 'cannot').map(x => x.q), spokenWithoutModel: rows.filter(x => x.guard === 'say').map(x => x.q),
@@ -688,7 +704,7 @@ async function runRadioV3() {
     latencyMs: { median: ms[Math.floor(ms.length / 2)], max: ms[ms.length - 1], min: ms[0] },
     byCategory: Object.fromEntries([...new Set(rows.map(x => x.cat))].map(c => [c, countBy(rows.filter(x => x.cat === c), 'grade')])),
   };
-  log(`radio v4 summary: ${JSON.stringify(T.summary)}`, 'ok');
+  log(`radio v5 summary: ${JSON.stringify(T.summary)}`, 'ok');
 }
 
 // ---------- run ----------
@@ -729,7 +745,7 @@ async function runAll() {
   $('#run').disabled = false;
 }
 
-// round 4: environment, then the radio set with the app's registry, guards and checks (about 5 minutes)
+// round 5: environment, then the radio set with the app's registry, guards and checks (about 5 minutes)
 async function runV3() {
   $('#run').disabled = true; $('#log').textContent = ''; stepsDone = 0;
   stepsTotal = 1 + RADIO_REQUESTS.length;
@@ -737,7 +753,7 @@ async function runV3() {
   log(`run ${runId} (probe v${R.probeVersion}, the app's registry, guards and checks after the model) on ${location.origin}`);
   const guard = async (name, fn) => { const t = now(); try { return await fn(); } catch (e) { R.tests[name] = { ...(R.tests[name] || {}), crashed: errInfo(e) }; log(`${name} crashed: ${e && e.name}: ${e && e.message}`, 'bad'); return undefined; } finally { (R.tests[name] = R.tests[name] || {}).totalMs = Math.round(now() - t); await save(); } };
   const go = await guard('environment', testEnvironment); step();
-  if (go !== false && M) await guard('radioV4', runRadioV3);
+  if (go !== false && M) await guard('radioV5', runRadioV3);
   else if (!M) log('app modules missing: nothing more to test', 'bad');
   R.finished = new Date().toISOString();
   await save();
@@ -748,3 +764,16 @@ async function runV3() {
 }
 
 $('#run').addEventListener('click', runAll);
+
+// ?autorun=1: the run starts by itself once the modules are loaded and the model is "available" (a model still to download
+// needs the click, the download wants a user gesture)
+if (new URLSearchParams(location.search).get('autorun') === '1') (async () => {
+  await loading;
+  const L = LM();
+  let a = null;
+  try { a = L ? await (typeof L.availability === 'function' ? L.availability(LANG) : null) : null; } catch (e) { a = `error ${e && e.name}`; }
+  R.autorun = { availability: a, userActivation: !!(navigator.userActivation && navigator.userActivation.isActive) };
+  if (a !== 'available') { log(`autorun: availability is ${JSON.stringify(a)}, not "available": not started, use Run all tests`, 'bad'); status('Autorun not started (see the log).'); await save(); return; }
+  log('autorun: the model is available, the run starts without a click');
+  await runAll();
+})();

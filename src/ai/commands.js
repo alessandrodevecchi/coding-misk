@@ -338,9 +338,23 @@ export function kindsNamed(request) {
   const text = norm(request);
   return ENTRIES.filter(e => e.words.some(w => WORD_OWNERS.get(w) === 1 && has(text, w))).map(e => e.kind);
 }
-// the answer read against the request: { json, check: null | 'pattern' | 'words', fixed: [what was changed] }. json is
-// a copy with pattern names replaced or set to the request's name; check asks for a proposal even in "Apply at once"
+// D4 check 7 (probe v4): a "cannot" answer to a request that is not vague and names exactly one command by its unique
+// words, a command with no required arguments, becomes that command; null when the "cannot" stays
+export function cannotOverride(request, ctx = {}) {
+  if (precheck(request, ctx).vague !== false) return null;
+  const named = kindsNamed(request);
+  if (named.length !== 1) return null;
+  const e = BY_KIND[named[0]];
+  return e && !e.args.required.length ? e.kind : null;
+}
+// the answer read against the request: { json, check: null | 'pattern' | 'words' | 'cannot', fixed: [what was changed] }.
+// json is a copy with pattern names replaced or set to the request's name, or a "cannot" turned into the command the
+// request names (check 7, the engine's note dropped); check asks for a proposal even in "Apply at once"
 export function reviewAnswer(request, json, ctx = {}) {
+  if (json && typeof json === 'object' && Array.isArray(json.commands) && !json.commands.length) {
+    const kind = cannotOverride(request, ctx);
+    if (kind) return { json: { ...json, note: '', commands: [{ kind }] }, check: 'cannot', fixed: [{ from: 'cannot', to: kind }] };
+  }
   if (!json || typeof json !== 'object' || !Array.isArray(json.commands) || !json.commands.length) return { json, check: null, fixed: [] };
   const patterns = ctx.patterns || [], fixed = [];
   let check = null, named;

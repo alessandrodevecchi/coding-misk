@@ -23,6 +23,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Guide: "Sound dice" card.
 - Radio: a request row at the top of the console turns a typed request into console commands with the browser's built-in model, applied at once or proposed first.
 - Radio: requests name saved patterns by name, refuse unknown or unclear names, answer "cannot" for tempo, time signature and playing backwards, and show vague requests as a proposal.
+- Radio: a "cannot" answer to a request that names exactly one command without arguments is shown as a proposal of that command.
 - Settings: AI assistant card with the engine, model, status, download and mode per area.
 - `docs/AGENT-API.md`: every console command an AI engine or agent may give, generated from the command registry.
 - `npm run agent-api`, `npm run check:agent-api`, `npm run check:ai` and `tools/check-ai.cjs`: the command registry, its document and the console assistant.
