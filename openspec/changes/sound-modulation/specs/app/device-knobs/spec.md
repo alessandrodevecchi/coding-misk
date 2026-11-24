@@ -49,12 +49,12 @@ A recorded gesture SHALL be saved as a path of the path engine (`app/movement-pa
 ### Requirement: Knob placement without a new panel
 No permanent panel SHALL be added for knobs. A knob SHALL appear only:
 - on the movement device's card in the Compose rack, as the first row of the card's controls, with the record dot;
-- in the radio console's Parts row, after the Vary and Swap keys, only while the selected part plays a movement device, at most two knobs, acting while the song plays and never recorded;
+- in the Movement row of the radio console's track card (the card a Mixer row's name opens), only while that track plays a movement device, at most two knobs, acting while the song plays and never recorded;
 - in code, as the editor's slider widget on the `knob(n)` call the app writes.
 
 #### Scenario: Radio row
-- **WHEN** a radio song plays and the user selects the pad chip, whose track has one movement device, then the bass chip, whose track has none
-- **THEN** one knob shows next to Vary and Swap for the pad, and no knob shows for the bass
+- **WHEN** a radio song plays and the user opens the track card of the pad, whose track has one movement device, then the card of the bass, whose track has none
+- **THEN** the pad's card shows one knob in its Movement row, and the bass's card shows no Movement row
 
 #### Scenario: Radio moves not recorded
 - **WHEN** the user turns the pad's knob in the radio, then saves the song and opens it in Compose
