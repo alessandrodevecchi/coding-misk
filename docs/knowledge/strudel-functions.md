@@ -14,7 +14,7 @@ The app ships one exact version of Strudel. The catalog lists every function of 
 The catalog exists because many useful functions were never written: the app kept using the same few. Read this note before adding a move to the generator, a growth shape or a radio command. Pick functions from the list below first.
 
 <!-- generated:summary -->
-Functions in the shipped Strudel: 610. Written by the app: 70. Never written: 540.
+Functions in the shipped Strudel: 610. Written by the app: 80. Never written: 530.
 <!-- /generated -->
 
 ## How it connects
@@ -53,8 +53,6 @@ Useful for variety and not written yet by the app (a function written under any 
 | `off` | A shifted, transformed copy of a line (echoes, harmonies). |
 | `ply` | Repeats each event: a build-up move. |
 | `perlin` | Smooth seeded movement for filters and levels. |
-| `pick` | Picks named ideas by a pattern of indices. |
-| `duck` | Sidechain ducking of one bus by another, instead of written gain steps. |
 | `lpenv` | Filter envelope depth: a filter that opens per note. |
 | `fm3` | Third FM operator. |
 | `fm4` | Fourth FM operator. |
@@ -71,7 +69,7 @@ Useful for variety and not written yet by the app (a function written under any 
 <!-- generated:written -->
 Written by the app today:
 
-`K`, `add`, `all`, `analyze`, `anchor`, `arp`, `attack`, `bank`, `beat`, `chord`, `clip`, `crush`, `decay`, `degradeBy`, `delay`, `delayfeedback`, `delaysync`, `distort`, `distorttype`, `distortvol`, `early`, `fmdecay`, `fmh`, `fmh2`, `fmi` (as `fm`), `fmi2` (as `fm2`), `fmsustain`, `fmwave`, `gain`, `hpf`, `irand`, `jux`, `late`, `lpf`, `lpq`, `mask`, `mode`, `mul`, `n`, `note`, `orbit`, `pan`, `phaser`, `phaserdepth`, `postgain`, `range`, `register`, `release`, `ribbon` (as `rib`), `room`, `roomsize`, `s`, `scale`, `segment` (as `seg`), `setcpm`, `slice`, `slow`, `speed`, `stretch`, `struct`, `sub`, `superimpose`, `sustain`, `swingBy`, `transpose`, `tremolodepth`, `tremolosync`, `velocity`, `voicing`, `vowel`
+`K`, `add`, `all`, `analyze`, `anchor`, `arp`, `attack`, `bank`, `beat`, `chord`, `clip`, `crush`, `decay`, `degradeBy`, `delay`, `delayfeedback`, `delaysync`, `distort`, `distorttype`, `distortvol`, `duckattack`, `duckdepth`, `duckorbit` (as `duck`), `early`, `env`, `fmdecay`, `fmh`, `fmh2`, `fmi` (as `fm`), `fmi2` (as `fm2`), `fmsustain`, `fmwave`, `gain`, `hpf`, `irand`, `jux`, `late`, `lfo`, `lpdepth`, `lpf`, `lpq`, `lpshape`, `lpsync`, `mask`, `mode`, `mul`, `n`, `note`, `orbit`, `pan`, `phaser`, `phaserdepth`, `pick`, `postgain`, `range`, `rangex`, `register`, `release`, `ribbon` (as `rib`), `room`, `roomsize`, `s`, `scale`, `segment` (as `seg`), `setcpm`, `slice`, `slow`, `speed`, `stretch`, `struct`, `sub`, `superimpose`, `sustain`, `swingBy`, `transpose`, `tremolodepth`, `tremolosync`, `velocity`, `voicing`, `vowel`
 <!-- /generated -->
 
 ## Where to read more

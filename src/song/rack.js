@@ -1,5 +1,6 @@
 // Track rack: an ordered chain of devices added after the instrument, each one a Strudel function.
 // A device in a song: { "device": "echo", "count": 3, "time": 0.125, "feedback": 0.5 } (missing values take the defaults; "on": false bypasses it).
+import { MOVE_DEVICES, movePreview, checkMoves } from './movement.js';
 const f = n => String(Math.round(n * 1000) / 1000);
 const MELODIC = ['bass', 'guitar', 'arp', 'hook', 'pad', 'code'];
 
@@ -54,7 +55,13 @@ export const DEVICES = {
     code: a => `.K(audioin().mul(sine(${f(a.freq)}).mul(${f(a.amount)}).add(${f(1 - a.amount)})).out())` },
   pan: { kind: 'sound', label: { en: 'Pan', it: 'Panorama' }, args: [['position', 'num', 0.5, 0, 1, 0.05], ['motion', 'choice', 'fixed', ['fixed', 'slow', 'fast']]],
     code: a => a.motion === 'fixed' ? `.pan(${f(a.position)})` : `.pan(sine.slow(${a.motion === 'slow' ? 8 : 1}))` },
+  // movement devices (sound-modulation, #95): their code depends on the clip, the tempo and the other tracks, so the
+  // compiler writes it (src/song/movement.js); code() here is the preview of the Compose card
+  ...Object.fromEntries(Object.entries(MOVE_DEVICES).map(([k, d]) => [k, { ...d, code: (a, type) => movePreview({ device: k, ...a }, type) }])),
 };
+// the controls a device writes as a base value later on the line (sound-modulation D2): #94's variation leaves them out
+// (src/song/writes.js, also read by the variation without importing the rack)
+export { deviceWrites, WRITES } from './writes.js';
 
 // the level after a fold (fm-like-effects D2). The fold's slope at zero is g = 1 + k/2 with k = expm1(amount)
 // (superdough's distort), times π/2 for the soft curve (sinefold), and the fold never leaves -1…1. With the level
@@ -78,9 +85,9 @@ export const deviceArgs = dev => {
 };
 export const newDevice = name => ({ device: name, ...deviceArgs({ device: name }) });
 // code of the whole chain for a track type
-export const rackCode = (rack, type) => (rack || []).filter(d => d && d.on !== false && DEVICES[d.device]).map(d => DEVICES[d.device].code(deviceArgs(d), type)).join('');
+export const rackCode = (rack, type) => (rack || []).filter(d => d && d.on !== false && DEVICES[d.device] && DEVICES[d.device].kind !== 'move').map(d => DEVICES[d.device].code(deviceArgs(d), type)).join('');
 
-export function checkRack(rack, p, err, warn) {
+export function checkRack(rack, p, err, warn, type = null, settings = {}) {
   if (!Array.isArray(rack)) { err(p, 'an array of devices, for example [{ "device": "delay", "amount": 0.4 }]'); return; }
   rack.forEach((d, i) => {
     const dp = `${p}[${i}]`;
@@ -103,4 +110,5 @@ export function checkRack(rack, p, err, warn) {
   // Fold and Distortion write the same Strudel stage (distort): only the later one is heard (fm-like-effects D2)
   const on = rack.map((d, i) => [d, i]).filter(([d]) => d && d.on !== false && (d.device === 'fold' || d.device === 'distort'));
   if (on.some(([d]) => d.device === 'fold') && on.some(([d]) => d.device === 'distort')) warn(p, `fold and distort share one distortion stage: only the later one (${on[on.length - 1][0].device}) is heard`);
+  checkMoves(rack, p, err, warn, type, settings);
 }

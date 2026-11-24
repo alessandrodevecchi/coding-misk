@@ -126,7 +126,7 @@ export function validateSong(song, opts = {}) {
     ids.add(tr.id);
     if (!TYPES.includes(tr.type)) { err(`${p}.type`, `one of ${TYPES.join(', ')}`); return; }
     checkSettings(tr.type, tr.settings || {}, `${p}.settings`, err, warn);
-    if (tr.rack !== undefined) checkRack(tr.rack, `${p}.rack`, err, warn);
+    if (tr.rack !== undefined) checkRack(tr.rack, `${p}.rack`, err, warn, tr.type, tr.settings);
     // variation left out by the writer (random-sound-params D4): an automated target, one a rack device writes later on
     // the line, or one an idea's random values write too
     const vary = (tr.settings || {}).vary;

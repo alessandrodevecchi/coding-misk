@@ -1,8 +1,8 @@
 ---
 id: sound-and-levels
 related: [sounds, songs, material, export, checks, pitfalls]
-code: [src/song/rack.js, src/sounds/limiter.js, src/sounds/sound-guard.js, src/sounds/reverb-cache.js, src/sounds/soundfont-fix.js, tools/output-peak.cjs, tools/check-levels.cjs, tools/snapshot-levels.cjs, tests/snapshots/levels.json]
-checks: [node tools/check-levels.cjs, node tools/snapshot-levels.cjs, node tools/check-export.cjs, npm run check:sound-guard, node tools/check-sounds.cjs]
+code: [src/song/rack.js, src/song/movement.js, src/sounds/duck-guard.js, src/sounds/limiter.js, src/sounds/sound-guard.js, src/sounds/reverb-cache.js, src/sounds/soundfont-fix.js, tools/output-peak.cjs, tools/check-levels.cjs, tools/snapshot-levels.cjs, tests/snapshots/levels.json]
+checks: [npm run check:modulation, node tools/check-modulation.cjs, node tools/check-levels.cjs, node tools/snapshot-levels.cjs, node tools/check-export.cjs, npm run check:sound-guard, node tools/check-sounds.cjs]
 ---
 
 # Sound and levels
@@ -48,6 +48,14 @@ Ring per note is fine on one or two tracks; on every line of a dense song it bre
 
 **Sound guard.** Some soundfont files are broken upstream. The guard plays a stand-in font instead of silence, and an export names a sound it had to skip. A drum row a kit lacks is mapped to the nearest row by the compiler (`kitRow` in `src/music.js`). It remembers what it learned in the browser, per soundfont library version. It never learns the voice helper's banks (`say_*`): their files are made on this machine while the page runs, so a failed load is tried once more from a fresh address (`freshUrl`: superdough keeps every address's load, a failed one too, in a private cache it cannot clear) and stored `say_*` entries are dropped on load. A sample whose address answers with a page (`text/html`) or an error status is not learned either (`servesAudio`, #82).
 
+**Movement devices** (sound-modulation, #95; `src/song/movement.js`). Strudel reads an effect value at each note's onset, so `.lpf(sine.slow(8))` on a held pad stays frozen for the note. Three rack devices in the "Movement" group move a melodic track (bass, arp, hook, pad, guitar, code) inside its notes, with no random value; at most two per track and one Pump. The compiler writes them after the other rack devices of a line, adds the base value a modulator needs when the line has none (the track's own value, else pan 0.5, sends 0.001, the filter at the track's cutoff) and keeps one call per control.
+
+- **Sweep** (Apertura): the target's value per onset follows a ramp aligned to the clip's start (`saw.slow(bars).rangex(from, top)`, `top` a little over `to` so the last sixteenth reaches it; `once` on a longer clip picks `to` after the ramp). On a pad that holds one chord per bar it writes one value per bar and `.env({ c, a: <bar seconds>, s: 1, da: <step to the next bar> })`, so the value glides inside the held note. It replaces the track's cutoff ramp or its own room or delay on the line (the validator warns), and #94's `vary` on the same control steps aside.
+- **LFO** (Oscillazione): the filter LFO for the filter (`lpsync(1/rate).lpdepth(depth × 1.8).lpshape(…)`), `.lfo({ c, s, da, sh })` for pan (`da` = 2 × depth: the panner runs from -1 to 1) and the sends (`dc: 0`, `da` = 0.5 × depth: from the send's own value up). Its phase follows the song's bars, not the note (superdough starts the wave at `cycle × sync`).
+- **Pump** (Pompa): every kick line (row `bd` of a drums track that plays) in a section where the pumped track plays gets `.duck(<orbit>).duckdepth(d).duckattack(recover)`, several pumped tracks as `"6:9"`; the pumped line is unchanged. In a section with no kick the pumped line dips on the beat instead: `.lfo({ c: 'gain', s: 1/rate, da: depth × gain, dc: -1, sh: 'ramp' })`, from `gain - da` back to `gain`. `src/sounds/duck-guard.js` makes a pumped orbit that has not played yet before the first kick ducks it (superdough otherwise skips the duck and logs an error) and, on the render page, schedules the dip on the audio clock, so two fast exports match.
+
+Measured with `tools/check-modulation.cjs` (fast export, 2026-11-24): filter LFO `lpdepth` is linear, a share of the cutoff peak to peak (0.36 swayed about 700 to 1300 Hz around 1000, 1.44 about 290 to 1900); the Sweep's glide rises through a held bar to the next bar's value with no overshoot, where steps alone stay flat; a pumped pad is about 10 dB down in the eighth of a beat after the kick and back within 0.4 dB by the beat's end (beat dip without a kick: 6.4 dB down, 0.4 dB at the end); no device made a line louder than its open filter or its still self by more than 0.02, and the example songs stay below 0.97. Fast and real-time exports of the Pump and Sweep examples agree (`tools/check-export.cjs example-pump,example-sweep`: loudness within 0.02 dB, r ≥ 0.995).
+
 **Composed drum tones** (`random-sound-params` 2.4, measured with `tools/check-sound-levels.cjs` on the fast export): `.decay(d).sustain(0)` shortens a drum sample and `.speed()` tunes it on every kit tried; a low-pass on a full kick overshoots its peak (0.85 to 0.97 on LinnDrum, AkaiMPC60, AlesisHR16), so the generator gives the kick no cutoff; a tone adds drive only to a track that drives already, since `distortvol(.5)` halves a clean row; variation never varies the distortion of a clean line for the same reason, and `gain` variation only lowers.
 
 ## How it connects
@@ -86,6 +94,9 @@ Ring per note is fine on one or two tracks; on every line of a dense song it bre
 | `fold` | Fold (it: Piega) | sound | amount 0.1-3 (1.5); curve sharp/soft (sharp) |
 | `ring` | Ring | sound | freq 30-2000 (220); amount 0-1 (0.8) |
 | `pan` | Pan (it: Panorama) | sound | position 0-1 (0.5); motion fixed/slow/fast (fixed) |
+| `sweep` | Sweep (it: Apertura) | move | target filter/hpf/room/delay (filter); from 0-18000 (400); to 0-18000 (4000); bars 1/2/4/8/16 (8); curve exp/linear (exp); repeat once/loop (once) |
+| `lfo` | LFO (it: Oscillazione) | move | target filter/pan/room/delay (filter); rate 0.0625/0.125/0.25/0.5/1/2/4 (0.5); depth 0-1 (0.4); shape sine/tri/saw/ramp/square (sine) |
+| `pump` | Pump (it: Pompa) | move | depth 0-1 (0.6); recover 0.05-0.5 (0.15); rate 0.25/0.125/0.0625 (0.25) |
 <!-- /generated -->
 
 <!-- generated:levels -->

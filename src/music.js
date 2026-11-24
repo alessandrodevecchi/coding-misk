@@ -449,7 +449,7 @@ const altItems = s => {
 // crash, breath: crash sul primo colpo, mezza battuta di silenzio alla fine
 // only: genera un solo strumento (compilatore v2, un clip alla volta); orbit: bus del clip
 // shared: the song's shared progressions ({ name: text }); variant: the prepared variant switched on (index or null)
-export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, crash = false, breath = false, fill = false, only = null, orbit = null, rack = '', shared = {}, variant = null } = {}) {
+export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = false, crash = false, breath = false, fill = false, only = null, orbit = null, rack = '', shared = {}, variant = null, duck = '' } = {}) {
   s = normalizeState(s);
   const want = ch => !only || only === ch;
   const orb = ch => `.orbit(${orbit ?? ORBITS[ch]})`;
@@ -502,7 +502,7 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     const row = d.rows[id], on = d.on && (irows ? !!irows[id] : !row.mute), steps = irows ? irows[id] || '' : fitSteps(row.steps, N);
     if (!steps.includes('x') || !show(on)) continue;
     // composed tones and variation (random-sound-params D2, D4): none without the settings, so the line stays as it was
-    if (!d.tone && !d.vary) { L.push(`${lab(on)}: ${drumRow(kitRow(d.kit, id), steps, { coarse })}.bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${rack}${breathMask}${g}${orb('drums')}.analyze("${inst}")`); continue; }
+    if (!d.tone && !d.vary) { L.push(`${lab(on)}: ${drumRow(kitRow(d.kit, id), steps, { coarse })}.bank("${d.kit}").gain(${scaleGain(d.gain, d.gainEnd, mult)})${filter(d.cutoff, d.cutoffEnd)}${drive(d.drive)}${grit(d.grit)}${sw}${rack}${id === 'bd' ? duck : ''}${breathMask}${g}${orb('drums')}.analyze("${inst}")`); continue; }
     const tn = toneOfRow(d.tone, id), V = vOn(d.vary, id, rack);
     const fixedCut = d.cutoffEnd === null || d.cutoffEnd === undefined || d.cutoffEnd === d.cutoff;
     const cut = fixedCut && tn && tn.cutoff !== null && tn.cutoff < Math.min(d.cutoff, 18000) ? tn.cutoff : d.cutoff;
@@ -512,7 +512,7 @@ export function sceneLayers(s, { start = 0, bars = 1, gate = null, labels = fals
     const lpfCode = V && V.lpf && fixedCut ? `.lpf(${vArg(V, 'lpf', cut)})` : filter(cut, fixedCut ? null : d.cutoffEnd);
     const drvCode = V && V.distort && drv > 0 ? `.distort(${vArg(V, 'distort', drv)}).distortvol(.5)` : drive(drv);
     const gritCode = V && V.crush ? `.crush(${vArg(V, 'crush', d.grit > 0 ? Math.round(16 - d.grit * 13) : 16)})` : grit(d.grit);
-    L.push(`${lab(on)}: ${drumRow(kitRow(d.kit, id), steps, { coarse })}.bank("${d.kit}")${head}.gain(${gainCode})${lpfCode}${drvCode}${gritCode}${vExtra(V, ['hpf', 'pan', 'delay', 'room', 'vowel'], {})}${sw}${rack}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
+    L.push(`${lab(on)}: ${drumRow(kitRow(d.kit, id), steps, { coarse })}.bank("${d.kit}")${head}.gain(${gainCode})${lpfCode}${drvCode}${gritCode}${vExtra(V, ['hpf', 'pan', 'delay', 'room', 'vowel'], {})}${sw}${rack}${id === 'bd' ? duck : ''}${breathMask}${g}${orb('drums')}.analyze("${inst}")`);
   }
   if (want('drums') && fill && d.on) L.push(`$: s("sd*${N}").bank("${d.kit}").gain(saw.range(.15, .75)).mask("${rle(rotate([...Array(Math.max(0, bars - 1)).fill('0'), '1'], start))}")${g}${orb('drums')}.analyze("snare")`);
   if (want('drums') && crash && d.on) L.push(`$: s("cr").bank("${NO_CRASH.includes(d.kit) ? 'RolandTR909' : d.kit}").gain(.55).room(.4).mask("${rle(rotate(['1', ...Array(Math.max(0, bars - 1)).fill('0')], start))}")${g}${orb('drums')}.analyze("fx")`);

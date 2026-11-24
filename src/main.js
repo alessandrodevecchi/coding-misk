@@ -34,6 +34,8 @@ import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SOUND_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, VOICE_STYLES, styleOf, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice, choiceLabel } from './song/rack.js';
+import { MOVE_TYPES, MOVE_MAX, SWEEP_DEFAULTS } from './song/movement.js';
+import { guardDuck } from './sounds/duck-guard.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
 import { inventStyle } from './endless/style-maker.js';
 import { createSongOptions, RADIO_KEY, NEW_SONG_KEY } from './endless/song-options.js';
@@ -1345,7 +1347,7 @@ renderHandLast();
 let audioInit = null;
 function initAudioOnce() {
   // the master limiter's worklet (level-headroom) loads with the others, before the first note
-  if (!audioInit && typeof globalThis.initAudio === 'function') audioInit = globalThis.initAudio().then(() => loadLimiter(globalThis.getAudioContext())).catch(e => { audioInit = null; console.error(e); });
+  if (!audioInit && typeof globalThis.initAudio === 'function') audioInit = globalThis.initAudio().then(() => { try { guardDuck(globalThis.getSuperdoughAudioController()); } catch (e) {} return loadLimiter(globalThis.getAudioContext()); }).catch(e => { audioInit = null; console.error(e); });
   return audioInit;
 }
 
@@ -3953,17 +3955,20 @@ const simpleNotes = s => !s || /^[-\d~\s]+$/.test(s);
 const noteTokens = (s, n) => { const tk = (s || '').trim().split(/\s+/).filter(Boolean); return Array.from({ length: n }, (_, i) => tk.length ? tk[i % tk.length] : '~'); };
 
 // un modulo del rack: nome, acceso/spento, codice Strudel che aggiunge, valori, ordine
-const devValue = (name, v) => name === 'time' ? `${+(v * 16).toFixed(2)}/16` : String(v);
+const devValue = (name, v) => name === 'time' ? `${+(v * 16).toFixed(2)}/16` : name === 'recover' ? `${v} s` : String(v);
 function deviceHtml(d, i, tr) {
   const spec = DEVICES[d.device]; if (!spec) return '';
   const a = deviceArgs(d), n = (tr.rack || []).length;
+  // a movement device (sound-modulation): its main knob first, always shown and larger, heard from the next note; the
+  // from and to of a Sweep take the range of its target
+  const args = spec.knob ? [...spec.args.filter(x => x[0] === spec.knob), ...spec.args.filter(x => x[0] !== spec.knob)].map(x => { const r = spec.argRange && spec.argRange(x[0], a); return r ? [x[0], x[1], x[2], ...r] : x; }) : spec.args;
   return `<div class="device${d.on === false ? ' off' : ''}" data-dev="${i}">
     <div class="dev-head"><button class="led" data-dev-on="${i}" aria-pressed="${d.on !== false}" aria-label="${esc(t('onoff', { name: tx(spec.label) }))}"></button>
       <b>${esc(tx(spec.label))}</b><code data-dev-code="${i}"></code>
       <span class="dev-tools"><button class="mini" data-dev-move="${i}:-1" ${i === 0 ? 'disabled' : ''} aria-label="${esc(t('moveUp'))}">▲</button><button class="mini" data-dev-move="${i}:1" ${i === n - 1 ? 'disabled' : ''} aria-label="${esc(t('moveDown'))}">▼</button><button class="mini" data-dev-del="${i}" aria-label="${esc(t('remove'))}">✕</button></span></div>
-    ${spec.args.length ? `<div class="dev-args">${spec.args.map(([name, kind, , lo, hi, step], k) => kind === 'choice'
-      ? `<div class="ctrl"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><select id="dev-${i}-${name}" data-dev-arg="${i}:${name}">${lo.map(v => `<option value="${v}"${v === a[name] ? ' selected' : ''}>${esc(spec.args[k][4] ? choiceLabel(spec.args[k], v, getLang()) : devValue(name, v))}</option>`).join('')}</select></div>`
-      : `<div class="ctrl"><div class="row"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><output data-dev-out="${i}:${name}"></output></div><input type="range" id="dev-${i}-${name}" data-dev-arg="${i}:${name}" min="${lo}" max="${hi}" step="${step}" value="${a[name]}"></div>`).join('')}</div>` : ''}
+    ${args.length ? `<div class="dev-args">${args.map(([name, kind, , lo, hi, step], k) => kind === 'choice'
+      ? `<div class="ctrl"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><select id="dev-${i}-${name}" data-dev-arg="${i}:${name}">${lo.map(v => `<option value="${v}"${v === a[name] ? ' selected' : ''}>${esc(args[k][4] ? choiceLabel(args[k], v, getLang()) : devValue(name, v))}</option>`).join('')}</select></div>`
+      : `<div class="ctrl${spec.knob === name ? ' dev-knob' : ''}"${spec.knob === name ? ` title="${esc(t('moveKnobTip'))}"` : ''}><div class="row"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><output data-dev-out="${i}:${name}"></output></div><input type="range" id="dev-${i}-${name}" data-dev-arg="${i}:${name}" min="${lo}" max="${hi}" step="${step}" value="${a[name]}"></div>`).join('')}</div>` : ''}
   </div>`;
 }
 function syncRack(tr, host = document) {
@@ -4390,7 +4395,7 @@ function panelHtml(ti) {
     <div class="ctrls">${tr.type === 'voice' || tr.type === 'spoken' ? vstyleHtml() : ''}${(CONTROLS[tr.type] || []).map(settingHtml).join('')}</div>
     <div class="tp-rack"><div class="row"><span class="lbl">Rack</span><span class="hint">${t('rackHint')}</span></div>
       <div class="rack-list">${(tr.rack || []).map((d, i) => deviceHtml(d, i, tr)).join('') || `<p class="note">${t('noDevices')}</p>`}</div>
-      <div class="rack-add"><select id="rk-type" aria-label="${esc(t('addDevice'))}">${['note', 'sound'].map(kind => `<optgroup label="${esc(t(kind === 'note' ? 'devNote' : 'devSound'))}">${Object.entries(DEVICES).filter(([, d]) => d.kind === kind).map(([k, d]) => `<option value="${k}">${esc(tx(d.label))}</option>`).join('')}</optgroup>`).join('')}</select><button class="btn" id="rk-add">${t('addDevice')}</button></div>
+      <div class="rack-add"><select id="rk-type" aria-label="${esc(t('addDevice'))}">${['note', 'sound', ...(MOVE_TYPES.includes(tr.type) ? ['move'] : [])].map(kind => `<optgroup label="${esc(t(kind === 'note' ? 'devNote' : kind === 'move' ? 'devMove' : 'devSound'))}">${Object.entries(DEVICES).filter(([, d]) => d.kind === kind).map(([k, d]) => `<option value="${k}">${esc(tx(d.label))}</option>`).join('')}</optgroup>`).join('')}</select><button class="btn" id="rk-add">${t('addDevice')}</button></div>
     </div>`);
 }
 // the line of a voice instrument's pattern (voice-instrument): how it speaks, its text (own, or drawn from the
@@ -4531,7 +4536,12 @@ $('#track-panel').addEventListener('change', e => {
     const start = r === 'clip-start' ? Math.round(+e.target.value) - 1 : sp.s, bars = r === 'clip-bars' ? Math.round(+e.target.value) : sp.e - sp.s;
     setClipSpan(tr, c, start, bars); changed(); renderTrackPanel(); return;
   }
-  if (e.target.matches('select[data-dev-arg]')) { const [i, name] = e.target.dataset.devArg.split(':'); const v = e.target.value; tr.rack[+i][name] = isNaN(+v) ? v : +v; changed(); syncRack(tr, e.target.closest('[data-ptrk]')); return; }
+  if (e.target.matches('select[data-dev-arg]')) {
+    const [i, name] = e.target.dataset.devArg.split(':'); const v = e.target.value; tr.rack[+i][name] = isNaN(+v) ? v : +v;
+    // a Sweep's new target brings its own from, to and curve (Hz for the filters, 0-1 for the sends)
+    if (tr.rack[+i].device === 'sweep' && name === 'target' && SWEEP_DEFAULTS[v]) { Object.assign(tr.rack[+i], SWEEP_DEFAULTS[v]); changed(); renderTrackPanel(); return; }
+    changed(); syncRack(tr, e.target.closest('[data-ptrk]')); return;
+  }
   if (r === 'pt-preset') editPattern(p => { p.preset = e.target.value; delete p.steps; delete p.idea; });
   if (r === 'pt-speed') { editPattern(p => { p.speed = e.target.value; delete p.steps; }); renderTrackPanel(); }
   if (r === 'pt-rhythm') editPattern(p => { p.rhythm = e.target.value; });
@@ -4581,7 +4591,12 @@ $('#track-panel').addEventListener('click', e => {
   }
   if (r === 'pt-notes-reset') return editPattern(p => { delete p.notes; });
   if (r === 'clip-del') { tr.clips.splice(selClip, 1); selClip = null; changed(); renderTrackPanel(); return; }
-  if (r === 'rk-add') { tr.rack = [...(tr.rack || []), newDevice(($('#p' + tk + '_rk-type') || {}).value)]; changed(); renderTrackPanel(); return; }
+  if (r === 'rk-add') {
+    const kind = ($('#p' + tk + '_rk-type') || {}).value, moves = (tr.rack || []).filter(d => DEVICES[d.device] && DEVICES[d.device].kind === 'move');
+    // at most two movement devices on a track and one Pump (sound-modulation D1)
+    if (DEVICES[kind] && DEVICES[kind].kind === 'move' && (moves.length >= MOVE_MAX || (kind === 'pump' && moves.some(d => d.device === 'pump')))) { toast(t(kind === 'pump' && moves.some(d => d.device === 'pump') ? 'movePumpOne' : 'moveMax')); return; }
+    tr.rack = [...(tr.rack || []), newDevice(kind)]; changed(); renderTrackPanel(); return;
+  }
   if (b.dataset.devOn !== undefined) { const d = tr.rack[+b.dataset.devOn]; if (d.on === false) delete d.on; else d.on = false; changed(); renderTrackPanel(); return; }
   if (b.dataset.devDel !== undefined) { tr.rack.splice(+b.dataset.devDel, 1); if (!tr.rack.length) delete tr.rack; changed(); renderTrackPanel(); return; }
   if (b.dataset.devMove) { const [i, d] = b.dataset.devMove.split(':').map(Number), j = i + d; if (j < 0 || j >= tr.rack.length) return; [tr.rack[i], tr.rack[j]] = [tr.rack[j], tr.rack[i]]; changed(); renderTrackPanel(); return; }

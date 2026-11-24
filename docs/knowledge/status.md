@@ -14,7 +14,7 @@ Before starting work, read the last entries of `DEVLOG.md` (Italian) and run `gh
 ## Open changes
 
 <!-- generated:changes -->
-OpenSpec changes not archived: 132. With open tasks: 45. All tasks ticked, waiting to be archived: 87.
+OpenSpec changes not archived: 133. With open tasks: 46. All tasks ticked, waiting to be archived: 87.
 
 | Change | Open tasks | Tasks |
 | --- | --- | --- |
@@ -56,6 +56,7 @@ OpenSpec changes not archived: 132. With open tasks: 45. All tasks ticked, waiti
 | [random-sound-params](../../openspec/changes/random-sound-params/tasks.md) | 1 | 31 |
 | [settings-polish](../../openspec/changes/settings-polish/tasks.md) | 1 | 14 |
 | [song-library-meta](../../openspec/changes/song-library-meta/tasks.md) | 1 | 10 |
+| [sound-modulation](../../openspec/changes/sound-modulation/tasks.md) | 27 | 27 |
 | [switch-styles](../../openspec/changes/switch-styles/tasks.md) | 2 | 8 |
 | [track-to-code](../../openspec/changes/track-to-code/tasks.md) | 11 | 42 |
 | [varied-openings](../../openspec/changes/varied-openings/tasks.md) | 1 | 28 |
