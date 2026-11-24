@@ -16,6 +16,8 @@ Estimates are in agent hours. Stage 0 is the command registry; stage 1 is the Ra
 - [x] 1.7 Guide part for the assistant (both languages), `docs/knowledge/` note `ai-assistant.md` and its row in the README table, the "Add a radio command" recipe updated for the registry, a line in `docs/knowledge/decisions.md`; `npm run check:guide`, `npm run check:knowledge` (0.5 h).
 - [x] 1.8 `npm run check:ai` (prompt size and content, schema, the three guards, validator fixtures with a fake console); `tools/check-ai.cjs` with a fake engine (queue, cancel, reasons, row, Italian, 400 px) (1 h).
 
+- [ ] 1.9 The checks after the engine from probe v3 (D4, checks 4 to 6): the pattern the request names, the command the request names (proposal), spoken lines after a colon or in quotes without the model; two prompt examples ("more energy", a spoken line); `npm run check:ai` with the three v3 answers from the log and no-regression cases (near names, two-step, Italian); the probe saves v4 files with what the app does per request; the owner reruns it (1.5 h, plus the owner's run).
+
 ## 2. Stage 2: OpenRouter, keys, model lists and upgrades (about 6 h)
 
 - [ ] 2.1 Local helper routes in `vite.config.js`: `/ai/status`, `/ai/openrouter/models|chat|key`, local only, key from `ai-keys.local.json` or the environment, body and time caps, no logging; `.gitignore` entry (D9) (1.5 h).

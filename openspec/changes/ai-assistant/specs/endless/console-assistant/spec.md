@@ -72,6 +72,50 @@ A request that names no command word, instrument, playing track or saved pattern
 - **WHEN** the mode is "Apply at once" and the listener types "it is getting boring"
 - **THEN** the answer row shows the commands as a proposal with "A vague request: check before applying", and nothing is queued until Apply
 
+### Requirement: Answers checked against the request
+
+After the engine answers, the app SHALL check the answer against the request text before anything applies (probe v3). A saved pattern whose name the request does not support SHALL be replaced by the saved pattern the request names, or rejected with the name from the request when the request names a pattern the listener does not have, or else shown as a proposal. When the request clearly uses the words of exactly one command (or names a saved pattern in full) and the answer leaves that command out, the answer SHALL be shown as a proposal even in "Apply at once", with a line saying why. A request to say a line with the line after a colon or in quotes SHALL become that spoken line without asking the engine, with the usual 12-word limit and voice helper check.
+
+#### Scenario: The model picks another existing pattern
+
+- **WHEN** the listener has fitting patterns "Glass Arp" and "Rolling Sub", types "play Glass Arp", and the engine answers the pattern "Rolling Sub"
+- **THEN** the console queues "Glass Arp", not "Rolling Sub"
+
+#### Scenario: A pattern the listener does not have
+
+- **WHEN** the listener types "add my saved pattern Sunset Lead", has no pattern close to it, and the engine answers another existing pattern
+- **THEN** the chip says there is no saved pattern called "Sunset Lead" and nothing is queued for it
+
+#### Scenario: A pattern the request does not name
+
+- **WHEN** the engine answers a saved pattern that the request does not name and the request names no saved pattern
+- **THEN** the answer is shown as a proposal with "The answer may not match the request: check before applying"
+
+#### Scenario: A near spelling still applies
+
+- **WHEN** the listener types "add my pattern Dusty Break" and the engine answers "Dusty Break" for the fitting pattern "Dusty Breaks"
+- **THEN** the console queues "Dusty Breaks" at once
+
+#### Scenario: The command the request names is missing
+
+- **WHEN** the mode is "Apply at once", the listener types "more energy" and the engine answers "+ Pad" and Brighter
+- **THEN** the answer is shown as a proposal with the line that it may not match the request, and nothing is queued until Apply
+
+#### Scenario: A two-step request answered right
+
+- **WHEN** the listener types "more energy and add a second arp" and the engine answers "+ Arp" and More energy
+- **THEN** both are queued at once, with no proposal
+
+#### Scenario: A spoken line after a colon
+
+- **WHEN** the listener types "add a spoken line: welcome to the night shift"
+- **THEN** the console queues the line "welcome to the night shift" with Say now, without asking the engine, also when the line holds a word like "faster"
+
+#### Scenario: A spoken line too long or without the voice helper
+
+- **WHEN** the line after the colon has more than 12 words, or the voice helper is not running
+- **THEN** the chip is struck through with the usual reason and nothing is queued
+
 ### Requirement: Apply at once or ask first
 
 The assistant SHALL offer two modes per area, chosen in its menu and in Settings: "Apply at once" (the default) applies the valid commands as soon as they are validated; "Ask before applying" shows them as a proposal and applies nothing until the listener accepts it. On acceptance the commands SHALL be checked again against the song as it is then.
