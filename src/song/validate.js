@@ -139,6 +139,22 @@ export function validateSong(song, opts = {}) {
     }
     for (const k of ['mute', 'solo']) if (tr[k] !== undefined && typeof tr[k] !== 'boolean') err(`${p}.${k}`, 'true or false');
     if (tr.pinned !== undefined && (!Array.isArray(tr.pinned) || tr.pinned.some(k => !SETTING_FIELDS[tr.type].includes(k)))) err(`${p}.pinned`, `settings fixed against the live build steps, from: ${SETTING_FIELDS[tr.type].join(', ')}`);
+    // the sounds the dice rolled on the track in Compose (random-sound-params D10): { cur, rolls: [{ n, settings, rack, fm }] }
+    if (tr.soundRolls !== undefined) {
+      const h = tr.soundRolls, hp = `${p}.soundRolls`, isN = x => Number.isInteger(x) && x >= 1 && x <= 9999;
+      if (!h || typeof h !== 'object' || Array.isArray(h) || !Array.isArray(h.rolls)) err(hp, 'an object { "cur": 1, "rolls": [{ "n": 1, "settings": {}, "rack": [] }] }');
+      else {
+        if (h.cur !== null && h.cur !== undefined && !isN(h.cur)) err(`${hp}.cur`, 'a whole number from 1 to 9999, or null');
+        if (h.rolls.length > 12) warn(`${hp}.rolls`, 'more than 12 sounds: Compose keeps the last 12');
+        h.rolls.forEach((r, i) => {
+          const rp = `${hp}.rolls[${i}]`;
+          if (!r || typeof r !== 'object' || !isN(r.n)) { err(rp, 'an entry { "n": 1, "settings": {}, "rack": [] } with n from 1 to 9999'); return; }
+          if (!r.settings || typeof r.settings !== 'object' || Array.isArray(r.settings)) err(`${rp}.settings`, 'an object of settings');
+          if (!Array.isArray(r.rack)) err(`${rp}.rack`, 'a list of rack devices');
+        });
+        if (isN(h.cur) && !h.rolls.some(r => r && r.n === h.cur)) warn(`${hp}.cur`, `no entry has number ${h.cur}`);
+      }
+    }
     // the voice instrument options a spoken track was written with in Compose (voice-placement)
     if (tr.voiceOptions !== undefined) {
       const v = tr.voiceOptions, vp = `${p}.voiceOptions`;

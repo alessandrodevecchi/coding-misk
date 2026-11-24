@@ -60,6 +60,7 @@ Progressions are written in A minor and moved to `key`; see `PROGS` in `src/musi
 ```
 
 - `id`: unique in the song. `name`: label in the code and UI (defaults to `id`). `mute`, `solo`: `true` leaves the track out of the code (solo: every other track). `pinned`: settings fixed against live build steps (a list of setting names): the track's own value holds even where a `set` step would change it.
+- `soundRolls`: the sounds the sound dice rolled on the track in Compose (random-sound-params D10), written by the app: `{ "cur": 3, "rolls": [{ "n": 1, "settings": { "wave": "…", "cutoff": 900 }, "rack": [], "fm": null }] }`. `cur` is the sound the track has now; each entry holds the settings the dice may change (`wave type kit tone cutoff reso drive delay room vary`), the whole rack and the FM device the dice owned. At most 12 entries. The compiler ignores it.
 - `type`: `drums bass guitar arp hook pad texture riser code voice spoken`. Any number of tracks of any type (`voice` is the narrator, `spoken` the voice instrument).
 - `settings`: how the track sounds. Missing settings take the defaults below.
 - `patterns`: named patterns (`"A"`, `"verse"`, …), what the track plays.

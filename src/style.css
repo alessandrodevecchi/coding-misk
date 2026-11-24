@@ -343,6 +343,10 @@
   .tp-dice .tp-dlocks-lbl { display: inline-flex; align-items: center; gap: 4px; }
   .tp-dice .tp-dlocks-lbl svg { width: 12px; height: 12px; }
   .tp-dice .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  /* the sound history (random-sound-params D10): one chip per sound rolled, the lit one is the sound now */
+  .tp-dhist { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 0; }
+  .tp-dhist .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tp-dhist + .tp-dice { margin-top: 6px; }
   .ico-compose, .ico-rhythm, .ico-notes { width: 14px; height: 14px; flex: none; }
   .tp-editor { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel2) 60%, transparent); }
   .pt-top { display: flex; gap: 12px; flex-wrap: wrap; }

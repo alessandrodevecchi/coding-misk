@@ -107,7 +107,7 @@ import { createPreview, previewOrbit } from './player/preview.js';
 import { createPatternsTab } from './library/patterns-tab.js';
 import { patternStore, savedFromTrack, fallbackStyles, addToSong as addPatternToSong, kindOfPreset, forRadio, soundKey, PATTERN_TYPES, KIND_DEFAULTS, KIND_TYPE, loopSong } from './library/patterns.js';
 import { compose, KIND_OF_TYPE, presetOf } from './material/index.js';
-import { rollSound, DICE_GROUPS } from './material/dice.js';
+import { rollSound, DICE_GROUPS, DICE_KEYS, soundSnapshot, applySnapshot, keepCurrent, addRoll, nextRollNumber, rollEntry, rollNumbers } from './material/dice.js';
 import { t, tx, getLang, setLang } from './i18n.js';
 import { createPhrases } from './voices/service.js';
 import { textIn } from './voices/phrases.js';
@@ -4077,48 +4077,74 @@ function composeRow(tr, pat) {
 }
 // The sound dice (random-sound-params D5, app/sound-dice): a new sound for this track within its style, from the seed
 // "<song id>:<track id>:sound:<n>"; lock chips keep groups of settings across rolls. The locks and the FM device the
-// dice added are remembered per song and track in the browser (not in the song file); the number is a page counter
+// dice added are remembered per song and track in the browser (not in the song file). The sounds rolled are kept on the
+// track (track.soundRolls, D10): one chip each, the lit one is the sound the track has; «New sound» takes the highest
+// number plus one; the number field applies a number by itself (a chip restores, a new number rolls)
 const DICE_KEY = 'coding-misk-sound-dice';
-const diceNums = {};
 const diceKey = tr => `${T.id}:${tr.id}`;
-const diceNumOf = tr => diceNums[diceKey(tr)] || 1;
 const diceMem = tr => { const all = store.get(DICE_KEY, {}) || {}, m = all[diceKey(tr)]; return m && typeof m === 'object' ? { locks: Array.isArray(m.locks) ? m.locks : [], fm: m.fm || null } : { locks: [], fm: null }; };
 const setDiceMem = (tr, patch) => { const all = store.get(DICE_KEY, {}) || {}; all[diceKey(tr)] = { ...diceMem(tr), ...patch }; store.set(DICE_KEY, all); };
+let diceNumTimer = null;
 function diceRow(tr) {
   const groups = DICE_GROUPS[tr.type];
   if (!groups) return '';
-  const R = composeStyle(), locks = new Set(diceMem(tr).locks);
+  const R = composeStyle(), locks = new Set(diceMem(tr).locks), H = tr.soundRolls, cur = H && H.cur, nums = rollNumbers(H);
   const off = R ? '' : ` disabled title="${esc(t('diceNoStyle'))}"`;
-  return `<div class="tp-dice" role="group" aria-label="${esc(t('diceGroup'))}">
+  const hist = nums.length ? `<div class="tp-dhist" role="group" aria-label="${esc(t('diceHistory'))}"><span class="lbl" title="${esc(t('diceHistoryTip'))}">${esc(t('diceHistory'))}</span>
+      <div class="chips">${nums.map(n => `<button class="chip pat-chip" data-droll="${n}" aria-pressed="${n === cur}" title="${esc(t('diceChipTip', { n }))}"><span class="pat-k">#${n}</span></button>`).join('')}</div></div>` : '';
+  return `${hist}<div class="tp-dice" role="group" aria-label="${esc(t('diceGroup'))}">
       <button class="btn small" id="pt-dice"${off || ` title="${esc(t('diceTip'))}"`}>${DICE}<span>${esc(t('diceRoll'))}</span></button>
-      <label class="tp-cnum" for="pt-dnum"><span class="lbl">#</span><input type="number" id="pt-dnum" min="1" max="9999" step="1" value="${diceNumOf(tr)}" aria-label="${esc(t('diceNum'))}" title="${esc(t('diceNumTip'))}"${R ? '' : ' disabled'}></label>
+      <label class="tp-cnum" for="pt-dnum"><span class="lbl">#</span><input type="number" id="pt-dnum" min="1" max="9999" step="1" value="${cur || ''}" placeholder="${nextRollNumber(H)}" aria-label="${esc(t('diceNum'))}" title="${esc(t('diceNumTip'))}"${R ? '' : ' disabled'}></label>
       <span class="lbl tp-dlocks-lbl" title="${esc(t('diceLockTip'))}">${LOCK}<span>${esc(t('diceKeep'))}</span></span>
       <div class="chips tp-dlocks">${groups.map(g => `<button class="chip" data-dlock="${g}" aria-pressed="${locks.has(g)}" title="${esc(t('diceLockTip'))}">${esc(t(`diceLock:${g}`))}</button>`).join('')}</div>
     </div>`;
 }
-// the settings the dice may change (the level, octave, mode, patterns and clips never)
-const DICE_KEYS = ['wave', 'type', 'kit', 'tone', 'cutoff', 'reso', 'drive', 'delay', 'room', 'vary'];
-function rollTrackSound(tr) {
+// what an Undo gives back: the track's settings, rack, the dice's FM device and the history as they were
+const diceBefore = tr => ({ settings: clone(tr.settings), rack: tr.rack ? clone(tr.rack) : undefined, fm: diceMem(tr).fm, rolls: tr.soundRolls ? clone(tr.soundRolls) : undefined });
+const diceUndo = (who, before) => ({ label: t('patUndo'), run: () => {
+  who.settings = before.settings;
+  if (before.rack) who.rack = before.rack; else delete who.rack;
+  if (before.rolls) who.soundRolls = before.rolls; else delete who.soundRolls;
+  setDiceMem(who, { fm: before.fm });
+  changed(); renderTrackPanel();
+} });
+// roll number n (a new number: «New sound», or a number typed without a chip); the sound left is kept in its entry
+function rollTrackSound(tr, n = nextRollNumber(tr.soundRolls)) {
   const R = composeStyle();
   if (!R || !DICE_GROUPS[tr.type]) { toast(t('diceNoStyle')); return; }
-  const n = diceNumOf(tr), mem = diceMem(tr), full = { ...baseSettings(tr.type), ...tr.settings };
+  const mem = diceMem(tr), full = { ...baseSettings(tr.type), ...tr.settings };
   const out = rollSound({ track: { ...tr, settings: full }, recipe: R, seedBase: `${T.id}:${tr.id}:sound`, n, locks: mem.locks, energy: composeEnergy, owned: mem.fm });
   if (!out) return;
-  const before = { settings: clone(tr.settings), rack: tr.rack ? clone(tr.rack) : undefined, fm: mem.fm }, who = tr;
+  const before = diceBefore(tr), kept = keepCurrent(tr.soundRolls, tr, mem.fm);
   for (const k of DICE_KEYS) {
     if (k in out.settings) { if (JSON.stringify(out.settings[k]) !== JSON.stringify(full[k])) tr.settings[k] = out.settings[k]; }
     else if (k in tr.settings) delete tr.settings[k];
   }
   if (out.rack.length || tr.rack) tr.rack = out.rack;
   setDiceMem(tr, { fm: out.owned });
-  diceNums[diceKey(tr)] = n + 1;
+  tr.soundRolls = addRoll(kept, n, soundSnapshot(tr, out.owned));
   changed(); renderTrackPanel();
-  toast(t('diceRolled', { n }), { label: t('patUndo'), run: () => {
-    who.settings = before.settings;
-    if (before.rack) who.rack = before.rack; else delete who.rack;
-    setDiceMem(who, { fm: before.fm });
-    changed(); renderTrackPanel();
-  } });
+  toast(t('diceRolled', { n }), diceUndo(tr, before));
+}
+// back to sound n of the history: exactly its entry (the sound left is kept in its own entry first)
+function restoreTrackSound(tr, n) {
+  const H = tr.soundRolls, e = rollEntry(H, n);
+  if (!e || H.cur === n) return;
+  const mem = diceMem(tr), before = diceBefore(tr), kept = keepCurrent(H, tr, mem.fm);
+  applySnapshot(tr, e);
+  setDiceMem(tr, { fm: e.fm || null });
+  tr.soundRolls = { cur: n, rolls: kept.rolls };
+  changed(); renderTrackPanel();
+  toast(t('diceBack', { n }), diceUndo(tr, before));
+}
+// the number field applies by itself: a chip's number restores it, a new number rolls it, the lit number does nothing
+function applyDiceNum(tr, input) {
+  clearTimeout(diceNumTimer); diceNumTimer = null;
+  const n = Math.round(+input.value), H = tr.soundRolls;
+  if (!(n >= 1 && n <= 9999) || (H && H.cur === n)) return;
+  const refocus = document.activeElement === input, id = input.id;
+  if (rollEntry(H, n)) restoreTrackSound(tr, n); else rollTrackSound(tr, n);
+  if (refocus) { const el = document.getElementById(id); if (el) el.focus(); }
 }
 // the style of the song for the generator: its first style tag, else the style closest to its tempo and meter
 function composeStyle() {
@@ -4485,7 +4511,7 @@ $('#track-panel').addEventListener('input', e => {
   if (k) { let v = e.target.value; if (e.target.type === 'range') v = e.target.dataset.cut ? rangeToCut(+v) : +v; setSetting(k, v); changed(); syncTrackPanel(); return; }
   if (role(e.target) === 'tk-name') { curTrack().name = e.target.value; changed(); return; }
   if (role(e.target) === 'pt-cnum') { const v = Math.round(+e.target.value); if (v >= 1) composeNums[`${T.id}:${curTrack().id}`] = v; return; }
-  if (role(e.target) === 'pt-dnum') { const v = Math.round(+e.target.value); if (v >= 1) diceNums[diceKey(curTrack())] = v; return; }
+  if (role(e.target) === 'pt-dnum') { const inp = e.target, tr = curTrack(); clearTimeout(diceNumTimer); diceNumTimer = setTimeout(() => { if (inp.isConnected) applyDiceNum(tr, inp); }, 1000); return; }
   if (role(e.target) === 'pt-cguitar') { composeGuitar = e.target.value === 'chords' ? 'chords' : 'riff'; return; }
   if (role(e.target) === 'pt-cenergy') { composeEnergy = +e.target.value; const o = e.target.closest('.tp-cen').querySelector('output'); if (o) o.textContent = `${Math.round(composeEnergy * 100)}%`; return; }
   if (role(e.target) === 'pt-code') { const v = e.target.value; clearTimeout(codeTimer); codeTimer = setTimeout(() => editPattern(p => { p.code = v; }), 400); return; }
@@ -4495,6 +4521,7 @@ let codeTimer = 0;
 $('#track-panel').addEventListener('change', e => {
   if (!hostTrack(e)) return;
   const tr = curTrack(), r = role(e.target);
+  if (r === 'pt-dnum') return applyDiceNum(tr, e.target);
   if (e.target.matches('select[data-set]')) { setSetting(e.target.dataset.set, e.target.value); changed(); syncTrackPanel(); return; }
   // a voice style (voice-full-controls D3): its seven values at once, speaker and volume kept
   if (e.target.matches('select[data-vstyle]')) { const st = VOICE_STYLES[e.target.value]; if (st) { for (const [k, v] of Object.entries(st)) setSetting(k, v, tr); changed(); syncTrackPanel(); } return; }
@@ -4602,6 +4629,7 @@ $('#track-panel').addEventListener('click', e => {
   }
   if (r === 'pt-compose') return composePattern(tr);
   if (r === 'pt-dice') return rollTrackSound(tr);
+  if (b.dataset.droll !== undefined) return restoreTrackSound(tr, +b.dataset.droll);
   if (b.dataset.dlock) { const g = b.dataset.dlock, l = new Set(diceMem(tr).locks); if (l.has(g)) l.delete(g); else l.add(g); setDiceMem(tr, { locks: [...l] }); b.setAttribute('aria-pressed', String(l.has(g))); return; }
   if (r === 'pt-listen') return listenPattern(tr);
   if (r === 'pt-preview') { if (labPreview) labPreview.stop(); preview.toggle(tr.id, patOf(tr)); syncPreviewButtons(); return; }

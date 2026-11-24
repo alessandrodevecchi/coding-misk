@@ -88,3 +88,41 @@ export function rollSound({ track, recipe, seedBase, n = 1, locks = [], energy =
   if (track.settings && 'gain' in track.settings) set.gain = track.settings.gain;
   return { settings: set, rack, owned: own, groups: drawn };
 }
+
+// ---------- the sound history (random-sound-params D10, owner test r94e) ----------
+// track.soundRolls = { cur, rolls: [{ n, settings, rack, fm }] }: one entry per sound rolled on the track, in the order
+// they were added, saved with the song. An entry holds the track's full sound: the settings the dice may change and the
+// whole rack, plus the FM device the dice owned at that point. The level, octave, mode, patterns and clips are not in it.
+export const DICE_KEYS = ['wave', 'type', 'kit', 'tone', 'cutoff', 'reso', 'drive', 'delay', 'room', 'vary'];
+export const SOUND_ROLLS_MAX = 12;
+// the track's sound now (a key absent from the track is absent from the snapshot)
+export function soundSnapshot(track, fm = null) {
+  const s = (track && track.settings) || {}, settings = {};
+  for (const k of DICE_KEYS) if (k in s) settings[k] = clone(s[k]);
+  return { settings, rack: clone((track && track.rack) || []), fm: fm ? clone(fm) : null };
+}
+// write a snapshot into a track (in place): the dice keys as in the snapshot, the rack as in the snapshot
+export function applySnapshot(track, snap) {
+  track.settings = track.settings || {};
+  for (const k of DICE_KEYS) { if (k in snap.settings) track.settings[k] = clone(snap.settings[k]); else delete track.settings[k]; }
+  if (snap.rack.length || track.rack) track.rack = clone(snap.rack);
+  return track;
+}
+const emptyHistory = () => ({ cur: null, rolls: [] });
+const histOf = h => (h && Array.isArray(h.rolls) ? { cur: h.cur ?? null, rolls: h.rolls } : emptyHistory());
+export const rollEntry = (h, n) => histOf(h).rolls.find(r => r && r.n === n) || null;
+// the number of the next «New sound»: one above the highest number in the history
+export const nextRollNumber = h => histOf(h).rolls.reduce((m, r) => Math.max(m, (r && r.n) || 0), 0) + 1;
+// the history with the lit sound's entry overwritten by the track's current sound (hand edits kept) → a new history
+export function keepCurrent(h, track, fm = null) {
+  const H = histOf(h);
+  return { cur: H.cur, rolls: H.rolls.map(r => (r && r.n === H.cur ? { n: r.n, ...soundSnapshot(track, fm) } : r)) };
+}
+// the history with entry n set to snap and lit; capped to the most recently added max entries, never dropping the lit one
+export function addRoll(h, n, snap, max = SOUND_ROLLS_MAX) {
+  const H = histOf(h), rolls = H.rolls.filter(r => r && r.n !== n).concat([{ n, ...clone(snap) }]);
+  while (rolls.length > max) { const i = rolls.findIndex(r => r.n !== n); if (i < 0) break; rolls.splice(i, 1); }
+  return { cur: n, rolls };
+}
+// the history's numbers in number order (the chips)
+export const rollNumbers = h => histOf(h).rolls.map(r => r.n).sort((a, b) => a - b);

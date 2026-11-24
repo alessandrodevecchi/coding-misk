@@ -13,7 +13,7 @@ import { validateSong } from '../src/song/validate.js';
 import { generateSession, SOUND_VERSION, DIRECTOR_VERSION } from '../src/endless/director.js';
 import { drawTone, TONE_RANGES, toneInRange, toneOfRow } from '../src/material/tone.js';
 import { drawVary, varyArg, varyRange, VARY_TARGETS } from '../src/material/variation.js';
-import { rollSound } from '../src/material/dice.js';
+import { rollSound, soundSnapshot, applySnapshot, keepCurrent, addRoll, nextRollNumber, rollEntry, rollNumbers, SOUND_ROLLS_MAX } from '../src/material/dice.js';
 import { hashString } from '../src/endless/random.js';
 import { strudelInNode, hapsAt } from './mixer-checks.mjs';
 import { crescendoSong } from '../src/song/crescendo.js';
@@ -222,6 +222,35 @@ await check('dice: same number same sound, locks keep their group and leave the 
   const fm = { device: 'fm', index: 1, harmonicity: 2, wave: 'sine', decay: 0.2, sustain: 0.5 };
   const back = rollSound({ track: { id: 'a', type: 'arp', settings: { wave: 'sine' }, rack: [fm] }, recipe: byId['trance'], seedBase: 's:a:sound', n: 1, owned: fm });
   assert(!back.rack.length && back.owned === null, 'the dice kept its FM device on a plain wave');
+});
+
+// ---------- the sound history (D10) ----------
+await check('sound history: snapshots hold the dice keys and the rack, keepCurrent keeps hand edits, New sound takes the highest plus one, the cap keeps the lit one', () => {
+  const tr = { id: 'b', type: 'bass', settings: { wave: 'sawtooth', gain: 0.7, cutoff: 700, octave: 2 }, rack: [{ device: 'delay', amount: 0.3 }] };
+  const snap = soundSnapshot(tr);
+  assert(snap.settings.wave === 'sawtooth' && snap.settings.cutoff === 700 && !('gain' in snap.settings) && !('octave' in snap.settings) && snap.rack.length === 1 && snap.fm === null, JSON.stringify(snap));
+  assert(nextRollNumber(undefined) === 1, 'an empty history must give 1');
+  let h = addRoll(undefined, 1, snap);
+  tr.settings.cutoff = 400; tr.settings.room = 0.3;                    // a hand edit on sound 1
+  h = keepCurrent(h, tr);
+  assert(rollEntry(h, 1).settings.cutoff === 400 && rollEntry(h, 1).settings.room === 0.3, 'keepCurrent lost the hand edit');
+  tr.settings.wave = 'square'; tr.settings.cutoff = 1200; delete tr.settings.room; tr.rack = [];
+  h = addRoll(h, 2, soundSnapshot(tr));
+  h = addRoll(keepCurrent(h, tr), 3, soundSnapshot(tr));
+  assert(h.cur === 3 && nextRollNumber(h) === 4 && rollNumbers(h).join() === '1,2,3', JSON.stringify(rollNumbers(h)));
+  // back to 1: exactly its entry, the level and the octave untouched; a new roll after going back is 4
+  applySnapshot(tr, rollEntry(h, 1)); h = { cur: 1, rolls: h.rolls };
+  assert(tr.settings.wave === 'sawtooth' && tr.settings.cutoff === 400 && tr.settings.room === 0.3 && tr.settings.gain === 0.7 && tr.settings.octave === 2 && tr.rack.length === 1, JSON.stringify(tr));
+  assert(nextRollNumber(h) === 4, 'New sound after going back must be 4');
+  // a number typed out of order sorts in number order and the next is above it
+  h = addRoll(h, 9, soundSnapshot(tr));
+  assert(rollNumbers(h).join() === '1,2,3,9' && nextRollNumber(h) === 10, rollNumbers(h).join());
+  // the cap: the oldest added goes, never the lit one
+  let c = addRoll(undefined, 5, snap);
+  for (let n = 6; n < 6 + SOUND_ROLLS_MAX; n++) c = addRoll(c, n, snap);
+  assert(c.rolls.length === SOUND_ROLLS_MAX && !rollEntry(c, 5) && rollEntry(c, 6) && c.cur === 5 + SOUND_ROLLS_MAX, rollNumbers(c).join());
+  const lit = addRoll({ cur: 1, rolls: Array.from({ length: SOUND_ROLLS_MAX }, (_, i) => ({ n: i + 1, ...snap })) }, 1, snap);
+  assert(lit.rolls.length === SOUND_ROLLS_MAX && rollEntry(lit, 1), 'the lit entry was dropped');
 });
 
 console.log(failed ? `\n${failed} check(s) failed, ${passed} passed` : `\nall ${passed} sound parameter checks passed`);
