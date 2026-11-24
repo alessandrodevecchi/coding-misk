@@ -7,9 +7,14 @@
 //    rule against the most open filter;
 // 4. Pump: the pad's level per beat phase with a kick (a dip after the kick, back before the next) and without a kick
 //    (the beat dip), never above the pad without Pump plus 0.02; the mix never louder;
-// 5. the same code renders the same twice.
-// Fast export against real time: tools/check-export.cjs example-pump example-sweep (the songs' files compared).
-// Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-modulation.cjs [--json out]   (dev server on PORT)
+// 5. the same code renders the same twice;
+// 6. movement parameters (D11 to D13): the Gate on a held pad (open and closed steps, smoothed edges, never louder), the
+//    phase of a Pump's dip and of a tremolo moving their low point, the tremolo never louder, the vibrato's pitch swing;
+// 7. playback against the fast export (needs ffmpeg; --no-export skips it): example-gate exported fast and in real time
+//    from the Songs tab, aligned on the kick of its second section, the gated pad and the phased bass dip of its first
+//    section folded per bar: the same place within a 32nd of a bar.
+// Fast export against real time, loudness: tools/check-export.cjs example-pump example-sweep example-gate.
+// Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-modulation.cjs [--json out] [--no-export]   (dev server on PORT)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs');
 const PORT = process.env.PORT || 5173;
@@ -22,7 +27,7 @@ const r3 = x => Math.round(x * 1000) / 1000;
 (async () => {
   const { compileSong } = await import('../src/song/compile.js');
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
-  const page = await (await browser.newContext({ viewport: { width: 1200, height: 800 } })).newPage();
+  const page = await (await browser.newContext({ viewport: { width: 1200, height: 800 }, acceptDownloads: true })).newPage();
   const errors = [];
   page.on('console', m => { const t = m.text(); if (/error/i.test(t) && /superdough|duck|modulat|connect/i.test(t)) errors.push(t); });
   page.on('pageerror', e => errors.push(String(e)));
@@ -70,7 +75,7 @@ const r3 = x => Math.round(x * 1000) / 1000;
   const PAD = '$: note("a2").s("sawtooth").attack(.01).release(.05).room(0).gain(.3)';
 
   // ---------- 1. the example songs ----------
-  for (const f of ['07-pump', '08-sweep', '09-sway']) {
+  for (const f of ['07-pump', '08-sweep', '09-sway', '10-gate']) {
     const s = JSON.parse(fs.readFileSync(`songs/examples/${f}.json`, 'utf8')), n = errors.length;
     const r = await render(compileSong(s), 16, 124);
     check(errors.length === n && r.peak > 0.05 && r.peak < 0.97, `${f}: renders with no superdough error, peak below 0.97`, `peak ${r3(r.peak)}${errors.length > n ? `; ${errors.slice(n).join(' | ')}` : ''}`);
@@ -157,6 +162,60 @@ const r3 = x => Math.round(x * 1000) / 1000;
     check(m2.peak <= m1.peak + 0.02, 'Pump: the mix with the kick is never louder', `${r3(m2.peak)} against ${r3(m1.peak)}`);
   }
 
+
+  // ---------- 6. movement parameters ----------
+  {
+    const M = await import('../src/song/movement.js');
+    const HELD = '$: note("[a3,c4,e4]").s("sawtooth").attack(.01).release(.1).room(0).gain(.3)';
+    const db = x => 20 * Math.log10(Math.max(1e-9, x));
+    // rms per n-th of a bar over bars [from, to), folded into one bar
+    const fold = async (n, from, to) => { const w = await measure(Array.from({ length: n * (to - from) }, (_, i) => [from + i / n, from + (i + 1) / n])); const f = Array(n).fill(0); w.forEach((x, i) => { f[i % n] += x.rms / (to - from); }); return f; };
+    const lowest = f => f.indexOf(Math.min(...f));
+    // the Gate: Trance A, depth 1, hard and soft edges
+    const base = await render(head() + HELD, 3), bf = await fold(64, 1, 3);
+    const TA = 'xx.xx.x.xx.xx.x.';
+    const g0 = await render(head() + HELD + M.gateCode({ pattern: TA, depth: 1, smooth: 0, phase: 0 }, 0.3), 3), f0 = await fold(64, 1, 3);
+    // the middle half of each step: open steps keep the level, closed ones are at least 30 dB down
+    const stepDb = f => Array.from({ length: 16 }, (_, i) => db((f[4 * i + 1] + f[4 * i + 2]) / 2) - db((bf[4 * i + 1] + bf[4 * i + 2]) / 2));
+    const s0 = stepDb(f0);
+    const openOk = s0.every((d, i) => TA[i] === '.' || Math.abs(d) < 1), closedOk = s0.every((d, i) => TA[i] === 'x' || d < -30);
+    check(openOk && closedOk && g0.peak <= base.peak + 0.02, 'Gate, hard edges: open steps keep the pad\'s level, closed steps are silent, never louder', `${s0.map(d => d.toFixed(0)).join(' ')} dB; peak ${r3(g0.peak)} against ${r3(base.peak)}`);
+    out.gateHard = s0.map(d => r3(d));
+    // soft edges: just past the edge into a closed step (5 to 20 % of a step after it, past the LFO's start of up to one
+    // audio block, about 3 ms) the sound fades out with smoothing and is gone without
+    const W = [[1 + 2.05 / 16, 1 + 2.2 / 16], [2 + 2.05 / 16, 2 + 2.2 / 16]];
+    const edgeOf = async () => { const w = await measure(W); return db((w[0].rms + w[1].rms) / 2); };
+    await render(head() + HELD, 3); const eb = await edgeOf();
+    await render(head() + HELD + M.gateCode({ pattern: TA, depth: 1, smooth: 0, phase: 0 }, 0.3), 3); const eh = await edgeOf() - eb;
+    await render(head() + HELD + M.gateCode({ pattern: TA, depth: 1, smooth: 0.5, phase: 0 }, 0.3), 3);
+    const es = await edgeOf() - eb, f5 = await fold(64, 1, 3), s5 = stepDb(f5);
+    check(es > -20 && es < -3 && eh < -40 && s5.every((d, i) => TA[i] === '.' || Math.abs(d) < 1.5), 'Gate, soft edges: the sound fades over the edge instead of stopping, open steps keep their level', `just past an edge ${es.toFixed(1)} dB soft, ${eh.toFixed(1)} dB hard`);
+    // the Gate's phase: half a step later moves the silence by two 64ths
+    await render(head() + HELD + M.gateCode({ pattern: 'x...x...x...x...', depth: 1, smooth: 0, phase: 0.5 }, 0.3), 3);
+    const fp = await fold(64, 1, 3), quiet = fp.map((v, i) => [v, i]).filter(([v]) => db(v) - db(bf[0]) < -30).map(([, i]) => i);
+    // closed steps 2 to 4 of each beat, half a step later: 64ths 6 to 17 of each 16 are silent, 2 to 5 sound
+    check(quiet.length >= 40 && quiet.every(i => ![2, 3, 4, 5].includes(i % 16)), 'Gate phase 0.5: the steps start half a step later', `${quiet.length} silent 64ths: ${quiet.slice(0, 14).join(' ')}`);
+    // the Pump's dip without a kick, phase 0 and 0.5: the low point moves half a beat (16 of 64 bins a bar → 8)
+    await render(head() + HELD + M.pumpDipCode({ rate: 0.25, depth: 0.8, phase: 0 }, 0.3), 3);
+    const d0 = await fold(32, 1, 3);
+    await render(head() + HELD + M.pumpDipCode({ rate: 0.25, depth: 0.8, phase: 0.5 }, 0.3), 3);
+    const d5 = await fold(32, 1, 3);
+    const l0 = lowest(d0) % 8, l5 = lowest(d5) % 8;
+    check(l0 <= 1 && l5 >= 3 && l5 <= 5, 'Pump dip phase 0.5: the low point moves from the beat to half a beat later', `lowest 32nd in the beat: ${l0} at phase 0, ${l5} at phase 0.5`);
+    // tremolo (LFO on volume) at 1/8 bar, phase 0 and 0.25: the low point moves a quarter of its period; never louder
+    const t0 = await render(head() + HELD + M.lfoCode({ target: 'volume', rate: 0.125, depth: 1, shape: 'sine', phase: 0 }), 3), tf0 = await fold(64, 1, 3);
+    await render(head() + HELD + M.lfoCode({ target: 'volume', rate: 0.125, depth: 1, shape: 'sine', phase: 0.25 }), 3);
+    const tf5 = await fold(64, 1, 3), lt0 = lowest(tf0) % 8, lt5 = lowest(tf5) % 8, swing = db(Math.max(...tf0)) - db(Math.min(...tf0));
+    check(((lt5 - lt0 + 8) % 8) === 2 && swing > 10 && t0.peak <= base.peak + 0.02, 'tremolo (LFO on volume): sways 8 times a bar, phase 0.25 moves its low point a quarter period later, never louder', `low 64th ${lt0} → ${lt5}, swing ${swing.toFixed(1)} dB, peak ${r3(t0.peak)} against ${r3(base.peak)}`);
+    out.tremolo = { phase0: lt0, phase25: lt5, swing: r3(swing) };
+    // vibrato (LFO on pitch) at 1/4 bar, depth 1: a pure sine's frequency from zero crossings per 1/32 bar
+    await render(head() + '$: note("a4").s("sine").attack(.01).release(.1).room(0).gain(.3)' + M.lfoCode({ target: 'pitch', rate: 0.25, depth: 1, shape: 'sine' }, { barSec: 2 }), 2);
+    const fq = await page.evaluate(() => { const { L, sr, sec } = window.__mod, out = []; for (let k = 0; k < 32; k++) { const i0 = Math.floor((1 + k / 32) * sec * sr), i1 = Math.floor((1 + (k + 1) / 32) * sec * sr); let z = 0, first = -1, last = -1; for (let i = i0 + 1; i < i1; i++) if (L[i - 1] < 0 && L[i] >= 0) { const x = i - L[i] / (L[i] - L[i - 1]); if (first < 0) first = x; last = x; z++; } out.push(z > 1 ? (z - 1) * sr / (last - first) : 0); } return out; });
+    const hi = Math.max(...fq), lo = Math.min(...fq.filter(x => x > 0)), cents = 1200 * Math.log2(hi / lo);
+    check(cents > 60 && cents < 120, 'vibrato (LFO on pitch): depth 1 swings the pitch about a semitone peak to peak (half a semitone each way)', `${Math.round(lo)} to ${Math.round(hi)} Hz, ${Math.round(cents)} cents`);
+    out.vibrato = { lo: Math.round(lo), hi: Math.round(hi), cents: Math.round(cents) };
+  }
+
   // ---------- 5. the same twice ----------
   {
     // the song with Pump, and the same song without its Pump (the render's own spread between two runs)
@@ -166,6 +225,57 @@ const r3 = x => Math.round(x * 1000) / 1000;
     const a = await twice(compileSong(s)), b = await twice(compileSong(s0));
     check(a && a.len && a.max <= Math.max(1e-3, 2 * b.max), 'the same song renders the same twice (Pump, no random value)', `largest difference ${a && r3(a.max * 1e4) / 1e4}, without Pump ${b && r3(b.max * 1e4) / 1e4}`);
   }
+
+  // ---------- 7. playback against the fast export ----------
+  if (!process.argv.includes('--no-export')) {
+    const { execFileSync } = require('node:child_process'), os = require('node:os'), path = require('node:path');
+    const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'mod-export-'));
+    const downloads = [];
+    page.on('download', d => downloads.push(d));
+    const settings = o => page.evaluate(o => { for (const [k, v] of Object.entries(o)) localStorage.setItem(k, JSON.stringify(v)); }, o);
+    const pcm = f => { const b = execFileSync('ffmpeg', ['-v', 'error', '-i', f, '-ac', '1', '-ar', '48000', '-f', 'f32le', '-'], { maxBuffer: 1 << 30 }); return new Float32Array(b.buffer, b.byteOffset, b.length / 4); };
+    const exportAs = async speed => {
+      await settings({ 'coding-misk-export-format': 'wav', 'coding-misk-export-speed': speed });
+      await page.reload(); await new Promise(r => setTimeout(r, 3500));
+      await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await new Promise(r => setTimeout(r, 600));
+      if (!(await page.isVisible('#songs [data-song-id="example-gate"] [data-act="export"]'))) { await page.fill('#sv-q', 'Example 10'); await new Promise(r => setTimeout(r, 800)); }
+      const n = downloads.length, t0 = Date.now();
+      await page.click('#songs [data-song-id="example-gate"] [data-act="export"]');
+      await new Promise(r => setTimeout(r, 1500));
+      while (Date.now() - t0 < 120000) {
+        const busy = await page.evaluate(() => globalThis.codingMiskExport.job) || /REC|●/.test(await page.textContent('#songs [data-song-id="example-gate"] [data-act="export"]'));
+        if (!busy) break;
+        await new Promise(r => setTimeout(r, 500));
+      }
+      await new Promise(r => setTimeout(r, 1500));
+      const d = downloads.slice(n).find(x => /\.wav$/.test(x.suggestedFilename()));
+      if (!d) return null;
+      const f = path.join(TMP, `${speed}.wav`); await d.saveAs(f); return pcm(f);
+    };
+    const F = await exportAs('fast'), R = await exportAs('real');
+    if (!F || !R) check(false, 'example-gate: exported fast and in real time');
+    else {
+      const sr = 48000, bar = 240 / 132 * sr;
+      const lowpass = (a, hz) => { const k = 1 - Math.exp(-2 * Math.PI * hz / sr), o = new Float32Array(a.length); let y = 0; for (let i = 0; i < a.length; i++) { y += k * (a[i] - y); o[i] = y; } return o; };
+      const band = (a, lo, hi) => { const h = hi ? lowpass(a, hi) : a, l = lo ? lowpass(h, lo) : null; return l ? h.map((v, i) => v - l[i]) : h; };
+      const env = (a, from, n, w) => Array.from({ length: n }, (_, k) => { let s = 0; const i0 = Math.round(from + k * w); for (let i = i0; i < i0 + w && i < a.length; i++) s += a[i] * a[i]; return Math.sqrt(s / w); });
+      const corr = (x, y) => { const n = Math.min(x.length, y.length); let mx = 0, my = 0; for (let i = 0; i < n; i++) { mx += x[i] / n; my += y[i] / n; } let a = 0, b = 0, c = 0; for (let i = 0; i < n; i++) { a += (x[i] - mx) * (y[i] - my); b += (x[i] - mx) ** 2; c += (y[i] - my) ** 2; } return a / Math.sqrt(b * c || 1); };
+      // the real-time file starts a little late: the offset that best matches the kick (low band) of bars 9 to 15, in 1 ms steps
+      const FL = band(F, 0, 150), RL = band(R, 0, 150);
+      const ef = env(FL, 9 * bar, Math.round(6 * bar / 48), 48);
+      let off = 0, best = -2;
+      for (let o = 0; o <= 2000; o++) { const c = corr(ef, env(RL, 9 * bar + o * 48, ef.length, 48)); if (c > best) { best = c; off = o * 48; } }
+      // bars 2 to 7 (no kick), folded per bar at 64 bins: the gated pad (above 1.5 kHz) and the phased bass dip (below 150 Hz)
+      const foldBar = (a, at) => { const w = bar / 64, f = Array(64).fill(0); for (let b = 1; b < 7; b++) env(a, at + b * bar, 64, w).forEach((v, i) => { f[i] += v; }); return f; };
+      const lag = (x, y) => { let bl = 0, bc = -2; for (let l = -8; l <= 8; l++) { const c = corr(x, y.map((_, i) => y[(i + l + 64) % 64])); if (c > bc) { bc = c; bl = l; } } return [bl, bc]; };
+      const FH = band(F, 1500, 0), RH = band(R, 1500, 0);
+      const [lp, cp] = lag(foldBar(FH, 0), foldBar(RH, off)), [lb, cb] = lag(foldBar(FL, 0), foldBar(RL, off));
+      check(Math.abs(lp) <= 2 && cp > 0.9 && Math.abs(lb) <= 2 && cb > 0.9, 'example-gate: the gated pad and the phased bass dip fall at the same place in playback and in the fast export (within a 32nd of a bar)', `real time ${Math.round(off / 48)} ms late; pad lag ${lp}/64 bar (r ${r3(cp)}), bass lag ${lb}/64 bar (r ${r3(cb)})`);
+      out.exportPhase = { offMs: Math.round(off / 48), pad: [lp, r3(cp)], bass: [lb, r3(cb)] };
+    }
+    fs.rmSync(TMP, { recursive: true, force: true });
+  }
+
   if (arg('--json', null)) fs.writeFileSync(arg('--json'), JSON.stringify(out, null, 2));
   console.log(JSON.stringify(out));
   await browser.close();

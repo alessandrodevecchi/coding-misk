@@ -56,12 +56,12 @@ The path engine (section 8) carries the recorded gesture (design D15); this sect
 
 Design D11 to D13. Branch `feat/95-movement-params` from `feat/95-decode-round15`.
 
-- [ ] 7.1 Phase (D11): the `phase` argument on LFO, Pump and Gate; `phaseoffset` and `tremolophase` written as `1 - phase`, nothing at phase 0; the filter LFO's generic form with a phase; the card's tooltip for the Pump with a kick.
-- [ ] 7.2 LFO targets volume and pitch (D12): one tremolo function shared with the rack's Tremolo device (its code unchanged), the LFO replacing a Tremolo device on its line with a warning; `vib` and `vibmod` from the section's tempo; warnings for shape and phase on pitch.
-- [ ] 7.3 Gate (D13): the device, its presets, runs and periods, the square and the trapezoid LFOs, the gain rule of the Pump's dip; validator (pattern, one Gate, Gate with Pump, more than 6 runs); the step row and the preset menu on the Compose card; Italian and English labels.
-- [ ] 7.4 `check:modulation`: the new code, a model of the LFO worklet sampling the Gate and the phased dip, the validator, Strudel in Node; `check:code` unchanged.
-- [ ] 7.5 `tools/check-modulation.cjs`: an example song with the new parameters plays, levels with and without, the Gate's and the phased dip's envelope in playback against the fast export.
-- [ ] 7.6 Docs: `docs/SONG-FORMAT.md`, guide card, knowledge (`npm run knowledge`), catalog (`vib`, `vibmod`, `tremolophase`, `tremoloshape` written), DEVLOG, owner tests 10-13 in the checklist.
+- [x] 7.1 Phase (D11): the `phase` argument on LFO, Pump and Gate; `phaseoffset` and `tremolophase` written as `1 - phase`, nothing at phase 0; the filter LFO's generic form with a phase; the card's tooltip for the Pump with a kick.
+- [x] 7.2 LFO targets volume and pitch (D12): one tremolo function shared with the rack's Tremolo device (its code unchanged), the LFO replacing a Tremolo device on its line with a warning; `vib` and `vibmod` from the section's tempo; warnings for shape and phase on pitch.
+- [x] 7.3 Gate (D13): the device, its presets, runs and periods, the square and the trapezoid LFOs, the gain rule of the Pump's dip; validator (pattern, one Gate, Gate with Pump, more than 6 runs); the step row and the preset menu on the Compose card; Italian and English labels.
+- [x] 7.4 `check:modulation`: the new code, a model of the LFO worklet sampling the Gate and the phased dip, the validator, Strudel in Node; `check:code` unchanged.
+- [x] 7.5 `tools/check-modulation.cjs`: an example song with the new parameters plays, levels with and without, the Gate's and the phased dip's envelope in playback against the fast export.
+- [x] 7.6 Docs: `docs/SONG-FORMAT.md`, guide card, knowledge (`npm run knowledge`), catalog (`vib`, `vibmod`, `tremolophase`, `tremoloshape` written), DEVLOG, owner tests 10-13 in the checklist.
 
 ## 8. Path engine (spec only in this step; usable without any knob)
 

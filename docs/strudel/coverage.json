@@ -11,7 +11,7 @@
       "@strudel/repl": "1.3.0",
       "superdough": "1.3.0"
     },
-    "codes": 42997
+    "codes": 43187
   },
   "functions": {
     "K": {
@@ -34,7 +34,7 @@
     },
     "all": {
       "songs": 0,
-      "live": 49,
+      "live": 50,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -42,8 +42,8 @@
       ]
     },
     "analyze": {
-      "songs": 49,
-      "live": 49,
+      "songs": 50,
+      "live": 50,
       "radio": 60,
       "prelude": 1,
       "as": [
@@ -69,8 +69,8 @@
       ]
     },
     "attack": {
-      "songs": 42,
-      "live": 42,
+      "songs": 43,
+      "live": 43,
       "radio": 41,
       "prelude": 0,
       "as": [
@@ -78,8 +78,8 @@
       ]
     },
     "bank": {
-      "songs": 48,
-      "live": 113,
+      "songs": 49,
+      "live": 114,
       "radio": 59,
       "prelude": 0,
       "as": [
@@ -123,8 +123,8 @@
       ]
     },
     "decay": {
-      "songs": 48,
-      "live": 48,
+      "songs": 49,
+      "live": 49,
       "radio": 60,
       "prelude": 1,
       "as": [
@@ -133,7 +133,7 @@
     },
     "degradeBy": {
       "songs": 5,
-      "live": 45,
+      "live": 46,
       "radio": 56,
       "prelude": 0,
       "as": [
@@ -141,8 +141,8 @@
       ]
     },
     "delay": {
-      "songs": 43,
-      "live": 43,
+      "songs": 44,
+      "live": 44,
       "radio": 51,
       "prelude": 1,
       "as": [
@@ -195,8 +195,8 @@
       ]
     },
     "duckattack": {
-      "songs": 1,
-      "live": 1,
+      "songs": 2,
+      "live": 2,
       "radio": 0,
       "prelude": 0,
       "as": [
@@ -204,8 +204,8 @@
       ]
     },
     "duckdepth": {
-      "songs": 1,
-      "live": 1,
+      "songs": 2,
+      "live": 2,
       "radio": 0,
       "prelude": 0,
       "as": [
@@ -213,8 +213,8 @@
       ]
     },
     "duckorbit": {
-      "songs": 1,
-      "live": 1,
+      "songs": 2,
+      "live": 2,
       "radio": 0,
       "prelude": 0,
       "as": [
@@ -303,8 +303,8 @@
       ]
     },
     "gain": {
-      "songs": 49,
-      "live": 114,
+      "songs": 50,
+      "live": 115,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -348,8 +348,8 @@
       ]
     },
     "lfo": {
-      "songs": 2,
-      "live": 2,
+      "songs": 3,
+      "live": 3,
       "radio": 0,
       "prelude": 0,
       "as": [
@@ -366,8 +366,8 @@
       ]
     },
     "lpf": {
-      "songs": 48,
-      "live": 113,
+      "songs": 49,
+      "live": 114,
       "radio": 60,
       "prelude": 1,
       "as": [
@@ -375,8 +375,8 @@
       ]
     },
     "lpq": {
-      "songs": 47,
-      "live": 72,
+      "songs": 48,
+      "live": 73,
       "radio": 55,
       "prelude": 1,
       "as": [
@@ -402,8 +402,8 @@
       ]
     },
     "mask": {
-      "songs": 49,
-      "live": 49,
+      "songs": 50,
+      "live": 50,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -429,8 +429,8 @@
       ]
     },
     "n": {
-      "songs": 37,
-      "live": 46,
+      "songs": 38,
+      "live": 47,
       "radio": 54,
       "prelude": 0,
       "as": [
@@ -438,8 +438,8 @@
       ]
     },
     "note": {
-      "songs": 47,
-      "live": 96,
+      "songs": 48,
+      "live": 97,
       "radio": 55,
       "prelude": 0,
       "as": [
@@ -447,8 +447,8 @@
       ]
     },
     "orbit": {
-      "songs": 49,
-      "live": 49,
+      "songs": 50,
+      "live": 50,
       "radio": 60,
       "prelude": 1,
       "as": [
@@ -528,8 +528,8 @@
       ]
     },
     "release": {
-      "songs": 42,
-      "live": 42,
+      "songs": 43,
+      "live": 43,
       "radio": 41,
       "prelude": 0,
       "as": [
@@ -546,8 +546,8 @@
       ]
     },
     "room": {
-      "songs": 47,
-      "live": 96,
+      "songs": 48,
+      "live": 97,
       "radio": 59,
       "prelude": 1,
       "as": [
@@ -564,8 +564,8 @@
       ]
     },
     "s": {
-      "songs": 49,
-      "live": 114,
+      "songs": 50,
+      "live": 115,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -573,8 +573,8 @@
       ]
     },
     "scale": {
-      "songs": 34,
-      "live": 43,
+      "songs": 35,
+      "live": 44,
       "radio": 44,
       "prelude": 0,
       "as": [
@@ -592,8 +592,8 @@
       ]
     },
     "setcpm": {
-      "songs": 49,
-      "live": 114,
+      "songs": 50,
+      "live": 115,
       "radio": 60,
       "prelude": 0,
       "as": [
@@ -637,8 +637,8 @@
       ]
     },
     "struct": {
-      "songs": 41,
-      "live": 41,
+      "songs": 42,
+      "live": 42,
       "radio": 55,
       "prelude": 0,
       "as": [
@@ -664,8 +664,8 @@
       ]
     },
     "sustain": {
-      "songs": 48,
-      "live": 48,
+      "songs": 49,
+      "live": 49,
       "radio": 60,
       "prelude": 1,
       "as": [
@@ -682,8 +682,8 @@
       ]
     },
     "transpose": {
-      "songs": 38,
-      "live": 38,
+      "songs": 39,
+      "live": 39,
       "radio": 51,
       "prelude": 0,
       "as": [
@@ -691,17 +691,35 @@
       ]
     },
     "tremolodepth": {
-      "songs": 2,
-      "live": 2,
+      "songs": 3,
+      "live": 3,
       "radio": 0,
       "prelude": 0,
       "as": [
         "tremolodepth"
       ]
     },
+    "tremolophase": {
+      "songs": 1,
+      "live": 1,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "tremolophase"
+      ]
+    },
+    "tremoloshape": {
+      "songs": 1,
+      "live": 1,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "tremoloshape"
+      ]
+    },
     "tremolosync": {
-      "songs": 2,
-      "live": 2,
+      "songs": 3,
+      "live": 3,
       "radio": 0,
       "prelude": 0,
       "as": [
@@ -709,12 +727,30 @@
       ]
     },
     "velocity": {
-      "songs": 49,
-      "live": 49,
+      "songs": 50,
+      "live": 50,
       "radio": 60,
       "prelude": 0,
       "as": [
         "velocity"
+      ]
+    },
+    "vib": {
+      "songs": 1,
+      "live": 1,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "vib"
+      ]
+    },
+    "vibmod": {
+      "songs": 1,
+      "live": 1,
+      "radio": 0,
+      "prelude": 0,
+      "as": [
+        "vibmod"
       ]
     },
     "voicing": {

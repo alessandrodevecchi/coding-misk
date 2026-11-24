@@ -1,0 +1,187 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "example-gate",
+  "title": "Example 10 · Gate",
+  "created": "2026-11-24",
+  "appVersion": "0.1.0",
+  "look": "tramonto",
+  "style": {
+    "en": "A held pad cut by a rhythmic gate, an arpeggio with a tremolo that starts a sixteenth late, a hook with a vibrato and a bass whose dip moves half a beat",
+    "it": "Un pad tenuto tagliato da un gate ritmico, un arpeggio con un tremolo che parte un sedicesimo dopo, un hook con un vibrato e un basso il cui calo si sposta di mezzo battito"
+  },
+  "tags": {
+    "genres": [
+      "trance"
+    ],
+    "free": [
+      "example",
+      "movement"
+    ]
+  },
+  "sections": [
+    {
+      "name": "Gate",
+      "bars": 8,
+      "bpm": 132,
+      "key": "D",
+      "chords": "malinconica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Drop",
+      "bars": 8,
+      "bpm": 132,
+      "key": "D",
+      "chords": "epica",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.9
+      },
+      "patterns": {
+        "four": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "..x...x...x...x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Drop",
+          "pattern": "four"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "gain": 0.5,
+        "cutoff": 900,
+        "move": "fisso"
+      },
+      "patterns": {
+        "roll": {
+          "preset": "rolling"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 16,
+          "pattern": "roll"
+        }
+      ],
+      "rack": [
+        {
+          "device": "pump",
+          "depth": 0.5,
+          "recover": 0.15,
+          "rate": 0.25,
+          "phase": 0.5
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.26,
+        "cutoff": 2400,
+        "move": "fisso",
+        "room": 0.3
+      },
+      "patterns": {
+        "hold": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 16,
+          "pattern": "hold"
+        }
+      ],
+      "rack": [
+        {
+          "device": "gate",
+          "pattern": "xx.xx.x.xx.xx.x.",
+          "depth": 0.85,
+          "smooth": 0.1,
+          "phase": 0
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "triangle",
+        "gain": 0.3,
+        "cutoff": 3000,
+        "move": "fisso"
+      },
+      "patterns": {
+        "up": {
+          "preset": "su"
+        }
+      },
+      "clips": [
+        {
+          "start": 8,
+          "bars": 8,
+          "pattern": "up"
+        }
+      ],
+      "rack": [
+        {
+          "device": "lfo",
+          "target": "volume",
+          "rate": 0.125,
+          "depth": 0.5,
+          "shape": "tri",
+          "phase": 0.25
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "type": "hook",
+      "settings": {
+        "gain": 0.3
+      },
+      "patterns": {
+        "call": {
+          "preset": "richiamo"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 16,
+          "pattern": "call"
+        }
+      ],
+      "rack": [
+        {
+          "device": "lfo",
+          "target": "pitch",
+          "rate": 0.25,
+          "depth": 0.4,
+          "shape": "sine",
+          "phase": 0
+        }
+      ]
+    }
+  ]
+}

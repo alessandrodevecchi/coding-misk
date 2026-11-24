@@ -1,4 +1,6 @@
-// Checks for the movement devices of the rack (sound-modulation, #95; app/modulation-devices): Sweep, LFO and Pump.
+// Checks for the movement devices of the rack (sound-modulation, #95; app/modulation-devices): Sweep, LFO, Pump and Gate,
+// with the movement parameters (D11 to D13: phase, the LFO on volume and pitch, the Gate sampled with a model of
+// superdough's LFO worklet).
 // The writer's code for every target and argument, base values merged (one call per control), the kick lines with
 // one and two pumps, the beat dip without a kick, Sweep once and loop (held pads and short notes), what a Sweep
 // replaces, the validator's errors and warnings with their paths, #94's vary kept or left out, determinism, the
@@ -8,7 +10,7 @@ import fs from 'node:fs';
 import { compileSong } from '../src/song/compile.js';
 import { validateSong } from '../src/song/validate.js';
 import { DEVICES, deviceArgs, rackCode } from '../src/song/rack.js';
-import { MOVE_DEVICES, sweepCode, lfoCode, duckCode, moveFor, movePreview, LPDEPTH_SCALE } from '../src/song/movement.js';
+import { MOVE_DEVICES, sweepCode, lfoCode, duckCode, moveFor, movePreview, LPDEPTH_SCALE, gateRuns, gateCode, pumpDipCode, tremoloCode, phaseOffset, GATE_PRESETS } from '../src/song/movement.js';
 import { varySkips } from '../src/material/variation.js';
 import { strudelInNode } from './mixer-checks.mjs';
 
@@ -31,17 +33,19 @@ const val = (pat, err) => validateSong(pat, err);
 const issues = s => { const r = validateSong(s); return { errors: r.errors || [], warnings: r.warnings || [] }; };
 
 // ---------- the devices ----------
-await check('three movement devices in the rack, kind move, with the defaults of D4, D5, D6', () => {
-  for (const k of ['sweep', 'lfo', 'pump']) assert(DEVICES[k] && DEVICES[k].kind === 'move', k);
+await check('four movement devices in the rack, kind move, with the defaults of D4, D5, D6, D11, D13', () => {
+  for (const k of ['sweep', 'lfo', 'pump', 'gate']) assert(DEVICES[k] && DEVICES[k].kind === 'move', k);
   assert(JSON.stringify(deviceArgs({ device: 'sweep' })) === JSON.stringify({ target: 'filter', from: 400, to: 4000, bars: 8, curve: 'exp', repeat: 'once' }), JSON.stringify(deviceArgs({ device: 'sweep' })));
-  assert(JSON.stringify(deviceArgs({ device: 'lfo' })) === JSON.stringify({ target: 'filter', rate: 0.5, depth: 0.4, shape: 'sine' }), 'lfo');
-  assert(JSON.stringify(deviceArgs({ device: 'pump' })) === JSON.stringify({ depth: 0.6, recover: 0.15, rate: 0.25 }), 'pump');
-  assert(MOVE_DEVICES.sweep.label.it === 'Apertura' && MOVE_DEVICES.lfo.label.it === 'Oscillazione' && MOVE_DEVICES.pump.label.it === 'Pompa', 'labels');
-  assert(!MOVE_DEVICES.lfo.args[0][3].includes('gain') && !MOVE_DEVICES.sweep.args[0][3].includes('gain'), 'gain is never a target');
+  assert(JSON.stringify(deviceArgs({ device: 'lfo' })) === JSON.stringify({ target: 'filter', rate: 0.5, depth: 0.4, shape: 'sine', phase: 0 }), 'lfo');
+  assert(JSON.stringify(deviceArgs({ device: 'pump' })) === JSON.stringify({ depth: 0.6, recover: 0.15, rate: 0.25, phase: 0 }), 'pump');
+  assert(JSON.stringify(deviceArgs({ device: 'gate' })) === JSON.stringify({ pattern: 'x.x.x.x.x.x.x.x.', depth: 0.8, smooth: 0.1, phase: 0 }), 'gate');
+  assert(MOVE_DEVICES.sweep.label.it === 'Apertura' && MOVE_DEVICES.lfo.label.it === 'Oscillazione' && MOVE_DEVICES.pump.label.it === 'Pompa' && MOVE_DEVICES.gate.label.it === 'Gate ritmico', 'labels');
+  assert(!MOVE_DEVICES.lfo.args[0][3].includes('gain') && !MOVE_DEVICES.sweep.args[0][3].includes('gain'), 'the track gain is never a target');
+  assert(MOVE_DEVICES.lfo.args[0][3].includes('volume') && MOVE_DEVICES.lfo.args[0][3].includes('pitch'), 'volume and pitch targets');
 });
 await check('rackCode leaves movement devices to the compiler; the card previews evaluate in Strudel', async () => {
   assert(rackCode([{ device: 'sweep' }, { device: 'delay' }], 'pad') === DEVICES.delay.code(deviceArgs({ device: 'delay' })), rackCode([{ device: 'sweep' }], 'pad'));
-  for (const d of [{ device: 'sweep' }, { device: 'sweep', target: 'room', from: 0, to: 0.6, curve: 'linear' }, { device: 'lfo' }, { device: 'lfo', target: 'pan' }]) await hapsOf(`note("c e g").s("sawtooth")${movePreview(d, 'pad')}`, 0, 1);
+  for (const d of [{ device: 'sweep' }, { device: 'sweep', target: 'room', from: 0, to: 0.6, curve: 'linear' }, { device: 'lfo' }, { device: 'lfo', target: 'pan' }, { device: 'lfo', target: 'volume' }, { device: 'lfo', target: 'pitch' }, { device: 'lfo', phase: 0.25 }, { device: 'gate' }, { device: 'gate', smooth: 0 }]) await hapsOf(`note("c e g").s("sawtooth")${movePreview(d, 'pad')}`, 0, 1);
 });
 
 // ---------- Sweep ----------
@@ -175,6 +179,118 @@ await check('a code track gets its movement after its own code and a base value 
   assert(c.includes(".pan(0.5).lfo({ c: 'pan'"), c.split('\n').filter(l => l.includes('lfo')).join('\n'));
 });
 
+
+// ---------- movement parameters (D11 to D13) ----------
+// superdough's LFO worklet (worklets.mjs, LFOProcessor) at x cycles after a note struck on cycle c0: the phase starts at
+// c0 × sync + phaseoffset, the value is (wave + dc) × depth clamped to [dc × depth, dc × depth + depth]
+const fr = x => ((x % 1) + 1) % 1;
+const WAVES = { tri: (p, k = 0.5) => (p >= k ? 1 / (1 - k) - p / (1 - k) : p / k), sine: p => Math.sin(2 * Math.PI * p) * 0.5 + 0.5, ramp: p => p, saw: p => 1 - p, square: (p, k = 0.5) => (p >= k ? 0 : 1) };
+const lfoAt = (l, c0, x) => {
+  const ph = fr(c0 * l.sync + (l.phaseoffset || 0) + x * l.sync), dc = l.dcoffset ?? -0.5, d = l.depthabs;
+  const v = (WAVES[l.shape || 'tri'](ph, l.skew ?? 0.5) + dc) * d;
+  return Math.min(Math.max(v, Math.min(dc * d, dc * d + d)), Math.max(dc * d, dc * d + d));
+};
+// the gain of a gated line at bar position x, from the haps' lfo entries (Strudel in Node)
+const lfosOf = v => [...v.lfo.__ids].map(id => v.lfo[id]);
+const gainAt = (v, c0, x) => v.gain + lfosOf(v).filter(l => l.control === 'gain').reduce((t, l) => t + lfoAt(l, c0, x), 0);
+const gateHap = async (pattern, extra = {}, gain = 0.5) => (await hapsOf(`note("c3").s("sawtooth").gain(${gain})${gateCode({ pattern, depth: 1, smooth: 0, phase: 0, ...extra }, gain)}`, 0, 1))[0].value;
+
+await check('phase 0 writes nothing; a phase writes phaseoffset as 1 - phase on the Pump dip, pan and sends', async () => {
+  assert(phaseOffset(0) === 0 && phaseOffset(0.25) === 0.75 && phaseOffset(0.5) === 0.5, 'phaseOffset');
+  assert(pumpDipCode({ rate: 0.25, depth: 0.6 }, 0.3) === ".lfo({ c: 'gain', s: 4, da: 0.18, dc: -1, sh: 'ramp' })", 'pump at phase 0 as before');
+  assert(pumpDipCode({ rate: 0.25, depth: 0.6, phase: 0.5 }, 0.3) === ".lfo({ c: 'gain', s: 4, da: 0.18, dc: -1, sh: 'ramp', phaseoffset: 0.5 })", 'pump phased');
+  assert(lfoCode({ target: 'pan', rate: 0.5, depth: 1, shape: 'sine', phase: 0.25 }) === ".lfo({ c: 'pan', s: 2, da: 2, sh: 'sine', phaseoffset: 0.75 })", 'pan phased');
+  assert(lfoCode({ target: 'room', rate: 1, depth: 0.4, shape: 'tri', phase: 0.5 }).endsWith("sh: 'tri', phaseoffset: 0.5 })"), 'room phased');
+  // the dip of a Pump at 1/4 bar, phase 0.25: its lowest point is a sixteenth after each beat, as Strudel evaluates it
+  const s = song([pad([{ device: 'pump', phase: 0.25 }])]);
+  const [l] = block(compileSong(s), 'pad');
+  assert(l.includes('phaseoffset: 0.75'), l);
+  const [h] = await hapsOf(l, 0, 1), lf = lfosOf(h.value).find(x => x.control === 'gain');
+  assert(lf.phaseoffset === 0.75, JSON.stringify(lf));
+  const xs = Array.from({ length: 64 }, (_, i) => i / 64), low = xs.reduce((m, x) => (lfoAt(lf, 0, x) < lfoAt(lf, 0, m) ? x : m), 0);
+  assert(Math.abs(low - 1 / 16) < 1e-9, `lowest at ${low}`);
+});
+await check('a phased filter LFO uses the generic form around the track\'s cutoff, the same swing as lpdepth', async () => {
+  const [l] = block(compileSong(song([pad([{ device: 'lfo', depth: 0.5, phase: 0.25 }])])), 'pad');
+  assert(!l.includes('lpsync') && l.includes(`.lfo({ c: 'lpf', s: 2, da: ${Math.round(0.5 * LPDEPTH_SCALE * 2000)}, sh: 'sine', phaseoffset: 0.75 })`) && count(l, 'lpf') === 1, l);
+  const [h] = await hapsOf(l, 0, 1);
+  assert(h.value.cutoff === 2000 && h.value.lfo[0].control === 'cutoff', JSON.stringify(h.value.lfo));
+  const [p0] = block(compileSong(song([pad([{ device: 'lfo', depth: 0.5 }])])), 'pad');
+  assert(p0.includes('.lpsync(2)'), 'phase 0 keeps lpsync');
+});
+await check('LFO on volume writes the Tremolo device\'s tremolo with shape and phase; the device\'s own code is unchanged', async () => {
+  assert(DEVICES.tremolo.code(deviceArgs({ device: 'tremolo' })) === '.tremolosync(8).tremolodepth(0.7)', 'tremolo device');
+  assert(lfoCode({ target: 'volume', rate: 0.125, depth: 0.6, shape: 'sine' }) === '.tremolosync(8).tremolodepth(0.6).tremoloshape("sine")', 'volume');
+  assert(tremoloCode(4, 0.5, 'tri', 0.25) === '.tremolosync(4).tremolodepth(0.5).tremoloshape("tri").tremolophase(0.75)', 'phased');
+  const s = song([pad([{ device: 'tremolo' }, { device: 'lfo', target: 'volume', rate: 0.125, depth: 0.6 }])]);
+  const [l] = block(compileSong(s), 'pad');
+  assert(count(l, 'tremolosync') === 1 && l.includes('.tremolosync(8).tremolodepth(0.6).tremoloshape("sine")') && !l.includes('lpsync'), l);
+  assert(issues(s).warnings.some(x => x.path === 'tracks[0].rack[1]' && /replaces the tremolo device/.test(x.msg)), JSON.stringify(issues(s).warnings));
+  const [h] = await hapsOf(l, 0, 1);
+  assert(h.value.tremolosync === 8 && h.value.tremoloshape === 'sine' && h.value.cutoff === 2000, JSON.stringify(h.value));
+});
+await check('LFO on pitch: vib in Hz from the section\'s tempo and vibmod in semitones; shape and phase warn', async () => {
+  const t = { id: 'hook', type: 'hook', settings: { gain: 0.3 }, patterns: { P: { preset: 'richiamo' } }, clips: [{ section: 'A', pattern: 'P' }], rack: [{ device: 'lfo', target: 'pitch', rate: 0.25, depth: 0.4 }] };
+  const [l] = block(compileSong(song([t])), 'hook');
+  assert(l.includes('.vib(2).vibmod(0.2)') && !l.includes(".lfo("), l);
+  const [l90] = block(compileSong(song([t], [{ name: 'A', bars: 8, bpm: 90 }])), 'hook');
+  assert(l90.includes('.vib(1.5).vibmod(0.2)'), l90);
+  const [h] = await hapsOf(l, 0, 1);
+  assert(h.value.vib === 2 && h.value.vibmod === 0.2, JSON.stringify(h.value));
+  const w = issues(song([{ ...t, rack: [{ device: 'lfo', target: 'pitch', shape: 'tri', phase: 0.5 }] }])).warnings.map(x => x.path);
+  assert(w.includes('tracks[0].rack[0].shape') && w.includes('tracks[0].rack[0].phase'), w.join(' '));
+});
+await check('Gate runs: shortest period and closed runs, a run over the period\'s end kept whole', () => {
+  assert(JSON.stringify(gateRuns('x.x.x.x.x.x.x.x.')) === JSON.stringify({ period: 2, runs: [[1, 1]] }), JSON.stringify(gateRuns('x.x.x.x.x.x.x.x.')));
+  assert(JSON.stringify(gateRuns('..x...x...x...x.')) === JSON.stringify({ period: 4, runs: [[3, 3]] }), JSON.stringify(gateRuns('..x...x...x...x.')));
+  assert(JSON.stringify(gateRuns('xx.xx.x.xx.xx.x.')) === JSON.stringify({ period: 8, runs: [[2, 1], [5, 1], [7, 1]] }), JSON.stringify(gateRuns('xx.xx.x.xx.xx.x.')));
+  assert(gateRuns('x..x..x..x..x.x.').period === 16 && gateRuns('x..x..x..x..x.x.').runs.length === 6, 'dotted');
+  for (const p of Object.keys(GATE_PRESETS)) assert(p.length === 16 && gateRuns(p).runs.length, p);
+});
+await check('Gate, hard edges: the gain is the track\'s on open steps and 1 - depth of it on closed ones, for every preset, phase and onset', async () => {
+  for (const p of Object.keys(GATE_PRESETS)) for (const phase of [0, 0.5]) for (const c0 of [0, 3]) {
+    const v = await gateHap(p, { phase, depth: 0.8 });
+    for (let i = 0; i < 16; i++) for (const f of [0.1, 0.5, 0.9]) {
+      // a point inside step i, shifted by the phase (a share of a step)
+      const x = (i + phase + f) / 16, want = p[i] === 'x' ? 0.5 : 0.5 * 0.2;
+      assert(Math.abs(gainAt(v, c0, x) - want) < 1e-6, `${p} phase ${phase} step ${i + 1}: ${gainAt(v, c0, x)} for ${want}`);
+    }
+  }
+});
+await check('Gate, smoothed edges: a trapezoid with ramps of `smooth` steps centred on the edges, never above the gain', async () => {
+  for (const p of Object.keys(GATE_PRESETS)) for (const smooth of [0.1, 0.25, 0.5]) {
+    const v = await gateHap(p, { smooth, depth: 1 }, 0.4);
+    assert(lfosOf(v).length === 2 * gateRuns(p).runs.length, `${p}: ${lfosOf(v).length} LFOs`);
+    let top = 0;
+    for (let i = 0; i < 16; i++) {
+      const prevOpen = p[(i + 15) % 16] === 'x', nextOpen = p[(i + 1) % 16] === 'x';
+      // the middle of each step is past any ramp: full level or silence
+      const mid = gainAt(v, 0, (i + 0.5) / 16), want = p[i] === 'x' ? 0.4 : 0;
+      assert(Math.abs(mid - want) < 2e-3, `${p} smooth ${smooth} step ${i + 1} middle: ${mid}`);
+      // on an edge between an open and a closed step, the ramp is half way
+      if (p[i] === '.' && prevOpen) assert(Math.abs(gainAt(v, 0, i / 16) - 0.2) < 2e-3, `${p} edge into step ${i + 1}: ${gainAt(v, 0, i / 16)}`);
+      if (p[i] === '.' && nextOpen) assert(Math.abs(gainAt(v, 0, (i + 1) / 16) - 0.2) < 2e-3, `${p} edge out of step ${i + 1}`);
+      for (let j = 0; j < 32; j++) top = Math.max(top, gainAt(v, 0, (i + j / 32) / 16));
+    }
+    assert(top <= 0.4 + 2e-3, `${p}: above the gain (${top})`);
+  }
+});
+await check('Gate on a held pad: its gain LFOs after the line\'s own gain, Ottavi as one LFO at 8 cycles a bar', async () => {
+  const [l] = block(compileSong(song([pad([{ device: 'gate', smooth: 0, depth: 1 }])])), 'pad');
+  assert(count(l, 'lfo') === 1 && l.includes(".lfo({ c: 'gain', s: 8, da: 0.3, dc: -1, sh: 'square', sk: 0.5, phaseoffset: 0 })"), l);
+  const [h] = await hapsOf(l, 0, 1);
+  assert(h.value.gain === 0.3 && h.value.lfo[0].sync === 8 && h.value.lfo[0].skew === 0.5, JSON.stringify(h.value));
+});
+await check('validator: Gate pattern, one Gate, Gate with Pump, a costly pattern', () => {
+  const e = s => issues(s).errors.map(x => `${x.path}: ${x.msg}`);
+  for (const bad of ['x.x.', 'xxxxxxxxxxxxxxxx', '................', 'x-x-x-x-x-x-x-x-']) assert(e(song([pad([{ device: 'gate', pattern: bad }])])).some(x => x.startsWith('tracks[0].rack[0].pattern')), bad);
+  assert(e(song([pad([{ device: 'gate' }, { device: 'gate' }])])).some(x => x.startsWith('tracks[0].rack[1]: at most one gate')), 'two gates');
+  assert(e(song([pad([{ device: 'pump' }, { device: 'gate' }])])).some(x => x.startsWith('tracks[0].rack[1]: a gate and a pump')), 'gate and pump');
+  assert(e(song([pad([{ device: 'gate', pattern: 'x.x..x.xx.x...x.' }, { device: 'lfo', phase: 0.3 }])])).length === 0, 'gate and a phased lfo are fine');
+  assert(issues(song([pad([{ device: 'gate', pattern: 'x.x.x.x.x.x.x..x' }])])).warnings.some(x => x.path === 'tracks[0].rack[0].pattern'), 'costly pattern warns');
+  assert(e(song([pad([{ device: 'lfo', phase: 1 }])])).some(x => x.startsWith('tracks[0].rack[0].phase')), 'phase above 0.95');
+});
+
 // ---------- the validator ----------
 await check('validator: three movement devices, two pumps, two LFOs on one target, movement on drums, Sweep out of range', () => {
   const e = s => issues(s).errors.map(x => `${x.path}: ${x.msg}`);
@@ -219,7 +335,7 @@ await check('a song with a Sweep, an LFO and a Pump compiles byte for byte the s
   assert(compileSong(s) === compileSong(JSON.parse(JSON.stringify(s))), 'differs');
 });
 await check('the example songs validate and every line evaluates in Strudel', async () => {
-  for (const f of ['07-pump', '08-sweep', '09-sway']) {
+  for (const f of ['07-pump', '08-sweep', '09-sway', '10-gate']) {
     const s = JSON.parse(fs.readFileSync(`songs/examples/${f}.json`, 'utf8'));
     assert(issues(s).errors.length === 0 && issues(s).warnings.length === 0, `${f}: ${JSON.stringify(issues(s))}`);
     const code = compileSong(s);

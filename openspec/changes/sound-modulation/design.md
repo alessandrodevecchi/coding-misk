@@ -224,6 +224,11 @@ What the installed superdough (1.3.0) offers, read for this step:
 - **Meter.** The 16 steps divide the bar evenly, also in meters other than 4/4.
 - **Never louder.** The gain only goes down: the level rule of D6 holds.
 
+### Implementation notes (2026-11-24, D11 to D13)
+
+- **As designed.** The phase, the two targets and the Gate went in as written. `gateRuns` reads a pattern's shortest period and its closed runs; `gateCode` writes 5-decimal depths and offsets so the two triangles of a run cancel to well under a thousandth of the gain.
+- **Measured** (`tools/check-modulation.cjs`): closed steps -158 dB, open steps 0 dB; smoothing 0.5 fades the edge (-11 dB just past it) where hard edges are silent; a phased dip and a phased tremolo move their low point by the phase; a vibrato at depth 1 swings a sine about 90 cents peak to peak. Every superdough LFO starts on the first audio block after the note's onset, so the Gate's edges come about 3 ms late, in playback as in the export. Example 10 exported fast and in real time: the gated pad and the phased bass dip agree within 1/64 bar.
+
 ### Checks for D11 to D13
 
 - `check:modulation` (Node): the code of every new target and argument, phase 0 writing nothing, the filter's generic form with a phase, the Gate's runs and periods, the trapezoid sampled with a model of the LFO worklet at 64 points a bar against the pattern (closed steps at `1 - depth`, open steps at 1, never above 1), the validator's new errors and warnings, Strudel in Node evaluating every line, and the existing songs' code unchanged (`check:code`).

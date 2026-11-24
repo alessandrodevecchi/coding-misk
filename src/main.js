@@ -3955,7 +3955,7 @@ const simpleNotes = s => !s || /^[-\d~\s]+$/.test(s);
 const noteTokens = (s, n) => { const tk = (s || '').trim().split(/\s+/).filter(Boolean); return Array.from({ length: n }, (_, i) => tk.length ? tk[i % tk.length] : '~'); };
 
 // un modulo del rack: nome, acceso/spento, codice Strudel che aggiunge, valori, ordine
-const devValue = (name, v) => name === 'time' ? `${+(v * 16).toFixed(2)}/16` : name === 'recover' ? `${v} s` : String(v);
+const devValue = (name, v) => name === 'time' ? `${+(v * 16).toFixed(2)}/16` : name === 'recover' ? `${v} s` : name === 'phase' ? `${Math.round(v * 100)}%` : String(v);
 function deviceHtml(d, i, tr) {
   const spec = DEVICES[d.device]; if (!spec) return '';
   const a = deviceArgs(d), n = (tr.rack || []).length;
@@ -3966,9 +3966,12 @@ function deviceHtml(d, i, tr) {
     <div class="dev-head"><button class="led" data-dev-on="${i}" aria-pressed="${d.on !== false}" aria-label="${esc(t('onoff', { name: tx(spec.label) }))}"></button>
       <b>${esc(tx(spec.label))}</b><code data-dev-code="${i}"></code>
       <span class="dev-tools"><button class="mini" data-dev-move="${i}:-1" ${i === 0 ? 'disabled' : ''} aria-label="${esc(t('moveUp'))}">▲</button><button class="mini" data-dev-move="${i}:1" ${i === n - 1 ? 'disabled' : ''} aria-label="${esc(t('moveDown'))}">▼</button><button class="mini" data-dev-del="${i}" aria-label="${esc(t('remove'))}">✕</button></span></div>
-    ${args.length ? `<div class="dev-args">${args.map(([name, kind, , lo, hi, step], k) => kind === 'choice'
+    ${args.length ? `<div class="dev-args">${args.map(([name, kind, , lo, hi, step], k) => kind === 'steps'
+      // a Gate's pattern (sound-modulation D13): 16 toggles in the pattern editor's step row and a menu of presets
+      ? `<div class="ctrl dev-steps"><div class="row"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><select id="dev-${i}-${name}" data-dev-preset="${i}:${name}"><option value="">${esc(t('gatePreset'))}</option>${Object.entries(lo).map(([v, l]) => `<option value="${v}"${v === a[name] ? ' selected' : ''}>${esc(l[getLang()] || l.en)}</option>`).join('')}</select></div><div class="steps">${String(a[name]).split('').map((c, j) => `<button class="step" data-g="${Math.floor(j / 4)}" data-dev-step="${i}:${name}:${j}" aria-pressed="${c === 'x'}" aria-label="${esc(t('gateStep', { n: j + 1 }))}"></button>`).join('')}</div></div>`
+      : kind === 'choice'
       ? `<div class="ctrl"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><select id="dev-${i}-${name}" data-dev-arg="${i}:${name}">${lo.map(v => `<option value="${v}"${v === a[name] ? ' selected' : ''}>${esc(args[k][4] ? choiceLabel(args[k], v, getLang()) : devValue(name, v))}</option>`).join('')}</select></div>`
-      : `<div class="ctrl${spec.knob === name ? ' dev-knob' : ''}"${spec.knob === name ? ` title="${esc(t('moveKnobTip'))}"` : ''}><div class="row"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><output data-dev-out="${i}:${name}"></output></div><input type="range" id="dev-${i}-${name}" data-dev-arg="${i}:${name}" min="${lo}" max="${hi}" step="${step}" value="${a[name]}"></div>`).join('')}</div>` : ''}
+      : `<div class="ctrl${spec.knob === name ? ' dev-knob' : ''}"${spec.knob === name ? ` title="${esc(t('moveKnobTip'))}"` : name === 'phase' ? ` title="${esc(t(d.device === 'pump' ? 'phaseTipPump' : d.device === 'gate' ? 'phaseTipGate' : 'phaseTip'))}"` : ''}><div class="row"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><output data-dev-out="${i}:${name}"></output></div><input type="range" id="dev-${i}-${name}" data-dev-arg="${i}:${name}" min="${lo}" max="${hi}" step="${step}" value="${a[name]}"></div>`).join('')}</div>` : ''}
   </div>`;
 }
 function syncRack(tr, host = document) {
@@ -4536,6 +4539,10 @@ $('#track-panel').addEventListener('change', e => {
     const start = r === 'clip-start' ? Math.round(+e.target.value) - 1 : sp.s, bars = r === 'clip-bars' ? Math.round(+e.target.value) : sp.e - sp.s;
     setClipSpan(tr, c, start, bars); changed(); renderTrackPanel(); return;
   }
+  if (e.target.matches('select[data-dev-preset]')) {
+    const [i, name] = e.target.dataset.devPreset.split(':'); if (!e.target.value) return;
+    tr.rack[+i][name] = e.target.value; changed(); renderTrackPanel(); return;
+  }
   if (e.target.matches('select[data-dev-arg]')) {
     const [i, name] = e.target.dataset.devArg.split(':'); const v = e.target.value; tr.rack[+i][name] = isNaN(+v) ? v : +v;
     // a Sweep's new target brings its own from, to and curve (Hz for the filters, 0-1 for the sends)
@@ -4595,7 +4602,16 @@ $('#track-panel').addEventListener('click', e => {
     const kind = ($('#p' + tk + '_rk-type') || {}).value, moves = (tr.rack || []).filter(d => DEVICES[d.device] && DEVICES[d.device].kind === 'move');
     // at most two movement devices on a track and one Pump (sound-modulation D1)
     if (DEVICES[kind] && DEVICES[kind].kind === 'move' && (moves.length >= MOVE_MAX || (kind === 'pump' && moves.some(d => d.device === 'pump')))) { toast(t(kind === 'pump' && moves.some(d => d.device === 'pump') ? 'movePumpOne' : 'moveMax')); return; }
+    // a Gate and a Pump both dip the gain: one of them on a track (D13)
+    if ((kind === 'gate' || kind === 'pump') && moves.some(d => d.device === 'gate' || d.device === 'pump')) { toast(t(moves.some(d => d.device === kind) ? (kind === 'pump' ? 'movePumpOne' : 'moveGateOne') : 'moveGatePump')); return; }
     tr.rack = [...(tr.rack || []), newDevice(kind)]; changed(); renderTrackPanel(); return;
+  }
+  if (b.dataset.devStep !== undefined) {
+    // a Gate's step: open or closed; a pattern needs one of each (sound-modulation D13)
+    const [i, name, j] = b.dataset.devStep.split(':'), d = tr.rack[+i], cur = String(deviceArgs(d)[name]).split('');
+    cur[+j] = cur[+j] === 'x' ? '.' : 'x';
+    if (!cur.includes('x') || !cur.includes('.')) { toast(t('gateOneEach')); return; }
+    d[name] = cur.join(''); changed(); renderTrackPanel(); return;
   }
   if (b.dataset.devOn !== undefined) { const d = tr.rack[+b.dataset.devOn]; if (d.on === false) delete d.on; else d.on = false; changed(); renderTrackPanel(); return; }
   if (b.dataset.devDel !== undefined) { tr.rack.splice(+b.dataset.devDel, 1); if (!tr.rack.length) delete tr.rack; changed(); renderTrackPanel(); return; }

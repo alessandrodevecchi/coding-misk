@@ -102,9 +102,9 @@ Each track gets its own orbit (bus), so its delay and reverb are independent.
 
 Times are fractions of a bar: `0.0625` a 16th, `0.125` an 8th, `0.1875` a dotted 8th, `0.25` a quarter. Devices act after the instrument settings, so a rack `lpf` or `distort` replaces or adds to the track's own filter and drive.
 
-#### Movement devices (`sweep`, `lfo`, `pump`)
+#### Movement devices (`sweep`, `lfo`, `pump`, `gate`)
 
-Three devices move the sound over time, inside held notes too (sound-modulation, #95). Only on `bass guitar arp hook pad code` tracks; at most two per track, one `pump`, one `sweep` and one `lfo` per target (errors). The compiler writes them after the other devices of the line, with no random value.
+Four devices move the sound over time, inside held notes too (sound-modulation, #95). Only on `bass guitar arp hook pad code` tracks; at most two per track, one `pump`, one `gate`, never a `pump` and a `gate` together, one `sweep` and one `lfo` per target (errors). The compiler writes them after the other devices of the line, with no random value.
 
 ```json
 "rack": [
@@ -116,8 +116,11 @@ Three devices move the sound over time, inside held notes too (sound-modulation,
 | Device | Values (defaults) | Strudel |
 | --- | --- | --- |
 | `sweep` | `target` filter (`filter hpf room delay`), `from` 400 and `to` 4000 (Hz 60 to 18000 for the filters, 0 to 1 for the sends), `bars` 8 (`1 2 4 8 16`), `curve` exp (`exp linear`; the sends are always linear), `repeat` once (`once loop`) | a ramp per onset from the clip's start, `saw.slow(bars).rangex(from, to)`; on a pad holding one chord per bar a value per bar and `.env({ c, a, s: 1, da })` gliding inside the bar; `once` holds `to` after the ramp |
-| `lfo` | `target` filter (`filter pan room delay`), `rate` 0.5 bar (`0.0625 0.125 0.25 0.5 1 2 4`), `depth` 0.4 (0 to 1), `shape` sine (`sine tri saw ramp square`) | filter: `.lpsync(1/rate).lpdepth(depth × 1.8).lpshape()`; others: `.lfo({ c, s: 1/rate, da, sh })` with a base value when the line has none |
-| `pump` | `depth` 0.6 (0 to 1), `recover` 0.15 s (0.05 to 0.5), `rate` 0.25 bar (`0.25 0.125 0.0625`, only where no kick plays) | on every playing kick line of the section: `.duck(orbit).duckdepth(depth).duckattack(recover)`; with no kick: `.lfo({ c: 'gain', s: 1/rate, da: depth × gain, dc: -1, sh: 'ramp' })` on the track's line |
+| `lfo` | `target` filter (`filter pan room delay volume pitch`), `rate` 0.5 bar (`0.0625 0.125 0.25 0.5 1 2 4`), `depth` 0.4 (0 to 1), `shape` sine (`sine tri saw ramp square`), `phase` 0 (0 to 0.95) | filter: `.lpsync(1/rate).lpdepth(depth × 1.8).lpshape()`, with a phase `.lfo({ c: 'lpf', s, da: depth × 1.8 × cutoff, sh, phaseoffset })`; volume: the Tremolo device's `.tremolosync(1/rate).tremolodepth(depth).tremoloshape()` (`.tremolophase()` with a phase), replacing a Tremolo device on the line (warning); pitch: `.vib(Hz).vibmod(depth × 0.5)`, the rate in Hz from the section's tempo, always a sine from each note's start (shape and phase warn); others: `.lfo({ c, s: 1/rate, da, sh })` with a base value when the line has none |
+| `pump` | `depth` 0.6 (0 to 1), `recover` 0.15 s (0.05 to 0.5), `rate` 0.25 bar (`0.25 0.125 0.0625`, only where no kick plays), `phase` 0 (0 to 0.95, only where no kick plays) | on every playing kick line of the section: `.duck(orbit).duckdepth(depth).duckattack(recover)`; with no kick: `.lfo({ c: 'gain', s: 1/rate, da: depth × gain, dc: -1, sh: 'ramp' })` on the track's line |
+| `gate` | `pattern` `"x.x.x.x.x.x.x.x."` (16 steps a bar, `x` open, `.` closed, at least one of each; presets Ottavi, Controtempo, Trance A `xx.xx.x.xx.xx.x.`, Trance B, Puntato), `depth` 0.8 (0 to 1), `smooth` 0.1 of a step (`0 0.1 0.25 0.5`), `phase` 0 (0 to 0.95 of a step) | per closed run, a gain LFO (`sh: 'square'`) or two (`sh: 'tri'`, a trapezoid with ramps of `smooth` steps) going down by `depth × gain`; a pattern that repeats every 2, 4 or 8 steps is written once per repetition. More than 6 closed runs that do not repeat warn (CPU) |
+
+`phase` delays the wave by that share of its period (of a step for `gate`); the code holds Strudel's `phaseoffset` or `tremolophase` as `1 - phase`, and phase 0 writes nothing.
 
 A `sweep` replaces the track's cutoff ramp (`cutoffEnd`, a moving filter) or its own `room` or `delay` on the line (warning), and a `vary` entry on the control it writes is left out (warning). An `lfo` or a `pump` keeps `vary`: the per-hit value is the base and the movement sways around it.
 
