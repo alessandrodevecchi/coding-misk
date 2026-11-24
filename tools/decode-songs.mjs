@@ -266,6 +266,59 @@ export const HIT_SONGS = [
 ];
 export const HITS = HIT_SONGS.map(s => s.id);
 
+// Modulated test songs (sound-modulation D9, #95): a held pad whose sound moves with known parameters, each in two takes:
+// with drums (`mod-<kind>`) and the pad alone with the bass (`mod-<kind>-bare`), so the next Decode round can check
+// that a kick is not read as a pump. The gate's drums play no kick (a Pump without a kick dips on its rate). Held out:
+// in VALIDATION, never used to choose a value. Exported by `tools/decode-export.cjs --mod` into .cache/decode/mod/.
+const MOD_PAD = { wave: 'sawtooth', gain: 0.3, cutoff: 1800, move: 'fisso', room: 0.2 };
+const MOD_KINDS = {
+  pump: { rack: [{ device: 'pump', depth: 0.6, recover: 0.15 }], rows: FOUR },
+  gate: { rack: [{ device: 'pump', depth: 0.6, recover: 0.15, rate: 0.125 }], rows: { cp: '....x.......x...', hh: '..x...x...x...x.' } },
+  lfo: { rack: [{ device: 'lfo', target: 'filter', rate: 0.5, depth: 0.5, shape: 'sine' }], rows: FOUR },
+  trem: { rack: [{ device: 'tremolo', rate: 8, depth: 0.6 }], rows: FOUR },
+  sweep: { rack: [{ device: 'sweep', target: 'filter', from: 300, to: 5000, bars: 8, curve: 'exp', repeat: 'loop' }], rows: FOUR, cutoff: 18000 },
+};
+export const MOD_SONGS = Object.entries(MOD_KINDS).flatMap(([kind, k]) => [true, false].map(withDrums => {
+  const id = `mod-${kind}${withDrums ? '' : '-bare'}`;
+  return song(id, id, [sec('Main', 16, 124, 'A', 'epica')], [
+    ...(withDrums ? [{ id: 'drums', name: 'Drums', type: 'drums', settings: { kit: 'RolandTR909' }, patterns: { A: { rows: k.rows } }, clips: [{ section: 'Main', pattern: 'A' }] }] : []),
+    { id: 'bass', name: 'Bass', type: 'bass', settings: { wave: 'sawtooth', cutoff: 700, move: 'fisso' }, patterns: { A: { preset: 'offbeat' } }, clips: [{ section: 'Main', pattern: 'A' }] },
+    { id: 'pad', name: 'Pad', type: 'pad', settings: { ...MOD_PAD, ...(k.cutoff ? { cutoff: k.cutoff } : {}) }, patterns: { A: { preset: 'pad' } }, clips: [{ section: 'Main', pattern: 'A' }], rack: k.rack },
+  ]);
+}));
+export const MOD = MOD_SONGS.map(s => s.id);
+// the same song with its movement taken out (the still pad the envelope error measures against)
+export const stillOf = s => ({ ...s, id: `${s.id}-still`, tracks: s.tracks.map(t => (t.rack ? { ...t, rack: t.rack.filter(d => !['sweep', 'lfo', 'pump', 'tremolo'].includes(d.device)) } : t)) });
+
+// The truth of a song's movement, read from the song itself: per track id, its movement devices and its Tremolo with
+// their arguments (defaults filled in). A Pump's rate counts only where no kick plays in the song (the beat dip).
+const MOVE_DEFAULTS = { sweep: { target: 'filter', from: 400, to: 4000, bars: 8, curve: 'exp', repeat: 'once' }, lfo: { target: 'filter', rate: 0.5, depth: 0.4, shape: 'sine' }, pump: { depth: 0.6, recover: 0.15, rate: 0.25 }, tremolo: { rate: 8, depth: 0.7 } };
+export function modTruth(s) {
+  const kick = s.tracks.some(t => t.type === 'drums' && !t.mute && Object.values(t.patterns || {}).some(p => p.rows && /x/.test(p.rows.bd || '')));
+  const out = {};
+  for (const t of s.tracks) for (const d of t.rack || []) {
+    if (!MOVE_DEFAULTS[d.device] || d.on === false) continue;
+    const a = { ...MOVE_DEFAULTS[d.device], ...Object.fromEntries(Object.entries(d).filter(([k]) => k in MOVE_DEFAULTS[d.device])) };
+    const x = d.device === 'pump' ? { device: 'pump', depth: a.depth, recover: a.recover, ...(kick ? {} : { rate: a.rate }) } : { device: d.device, ...a };
+    (out[t.id] = out[t.id] || []).push(x);
+  }
+  return out;
+}
+// The parameter score (D9): a device counts as recovered when a measured device of the same track has its kind and
+// rate (exact; a Sweep: its bars, a Pump with a kick: no rate) and its depth within 0.15 (a Sweep: no depth).
+// → { devices, recovered, share }
+export function modScore(truth, measured) {
+  let devices = 0, recovered = 0;
+  for (const [track, list] of Object.entries(truth || {})) for (const t of list) {
+    devices++;
+    const ok = ((measured || {})[track] || []).some(m => m.device === t.device
+      && (t.device === 'sweep' ? m.bars === t.bars : (t.rate === undefined || m.rate === t.rate))
+      && (t.depth === undefined || (typeof m.depth === 'number' && Math.abs(m.depth - t.depth) <= 0.15)));
+    if (ok) recovered++;
+  }
+  return { devices, recovered, share: devices ? Math.round((recovered / devices) * 1000) / 1000 : null };
+}
+
 // The split of every bench song (decode-refine group 10, phase 1). TUNING songs may be used to choose a value of the
 // decoder; VALIDATION songs are never used to choose a value: they only verify a value chosen on the tuning songs.
 // The old bench (TEST_SONGS and the app songs) was already used to tune groups 7 to 10, so it is tuning; the held-out
@@ -275,7 +328,9 @@ export const TUNING = ['decode-test-124', 'decode-test-90', 'decode-test-174', '
 // (round 6: the held-out songs were looked at in rounds 2 to 5 and this VALIDATION set in phase 1 and its review, so it
 // is a validation set already seen; FRESH, below, is the one never looked at before the end of round 6)
 export const VALIDATION = [...HOLDOUT_SONGS.map(s => s.id),
-  'genre-boombap-90', 'genre-ambient-70', 'genre-dub-75', 'genre-breakbeat-135', 'genre-lofi-80', 'genre-acid-bright-132'];
+  'genre-boombap-90', 'genre-ambient-70', 'genre-dub-75', 'genre-breakbeat-135', 'genre-lofi-80', 'genre-acid-bright-132',
+  // (sound-modulation D9: the modulated songs, held out)
+  ...MOD];
 export const FRESH = FRESH_SONGS.map(s => s.id);
 // the variation sweep (phase 1): one 8-bar techno song at 130 BPM, the bass's drive and gain and the drums' drive moved
 // one at a time, to see where level B's drive detection switches on

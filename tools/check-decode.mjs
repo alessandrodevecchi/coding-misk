@@ -840,5 +840,22 @@ if (process.argv.includes('--app')) {
     }
   } else console.log('skip  beat tracker: model files not in .cache/beat-this/');
 }
+// ---------- modulated songs at the bench (sound-modulation D9, #95) ----------
+{
+  const DS = await import('./decode-songs.mjs'), HD = await import('./decode-hits.mjs');
+  check(DS.MOD_SONGS.length === 10 && DS.MOD.every(id => DS.VALIDATION.includes(id)) && DS.MOD_SONGS.every(s => validateSong(s).errors.length === 0), 'modulated songs: five kinds in two takes, held out in VALIDATION, valid');
+  const t = DS.modTruth(DS.MOD_SONGS.find(s => s.id === 'mod-pump'));
+  check(JSON.stringify(t) === JSON.stringify({ pad: [{ device: 'pump', depth: 0.6, recover: 0.15 }] }), 'modTruth reads mod-pump\'s pad: { device: pump, depth 0.6, recover 0.15 }', JSON.stringify(t));
+  const gate = DS.modTruth(DS.MOD_SONGS.find(s => s.id === 'mod-gate'));
+  check(gate.pad[0].rate === 0.125, 'modTruth: a Pump without a kick counts its rate (the gate)', JSON.stringify(gate));
+  check(DS.MOD_SONGS.every(s => { const r = DS.modTruth(s), a = DS.modScore(r, r), b = DS.modScore(r, {}); return a.devices === 1 && a.recovered === 1 && b.recovered === 0; }), 'modScore: the truth against itself recovers every device, an empty measure none');
+  check(DS.modScore(t, { pad: [{ device: 'pump', depth: 0.5 }] }).recovered === 1 && DS.modScore(t, { pad: [{ device: 'pump', depth: 0.4 }] }).recovered === 0, 'modScore: depth within 0.15 counts, 0.2 off does not');
+  // the envelope error on features built by hand: 21 frames a beat, a flat band against a band that dips after the beat
+  const frames = (dip, beats = 64) => ({ hop: 0.5 / 21, fr: Array.from({ length: beats * 21 }, (_, i) => { const ph = (i % 21) / 21, g = dip ? 1 - 0.8 * Math.max(0, 1 - ph / 0.4) : 1; return { low: 0.5, mid: g, high: 0.1 * g }; }) });
+  const grid = { downbeat: 0, barSeconds: 2, bars: 16 };
+  const same = HD.envelopeError(frames(true), frames(true), grid), diff = HD.envelopeError(frames(true), frames(false), grid);
+  check(same.low === 0 && same.mid === 0 && same.high === 0, 'envelope error: a file against itself is 0 dB in every band', JSON.stringify(same));
+  check(diff.mid >= 1 && diff.low === 0, 'envelope error: a dipping band against a still one is clearly above 0 (at least 1 dB), a band that does not move stays 0', JSON.stringify(diff));
+}
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
