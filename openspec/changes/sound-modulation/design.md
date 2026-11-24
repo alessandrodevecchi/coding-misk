@@ -32,7 +32,7 @@ What the code and the installed Strudel do today (`@strudel/core` 1.2.6, superdo
 
 - Decode measuring and writing modulation (owner's step 3).
 - Generator, style recipes, Live coder growth and radio console commands that add modulation (owner's step 4).
-- Modulating pitch (`vib`, `penv`), the FM index (the FM rise exists) or drum rows.
+- Modulating the pitch envelope (`penv`), the FM index (the FM rise exists) or drum rows. (Vibrato came with the movement parameters, D12.)
 - Changing #94's `vary` or `tone`.
 
 ## Decisions
@@ -86,8 +86,8 @@ The change sits beside `vary` and `tone` and reuses #94's structures:
 | shape | `sine`, `tri`, `saw`, `ramp`, `square` | `sine` |
 
 - **Code.** Filter: `.lpsync(s).lpdepth(d).lpshape("sine")` with `s = 1 / rate`; `lpdepth` is in octaves-like units of the filter LFO, so the writer maps depth 0-1 to 0-4 and task 1.4 checks it by ear and by spectrum. Pan, room, delay: `.lfo({ c: 'pan', s: 2, da: d, sh: 'sine' })` with `da` = depth × 0.5 for pan, depth × the base's headroom for sends.
-- **Gain is not a target.** The Tremolo device already sways the gain inside the note.
-- **Phase.** The LFO restarts at each onset, so a pad struck on the bar line sways in phase with the bar. Notes struck off the grid start their own phase; the guide says so.
+- **Gain is not a target.** The Tremolo device already sways the gain inside the note. (Superseded by D12: the target "volume" writes that same tremolo.)
+- **Phase.** The LFO restarts at each onset, so a pad struck on the bar line sways in phase with the bar. Notes struck off the grid start their own phase; the guide says so. (Measured later: the wave follows the song, see the implementation notes; D11 adds a phase argument.)
 
 ### D6. Pump ("Pompa")
 
@@ -172,6 +172,63 @@ What the code and the measures settled (`src/song/movement.js`, `tools/check-mod
 
 - **D9 (bench, 2026-11-24).** The envelope error works on the bench's features (frames of 2048 samples every 512, 32 phases a beat folded over every beat). Its scale is weaker than the spec expected: `mod-pump-bare` against its still take is 0.62 dB in the mid band (the scenario asks for at least 1 dB), because the bass fills the same band and the frame smooths the dip; the tremolo song reaches 2.7 dB, the sweep 8.6 dB in the high band. A finer measure on the chords' tonal bins (as the owner's proposal suggests) belongs to step 3. Level B decoded `mod-pump-bare`, which has no drums, with a four-on-the-floor kick: the pump read as a kick, the risk step 3 must avoid. (Decode round 15: the weak scale came from the fast export, which started each note's LFO and tremolo wave at its time in seconds, so the Pump without a kick drifted a quarter beat per bar; with the note's cycle passed, as the live player does, `mod-pump-bare` reads 2.02 dB. The kick on the drumless songs came from the pad and the bass, not the pump: `decode-round15` B.)
 
+## Movement parameters (D11 to D13, second step)
+
+What the installed superdough (1.3.0) offers, read for this step:
+
+- **Generic LFO.** `connectLFO` starts the wave at `cycle / cps × frequency + phaseoffset` (`modulators.mjs`, the LFO worklet in `worklets.mjs`), so with `sync` the wave follows the bar. `phaseoffset` has no alias, and `.lfo({ … })` passes any key it does not know to the worklet, so `.lfo({ c: 'gain', …, phaseoffset: 0.5 })` works (the Decode bench used it, `tools/decode-mod-bench.cjs`).
+- **Tremolo.** The same LFO worklet on a gain node: `tremolosync`, `tremolodepth`, `tremoloshape`, `tremolophase`, skew 0.5 when a shape is set. The gain is `1 - depth` plus the wave clamped to 0-1, so the tremolo never raises the note.
+- **Filter LFO** (`lpsync`, `lpdepth`, `lpshape`): built inside the filter, with no phase input.
+- **Vibrato.** `vib` (rate in Hz) and `vibmod` (depth in semitones) add a sine oscillator on the source's detune, started at the note's onset. It works on every source (synths, samples, soundfonts); it has no sync, no phase and no shape.
+- **Fast export.** Since `ef0bfb0` the render page passes the note's cycle, as the live player does, so every wave above starts at the same phase in playback, fast export and real-time export.
+
+### D11. Phase ("Fase")
+
+| Device | Argument | Values | Default |
+| --- | --- | --- | --- |
+| LFO, Pump, Gate | phase | 0 to 0.95, step 0.05 | 0 |
+
+- **Meaning.** How late the wave starts, as a share of its period: Fase 0.25 on a Pump at 1/4 bar puts the dip a sixteenth after each beat. For the Gate the share is of one step (D13), since a whole step is a pattern edit.
+- **Code.** Strudel counts the other way (`phaseoffset` moves the wave earlier), so the writer writes `1 - phase`: `phaseoffset: 0.75` for Fase 0.25 on generic LFOs (pan, sends, the Pump's dip, the Gate), `.tremolophase(0.75)` on volume. Phase 0 writes nothing, so every existing song compiles byte for byte as before.
+- **Filter.** The filter LFO has no phase input. With a phase, the writer writes the filter LFO in the generic form, `.lfo({ c: 'lpf', s, da: depth × 1.8 × cutoff, sh, phaseoffset })`, the same centred swing as `lpdepth` (D5 notes) around the line's base cutoff. Phase 0 keeps the `lpsync` form. The one difference: with #94's `vary` on `lpf`, the generic form's swing follows the base cutoff, not each hit's value.
+- **Pump with a kick.** The dip follows the kick; phase moves only the beat dip of a section without a kick. The card's tooltip says so.
+- **Pitch.** Strudel's vibrato has no phase: phase on the pitch target does nothing, and the validator warns.
+
+### D12. Oscillazione on volume (tremolo) and on pitch (vibrato)
+
+| Target | Code | Depth 1 means |
+| --- | --- | --- |
+| `volume` | `.tremolosync(1/rate).tremolodepth(depth).tremoloshape("<shape>")` | the sound goes down to silence at the wave's low point |
+| `pitch` | `.vib(<Hz>).vibmod(<semitones>)` | half a semitone up and down |
+
+- **Volume reuses the Tremolo device.** The rack's Tremolo device and the volume target write the same Strudel tremolo through one function in `movement.js`; the Tremolo device's code does not change. The volume target adds a shape (so the wave is symmetric, skew 0.5) and the phase. The Tremolo device stays a Sound device, outside the two-device rule. A Tremolo device and an LFO on volume on one track: the LFO wins, the Tremolo device's calls leave the line and the validator warns, as for a Sweep over the track's own value (D4).
+- **Pitch through `vib`.** The generic LFO on `note` moves the source's frequency in Hz on synths but falls back to the detune in cents on samples, so one absolute depth cannot serve both. `vib` acts in semitones on every source. The rate in Hz comes from the section's tempo, `1 / (rate × bar seconds)` with the bar seconds of D4 (the mean tempo under a ramp). Depth 0 to 1 maps to `vibmod` 0 to 0.5 semitones (0.4 is 20 cents each way). The wave is a sine that starts with each note, so shape and phase do nothing and the validator warns when they are set.
+- **No base value.** The tremolo makes its own gain node and the vibrato its own oscillator: the writer adds nothing to the line.
+- **Never louder.** The tremolo only lowers the sound; the vibrato does not change the level.
+
+### D13. Gate ritmico ("Rhythmic gate")
+
+| Argument | Values | Default |
+| --- | --- | --- |
+| pattern | 16 steps, `x` open and `.` closed, at least one of each; five presets | `x.x.x.x.x.x.x.x.` |
+| depth | 0-1 | 0.8 |
+| smooth | 0, 0.1, 0.25, 0.5 of a step | 0.1 |
+| phase | 0-0.95 of a step (D11) | 0 |
+
+- **Presets:** Ottavi `x.x.x.x.x.x.x.x.`, Controtempo `..x...x...x...x.`, Trance A `xx.xx.x.xx.xx.x.`, Trance B `x.xx.xx.x.xx.xx.`, Puntato `x..x..x..x..x.x.`. The card shows the 16 steps as a row of toggles (the step row of the pattern editor) and a menu of presets; a song file may hold any pattern of 16 steps.
+- **Code: a gain LFO per closed run.** The gain dips by `depth × g` during each run of closed steps, `g` the line's gain as for the Pump's dip (D6 notes). With `smooth` 0, each run is one generic LFO on `gain`: square, `dc: -1`, skew `1 - run`, `phaseoffset` at the run's end, one cycle per bar. A pattern that repeats every 2, 4 or 8 steps is written once for its period (`s` 8, 4, 2), so Ottavi is a single LFO.
+- **Smoothing.** With `smooth` above 0, each run is two triangle LFOs whose sum is a trapezoid: with `k = 1 - run` and the ramp `r` (both shares of the period), `tri_k(u - a) - tri_k(u - a - r)` rises over `r`, holds, and falls over `r`; Strudel has no negative wave, so the second one is written as `tri_(1-k)` shifted by `k`, which equals `1 - tri_k`. Each LFO has depth `depth × g × k (1 - k) / r`, and their offsets put the high plateau at 0 and the low one at `-depth × g`. The ramps are centred on the run's edges, so a step keeps its length. Both LFOs start on the same audio block, so the sum is exact. A model of superdough's LFO in `check:modulation` samples the sum against the pattern.
+- **Why not the duck or `struct`.** A duck dips and recovers, it holds no step, needs a trigger line and cancels a Pump's duck on the same orbit. `struct` or `seg` cut a held note into new notes: the pad's attack starts again and the Sweep's glide breaks.
+- **Existing gate usage.** The bench song `mod-gate` (D9) is a Pump without a kick at 1/8 bar. The Gate reuses that dip's gain rule and LFO form; the bench song stays as it is.
+- **Limits.** One Gate per track; a Gate counts in the two movement devices. Gate and Pump on one track is an error: both dip the gain, and two deep dips could pass zero and flip the sound. Above 6 closed runs in a bar (12 LFOs per note) the validator warns about the cost.
+- **Meter.** The 16 steps divide the bar evenly, also in meters other than 4/4.
+- **Never louder.** The gain only goes down: the level rule of D6 holds.
+
+### Checks for D11 to D13
+
+- `check:modulation` (Node): the code of every new target and argument, phase 0 writing nothing, the filter's generic form with a phase, the Gate's runs and periods, the trapezoid sampled with a model of the LFO worklet at 64 points a bar against the pattern (closed steps at `1 - depth`, open steps at 1, never above 1), the validator's new errors and warnings, Strudel in Node evaluating every line, and the existing songs' code unchanged (`check:code`).
+- `tools/check-modulation.cjs` (browser): an example song with a Gate, a tremolo, a vibrato and a phased Pump plays with no error; levels with and without (never louder); the envelope of the Gate and of the phased dip in playback against the fast export, aligned within a 32nd.
+
 ## Owner tests (checklist)
 
 1. **Pad che si apre (Sweep).** Dove: Compose, un brano con un pad tenuto (per esempio `luci-rosse`), pannello della traccia pad, rack. Cosa fare: aggiungi "Apertura", lascia filtro da 400 a 4000 in 8 battute, premi Play. Cosa deve succedere: il pad parte scuro e diventa brillante in 8 battute, in modo continuo anche dentro ogni accordo tenuto, senza scatti a ogni battuta. Perché: è il movimento dentro la nota che oggi manca.
@@ -183,6 +240,11 @@ What the code and the measures settled (`src/song/movement.js`, `tools/check-mod
 7. **Stesso suono nell'export.** Dove: il brano del test 3. Cosa fare: esporta veloce in WAV e riascolta. Cosa deve succedere: il pompaggio e l'apertura sono uguali a quelli in riproduzione, negli stessi punti. Perché: i dispositivi sono deterministici.
 8. **Fase successiva, manopola in Compose.** Dove: la scheda di Oscillazione del test 2, nel rack del pad. Cosa fare: guarda la manopola in cima alla scheda, poi girala durante un accordo tenuto; accendi il punto di registrazione, rifai il gesto, spegni il punto e riascolta. Cosa deve succedere: la manopola parte dal valore impostato e senza toccarla il pad suona come nel test 2; girandola il filtro si muove subito, dentro l'accordo che sta suonando; accanto alla manopola c'è solo un piccolo segno (nessuna scritta "Live"); al riascolto la manopola si muove da sola e ripete il gesto; le tracce senza dispositivi di movimento non hanno manopole. Perché: la manopola muove una nota già partita e il gesto resta nel brano.
 9. **Fase successiva, manopola in radio e nel codice.** Dove: Radio, un tuo brano con un dispositivo di movimento in una playlist; poi Copia codice. Cosa fare: nella console scegli la parte con il dispositivo, gira la manopola; poi incolla il codice copiato in Strudel. Cosa deve succedere: la manopola compare solo per quella parte, accanto a Varia e Scambia, e sparisce scegliendo un'altra parte; il gesto in radio non viene registrato; nel codice copiato il gesto registrato in Compose diventa un valore per battuta. Perché: nessun pannello nuovo, e il codice copiato suona anche fuori dall'app.
+
+10. **Fase.** Dove: Compose, un brano con pad e senza batteria (o batteria silenziata), rack del pad. Cosa fare: aggiungi "Pompa", ascolta, poi porta Fase a 0,5. Cosa deve succedere: con Fase 0 il pad si abbassa sul battito; con 0,5 si abbassa a metà fra un battito e l'altro, e l'export veloce fa lo stesso negli stessi punti. Perché: decidere dove cade il movimento dentro il battito.
+11. **Tremolo e vibrato da Oscillazione.** Dove: lo stesso pad. Cosa fare: Oscillazione con bersaglio Volume, velocità 1/8; poi bersaglio Intonazione, profondità 0,4. Cosa deve succedere: con Volume il pad pulsa a tempo senza mai diventare più forte; con Intonazione la nota oscilla di poco in altezza, come un vibrato. Perché: due bersagli nuovi senza un modulo in più.
+12. **Gate ritmico.** Dove: un pad tenuto (per esempio `luci-rosse`). Cosa fare: aggiungi "Gate ritmico", prova i preset Ottavi e Trance A, poi cambia due passi a mano e prova Morbidezza da Netta a Morbida. Cosa deve succedere: il pad viene tagliato a ritmo di sedicesimi secondo i passi accesi; con Netta i tagli sono secchi, con Morbida più dolci; il master non diventa mai rosso. Perché: il trance gate dei brani trance e progressive.
+13. **Brani vecchi uguali (movimento).** Dove: gli esempi `07-pump`, `08-sweep`, `09-sway`. Cosa fare: suonali. Cosa deve succedere: suonano come prima di questo passo. Perché: i valori nuovi partono neutri.
 
 ## Risks / Trade-offs
 
@@ -215,3 +277,4 @@ In agent hours:
 - Later phase, knobs (D7, D8): about 8 (bus driver and reset 2, Compose card and path 2, fast export and copied code 1.5, radio row 1, code widget 1, checks 0.5).
 
 This change, without the later phase: about 10.
+- Movement parameters (D11 to D13): about 4 (phase and the filter's generic form 0.5, volume and pitch 0.5, Gate with its step row and smoothing 1.5, checks in Node and in the browser 1, docs, guide and knowledge 0.5).
