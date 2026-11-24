@@ -245,7 +245,7 @@ What the installed superdough (1.3.0) offers, read for this step:
 | --- | --- | --- |
 | target | `filter`, `hpf`, `volume`, `room`, `delay`, `pan` | `filter` |
 | points | `[bar, value]` pairs, bars from the song's start, increasing; values in the target's range (filters 60-18000 Hz, volume 0-1 of the track's gain, sends 0-1, pan 0-1) | none (the device needs points) |
-| smooth | `linear` (straight lines between points), `step` (each value held until the next point, edges of 5 ms) | `linear` |
+| smooth | `linear` (straight lines between points), `step` (each value held until the next point, edges of 10 ms) | `linear` |
 
   Before the first point the value is the first point's, after the last the last one's. Pitch is not a path target in this step: a pitch curve needs the source's frequency, whose unit depends on the sound (D12).
 - **How it moves a held note.** Inside a note only a modulator moves a value (Context). The engine uses Strudel's bus: a path line plays Strudel's constant sound `one` (a `ConstantSourceNode`) into a bus with no dry output, and the moved line reads that bus with `.bmod({ b: N, c, da })` over a base value. Each point is a short note of `one`; with `linear` its gain envelope is a triangle from the previous point's time to the next point's (linear attack and decay), and overlapping triangles sum to the straight line through the points. With `step` each note holds its value until the next point. For example, a volume path on a pad:
@@ -255,7 +255,14 @@ What the installed superdough (1.3.0) offers, read for this step:
   $: note("<[c3,e3,g3]>").s("supersaw").gain(.05).bmod({ b: 1, c: 'gain', da: .075 })…
   ```
 
-  The exact calls (the triangle's start, the gain curve, the depth factor) are fixed by task 8.1's measures; the shape above is the plan.
+  (the plan; the measured form is under "Measured (task 8.1)" below:)
+
+  ```js
+  $: stack("<.0625:.01:1.99:0 …>", "<.125:2:0:1 …>").as("gain:attack:decay:sustain").s("one").bus(1).dry(0)  // percorso: volume, 2 punti
+  $: note("<[c3,e3,g3]>").s("supersaw").gain(.3)….mul(postgain(.001)).bmod({ b: 1, c: 'postgain', dep: 1000 }).orbit(6)…
+  ```
+
+  The exact calls (the triangle's start, the gain curve, the depth factor) are fixed by task 8.1's measures; the shape above is the plan. The measures changed it as written under "Measured (task 8.1)" below.
 - **Encoding.** The bus carries 0 to 1, the path between its lowest and highest value; the moved line's base is the lowest value and `da` is the span, times the bus modulator's factor (superdough divides the depth by 0.3) and through the inverse of the gain curve `one`'s notes pass (`applyGainCurve`). A filter path is linear in Hz between points; Decode writes more points where an opening is steep, so the ear hears no corner.
 - **Same everywhere.** Both lines are plain Strudel, so the sound is the same in the page, in the real-time export (it records the page), in the fast export (the render page plays every hap through its own controller, which makes the bus on first use) and in code copied out of the app, which holds the path line as written with a comment naming it (`// percorso: filtro, 24 punti`).
 - **Limits.**
@@ -274,6 +281,15 @@ What the installed superdough (1.3.0) offers, read for this step:
   - a filter that opens unevenly: one point per bar from the measured brightness, `perBar: 1`, or 4 where it moves fast.
   
   The truth for Decode's bench reads paths with `modTruth` like the other devices.
+
+- **Measured (task 8.1, 2026-11-24).** The plan works in superdough 1.3.0 with these changes, measured on held notes rendered by the fast export's render page (`renderOffline`):
+  - **Notes per bar, not triangles across points.** A note whose onset is missed (a start in the middle of the song, a bus made again after a reset) would leave the path at its base until the next point, which can be many bars away. The bus's notes are cut at every point and every bar line, and each piece is one or two notes of `one` with linear envelopes: a held value is one note (attack 10 ms, sustain 1); a ramp from `x` to `y` over `d` seconds is a falling note (gain `x (1 - 0.01/d)`, attack 10 ms, decay `d - 0.01`, sustain 0) plus a rising one (gain `y`, attack `d`, sustain 1). Every note that ends at a piece's end falls to 0 over superdough's shortest release (10 ms) while the next piece's first note rises over the same 10 ms, so the two sum to a straight crossfade and a held value never dips. The seconds come from the bar's tempo (TEMPO's per-bar values).
+  - **Edges of 10 ms**, not 5: superdough's release is at least 10 ms (`getADSRValues`), and an edge shorter than the release would bump.
+  - **Code.** `$: stack("<…>", "<…>").as("gain:attack:decay:sustain").s("one").bus(N).dry(0)`, one value per bar (`!` for repeats); the rising notes' list is left out when it is empty. The moved line: `.lpf(lo).bmod({ b: N, c: 'lpf', da: span })` (hpf the same; sends from at least .001 so their node exists; pan's `da` is twice the span, its panner runs from -1 to 1).
+  - **Depth factor.** `one` passes a gain of .3 (`synth.mjs`, "turn down") and `bmod` divides its depth by .3: the bus's 0 to 1 arrives as 0 to 1 times `da`. The gain curve is the identity (the app sets none). Measured: a filter path at nine points gives the brightness of the static cutoff at each, to the hertz of the centroid; pan swings from 20 dB left to 20 dB right; a volume path matches the drawn value within 0.003 of the gain at 90 and 120 BPM, a step path within 0.001 away from its edges.
+  - **Volume on the postgain, relative.** A volume path writes `.mul(postgain(m)).bmod({ b: N, c: 'postgain', dep: span / m })` with `m` the lowest share (at least .001): the line's own postgain (a pad's or bass's volume shape, a guitar's gated level) is scaled, the depth relative to the note's postgain follows it, the section lanes' `velocity` fades still act on the gain, and the gain a Gate or a Pump dips stays apart. The volume calls go before the line's orbit, after any postgain it sets: a base set after its `bmod` on the line gives a wrong depth (measured 4 to 8 times too deep), so every base comes before its `bmod`.
+  - **The render page connects late.** superdough connects a bus modulator from a source node's `ended` event; an offline context delivers it only when its render pauses, so the fast export connected each moved note up to a second late (the first 0.2 to 0.5 bar of a note stayed at the base). The render page now pauses one render quantum after each onset of a note with a `bmod`; the measured volume path then matches from the note's start. Live playback gets the event within milliseconds.
+  - **Bus on first use.** The render page's own controller makes the bus on the first note that uses it; the path line alone is silent (`dry(0)`, peak 0).
 
 ### D15. Knobs on top of the path engine (revises D7)
 
