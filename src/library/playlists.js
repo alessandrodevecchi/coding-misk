@@ -19,9 +19,13 @@ export const sessionVersions = (now, grown) => ({ version: now.director, ...(gro
 // whether a saved session may sound different: any recorded version differs from the app's (a version it did not record
 // is not compared); a frozen session plays its stored songs and never warns. now.choosers: the chooser versions on air
 // in the code (radio-chooser-versions D4): a recipe that names one no longer there replays with the default and warns
+// the composed sound version a recipe recorded (random-sound-params D6): the highest of its options and changes, 0 when
+// none (a session saved before plays as it did and never warns for it)
+export const recipeSound = r => Math.max(0, ...[r && r.options, ...((r && r.changes) || []).map(c => c && c.options)].map(o => Number(o && o.sound) || 0));
 export function sessionOutdated(s, now) {
   if (!s || s.frozen) return false;
-  const chooser = s.recipe && s.recipe.chooser;
+  const chooser = s.recipe && s.recipe.chooser, snd = recipeSound(s.recipe);
+  if (snd > 0 && Number.isFinite(now.sound) && snd !== now.sound) return true;
   return (s.version || 0) !== now.director || (s.shapes !== undefined && s.shapes !== now.shapes) || (s.growth !== undefined && s.growth !== now.growth) || (chooser !== undefined && Array.isArray(now.choosers) && !now.choosers.includes(chooser));
 }
 

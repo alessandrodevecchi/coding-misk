@@ -16,7 +16,7 @@ import { mineSpokenTrack } from '../voices/mine.js';
 import { artistSongOptions, pickWeighted } from './artist.js';
 import { has, applyPlanQuirks } from './quirks.js';
 import { planTransition, MAX_RAMP } from './transitions.js';
-import { applyMaterial, sessionSource } from './material.js';
+import { applyMaterial, applySound, sessionSource } from './material.js';
 import { songProfileOnAir } from './profile.js';
 import { voiceOption, PHRASE_RANGES, VOICE_WAYS, isQuietOnly, whereOf } from './voice-options.js';
 import { soundPatch, cleanSound } from './voice-sound.js';
@@ -63,7 +63,13 @@ export const DIRECTOR_VERSION = 20;
 // material (material-generator): where parts come from, patterns, varied, composed or mix (each recipe decides)
 // (gestures, director-fold-ring D6: false turns the effect gestures off; the checks use it to compare with version 14)
 // profile (radio-profiles D3): as the artist and the style say ('artist'), or one profile for every generated song
-export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist' };
+// sound (random-sound-params D6): 0 plays as before; SOUND_VERSION turns on composed drum tones and per-hit variation.
+// New radio sessions, compilations and the New song panel record it; a recipe without it reads 0
+export const OPTION_DEFAULTS = { chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5, minutes: 15, transition: 'artist', harmony: 'artist', material: 'mix', profile: 'artist', sound: 0 };
+// the version of the composed sound (random-sound-params D6): raise it when an intended change moves the draws at
+// sound 1 or more (tones, variation); a session saved at an older value warns that it may sound different
+// 1 (#94): composed drum tones and per-hit variation
+export const SOUND_VERSION = 1;
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const round = x => (Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 100) / 100);
 const cap = s => s[0].toUpperCase() + s.slice(1);
@@ -252,6 +258,8 @@ export function planSong({ parts, byId, prev, opts, rng, index, recent = null })
   const tracks = candidateTracks(R, meter, opts.complexity, S || P, S ? S.fork('mutation') : rng.mutation, opts);
   // composed, varied or saved material (material-generator): from the material streams, never at complexity 0
   const material = applyMaterial(tracks, R, opts.complexity, opts, { seed: opts.seed, index, key, chords: mainChords, meter, targets: plan.map(d => d.target), parts, entry: ENTRY });
+  // composed drum tones and variation (random-sound-params D6): only at the session option sound 1 or more, from their own streams
+  applySound(tracks, R, opts, { seed: opts.seed, index, targets: plan.map(d => d.target), entry: ENTRY });
   const usual = R.tracks.usual, hardMax = opts.complexity > 0.8 ? Math.max(R.tracks.max, 8) + 2 : Math.min(R.tracks.max, 8);
   const usualHigh = clamp(usual[1] + Math.round((opts.complexity - 0.5) * 2), usual[0], hardMax);
   const voice = voiceFor(R, opts, rng.voice, index);
@@ -1021,7 +1029,7 @@ export function generateSession(recipes, options) {
     const { song, entry } = ses.next(opts);
     songs.push(song); seconds += entry.seconds;
   }
-  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes, transition: opts.transition, harmony: opts.harmony, ...(sessionSource(opts) !== 'mix' ? { material: sessionSource(opts) } : {}), ...(opts.userPatterns ? { userPatterns: opts.userPatterns } : {}), ...(opts.artist ? { artist: opts.artist } : {}), ...(opts.profile !== OPTION_DEFAULTS.profile ? { profile: opts.profile } : {}), ...(voiceOption(opts.voice) ? { voice: voiceOption(opts.voice) } : {}) }, seconds: Math.round(seconds), songs: ses.entries };
+  const session = { format: SESSION_FORMAT, version: 1, seed: ses.seed, options: { styles: opts.styles, chaos: opts.chaos, energy: opts.energy, complexity: opts.complexity, talk: opts.talk, minutes: opts.minutes, transition: opts.transition, harmony: opts.harmony, ...(sessionSource(opts) !== 'mix' ? { material: sessionSource(opts) } : {}), ...(opts.userPatterns ? { userPatterns: opts.userPatterns } : {}), ...(opts.artist ? { artist: opts.artist } : {}), ...(opts.profile !== OPTION_DEFAULTS.profile ? { profile: opts.profile } : {}), ...(voiceOption(opts.voice) ? { voice: voiceOption(opts.voice) } : {}), ...(opts.sound ? { sound: opts.sound } : {}) }, seconds: Math.round(seconds), songs: ses.entries };
   return { session, songs };
 }
 

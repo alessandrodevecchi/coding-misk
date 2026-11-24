@@ -64,9 +64,12 @@ A song on air builds itself like a live build. The listener can steer it from th
 | `harmony` | Harmony (it: Armonia) | `artist` | Compatible: the next song is a fifth away with a close tempo. Free: any key and tempo. |
 | `material` | Material (it: Materiale) | `mix` | Where the parts of the songs come from: the patterns as written, varied patterns, parts composed by the generator, or as each style says. |
 | `profile` | Profile (it: Profilo) | `artist` | How the radio's generated songs grow. As the artist and style say: they decide, songs of the live coder styles grow like a live coder. One profile: it applies to every generated song, with any artist, compilation or style, from the next song. Custom: the same controls as Compose, set here. Saved songs keep their own profile |
+| `sound` |  | `0` | no help text: described below |
 <!-- /generated -->
 
 `minutes` is the length of a session on the command line (`--minutes`); the radio in the app plays until it is stopped. Styles, chaos, energy, complexity, voice, material and profile apply from the next song prepared. `profile` is `artist` or one of `classic`, `crescendo`, `switch`; it overrides the artist's and the style's profile without changing which artists or styles play. A recipe saved without it replays as `classic`. Settings → Radio keeps its default.
+
+`sound` (random-sound-params, #94) turns on composed drum tones and per-hit variation: 0 plays as before, `SOUND_VERSION` (1) gives every drum track of a new song a `tone` and each drum and melodic track a `vary` drawn from their own streams, so every other draw stays as at 0. New radio sessions, compilations and New song panel songs record `sound: 1` in their recipe; a recipe without it reads 0 and replays as it was heard, and the command line keeps 0 unless `--sound 1` is given. A session saved with an older `sound` than the app's warns that it may sound different. See [material.md](material.md).
 
 The console's Profile control also offers **Custom** (owner decision 4): the same controls as Compose in a section that folds to a one-line summary. The recipe records the profile the combination amounts to (`profile`) and the combination itself (`custom: { base, controls }`, `profileOptions` and `customControls` in `src/endless/profile.js`); the songs grow and show their code with it, and a replay plays it the same. Without a duration of its own it is fitted.
 

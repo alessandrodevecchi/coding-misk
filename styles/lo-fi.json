@@ -50,7 +50,7 @@
     "drive": 0
   },
   "drums": {
-    "material": { "source": "mix", "share": 0.3, "families": ["two-step", "half-time", "breakbeat"] },
+    "material": { "source": "mix", "share": 0.3, "families": ["two-step", "half-time", "breakbeat"], "tones": {"kick": {"decay": [0.3, 0.6], "drive": [0, 0.2]}, "snare": {"decay": [0.15, 0.4], "drive": [0, 0.15]}, "hats": {"decay": [0.06, 0.2], "drive": [0, 0.05], "cutoff": [6000, 12000]}}, "variation": { "amount": 0.15, "targets": ["lpf", "decay", "pan"] } },
     "kits": [
       "AkaiMPC60",
       "EmuSP12",
@@ -70,7 +70,7 @@
     }
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.4, "rules": ["half", "pulse", "offbeat", "roots"] },
+    "material": { "source": "mix", "share": 0.4, "rules": ["half", "pulse", "offbeat", "roots"], "variation": { "amount": 0.15, "targets": ["room", "lpf"] } },
     "presets": [
       "walking",
       "sub",
@@ -84,7 +84,7 @@
     ]
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response"] },
+    "material": { "source": "mix", "share": 0.4, "rules": ["tail", "call-response"], "variation": { "amount": 0.15, "targets": ["room", "lpf"] } },
     "presets": [
       "pioggia",
       "anima",
@@ -103,7 +103,7 @@
     "weight": 0.6
   },
   "pad": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"], "variation": { "amount": 0.15, "targets": ["room", "lpf"] } },
     "presets": [
       "comp",
       "pad"

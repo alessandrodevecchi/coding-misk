@@ -60,6 +60,7 @@ Progressions are written in A minor and moved to `key`; see `PROGS` in `src/musi
 ```
 
 - `id`: unique in the song. `name`: label in the code and UI (defaults to `id`). `mute`, `solo`: `true` leaves the track out of the code (solo: every other track). `pinned`: settings fixed against live build steps (a list of setting names): the track's own value holds even where a `set` step would change it.
+- `soundRolls`: the sounds the sound dice rolled on the track in Compose (random-sound-params D10), written by the app: `{ "cur": 3, "rolls": [{ "n": 1, "settings": { "wave": "…", "cutoff": 900 }, "rack": [], "fm": null }] }`. `cur` is the sound the track has now; each entry holds the settings the dice may change (`wave type kit tone cutoff reso drive delay room vary`), the whole rack and the FM device the dice owned. At most 12 entries. The compiler ignores it.
 - `type`: `drums bass guitar arp hook pad texture riser code voice spoken`. Any number of tracks of any type (`voice` is the narrator, `spoken` the voice instrument).
 - `settings`: how the track sounds. Missing settings take the defaults below.
 - `patterns`: named patterns (`"A"`, `"verse"`, …), what the track plays.
@@ -120,6 +121,44 @@ Common: `gain` (about 0 to 1), `gainEnd` and `cutoffEnd` (ramp to this value ove
 | `spoken` | the `voice` settings; `speaker` `""` draws one for the song (never the narrator's). Words stay within the voice limits (pitch .45 to 1.5, tempo .5 to 1.15, drive up to 5.5, …), except in chops |
 
 `wave` takes an oscillator (`sawtooth supersaw square triangle sine`) or a General MIDI sound (`gm_epiano1`, `gm_distortion_guitar`, `gm_choir_aahs`, …; see the Sounds tab). Layer two with a comma: `"gm_distortion_guitar,sawtooth"`.
+
+### Composed drum tones and variation (`tone`, `vary`)
+
+Two optional settings shape the sound hit by hit (`random-sound-params`, `#94`). A track without them compiles exactly as before; the radio writes them in new songs (session option `sound`, `docs/ENDLESS.md`) and the dice of Compose writes them on a press. Neither is ramped by Crescendo nor set by a live build `set` step (the validator rejects it): a growth types them with the track's line from its first step.
+
+`tone` (drums): decay, tune, drive and low-pass cutoff per kit piece group, inside a safe table. `kick` is row `bd`, `snare` rows `sd` and `cp`, `hats` rows `hh`, `oh`, `rd`; every value is optional.
+
+```json
+"settings": { "kit": "RolandTR909", "tone": { "kick": { "decay": 0.35, "tune": -1, "cutoff": 9000 }, "snare": { "decay": 0.2 }, "hats": { "decay": 0.06, "cutoff": 12000 } } }
+```
+
+| Group | `decay` (s) | `tune` (semitones) | `drive` | `cutoff` (Hz) |
+| --- | --- | --- | --- | --- |
+| `kick` | 0.15 to 0.8 | -3 to 2 | 0 to 0.6 | 1500 to 20000 |
+| `snare` | 0.08 to 0.5 | -2 to 3 | 0 to 0.8 | 2500 to 20000 |
+| `hats` | 0.03 to 0.3 | -2 to 4 | 0 to 0.3 | 5000 to 20000 |
+
+The writer appends a group's tone to its rows right after `.bank(kit)`: `decay` as `.decay(d).sustain(0)`, `tune` as `.speed(2^(t/12))`, `drive` as `.distort(x).distortvol(.5)` in place of the track's drive on that row, `cutoff` as `.lpf(c)` when lower than the track's cutoff. The open hat takes twice the hats decay.
+
+`vary` (drums, bass, arp, hook, pad, guitar): up to three entries, each a seeded random value per hit around the track's own value, never above its level nor brighter than its filter.
+
+```json
+"settings": { "vary": [{ "on": "lpf", "amount": 0.3, "seed": 41, "cycles": 4 }, { "on": "pan", "amount": 0.4, "seed": 7, "cycles": 2, "fn": "perlin" }, { "on": "decay", "amount": 0.25, "seed": 3, "cycles": 4, "row": "hh" }] }
+```
+
+| `on` | Range written around the track's value `v` | Cap of `amount` |
+| --- | --- | --- |
+| `lpf` | `v × (1 - a)` to `v` (`v` the cutoff, 18000 when open) | 0.6 |
+| `hpf` | `v` to `v + a × 2000` | 0.5 |
+| `pan` | `0.5 - a/2` to `0.5 + a/2` (`perlin` by default) | 0.8 |
+| `gain` | `v × (1 - a)` to `v` (never louder; never on the kick) | 0.3 |
+| `delay`, `room` | `v` to `v + a × 0.5` | 0.6 |
+| `decay` | `v × (1 - a)` to `v × (1 + a/2)` (drums: only where the tone sets a decay) | 0.5 |
+| `distort` | `v` to `v + a × 1.5` (only on a track that drives already; never on bass) | 0.4 |
+| `crush` | `16 - a × 10` to 16 bits (from the track's own crush when it has one) | 0.8 |
+| `vowel` | one of the first `round(a × 4) + 1` of `a e i o u` | 1 |
+
+Each entry has `on`, `amount`, `seed` (a whole number), `cycles` (the loop length in bars, 1 to 8), an optional `fn` (`rand` a new value each hit, `perlin` a smooth one) and, on drums, an optional `row`. The code is `.lpf(rand.range(2400, 4000).rib(41, 4))`: Strudel's `rand` depends only on time, so the same song gives the same value on the same hit everywhere, and the values repeat every `cycles` bars. A control the line already writes is replaced in place (one call per control). A target that is automated (`cutoffEnd`, `gainEnd`, a moving filter), written later on the line by a rack device, or written by an idea's `random` is left out, and the validator warns.
 
 ### Patterns per type
 

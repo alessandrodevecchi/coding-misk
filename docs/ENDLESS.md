@@ -182,6 +182,10 @@ The rules were written from scratch from general techniques of live coders and p
 
 `npm run check:material` checks the generator in Node: determinism, variety over 50 seeds, each rule, notes in key, chord tones, families, energy, varied presets, valid ideas in 4/4, 7/8 and 3/4, the FM range table, the session sources and the user's patterns.
 
+### Composed sound (`random-sound-params`, `#94`)
+
+The session option `sound` (`OPTION_DEFAULTS.sound` 0, `SOUND_VERSION` 1) turns on composed drum tones and per-hit variation (`docs/SONG-FORMAT.md`, `tone` and `vary`). At 1, `applySound` (`src/endless/material.js`) gives every drum track of a song one tone (the kick and the beat share it, seed `<session seed>:<index>:drums:tone`, at the energy target of pattern A) and each drum and melodic track a variation (`<session seed>:<index>:<track id>:vary`), from the new streams `material:tone/<group>` and `material:vary`: every other draw is the same as at 0. A track added by the console's "+" draws its own at `sound` 1. New radio sessions, compilations and New song panel songs record `sound: 1`; a recipe without it reads 0 and a saved session replays as it was heard. `tools/endless.mjs --sound 1` turns it on from the command line. `npm run check:sound-params` checks the writer, the draws, the "1 minus tone and vary equals 0" rule over every style and its seed fixtures (`tests/snapshots/sound-fixtures.json`); raise `SOUND_VERSION` when an intended change moves them.
+
 ## Voice
 
 Each song has its own voice. The style that gives the voice part sets the base: a list of speakers and a range for each effect (pitch, tempo, filters, drive, reverb, delay). The song draws a speaker from the list and a value from each range. Then, now and then, it goes further:

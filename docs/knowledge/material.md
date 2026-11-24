@@ -53,6 +53,8 @@ Material (it: Materiale): Where the parts of the songs come from: the patterns a
 
 The source is a session option ([radio.md](radio.md)). At complexity 0 the director keeps presets only, unless the source is `composed`.
 
+`compose('tone', …)` and `compose('vary', …)` (random-sound-params, `#94`) draw a drum track's `tone` (decay, tune, drive and cutoff per kit piece group, inside a safe table) and a track's per-hit `vary` (up to three seeded targets around the track's own values), from the streams `material:tone/<group>` and `material:vary`. The director writes them only at the session option `sound` 1 ([radio.md](radio.md)); the dice of Compose ([sounds.md](sounds.md)) writes them on a press. Fields and code: `docs/SONG-FORMAT.md`; style ranges (`tones`, `variation`): `docs/STYLES.md`.
+
 ## Example
 
 Compose a bassline in Node:

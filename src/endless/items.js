@@ -35,7 +35,7 @@ export const airChooserOf = recipe => {
 };
 // the per-song choices a compilation keeps from the radio's controls (a clip keeps its length); the radio's Length
 // (`length`, `lengthHeard`) too, so a compilation's songs keep the asked minutes instead of their style's (#82)
-export const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.length !== undefined ? { length: o.length } : {}), ...(o.lengthHeard !== undefined ? { lengthHeard: o.lengthHeard } : {}), ...(o.profile !== undefined ? { profile: o.profile } : {}), ...(o.custom ? { custom: o.custom } : {}), ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}), ...(o.voice ? { voice: o.voice } : {}) });
+export const howOf = o => ({ transition: o.transition, harmony: o.harmony, ...(o.sound !== undefined ? { sound: o.sound } : {}), ...(o.length !== undefined ? { length: o.length } : {}), ...(o.lengthHeard !== undefined ? { lengthHeard: o.lengthHeard } : {}), ...(o.profile !== undefined ? { profile: o.profile } : {}), ...(o.custom ? { custom: o.custom } : {}), ...(o.sounds ? { sounds: o.sounds } : {}), ...(o.material ? { material: o.material } : {}), ...(o.userPatterns ? { userPatterns: o.userPatterns } : {}), ...(o.fit ? { fit: o.fit } : {}), ...(o.voice ? { voice: o.voice } : {}) });
 // the director options of song n: the compilation's draw, else the recipe's
 // my phrases (my-phrases D4): the snapshot a session recorded when it started, never with Mai
 export const withMine = (o, recipe) => (recipe && recipe.mine ? { ...o, mine: recipe.mine } : o);

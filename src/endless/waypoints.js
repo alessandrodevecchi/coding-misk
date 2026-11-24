@@ -340,7 +340,8 @@ function transitSongNow(prev, W, Wprev, B, off, o) {
       const effS = { ...(t.settings || {}), ...(b.on && b.c.set ? b.c.set : {}) };
       for (const k of SETTING_FIELDS[t.type] || []) {
         const a = effS[k], z = d.set[k];
-        if (z === undefined || same(a, z)) continue;
+        // (a track's tone and variation are part of its line from the start, never a step: random-sound-params D1)
+        if (z === undefined || same(a, z) || k === 'tone' || k === 'vary') continue;
         if (KNOBS.includes(k) && typeof a === 'number' && typeof z === 'number' && !(o.kind === 'volume' && o.track === id && k === 'gain')) {
           const m = o.lean ? 1 : k === 'cutoff' ? (Math.max(a, z) / Math.max(1, Math.min(a, z)) > 2 ? 2 : 1) : k !== 'gain' && Math.abs(z - a) > 0.3 ? 2 : 1;
           turns(k, a, z, m).forEach(v => knob.push({ kind: k, dir: Math.sign(z - a) * (k === 'gain' || k === 'cutoff' || k === 'drive' || k === 'grit' ? 1 : 0), step: { set: { track: id, [k]: v } } }));

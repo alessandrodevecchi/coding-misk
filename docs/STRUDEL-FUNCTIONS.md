@@ -334,7 +334,7 @@ Line labels the REPL handles (`@strudel/core` repl.mjs). They are not functions.
 | [`krush`](#fn-krush) (undocumented) |  | core | never |  |
 | [`label`](#fn-label) |  | core | never |  |
 | [`lastOf`](#fn-lastOf) |  | core | never | yes: A fill on the last cycle of a phrase. |
-| [`late`](#fn-late) |  | core | songs 30, live 64, radio 41 |  |
+| [`late`](#fn-late) |  | core | songs 30, live 80, radio 41 |  |
 | [`layer`](#fn-layer) | `apply` | core | never |  |
 | [`lbrick`](#fn-lbrick) (undocumented) |  | core | never |  |
 | [`leslie`](#fn-leslie) |  | core | never |  |
@@ -355,7 +355,7 @@ Line labels the REPL handles (`@strudel/core` repl.mjs). They are not functions.
 | [`lpdepthfrequency`](#fn-lpdepthfrequency) | `lpdepthfreq` | core | never |  |
 | [`lpenv`](#fn-lpenv) | `lpe` | core | never | yes: Filter envelope depth: a filter that opens per note. |
 | [`lpf`](#fn-lpf) | `ctf`, `cutoff`, `lp` | core | songs 45, live 110, radio 60, prelude 1 |  |
-| [`lpq`](#fn-lpq) | `resonance` | core | songs 44, live 44, radio 55, prelude 1 |  |
+| [`lpq`](#fn-lpq) | `resonance` | core | songs 44, live 69, radio 55, prelude 1 |  |
 | [`lprate`](#fn-lprate) |  | core | never |  |
 | [`lprelease`](#fn-lprelease) | `lpr` | core | never |  |
 | [`lpshape`](#fn-lpshape) |  | core | never |  |
@@ -410,7 +410,7 @@ Line labels the REPL handles (`@strudel/core` repl.mjs). They are not functions.
 | [`overshape`](#fn-overshape) (undocumented) |  | core | never |  |
 | [`pace`](#fn-pace) (undocumented) |  | core | never |  |
 | [`palindrome`](#fn-palindrome) (undocumented) |  | core | never |  |
-| [`pan`](#fn-pan) |  | core | songs 10, live 41, radio 9 |  |
+| [`pan`](#fn-pan) |  | core | songs 10, live 25, radio 9 |  |
 | [`panchor`](#fn-panchor) |  | core | never |  |
 | [`panorient`](#fn-panorient) (undocumented) |  | core | never |  |
 | [`panspan`](#fn-panspan) (undocumented) |  | core | never |  |
@@ -486,7 +486,7 @@ Line labels the REPL handles (`@strudel/core` repl.mjs). They are not functions.
 | [`ring`](#fn-ring) (undocumented) |  | core | never |  |
 | [`ringdf`](#fn-ringdf) (undocumented) |  | core | never |  |
 | [`ringf`](#fn-ringf) (undocumented) |  | core | never |  |
-| [`room`](#fn-room) |  | core | songs 44, live 77, radio 59, prelude 1 |  |
+| [`room`](#fn-room) |  | core | songs 44, live 93, radio 59, prelude 1 |  |
 | [`roomdim`](#fn-roomdim) | `rdim` | core | never |  |
 | [`roomfade`](#fn-roomfade) | `rfade` | core | never |  |
 | [`roomlp`](#fn-roomlp) | `rlp` | core | never |  |

@@ -34,7 +34,7 @@
   ],
   "phrase": 8,
   "drums": {
-    "material": { "source": "mix", "share": 0.3, "families": ["breakbeat", "two-step"] },
+    "material": { "source": "mix", "share": 0.3, "families": ["breakbeat", "two-step"], "tones": {"kick": {"decay": [0.25, 0.5], "drive": [0, 0.3]}, "snare": {"decay": [0.12, 0.35], "tune": [-1, 2], "drive": [0, 0.4]}, "hats": {"decay": [0.04, 0.15], "drive": [0, 0.1]}}, "variation": { "amount": 0.25, "targets": ["decay", "pan", "gain"] } },
     "kits": [
       "AkaiMPC60",
       "EmuSP12",
@@ -48,7 +48,7 @@
     ]
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["half", "rolling", "offbeat", "octaves"], "sounds": ["reese"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["half", "rolling", "offbeat", "octaves"], "sounds": ["reese"], "variation": { "amount": 0.2, "targets": ["lpf"] } },
     "presets": [
       "sub",
       "rumble",
@@ -68,7 +68,7 @@
     }
   },
   "arp": {
-    "material": { "source": "mix", "share": 0.4, "rules": ["pedal", "skips", "random"] },
+    "material": { "source": "mix", "share": 0.4, "rules": ["pedal", "skips", "random"], "variation": { "amount": 0.25, "targets": ["lpf", "pan"] } },
     "presets": [
       "pedale",
       "spezzato"
@@ -83,7 +83,7 @@
     "weight": 0.4
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.4, "rules": ["polymeter", "tail", "dark"] },
+    "material": { "source": "mix", "share": 0.4, "rules": ["polymeter", "tail", "dark"], "variation": { "amount": 0.25, "targets": ["lpf", "pan"] } },
     "presets": [
       "eco",
       "segnale",
@@ -101,7 +101,7 @@
     "weight": 0.5
   },
   "pad": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"], "variation": { "amount": 0.25, "targets": ["lpf", "pan"] } },
     "presets": [
       "pad",
       "stab"

@@ -11,6 +11,8 @@ import { VOCAB_GROUPS } from '../song/vocabulary.js';
 import { MACHINES } from '../sounds/machines.js';
 import { SOURCES, RULES, FAMILIES, SOUND_KINDS, SOUND_KIND_ALIASES, KIND_OF_TYPE } from '../material/index.js';
 import { checkGestures } from './gestures.js';
+import { TONE_RANGES, TONE_GROUP_IDS, TONE_VALUES } from '../material/tone.js';
+import { VARY_TARGETS, VARY_TARGET_IDS } from '../material/variation.js';
 
 // The seven energy shapes (docs/ENDLESS.md); their curves live in shapes.js.
 export const SHAPES = ['build-drop', 'slow-burn', 'waves', 'flat-groove', 'verse-chorus', 'late-peak', 'descent'];
@@ -258,7 +260,7 @@ export function validateRecipe(r) {
 
 // The material choice of an instrument (material-generator, docs/STYLES.md "Material"): source, share of generated parts,
 // and the groove families, melody rules and sound kinds the generator may use for it.
-export const MATERIAL_FIELDS = ['source', 'share', 'families', 'rules', 'sounds'];
+export const MATERIAL_FIELDS = ['source', 'share', 'families', 'rules', 'sounds', 'tones', 'variation'];
 function checkMaterial(type, m, p, err, warn) {
   if (!m || typeof m !== 'object' || Array.isArray(m)) { err(p, 'an object, for example { "source": "mix", "share": 0.5 }'); return; }
   for (const k of Object.keys(m)) if (!MATERIAL_FIELDS.includes(k)) warn(`${p}.${k}`, `unknown field; fields: ${MATERIAL_FIELDS.join(', ')}`);
@@ -280,6 +282,36 @@ function checkMaterial(type, m, p, err, warn) {
   else if (m.rules !== undefined) err(`${p}.rules`, `no rules for ${type}`);
   if (type !== 'drums') names('sounds', SOUND_KINDS, 'sound kinds');
   else if (m.sounds !== undefined) err(`${p}.sounds`, 'sound kinds are for melodic instruments');
+  // composed drum tones (random-sound-params D8): per group, ranges inside the safe table
+  if (m.tones !== undefined) {
+    if (type !== 'drums') err(`${p}.tones`, 'drum tones are for drums only');
+    else if (!m.tones || typeof m.tones !== 'object' || Array.isArray(m.tones)) err(`${p}.tones`, `an object of groups: ${TONE_GROUP_IDS.join(', ')}`);
+    else for (const [g, v] of Object.entries(m.tones)) {
+      if (!TONE_RANGES[g]) { err(`${p}.tones.${g}`, `unknown group; groups: ${TONE_GROUP_IDS.join(', ')}`); continue; }
+      if (!v || typeof v !== 'object' || Array.isArray(v)) { err(`${p}.tones.${g}`, `an object of ranges: ${TONE_VALUES.join(', ')}`); continue; }
+      for (const [k, x] of Object.entries(v)) {
+        const R = TONE_RANGES[g][k];
+        if (!R) err(`${p}.tones.${g}.${k}`, `unknown value; values: ${TONE_VALUES.join(', ')}`);
+        else if (!Array.isArray(x) || x.length !== 2 || !x.every(isNum) || x[0] > x[1] || x[0] < R[0] || x[1] > R[1]) err(`${p}.tones.${g}.${k}`, `a range [low, high] inside the safe range ${R[0]} to ${R[1]}`);
+      }
+    }
+  }
+  // per-hit variation (D8): { amount, targets }
+  if (m.variation !== undefined) {
+    const v = m.variation;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) err(`${p}.variation`, `an object, for example { "amount": 0.2, "targets": ["lpf", "pan"] }`);
+    else {
+      for (const k of Object.keys(v)) if (!['amount', 'targets'].includes(k)) err(`${p}.variation.${k}`, 'unknown field; fields: amount, targets');
+      if (v.amount !== undefined && (!isNum(v.amount) || v.amount < 0 || v.amount > 1)) err(`${p}.variation.amount`, 'how much the sound varies from hit to hit, from 0 to 1');
+      if (v.targets !== undefined) {
+        if (!Array.isArray(v.targets) || !v.targets.length) err(`${p}.variation.targets`, `a non-empty list of targets: ${VARY_TARGET_IDS.join(', ')}`);
+        else v.targets.forEach((x, i) => {
+          if (!VARY_TARGETS[x]) err(`${p}.variation.targets[${i}]`, `unknown target "${x}"; targets: ${VARY_TARGET_IDS.join(', ')}`);
+          else if (type === 'bass' && x === 'distort') err(`${p}.variation.targets[${i}]`, 'a bass never varies its distortion');
+        });
+      }
+    }
+  }
 }
 
 // Every sound a recipe names (instrument waves), for the browser check.

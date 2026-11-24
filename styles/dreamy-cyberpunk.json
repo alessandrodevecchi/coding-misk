@@ -41,7 +41,7 @@
     "max": 6
   },
   "drums": {
-    "material": { "source": "mix", "share": 0.3, "families": ["half-time", "two-step"] },
+    "material": { "source": "mix", "share": 0.3, "families": ["half-time", "two-step"], "tones": {"kick": {"decay": [0.35, 0.7], "drive": [0, 0.15]}, "snare": {"decay": [0.15, 0.4], "drive": [0, 0.15]}, "hats": {"decay": [0.06, 0.2], "drive": [0, 0.05], "cutoff": [6000, 12000]}}, "variation": { "amount": 0.15, "targets": ["decay", "pan"] } },
     "kits": [
       "LinnDrum",
       "EmuSP12",
@@ -62,7 +62,7 @@
     }
   },
   "bass": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["half", "pulse", "offbeat", "octaves"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["half", "pulse", "offbeat", "octaves"], "variation": { "amount": 0.15, "targets": ["lpf"] } },
     "presets": [
       "sub",
       "ottavi",
@@ -80,7 +80,7 @@
     }
   },
   "arp": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["up", "updown", "pedal", "random"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["up", "updown", "pedal", "random"], "variation": { "amount": 0.2, "targets": ["pan", "room", "lpf"] } },
     "presets": [
       "sugiu",
       "pedale"
@@ -102,7 +102,7 @@
     }
   },
   "hook": {
-    "material": { "source": "mix", "share": 0.5, "rules": ["polymeter", "tail", "call-response"] },
+    "material": { "source": "mix", "share": 0.5, "rules": ["polymeter", "tail", "call-response"], "variation": { "amount": 0.2, "targets": ["pan", "room", "lpf"] } },
     "presets": [
       "pioggia",
       "orizzonte",
@@ -121,7 +121,7 @@
     ]
   },
   "pad": {
-    "material": { "source": "mix", "share": 0.3, "rules": ["style"] },
+    "material": { "source": "mix", "share": 0.3, "rules": ["style"], "variation": { "amount": 0.2, "targets": ["pan", "room", "lpf"] } },
     "presets": [
       "pad",
       "sidechain"
