@@ -42,3 +42,12 @@
 - [x] 6.2 Run `check:code`, `check:songs`, `check:material`, `check:endless`, `check:styles`, `check:strudel`, `check:functions`, `check:mixer`, `check:crescendo`, `check:live-code`, `check:typing`; the level run at `sound: 1` and `snapshot-levels.cjs check` (unchanged).
 - [x] 6.3 Add the owner tests of the design to the checklist.
 - [ ] 6.4 (Left to the owner.) Open issues for the future work: live knobs through `.bmod()` buses, and rack Sweep devices with `.env()`, `.lfo()` and `lpenv` (with FM index variation).
+
+## 7. Sound history (owner test r94e)
+
+- [ ] 7.1 Spec delta (`app/sound-dice`: Sound history, Number field applies by itself, Undo, numbering) and D10.
+- [ ] 7.2 Pure helpers in `src/material/dice.js` (`soundSnapshot`, `applySnapshot`, `keepCurrent`, `addRoll`, `nextRollNumber`, cap 12) with Node checks in `check:sound-params`.
+- [ ] 7.3 `track.soundRolls` in the song: validator shape check, `docs/SONG-FORMAT.md`.
+- [ ] 7.4 Compose: the chip row above the dice row, chip click restores, the field applies on change or after about a second, «New sound» uses the highest number plus one, Undo restores the history too; strings in both languages, the Compose card of the Guide.
+- [ ] 7.5 `tools/check-sound-dice.cjs`: chips, chip restore with a hand edit, the field applying by itself, numbering after going back, Undo of a chip click, the history after a reload, the cap.
+- [ ] 7.6 Rewrite the owner test r94e in the checklist.

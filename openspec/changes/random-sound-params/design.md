@@ -94,7 +94,7 @@ What the code does today (line numbers at `develop` 305be97):
 ### D5. The sound dice in Compose
 
 - **Where.** A dice button (`DICE`, `src/icons.js:5`) with a number next to it, in the track panel's sound row, for `drums`, `bass`, `arp`, `hook`, `pad` and `guitar` tracks. Not for code, texture, riser, voice and spoken tracks.
-- **Seed.** `<song id>:<track id>:sound:<n>`, with `n` from a page counter like `composeNums`. Each press draws with the current `n` and moves it to `n + 1`. The number field can be typed, so one sound can be found again. A song without a style tag uses `composeStyle()`; with no recipe at all the button is disabled with a tooltip.
+- **Seed.** `<song id>:<track id>:sound:<n>`. A press of «New sound» draws with `n` = the highest number in the track's sound history plus one (D10). The number field applies a number by itself (D10). A song without a style tag uses `composeStyle()`; with no recipe at all the button is disabled with a tooltip.
 - **Lock groups.** Each group draws from its own sub-stream of the seed (`sound/<group>`), so locking one never changes what the others draw:
 
 | Track | Groups |
@@ -107,7 +107,7 @@ What the code does today (line numbers at `develop` 305be97):
 - **Synth sound.** When the style names sound kinds (`material.sounds`), the dice composes one with `compose('sound')`, which may add or replace the `fm` device. Otherwise it picks a wave from the style's `waves` other than the current one, and removes an `fm` device the dice added before.
 - **Variation in the dice.** The Variation group draws a `vary` with the style's targets and amount (D8) at the Compose energy slider's value. An empty draw (amount 0) clears it.
 - **Locks are remembered per song and track in the browser** (local storage, like the Compose trials), not in the song file. Open question 2.
-- **Undo.** Each roll shows a toast "New sound #n" with Undo, which restores the track's settings and rack exactly as before the roll (hand edits included). The number field also gives back any earlier roll, since the same `n` and locks give the same sound.
+- **Undo.** Each roll shows a toast "New sound #n" with Undo, which restores the track's settings, rack and sound history exactly as before the roll (hand edits included). A chip click and an applied number show a toast "Sound #n" with the same Undo. Earlier sounds come back through the history chips (D10).
 - **Hearing it.** The dice works while the song plays: the change reaches the song through `changed()` at the next evaluation, and the pattern preview (headphones) plays it alone.
 
 ### D6. Existing songs and profiles keep their sound
@@ -140,11 +140,23 @@ The `fm` rack device writes `.fm(index)` after the variation on the line, so a v
 - `check:strudel` and `catalog:strudel`; `check:functions` (song functions still fold the longer lines); `check:mixer` (the hidden mixer keeps the varied gain); `check:code` unchanged.
 - Browser: a new `tools/check-sound-dice.cjs` (dice, locks, undo, number, both languages, both themes, 400 px) and a level run of radio songs at `sound: 1` over every style (`check-levels.cjs` on generated songs): each row at most 0.9, the median kick within 0.1 of today's, `in=` at most 1.2.
 
+### D10. Sound history chips (owner test r94e)
+
+The first version had a number field that did nothing by itself: typing 2 and pressing «New sound» rolled 2 and moved the field to 3, so going back felt unclear. The history replaces that path.
+
+- **Where it lives.** On the track, in the song: `track.soundRolls = { "cur": 3, "rolls": [{ "n": 1, "settings": { … }, "rack": [ … ], "fm": { … } | null }, …] }`, next to the other per-track state Compose writes (`voiceOptions`, `pinned`). It is saved with the song, travels with an exported file and survives a reload. The compiler ignores it; the validator checks its shape. The locks stay in the browser (D5).
+- **What an entry holds.** The track's full sound: the settings the dice may change (`wave`, `type`, `kit`, `tone`, `cutoff`, `reso`, `drive`, `delay`, `room`, `vary`; a key absent from the track is absent from the entry) and the whole rack, plus the FM device the dice owns at that point (`fm`), so a later roll still knows which device is the dice's. The level, octave, mode, patterns and clips are not in it, so going back never moves them.
+- **Rule.** Before the track leaves a sound (a new roll, a chip click, a number applied in the field), the entry of the lit sound is overwritten with the track's current sound, so the hand edits made on it are kept. A chip click then writes its entry into the track and lights it. Simplest rule that keeps hand edits without tracking each edit.
+- **Numbers.** «New sound» always uses the highest number in the history plus one, so it never gives back or overwrites an earlier entry. The field shows the lit number (empty with no history). A typed number applies on `change` (Enter, blur, the arrows) or about one second after the last keystroke: a number with a chip restores it, a number without one rolls it (the same seed as ever) and adds its chip. The lit number does nothing.
+- **Cap.** At most 12 entries, the most recently added; when a 13th comes, the oldest added goes, never the lit one. Chips show in number order.
+- **Undo.** The toast's Undo restores the track's settings, rack, the dice's FM device and the whole history as before the action, so the chip a roll added goes again and the next «New sound» reuses its number (and gives the same sound with the same locks).
+- **Pure helpers.** `soundSnapshot`, `applySnapshot`, `keepCurrent`, `addRoll` and `nextRollNumber` in `src/material/dice.js`, covered in `check:sound-params`; the browser check covers the chips, the field and the numbers.
+
 ## Owner tests (checklist)
 
 1. **Dice on a synth track.** Where: Compose, a built-in song with a bass track, track panel of the bass. Do: press the dice three times while the song plays. Right: each press changes the bass sound at the next bar and the toast shows "New sound #1", "#2", "#3"; the level, the notes and your other effects stay. Why: the dice must change only the sound, within the style.
 2. **Lock.** Where: the same panel. Do: lock "Filter", press the dice twice. Right: the filter value does not move, the wave changes. Why: locks keep what you like.
-3. **Undo and number.** Where: the same panel. Do: press Undo on the toast; then type 2 in the number and press the dice. Right: Undo brings back the sound before the last press; number 2 gives the same sound as the second press. Why: every roll can be found again.
+3. **Undo and history.** Where: the same panel. Do: press Undo on the toast; then click chip #1, then type 2 in the number and wait a second. Right: Undo brings back the sound before the last press and its chip goes; chip #1 gives back the first sound (with any hand edit you made on it); typing 2 gives back sound #2 without pressing anything; «New sound» then makes the next new number. Why: every roll can be found again.
 4. **Dice on drums.** Where: Compose, a song with a drum track. Do: press the drum dice with "Kit" locked. Right: the kit stays, kick, snare and hats change length, pitch or brightness; nothing clips (the master never turns red). Why: drum tones vary inside safe ranges.
 5. **Old songs unchanged.** Where: Songs tab, open three built-in songs and one of yours. Do: play them in Classic and in Crescendo. Right: they sound exactly as yesterday. Why: nothing changes unless you press the dice.
 6. **Saved radio session.** Where: Playlists, a radio session saved before this change. Do: play it. Right: same songs and same sound, no "may sound different" warning. Why: old sessions record no sound version, so they play as before.
