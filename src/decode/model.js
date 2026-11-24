@@ -12,7 +12,8 @@
 // (22, decode round 13: level B measures the kick's attack per step, kickShape; raised once with the round)
 // (23, decode round 14: level B moves the grid onto the kick when it sits a 16th off, writer.js gridRotation; raised once
 // with the round)
-export const ANALYSIS_VERSION = 23;
+// (24, decode round 15: a song without drums writes none, full.js drumless)
+export const ANALYSIS_VERSION = 24;
 
 export const STEPS = 16;
 export const DRUM_ROWS = ['bd', 'cp', 'hh', 'oh'];

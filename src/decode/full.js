@@ -164,6 +164,22 @@ export function takeChord(b, c) {
 // the lowest share of a song with a bass 0.39, and a bass decoded an octave off keeps a share of 0.48 or more)
 export const PARTS_RULE = { noBeat: 0.4, lowShare: 0.3, h1: 0.1 };
 // → whether a file has no steady beat (null when Essentia.js gave no tempo: unknown, so nothing changes)
+// a song without drums (decode round 15, decode-round15 B): misk-analyzer reads a kick on every beat in a pad and a bass
+// with no drums at all (the every-beat rule follows the low band's rise of the bass and the pad's low notes; the five
+// modulated test songs without drums, pumped or still, all read four kicks a bar). Such a song keeps its kick row on
+// DRUMLESS.cover of its bars or more, with no other drum row (hats, claps, open hats) on DRUMLESS.others of them, and
+// its kicks have no click (full.js kickShape: the median rise of the 4-12 kHz band on the kick steps under DRUMLESS.click
+// dB; a drum machine's kick 13 to 30 dB). Then its drums are no part. Bench: the songs with drums all have other rows on
+// 0.65 or more of their kick bars (two real tracks 0.65 and 0.69, the bench's songs 0.79 and more); the drumless songs
+// 0 to 0.44 with clicks of -4.9 to 3.3 dB (one, whose tremolo reads as hats on every bar, keeps its kicks)
+export const DRUMLESS = { cover: 0.8, others: 0.5, click: 6 };
+export function drumless(bars, rule = DRUMLESS) {
+  const kb = (bars || []).filter(b => b.drums && /x/.test(b.drums.bd || '') && b.kickShape);
+  if (!(rule.cover > 0) || !kb.length || kb.length < rule.cover * bars.length) return false;
+  const others = kb.filter(b => ['hh', 'cp', 'oh'].some(r => /x/.test(b.drums[r] || ''))).length / kb.length;
+  const clicks = kb.flatMap(b => [...b.drums.bd].map((c, j) => (c === 'x' ? b.kickShape.high[j] : null)).filter(x => x !== null)).sort((x, y) => x - y);
+  return others < rule.others && clicks[Math.floor(clicks.length / 2)] < rule.click;
+}
 export const noSteadyBeat = (ess, rule = PARTS_RULE) => (ess && Number.isFinite(ess.confidence) ? ess.confidence < rule.noBeat : null);
 // → whether the decoded bass notes are no bass (the low band's share of the original, the bass profile)
 export const noBassPart = (shares, drive, rule = PARTS_RULE) => !!(shares && drive && Number.isFinite(drive.h1) && shares[0] < rule.lowShare && drive.h1 < rule.h1);
@@ -458,6 +474,8 @@ export async function analyseFull(pcm, { sr = ANALYSIS_RATE, engine = null, temp
   m.bars.forEach((b, i) => { if ((b.bass || []).filter(x => x !== null && x !== undefined).length >= 2) b.bassAttack = bassAttack(pcm, sr, Math.round((m.downbeat + i * m.barSeconds) * sr), m.barSeconds * sr); });
   // (decode round 13: per bar with drums, the kick's attack per step, hit-measure.js kickShape, read by the writer's fullKick)
   m.bars.forEach((b, i) => { if (b.drums && Object.values(b.drums).some(r => /x/.test(r || ''))) b.kickShape = kickShape(pcm, sr, Math.round((m.downbeat + i * m.barSeconds) * sr), m.barSeconds * sr); });
+  // (decode round 15, decode-round15 B: a song without drums, drumless, writes none)
+  if (drumless(m.bars)) { for (const b of m.bars) if (b.drums) b.drums = Object.fromEntries(Object.keys(b.drums).map(r => [r, '.'.repeat(b.drums[r].length)])); m.drumless = true; m.variations = variationsOf(m); }
   // (decode round 14, decode-round14 B: the grid a 16th off the kick moves by that 16th for the whole song, writer.js
   // gridRotation and rotateGrid; the variations read again on the moved bars)
   { const s = gridRotation(m); if (s) { const r = rotateGrid(m, s); Object.assign(m, { bars: r.bars, downbeat: r.downbeat, gridRotated: s }); m.variations = variationsOf(m); } }

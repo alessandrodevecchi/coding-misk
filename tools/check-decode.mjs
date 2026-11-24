@@ -27,7 +27,7 @@ import { measureApp, measureSynth, measureFull, measureTimelines } from './decod
 import { SOUND_RULE as SR8, DRUM_DRIVE } from '../src/decode/writer.js';
 import { PART_LEVELS } from '../src/decode/part-levels.js';
 import { BASS_RULE } from '../src/decode/misk-analyzer.js';
-import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare, clapShift, thirdlessMode } from '../src/decode/full.js';
+import { analyseFull, pickTempo, threeAgree, noSteadyBeat, noBassPart, PARTS_RULE, barChords, settleMode, steadyQualities, bassRange, quietMinors, snapToKey, takeChord, backbeatSnare, clapShift, thirdlessMode, drumless } from '../src/decode/full.js';
 import { writeFull, inKey, leadCode, balanceLevels, stepShare, cutUnderLead, bassDriveOf, POWER_RULE, soundsByFit, chordRhythm, CHORD_RULE, bassFilled, twinParts, QUIET_RULE, LINE_RULE, lineChord, kickClicks, offSnare, tailEnd, droneOf, lateChords, fullKick, fourOnFloor, gridRotation, rotateGrid, leadIns } from '../src/decode/writer.js';
 import { chordHits, kickShape } from '../src/decode/hit-measure.js';
 import { nearestKit, rankKits, shapeOf as hatShapeOf, bassDrive, hatTop } from '../src/decode/kit-measure.js';
@@ -616,6 +616,13 @@ if (process.argv.includes('--app')) {
     const list = [pb('C', 0.05, 0.01), pb('E', 0.06, 0.01), pb('E', 0.1, 0.02), pb('E', 0.4, 0.05), pb('E', 0.4, 0.05)], kick = [pb('E', 0.06, 0.01, 'x...x...x...x...'), pb('E', 0.4, 0.05)];
     const li = leadIns(list, 5), lk = leadIns(kick, 2);
     check(li.size === 2 && li.has(list[1]) && li.has(list[2]) && !li.has(list[0]) && lk.size === 0, 'round 14: quiet bars on the same root without drums before a heard pad play it; another root or drums stop the fade-in', JSON.stringify([li.size, lk.size]));
+  }
+  // (round 15, decode-round15 B: a song without drums)
+  {
+    const shape = click => ({ low: Array(16).fill(8), high: Array.from({ length: 16 }, (_, j) => (j % 4 ? 0 : click)) });
+    const bar = (hh, click) => ({ ...Mk.bars[0], drums: { bd: 'x...x...x...x...', cp: E, hh, oh: E }, kickShape: shape(click) });
+    const list = (hh, click, n = 16) => Array.from({ length: n }, () => bar(hh, click));
+    check(drumless(list(E, 2)) && !drumless(list('..x...x...x...x.', 2)) && !drumless(list(E, 20)) && !drumless([...list(E, 2, 8), ...Array.from({ length: 8 }, () => ({ ...Mk.bars[0], drums: { bd: E, cp: E, hh: E, oh: E } }))]), 'round 15: kicks on every bar with no click and no other drum row are no drums; hats, a click or kicks on half the bars keep them', '');
   }
   // (round 13, decode-round13 D: chords entering inside a section)
   {
