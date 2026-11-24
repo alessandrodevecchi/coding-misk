@@ -5974,6 +5974,8 @@ radio = createRadio({
   userPatterns: () => forRadio(patternsStore.list(), { meta: true }),
   // a saved pattern queued from the console (Add as a new track, Replace) counts as one use
   onPatternUsed: id => patternsStore.markUsed(id),
+  // a pattern the radio's track card made, saved from its Save key (console-track-card D7)
+  savePattern: p => patternsStore.add(p),
   // the assistant's menu and its unavailable line open Settings → AI (ai-assistant D5)
   openSettings: () => { showTab('impostazioni'); requestAnimationFrame(() => { const c = $('#set-ai'); if (c) { c.scrollIntoView({ block: 'start', behavior: 'smooth' }); c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 1200); } }); },
   // the samples of the lines typed in the console (voice-full-controls D10): read again once the voice helper made them

@@ -82,5 +82,5 @@ Reserved for sound-modulation 6.6 (the knobs of the track's movement devices, ac
 ## Risks / Trade-offs
 
 - A sound entering with a batch makes the batch heavier (one more track's samples to load); the batch's rules (move to the next phrase when not ready) cover it.
-- The director's later moves on the same track (darker, brighter) may change a value the roll set; that is the radio's usual life, as after Vary.
+- The director's later moves on the same track (darker, brighter, a filter or drive step it wrote before the press) may change a value the roll set; that is the radio's usual life, as after Vary. On a grown song the typing aims at the state where its moves arrive, so such a later step can win there too; the sound itself (wave, kit, guitar type, sample) always arrives (measured in `tools/check-track-card.cjs --profile switch`).
 - A grown song hears the drum tone of a new sound later (D2); said in the guide.

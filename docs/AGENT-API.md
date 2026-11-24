@@ -57,6 +57,7 @@ An engine answers with one JSON object: `note` (required, first: empty when the 
 ## Left out
 
 - `add`: legacy, kept for sessions recorded before the per-instrument console.
+- `sound`: a sound rolled on the page by the track card's dice: its values come from the page, the assistant asks for instrument.
 - `remove`: legacy, kept for sessions recorded before the per-instrument console.
 - `voice`: a preset form, not a single request.
 - `voice-sound`: a preset form, not a single request.

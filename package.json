@@ -54,6 +54,7 @@
     "agent-api": "node --no-warnings tools/agent-api.mjs",
     "check:agent-api": "node --no-warnings tools/check-agent-api.mjs",
     "check:ai": "node --no-warnings tools/check-ai.mjs",
+    "check:track-card": "node --no-warnings tools/check-track-card.mjs",
     "check:sound-guard": "node --no-warnings tools/check-sound-guard.mjs",
     "catalog:strudel": "node --no-warnings tools/strudel-catalog.mjs",
     "check:strudel": "node --no-warnings tools/check-strudel.mjs",
