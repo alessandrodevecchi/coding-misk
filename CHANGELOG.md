@@ -7,6 +7,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Compose: "Movement" group in the rack's "+ Add device" menu of bass, arp, lead, pad, guitar and code tracks, with Sweep, LFO and Pump devices and each device's main knob first on its card.
+- Songs: `sweep`, `lfo` and `pump` rack devices that move a track's filter, high-pass, pan or sends, or duck it on every kick, also inside held notes.
+- Example songs 7, 8 and 9: a pumped pad, a swept pad and a swaying pad.
+- `npm run check:modulation` and `tools/check-modulation.cjs`: movement device code, validator rules and levels.
+- Decode bench: ten modulated test songs, the envelope error per band and `tools/decode-mod-bench.cjs`.
+- Guide: "Movement in the rack" card.
 - `tools/decode-hits.mjs`: the bars where the decoded code is silent and the original plays, in the Decode bench.
 - Settings: "Deep beat analysis" option, off by default, that downloads the third-party beat tracker Beat This! (about 88 MB, files pinned by SHA-256) with progress, Cancel and Remove, and a disclaimer on its licence, training data, size, host and on-device use.
 - Decode: with "Deep beat analysis" on and downloaded, Full takes its beat grid from Beat This! and names it in the panel.
