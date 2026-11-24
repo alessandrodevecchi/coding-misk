@@ -74,7 +74,7 @@ A request that names no command word, instrument, playing track or saved pattern
 
 ### Requirement: Answers checked against the request
 
-After the engine answers, the app SHALL check the answer against the request text before anything applies (probe v3). A saved pattern whose name the request does not support SHALL be replaced by the saved pattern the request names, or rejected with the name from the request when the request names a pattern the listener does not have, or else shown as a proposal. When the request clearly uses the words of exactly one command (or names a saved pattern in full) and the answer leaves that command out, the answer SHALL be shown as a proposal even in "Apply at once", with a line saying why. A request to say a line with the line after a colon or in quotes SHALL become that spoken line without asking the engine, with the usual 12-word limit and voice helper check.
+After the engine answers, the app SHALL check the answer against the request text before anything applies (probe v3). A saved pattern whose name the request does not support SHALL be replaced by the saved pattern the request names, or rejected with the name from the request when the request names a pattern the listener does not have, or else shown as a proposal. When the request clearly uses the words of exactly one command (or names a saved pattern in full) and the answer leaves that command out, the answer SHALL be shown as a proposal even in "Apply at once", with a line saying why. When the engine answers "cannot" (no commands) but the request is not vague and its words clearly name exactly one command that takes no arguments (the same unique words as above), the app SHALL show that command as a proposal with the same line instead of the engine's note. A request to say a line with the line after a colon or in quotes SHALL become that spoken line without asking the engine, with the usual 12-word limit and voice helper check.
 
 #### Scenario: The model picks another existing pattern
 
@@ -110,6 +110,26 @@ After the engine answers, the app SHALL check the answer against the request tex
 
 - **WHEN** the listener types "add a spoken line: welcome to the night shift"
 - **THEN** the console queues the line "welcome to the night shift" with Say now, without asking the engine, also when the line holds a word like "faster"
+
+#### Scenario: A "cannot" answer to a request that names one command
+
+- **WHEN** the listener types "go to the drop" and the engine answers no commands with the note "The console cannot change the tempo."
+- **THEN** the answer row shows a proposal with Drop and the line that the answer may not match the request, without the engine's note, and nothing is queued until Apply, also in "Apply at once"
+
+#### Scenario: A "cannot" answer to a request that names several commands or a command with arguments
+
+- **WHEN** the engine answers no commands to a request whose words name two commands, or one command that needs an argument (an instrument, a track, a pattern)
+- **THEN** the row shows the engine's "cannot" note as before
+
+#### Scenario: A vague request answered "cannot"
+
+- **WHEN** the engine answers no commands to a request flagged vague, such as "give it some air"
+- **THEN** the row shows the engine's "cannot" note as before
+
+#### Scenario: The "cannot" list before the engine is unchanged
+
+- **WHEN** the listener types "change the tempo to 140 bpm" or "play the whole song backwards"
+- **THEN** the row says the console cannot do it, without asking the engine and without a proposal
 
 #### Scenario: A spoken line too long or without the voice helper
 
