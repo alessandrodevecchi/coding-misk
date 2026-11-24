@@ -3764,3 +3764,8 @@ Piano in `notes/decode-round15-piano-2026-11-24.md`, risultati in `notes/decode-
 - **A, la Pompa misurata: non entra.** Il calo dei toni degli accordi subito dopo la cassa si trova su mod-pump, sei brani reali e due file del proprietario, ma su mod-pump inviluppo e note tenute peggiorano (6,80 → 7,07 dB, 10,52 → 10,93).
 - **C, l'Apertura misurata: non entra.** La luminosità dei toni per battuta, tolta quella media di ogni accordo, non distingue un filtro che si apre da una frase la cui seconda metà è più brillante (r² 0,54-0,58 contro 0,52-0,54 di tre brani senza apertura).
 - **Controlli:** `check:decode` 247 su 247 (caso nuovo del brano senza batteria), `check:modulation` 26, `check:decode-library` 74, catena e build (vedi note del giro). Ascolto e prove d15a-d15f in `notes/decode-round15-ascolto/`.
+
+## 2026-11-24 · Banco della modulazione rifatto dopo la correzione della fase (#95)
+
+- **Il banco dopo `ef0bfb0`.** `tools/decode-mod-bench.cjs` rifatto da capo sui brani reali real-14, real-17, real-18 e sulle dieci canzoni modulate riesportate. Brani reali: note tenute 14,05 ferme, 13,78 con la Pompa, 13,85 con l'Oscillazione, banda sotto 0,1 dB di differenza, come prima della correzione. Canzoni di prova con il modulo vero: note tenute 11,97 → 11,38 e ora anche l'inviluppo dei medi migliora (1,96 → 1,74 dB; prima peggiorava).
+- **Nuova opzione `--phase`.** Il modulo vero spostato di mezzo periodo e a metà profondità sugli accordi decodificati. Lo spostamento costa sull'inviluppo dei moduli dentro il battito (gate e tremolo 1,3-1,4 → 2,6 dB) e poco sulle note tenute; a metà profondità resta circa metà del guadagno. La Pompa non aiuta nemmeno vera e in fase. Numeri in `notes/decode-mod-bench-rerun-2026-11-24.md`.
