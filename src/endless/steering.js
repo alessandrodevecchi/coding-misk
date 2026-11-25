@@ -11,7 +11,7 @@ import { airIdea, airGroove, rowsKey, composesOnAir, sessionSource, readyParts, 
 import { presetOf, compose } from '../material/index.js';
 import { rewriteSpoken, nextQuiet, newSpokenTrack, wherePartsOf } from './voice-track.js';
 import { whereOfTrack } from '../song/spoken.js';
-import { normalizeSong, VOICE_STYLES } from '../song/format.js';
+import { normalizeSong, VOICE_STYLES, SETTING_FIELDS } from '../song/format.js';
 import { SPEAKERS, speakerId } from '../song/build.js';
 import { treat, treatmentsFor, TREATMENTS } from './part-harmony.js';
 export { TREATMENTS };
@@ -26,6 +26,9 @@ export const COMMANDS = {
   more: { group: 'arrangement' }, less: { group: 'arrangement' }, 'lock-part': { group: 'arrangement' }, 'unlock-part': { group: 'arrangement' }, riser: { group: 'arrangement' },
   // one of the listener's saved patterns on air (D9): a new track or in place of a playing one
   pattern: { group: 'arrangement' },
+  // a whole sound for one track from the console's track card (console-track-card D2): the settings and the rack the
+  // page rolled with the sound dice, from the next phrase
+  sound: { group: 'sound' },
   // how one part sits on the chords (D8): in thirds, an octave away, chord colour, another inversion, or Auto
   voicing: { group: 'arrangement' },
   // new notes for a part (radio-variation): a pattern step from the next phrase
@@ -160,6 +163,7 @@ export function whyNot(cmd, song, plan, now, tail = 0, opts = {}) {
     return on.filter(counted).length <= 1 ? 'last-track' : null;
   }
   if (cmd.kind === 'riser') return riserTarget(plan, at, cmd) ? null : 'late';
+  if (cmd.kind === 'sound') return song.tracks.some(t => t.id === cmd.track) ? null : 'not-playing';
   if (cmd.kind === 'pattern') {
     if (!cmd.item || !fitsAir(cmd.item, plan, song)) return 'no-fit';
     if (cmd.mode === 'replace') return on.some(t => t.id === cmd.target && t.type === cmd.item.type) ? null : 'not-playing';
@@ -401,6 +405,38 @@ function vary(song, P, O, cmd, st, seed) {
   return { song: { ...song, tracks, build }, plan: P, opts: O };
 }
 
+// ---------- a track's sound from the console's track card (console-track-card D2) ----------
+
+// the settings a rolled sound may hold (the sound dice's keys and a texture's sample)
+export const SOUND_KEYS = ['wave', 'type', 'kit', 'sample', 'tone', 'cutoff', 'reso', 'drive', 'delay', 'room', 'vary'];
+// keys a new sound without them clears (set to null, read as absent by the writer)
+const CLEARED = ['tone', 'vary'];
+// The steps of a rolled sound on a track from the command's bar, by the listener: one set step with the values that
+// differ from the track's state there, a rack step per new or changed device, an unrack per device kind it loses. Kept
+// in plan.varied, so a later command's rewrite keeps them (as after Vary); the director does not run.
+function soundOnAir(song, P, O, cmd) {
+  const tr = song.tracks.find(t => t.id === cmd.track);
+  if (!tr || !cmd.set || typeof cmd.set !== 'object') return { song, plan: P, opts: O };
+  const now = stateAt(song, cmd.at).song.tracks.find(t => t.id === cmd.track) || tr;
+  const allowed = SETTING_FIELDS[tr.type] || [], cur = now.settings || {}, set = {};
+  for (const k of SOUND_KEYS) {
+    if (!allowed.includes(k)) continue;
+    if (k in cmd.set && cmd.set[k] !== null && cmd.set[k] !== undefined) { if (JSON.stringify(cmd.set[k]) !== JSON.stringify(cur[k])) set[k] = clone(cmd.set[k]); }
+    else if (CLEARED.includes(k) && cur[k] !== undefined && cur[k] !== null) set[k] = null;
+  }
+  const steps = [];
+  if (Object.keys(set).length) steps.push({ at: cmd.at, set: { track: tr.id, ...set }, by: 'listener' });
+  if (Array.isArray(cmd.rack)) {
+    const old = Array.isArray(now.rack) ? now.rack : [], kinds = new Set(cmd.rack.filter(d => d && d.device).map(d => d.device));
+    for (const d of old) if (d && d.device && !kinds.has(d.device)) steps.push({ at: cmd.at, unrack: { track: tr.id, device: d.device }, by: 'listener' });
+    for (const d of cmd.rack) if (d && d.device && JSON.stringify(old.find(x => x && x.device === d.device)) !== JSON.stringify(d)) steps.push({ at: cmd.at, rack: { track: tr.id, ...clone(d) }, by: 'listener' });
+  }
+  if (!steps.length) return { song, plan: P, opts: O };
+  P.varied = [...(P.varied || []), ...steps];
+  const build = [...(song.build || []), ...steps].map((x, i) => [x, i]).sort((a, b) => a[0].at - b[0].at || a[1] - b[1]).map(([x]) => x);
+  return { song: { ...song, build }, plan: P, opts: O };
+}
+
 // ---------- per-instrument arrangement (radio-arrangement) ----------
 
 // a saved pattern on air (D9): the instrument it plays (a groove with the bd row only is a kick, else a beat)
@@ -639,6 +675,7 @@ function rewrite(song, plan, opts, cmd, rng) {
   const d0 = Math.floor(from / 2);
   const st = stateOf(song, P, at), on = playing(st);
   const ctx = { usual: P.usualHigh, weights: P.R.energy, hardMax: P.hardMax };
+  if (cmd.kind === 'sound') return soundOnAir(song, P, O, cmd);
   if (cmd.kind === 'vary' || cmd.kind === 'swap' || cmd.kind === 'voicing' || (cmd.kind === 'pattern' && cmd.mode === 'replace')) return vary(song, P, O, cmd, st, `${rng.seed}:${cmd.kind}:${rng.n}:${rng.i}`);
   // the voice instrument (voice-placement): kept in the plan, so later rewrites (which write the spoken track again
   // from the plan) apply it again in order; the song is not directed again

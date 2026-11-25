@@ -49,7 +49,7 @@ The path engine (section 8) carries the recorded gesture (design D15); this sect
 - [ ] 6.3 Compose card: the main knob as the first row of every movement device's card (Sweep opening, LFO depth, Pump depth), starting at the set value, the drawn "acts at once" mark (`src/icons.js`, no "Live" text), the record dot, the gesture saved as a path and replayed by the engine, hand wins (D7, D8, D15); both themes, hardware knob, 400 px.
 - [ ] 6.4 Export: nothing beyond section 8 (the gesture is a path); check that the live bus is never part of an export or of copied code.
 - [ ] 6.5 Code: `knob(n)` with the editor's slider widget (check the transpiler's widget hook; else an app code widget in `src/widgets/app-widgets.js`).
-- [ ] 6.6 Radio console: knobs in the Parts row only while the selected part plays a movement device, at most two, acting while the song plays, never recorded (`src/radio/radio.js`, `src/style.css`).
+- [ ] 6.6 Radio console: knobs in the Movement row of the track card (`console-track-card`, design D6) of a track that plays a movement device, at most two, acting while the song plays, never recorded (`src/radio/radio.js`, `src/style.css`); no knob in the Parts row.
 - [ ] 6.7 Browser check: untouched knob leaves the sound as set, knob moves a held note, Stop, Play and re-evaluation, gesture replay, fast against real-time export, copied code in plain Strudel, radio row and no path saved from the radio; guide and knowledge; owner tests 8-9.
 
 ## 7. Movement parameters (second step: phase, volume and pitch, Gate)

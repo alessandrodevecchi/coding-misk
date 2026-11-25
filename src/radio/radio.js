@@ -32,8 +32,9 @@ import { makeArtist, randomStyles, randomGenre, randomKnob, randomMix, KNOBS } f
 import { freshSeed } from '../endless/random.js';
 import { compilationOptions, segmentAt, PRESETS, SETUP_DEFAULT } from '../endless/compilation.js';
 import { SENSIBLE } from '../endless/artist-maker.js';
-import { DICE, INVENT, GEAR, LOCK, LOCK_OPEN, LOCK_HALF, VARY, SWAP, CHEVRON, SLIDERS, ROWS, CARDS, LISTEN, STOP, POWER } from '../icons.js';
-import { previewOf } from '../library/patterns.js';
+import { DICE, INVENT, GEAR, LOCK, LOCK_OPEN, LOCK_HALF, VARY, SWAP, CHEVRON, SLIDERS, ROWS, CARDS, LISTEN, STOP, POWER, COMPOSE, SAVE, REVERT } from '../icons.js';
+import { previewOf, savedFromGenerated } from '../library/patterns.js';
+import { rollCard, soundOf, cardSeed, cardGroups, CARD_TYPES, newHistory, addEntry, entryOf, nextNumber, undoTarget, newCardPattern, libraryFor } from './track-card.js';
 import { PROGS } from '../music.js';
 import { paintPreview } from '../library/patterns-tab.js';
 import { savedView, cleanView, daysAgo, SAVED_GROUP } from './saved-view.js';
@@ -67,7 +68,7 @@ export function usableRecipes(list) {
 // keepArtist(artist): saves a random artist among the listener's, returns its id (#50)
 // invent(seed, { genre, base }): a new invented style (invented-styles); keepStyle(recipe): saves it among the user's, → id
 // userPatterns(): the user's saved patterns as the director reads them (pattern-library): they join a song where they fit
-export function createRadio({ root, t, tx, esc, store, options, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, invent = null, keepStyle = null, userPatterns = () => [], onPatternUsed = () => {}, reloadSamples = async () => {}, voiceFiles = () => ({}), mine = () => null, onTyped = () => {}, onSampleMade = () => {}, typedSaved = () => true, saveTyped = () => {}, openSettings = () => {} }) {
+export function createRadio({ root, t, tx, esc, store, options, recipes, player, toast, getLang, artists = () => [], face = () => '', keepArtist = () => null, invent = null, keepStyle = null, userPatterns = () => [], onPatternUsed = () => {}, reloadSamples = async () => {}, voiceFiles = () => ({}), mine = () => null, onTyped = () => {}, onSampleMade = () => {}, typedSaved = () => true, saveTyped = () => {}, openSettings = () => {}, savePattern = null }) {
   const ids = recipes.map(r => r.id);
   // the options of how the next songs are made (new-song-panel D1): read, migrated and saved by the shared store under
   // coding-misk-radio, as before; the New song panel of Compose keeps its own values in a second instance
@@ -833,7 +834,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     return Math.min(ADD_BOUND, Math.max(item.addHold || 0, 1.3 * per * k + (item.addRest ?? addRest) + 0.5));
   }
   // the commands of a batch: its net counts, saved patterns and locks
-  const sizeOf = b => Math.max(1, Object.values(b.parts).reduce((a, n) => a + Math.abs(n), 0) + b.pats.length + Object.keys(b.locks).length);
+  const sizeOf = b => Math.max(1, Object.values(b.parts).reduce((a, n) => a + Math.abs(n), 0) + b.pats.length + Object.keys(b.locks).length + (b.cards || []).length);
   // a batch's preparation that ran long holds this song's estimate up (a grown song: addHold, Classic: addPrep)
   const holdPrep = (item, s) => { const v = Math.min(ADD_BOUND, s); if (airSteer(item) && item.g0) item.addHold = Math.max(item.addHold || 0, v); else item.addPrep = Math.max(item.addPrep ?? addPrep, v); };
   const batchesOf = item => batches.filter(b => b.item === item).sort((a, b) => a.at - b.at);
@@ -912,11 +913,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (last && now - last.tLast <= ADD_JOIN_LAST && now - last.tFirst <= ADD_JOIN_FIRST && secsTo(item, last.at) >= ADD_LEAD) return last;
     const floor = waveFloor(item, Infinity), at = addAt(item, floor - 0.5);
     if (at === null) return null;
-    const b = { id: ++batchN, S, item, at, at0: at, parts: {}, pats: [], locks: {}, t0: now, tFirst: now, tLast: now, q: Math.round(relNow() * 100) / 100, state: 'settle', seq: 0, pushes: 0, flash: 0, session: false, presses: [], moves: [] };
+    const b = { id: ++batchN, S, item, at, at0: at, parts: {}, pats: [], locks: {}, cards: [], t0: now, tFirst: now, tLast: now, q: Math.round(relNow() * 100) / 100, state: 'settle', seq: 0, pushes: 0, flash: 0, session: false, presses: [], moves: [] };
     batches.push(b);
     return b;
   }
-  const emptyBatch = b => !Object.keys(b.parts).length && !b.pats.length && !Object.keys(b.locks).length;
+  const emptyBatch = b => !Object.keys(b.parts).length && !b.pats.length && !Object.keys(b.locks).length && !(b.cards || []).length;
   // a saved pattern added as a new track (radio-arrangement D9) waits in the batch of its boundary with the "+" and "−"
   // pressed for it and enters with them (#82): prepared ahead like them, never steered on the page
   function pendPattern(pat) { const t0 = performance.now(); try { return pendPatternNow(pat); } finally { cost('press', t0); } }
@@ -931,6 +932,23 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     b.pats.push({ item: pat, part });
     b.session = opts.scope === 'session';
     pressed(b, 'pattern', part);
+    restartBatch(b, ADD_SETTLE);
+    paintPending();
+    addWatch();
+    return true;
+  }
+  // a press of the track card (console-track-card D2, D7): a sound (key "cs.<track>") or a pattern in place of the track's
+  // ("cp.<track>") waits in the batch of its boundary with the "+" pressed for it and enters with them; a second press of
+  // the same key in that batch replaces the first
+  function pendCard(key, cmd) { const t0 = performance.now(); try { return pendCardNow(key, cmd); } finally { cost('press', t0); } }
+  function pendCardNow(key, cmd) {
+    if (!S || S.paused !== undefined) return false;
+    const item = S.stream[S.onAir];
+    if (!item.plan) { toast(t(item.frozen ? 'steerWhy:frozen' : 'steerWhy:lead')); return false; }
+    const b = batchFor(item);
+    if (!b) { toast(t('steerLate')); return false; }
+    b.cards = [...b.cards.filter(x => x.key !== key), { key, cmd }];
+    pressed(b, cmd.kind, key);
     restartBatch(b, ADD_SETTLE);
     paintPending();
     addWatch();
@@ -1014,6 +1032,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     }
     for (const x of b.pats) out.push({ kind: 'pattern', mode: 'new', item: x.item, ...extra() });
     for (const L of Object.values(b.locks)) out.push({ ...L, ...extra() });
+    // (the track card's sounds and patterns, console-track-card D2, D7: in the order pressed)
+    for (const x of b.cards || []) out.push({ ...x.cmd, ...extra() });
     return out;
   }
   const windowItems = () => S.stream.slice(S.onAir, S.onAir + 2);
@@ -1167,7 +1187,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     batches = batches.filter(x => x !== b);
     // (each instrument's badge stays until all of its new tracks play, #82: the boundary of each of its commands)
     const placed = cmds.map(c => ({ c, at: air ? ((r.commands.find(x => x.id === c.id) || {}).at ?? b.at) : b.at })), fams = {};
-    for (const { c, at } of placed) { const part = c.kind === 'pattern' ? patternPart(c.item) : c.kind === 'more' ? c.part : null; if (part) (fams[part] = fams[part] || []).push(at); }
+    for (const { c, at } of placed) { const part = c.kind === 'pattern' && c.mode !== 'replace' ? patternPart(c.item) : c.kind === 'more' ? c.part : null; if (part) (fams[part] = fams[part] || []).push(at); }
     item.trails = [...(item.trails || []).filter(x => x.ats.some(a => a > relNow())), ...Object.entries(fams).map(([part, ats]) => ({ id: b.id, part, ats: ats.sort((x, y) => x - y) }))];
     addsDone = [...addsDone.slice(-19), { id: b.id, at0: b.at0, at: b.at, ats: placed.map(x => x.at), pats: b.pats.length, parts: { ...b.parts }, locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), pushes: b.pushes, underLoad, waited: Math.round(performance.now() - b.t0), q: b.q, moves: b.moves.slice(), presses: b.presses.slice(), head: b.head || null, times: { ...(b.times || {}) } }];
     // (the whole session: the kinds that go to the session, as command() gives them; a mixer lock stays on this song)
@@ -1196,9 +1216,9 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // (part: an instrument, or a lock's key, D8)
   function cancelPend(id, part) {
     const b = batches.find(x => x.id === id);
-    if (!b || !(part in b.parts || part in b.locks || b.pats.some(x => x.part === part))) return;
+    if (!b || !(part in b.parts || part in b.locks || b.pats.some(x => x.part === part) || b.cards.some(x => x.key === part))) return;
     if (b.item.start + b.at - nowBar() <= ADD_MARGIN) return;
-    delete b.parts[part]; delete b.locks[part]; b.pats = b.pats.filter(x => x.part !== part);
+    delete b.parts[part]; delete b.locks[part]; b.pats = b.pats.filter(x => x.part !== part); b.cards = b.cards.filter(x => x.key !== part);
     restartBatch(b, 0);
     paintPending();
   }
@@ -1223,6 +1243,11 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       const s = Math.max(0, Math.ceil(secsTo(item, b.at))), left = item.start + b.at - nowBar(), tr = L.track && item.song.tracks.find(x => x.id === L.track);
       out.push({ id: b.id, part: key, lock: L.kind, what: t(`steer:${L.kind}`, { part: L.part ? instName(L.part) : '', track: tr ? tr.name || tr.id : L.track }), s, bar: b.at + 1, state: b.state, flash: b.flash > performance.now(), entering: left <= ADD_MARGIN });
     }
+    // (the track card's sounds and patterns, console-track-card D2: one row each, "Bass · sound #4 · 6 s")
+    for (const b of batchesOf(item)) for (const x of b.cards || []) {
+      const s = Math.max(0, Math.ceil(secsTo(item, b.at))), left = item.start + b.at - nowBar();
+      out.push({ id: b.id, part: x.key, card: true, what: cardWhat(item, x.cmd), s, bar: b.at + 1, state: b.state, flash: b.flash > performance.now(), entering: left <= ADD_MARGIN });
+    }
     return out;
   }
   // the pending state of a lock button (D8): a ring, the seconds left, the tooltip with the bar
@@ -1239,12 +1264,13 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (v && v.flash) btn.dataset.pendFlash = ''; else delete btn.dataset.pendFlash;
   }
   const badgeHtml = v => `<span class="arr-pend${v.state === 'ready' ? ' ready' : ' prep'}${v.flash ? ' flash' : ''}" data-pend="${v.part}" title="${esc(t('arrPendBar', { bar: v.bar }))}"><i class="arr-pend-led" aria-hidden="true"></i><span class="arr-pend-t">${esc(v.k ? t('arrPendSome', { k: v.k, n: v.total, s: v.s }) : t('arrPendIn', { n: v.n, s: v.s }))}</span><span class="arr-pend-s" aria-hidden="true">${esc(v.k ? t('arrPendSomeShort', { k: v.k, n: v.total, s: v.s }) : t('arrPendShort', { n: v.n, s: v.s }))}</span></span>`;
-  const rowHtml = v => `<li data-pend-row="${v.id}:${esc(v.part)}"><span class="at">${esc(t('radioBarShort', { n: v.bar }))}</span> ${esc(v.lock ? t('arrPendLockRow', { what: v.what, s: v.s }) : t('arrPendRow', { n: v.k ? `${v.k}/${v.total}` : v.n, part: instName(v.part), s: v.s }))} <button class="mini" data-pend-cancel="${v.id}:${esc(v.part)}"${v.entering ? ` disabled title="${esc(t('arrPendEntering'))}" aria-label="${esc(t('arrPendEntering'))}"` : ` aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}"`}>✕</button></li>`;
+  const rowHtml = v => `<li data-pend-row="${v.id}:${esc(v.part)}"><span class="at">${esc(t('radioBarShort', { n: v.bar }))}</span> ${esc(v.lock || v.card ? t('arrPendLockRow', { what: v.what, s: v.s }) : t('arrPendRow', { n: v.k ? `${v.k}/${v.total}` : v.n, part: instName(v.part), s: v.s }))} <button class="mini" data-pend-cancel="${v.id}:${esc(v.part)}"${v.entering ? ` disabled title="${esc(t('arrPendEntering'))}" aria-label="${esc(t('arrPendEntering'))}"` : ` aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}"`}>✕</button></li>`;
   function paintPending() {
     const box = root.querySelector('#radio-steer');
     if (!box || !S) return;
     const item = S.stream[S.onAir], views = item && item.plan ? pendView(item) : [], first = {}, locks = {};
-    for (const v of views) if (v.lock) locks[v.part] = v; else if (!first[v.part]) first[v.part] = v;
+    for (const v of views) if (v.lock) locks[v.part] = v; else if (!v.card && !first[v.part]) first[v.part] = v;
+    paintCard(item);
     box.querySelectorAll('[data-lock-part]').forEach(el => paintLock(el, locks[`p.${el.dataset.lockPart}`]));
     box.querySelectorAll('[data-mix-lock]').forEach(el => paintLock(el, locks[`t.${el.dataset.mixLock}`]));
     box.querySelectorAll('.arr-inst[data-arr]').forEach(el => {
@@ -1463,7 +1489,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
 
   // ---------- console, queue and mixer (#24) ----------
   // keyboard shortcuts: a key per command (type toggles add or remove)
-  const KEYS_OF = { voicing: 'a', 'energy-up': 'ArrowUp', 'energy-down': 'ArrowDown', 'more-complex': '+', 'less-complex': '-', darker: '[', brighter: ']', dirtier: 'x', cleaner: 'c', 'more-space': 's', instrument: 'i', progression: 'h', key: 'k', 'talk-more': 'v', 'talk-less': 'V', drop: 'g', stay: 'r', extend: 'l', end: 'e', vary: 'n', swap: 'w' };
+  const KEYS_OF = { voicing: 'a', 'energy-up': 'ArrowUp', 'energy-down': 'ArrowDown', 'more-complex': '+', 'less-complex': '-', darker: '[', brighter: ']', dirtier: 'x', cleaner: 'c', 'more-space': 's', progression: 'h', key: 'k', 'talk-more': 'v', 'talk-less': 'V', drop: 'g', stay: 'r', extend: 'l', end: 'e', vary: 'n', swap: 'w' };
   // the instruments of the Arrangement group in their two rows (radio-arrangement D1): rhythm and low end, then melodic
   // and colour parts; digits 1 to 8 add the instruments shown in this order, Shift with the digit removes one
   const ARR_ROWS = [['kick', 'beat', 'bass', 'texture'], ['arp', 'hook', 'guitar', 'pad']];
@@ -1480,9 +1506,148 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   let voicingTreat = 'auto', harmChords = 'auto', harmKey = 'auto';
   // Add a saved pattern (radio-arrangement D9, saved-patterns-hide): the panel shown or hidden, and its body as rows or
   // cards (both remembered in this browser; the old key "saved-open" now means cards), the track each pattern would replace
-  let spCards = false, spHidden = false;
-  try { spCards = !!store.get('coding-misk-radio-saved-open', false); spHidden = !!store.get('coding-misk-radio-saved-hidden', false); } catch (e) {}
+  let spCards = false, spHidden = true;
+  try { spCards = !!store.get('coding-misk-radio-saved-open', false); spHidden = !!store.get('coding-misk-radio-saved-hidden', true); } catch (e) {}
   const spTarget = {};
+  // ---------- the track card (console-track-card) ----------
+  // the track whose card is open (D1), on the song cardSong of the session; the history of a track's sounds (D5) and the
+  // card's pattern (D7) per session, song and track ("<seed>:<song>:<track>"), for the page's life; the card's locks per
+  // track type, in this browser (D3)
+  let cardOpen = null, cardSong = '';
+  const cardHist = new Map(), cardPat = new Map(), cardLib = {};
+  let cardLocks = {};
+  try { const v = store.get('coding-misk-radio-card-locks', {}); cardLocks = v && typeof v === 'object' ? v : {}; } catch (e) {}
+  const cardKey = (item, id) => `${S.recipe.seed}:${item.n}:${id}`;
+  const trackName = (item, id) => { const x = item && item.song.tracks.find(y => y.id === id); return x ? x.name || x.id : id; };
+  // a sound or card pattern in the queue: "Bass · sound #4", "Bass · original sound", "Bass · pattern Bass #2"
+  const cardWhat = (item, c) => (c.kind === 'sound' ? t(c.n ? 'cardPendSound' : 'cardPendOriginal', { track: trackName(item, c.track), n: c.n }) : t('cardPendPattern', { track: trackName(item, c.target), name: (c.item && c.item.name) || '' }));
+  // a track's sounds now: the number heard last (0 = the original), the one waiting (in a batch or queued), and where
+  function cardState(item, id) {
+    const rel = relNow(), cmds = item.commands.filter(c => c.kind === 'sound' && c.track === id);
+    const heard = cmds.filter(c => heardAt(item, c) <= rel).pop(), queued = cmds.filter(c => heardAt(item, c) > rel).pop();
+    const bw = batchesOf(item).flatMap(b => (b.cards || []).filter(x => x.key === `cs.${id}`).map(x => ({ b, x }))).pop();
+    return { cur: heard ? heard.n : 0, wait: bw ? bw.x.cmd.n : queued ? queued.n : null, batch: bw || null, queued: queued || null };
+  }
+  // the boundary a card press takes, in the director's bars, and the track there (a grown song: its director's song)
+  function cardCtx(item, id) {
+    const air = airSteer(item) && item.g0, off = air ? airOffset(item.g0) : 0, song = air ? item.plain || item.base.song : item.song;
+    const bar = Math.max(0, Math.min(barsOf(song) - 1, applyBar('sound', relNow() - off, item.plan)));
+    const tr = stateAt(song, bar).song.tracks.find(x => x.id === id) || item.song.tracks.find(x => x.id === id);
+    const d = item.plan.plan[Math.min(item.plan.plan.length - 1, Math.floor(bar / (2 * item.plan.phrase)))] || {};
+    return { song, bar, tr, energy: d.target ?? 0.5, opts: item.opts || (item.base && item.base.opts) || {} };
+  }
+  const cardSend = (id, e) => pendCard(`cs.${id}`, { kind: 'sound', track: id, n: e.n, set: clone(e.set), rack: clone(e.rack) });
+  // «New sound» (D3): the dice on the track's sound at the boundary, as the last sound sent left it
+  function cardRoll(id) {
+    const item = S && S.stream[S.onAir];
+    if (!item || !item.plan) return;
+    const c = cardCtx(item, id);
+    if (!c.tr) return;
+    const k = cardKey(item, id), st = cardState(item, id), h = cardHist.get(k) || newHistory(soundOf(c.tr));
+    const last = entryOf(h, st.wait ?? st.cur) || entryOf(h, 0), keep = Object.fromEntries(Object.entries(c.tr.settings || {}).filter(([x]) => !(x in soundOf({ settings: c.tr.settings }).set)));
+    const n = nextNumber(h), out = rollCard({ track: { ...c.tr, settings: { ...keep, ...clone(last.set) }, rack: clone(last.rack) }, R: item.plan.R, seedBase: cardSeed(S.recipe.seed, item.n, id), n, locks: cardLocks[c.tr.type] || [], energy: c.energy, owned: last.owned });
+    if (!out) { toast(t('cardNoSound')); return; }
+    if (!cardSend(id, { n, set: out.set, rack: out.rack })) return;
+    cardHist.set(k, addEntry({ ...h, cur: st.cur }, { n, set: out.set, rack: out.rack, owned: out.owned }));
+    renderSteer(true);
+  }
+  // a chip: that sound again from the next phrase (D5)
+  function cardChip(id, n) {
+    const item = S && S.stream[S.onAir], h = item && cardHist.get(cardKey(item, id)), e = h && entryOf(h, n);
+    if (!e) return;
+    const st = cardState(item, id);
+    if (st.wait === n || (st.wait === null && st.cur === n)) return;
+    if (cardSend(id, e)) renderSteer(true);
+  }
+  // Undo (D5): the waiting sound taken back, else the sound before the one on air
+  function cardUndo(id) {
+    const item = S && S.stream[S.onAir];
+    if (!item) return;
+    const st = cardState(item, id), h = cardHist.get(cardKey(item, id));
+    if (st.batch) { cancelPend(st.batch.b.id, `cs.${id}`); return renderSteer(true); }
+    if (st.queued) return cancel(st.queued.id);
+    const to = h ? undoTarget({ rolls: h.rolls, cur: st.cur }) : null;
+    if (to !== null) cardChip(id, to);
+  }
+  // «New pattern» (D7): the next number, never the candidate shown before
+  function cardNewPattern(id) {
+    const item = S && S.stream[S.onAir];
+    if (!item || !item.plan) return;
+    const c = cardCtx(item, id), k = cardKey(item, id), prev = cardPat.get(k);
+    if (!c.tr) return;
+    if (prev && player.preview && player.preview.on === prev.item.id) player.preview.stop();
+    const n = (prev ? prev.n : 0) + 1, item2 = newCardPattern({ track: c.tr, plan: item.plan, opts: c.opts, song: c.song, at: c.bar, seedBase: cardSeed(S.recipe.seed, item.n, id), n, styles: (item.entry.styles || []).slice(), avoid: prev ? [prev.item.pattern] : [] });
+    if (!item2) { toast(t('cardNoPattern')); return; }
+    item2.name = `${trackName(item, id)} #${n}`;
+    cardPat.set(k, { n, item: item2 });
+    renderSteer(true);
+  }
+  // the card's pattern or a saved one in place of the track's from the next phrase (D7)
+  const cardUse = (id, it) => pendCard(`cp.${id}`, { kind: 'pattern', mode: 'replace', target: id, item: clone(it) });
+  // what the open card shows, for the console's render key
+  const cardView = item => { const k = cardKey(item, cardOpen), h = cardHist.get(k), p = cardPat.get(k); return [h ? h.rolls.map(r => r.n).join('.') : '', p ? `${p.n}${p.saved ? 's' : ''}` : '', JSON.stringify(cardLocks)].join('/'); };
+  // the card under a Mixer row (D1): the Sound row (D2, D3, D5) and, but for a texture, the Pattern row (D7); the
+  // Movement row comes with the live knobs (D6)
+  function cardHtml(x, item, whyOf, songNow) {
+    const id = x.id, k = cardKey(item, id), h = cardHist.get(k), st = cardState(item, id), groups = cardGroups(x.type), locks = new Set(cardLocks[x.type] || []);
+    const paused = S.paused !== undefined, why = paused ? 'paused' : whyOf({ kind: 'sound', track: id });
+    const off = why ? ` disabled data-why="${why}" title="${esc(t(`steerWhy:${why}`, { type: instName(instrumentOf(x)) }))}"` : '';
+    const undoOff = st.wait === null && !(h && undoTarget({ rolls: h.rolls, cur: st.cur }) !== null);
+    const chips = (h ? h.rolls.slice().sort((a, b) => a.n - b.n) : []).map(r => { const on = r.n === st.cur && st.wait !== r.n, wait = r.n === st.wait; return `<button class="chip tc-chip" data-card-chip="${r.n}" aria-pressed="${on}"${wait ? ' data-wait' : ''} title="${esc(t(r.n ? 'cardChipTip' : 'cardChipOrigTip', { n: r.n }))}"${paused ? ' disabled' : ''}><span class="pat-k">${esc(r.n ? `#${r.n}` : t('cardOriginal'))}</span><small class="tc-st">${esc(wait ? t('cardComing') : on ? t('cardOnAir') : '')}</small></button>`; }).join('');
+    const lockChips = groups.map(g => `<button class="chip small" data-card-lock="${g}" aria-pressed="${locks.has(g)}" title="${esc(t(g === 'move' ? 'cardMoveLockTip' : 'cardLockTip'))}">${esc(t(`diceLock:${g}`))}</button>`).join('');
+    const soundRow = `<div class="tc-row" role="group" aria-label="${esc(t('cardSound'))}"><span class="lbl tc-lbl">${esc(t('cardSound'))}</span>
+      <div class="tc-acts"><button class="btn small primary tc-roll" data-card-roll="${esc(id)}"${off || ` title="${esc(t('cardNewSoundTip'))}"`}>${DICE}<span>${esc(t('diceRoll'))}</span></button>${chips ? `<span class="chips tc-chips" role="group" aria-label="${esc(t('diceHistory'))}">${chips}</span>` : ''}<button class="btn small tc-undo" data-card-undo="${esc(id)}" title="${esc(t('cardUndoTip'))}"${undoOff || paused ? ' disabled' : ''}>${REVERT}<span>${esc(t('cardUndo'))}</span></button></div>
+      ${groups.length ? `<div class="tc-locks"><span class="lbl" title="${esc(t('cardLockTip'))}">${LOCK}<span>${esc(t('diceKeep'))}</span></span><span class="chips">${lockChips}</span></div>` : ''}
+      <p class="muted small tc-help">${esc(t('cardSoundHelp'))}</p></div>`;
+    if (x.type === 'texture') return `<div class="track-card" id="tc-${esc(id)}" data-card-track="${esc(id)}" role="region" aria-label="${esc(t('cardAria', { track: x.name || id }))}">${soundRow}</div>`;
+    const cand = cardPat.get(k), pvOn = player.preview ? player.preview.on : null, lib = libraryFor(x, userPatterns(), item.plan, songNow);
+    const useWhy = paused ? 'paused' : whyOf({ kind: 'pattern', mode: 'replace', target: id, item: cand ? cand.item : (lib[0] || { type: x.type, pattern: {}, context: {} }) });
+    const whyTip = w => (w ? ` disabled data-why="${w}" title="${esc(t(`steerWhy:${w}`, { type: instName(instrumentOf(x)) }))}"` : '');
+    const listening = cand && pvOn === cand.item.id;
+    const candHtml = cand ? `<span class="tc-cand"><button class="btn small" data-card-listen="${esc(id)}" aria-pressed="${!!listening}" title="${esc(t(listening ? 'savedListenStop' : 'cardListenTip'))}"${paused ? ' disabled' : ''}>${listening ? STOP : LISTEN}<span>${esc(t('cardListen'))}</span></button><canvas class="sp-pv tc-pv" data-card-pv="${esc(id)}" width="160" height="32" aria-hidden="true"></canvas><b class="tc-num">#${cand.n}</b><button class="btn small" data-card-use="${esc(id)}"${whyTip(useWhy) || ` title="${esc(t('cardUseTip'))}"`}>${esc(t('cardUse'))}</button><button class="btn small" data-card-save="${esc(id)}"${cand.saved || !savePattern ? ` disabled title="${esc(t('cardSavedTip'))}"` : ` title="${esc(t('cardSaveTip'))}"`}>${SAVE}<span>${esc(t(cand.saved ? 'cardSavedShort' : 'cardSave'))}</span></button></span>` : '';
+    const sel = cardLib[k] && lib.some(p => p.id === cardLib[k]) ? cardLib[k] : (lib[0] || {}).id;
+    const libHtml = `<div class="tc-lib"><label class="arr-sel"><span>${esc(t('cardLib'))}</span><select data-card-lib="${esc(id)}" data-no-knob${lib.length ? '' : ' disabled'}>${lib.length ? lib.map(p => `<option value="${esc(p.id)}"${p.id === sel ? ' selected' : ''}>${esc(p.name || p.id)}</option>`).join('') : `<option>${esc(t('cardLibNone', { inst: instName(instrumentOf(x)) }))}</option>`}</select></label><button class="btn small" data-card-libuse="${esc(id)}"${!lib.length ? ' disabled' : whyTip(useWhy) || ` title="${esc(t('cardLibTip'))}"`}>${esc(t('cardLibReplace'))}</button></div>`;
+    const patRow = `<div class="tc-row" role="group" aria-label="${esc(t('cardPattern'))}"><span class="lbl tc-lbl">${esc(t('cardPattern'))}</span>
+      <div class="tc-acts"><button class="btn small primary" data-card-newpat="${esc(id)}" title="${esc(t('cardNewPatternTip'))}"${paused ? ' disabled' : ''}>${COMPOSE}<span>${esc(t('cardNewPattern'))}</span></button>${candHtml}</div>${libHtml}
+      <p class="muted small tc-help">${esc(t('cardPatternHelp'))}</p></div>`;
+    return `<div class="track-card" id="tc-${esc(id)}" data-card-track="${esc(id)}" role="region" aria-label="${esc(t('cardAria', { track: x.name || id }))}">${soundRow}${patRow}</div>`;
+  }
+  // the card pattern's drawing (the saved patterns' preview drawing)
+  function cardPaintPv(box) {
+    const cv = box.querySelector('canvas[data-card-pv]'), item = S && S.stream[S.onAir];
+    if (!cv || !item) return;
+    const c = cardPat.get(cardKey(item, cv.dataset.cardPv));
+    if (!c) return;
+    try { const x = c.item.context || {}; paintPreview(cv, previewOf(c.item.type, c.item.pattern, { chords: x.chords || undefined, meter: x.meter || '4/4', mode: x.mode || 'minor' }), root); } catch (e) {}
+  }
+  // I (console-track-card D8): «New sound» in the open card; with none open, the card of the lead track playing
+  function cardKeyI() {
+    const item = S && S.stream[S.onAir];
+    if (!item || !item.plan) return;
+    if (cardOpen) { const b = root.querySelector(`#radio-steer [data-card-roll="${CSS.escape(cardOpen)}"]`); if (b && !b.disabled) b.click(); return; }
+    const lk = lockedIds(item.plan), rel = relNow(), on = stateAt(item.song, rel).song.tracks.filter(x => !x.mute && !lk.includes(x.id) && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
+    const lead = ['hook', 'arp', 'guitar', 'pad', 'bass'].map(ty => on.find(x => x.type === ty)).find(Boolean);
+    if (!lead) return;
+    cardOpen = lead.id;
+    renderSteer(true);
+    const f = root.querySelector(`#radio-steer [data-card="${CSS.escape(lead.id)}"]`);
+    if (f) f.focus();
+  }
+  // the chips' state drawn again with the console's quarter-second tick: lit on air, dashed waiting
+  function paintCard(item) {
+    const el = root.querySelector('#radio-steer .track-card');
+    if (!el || !item || !item.plan) return;
+    const st = cardState(item, el.dataset.cardTrack);
+    el.querySelectorAll('[data-card-chip]').forEach(b => {
+      const n = +b.dataset.cardChip, on = n === st.cur && st.wait !== n, wait = n === st.wait;
+      if (b.getAttribute('aria-pressed') !== String(on)) b.setAttribute('aria-pressed', String(on));
+      if (wait) b.dataset.wait = ''; else delete b.dataset.wait;
+      const lab = b.querySelector('.tc-st'), want = wait ? t('cardComing') : on ? t('cardOnAir') : '';
+      if (lab && lab.textContent !== want) lab.textContent = want;
+    });
+    const u = el.querySelector('[data-card-undo]');
+    if (u) { const h = cardHist.get(cardKey(item, el.dataset.cardTrack)), off = st.wait === null && !(h && undoTarget({ rolls: h.rolls, cur: st.cur }) !== null); if (u.disabled !== off) u.disabled = off; }
+  }
   // the panel among many saved patterns (saved-patterns-list D1): its view (instrument chip, Fit this song, style, sort,
   // collapsed groups) remembered in this browser; the search, the scroll position and the last context of the console
   // kept here, so the console's rebuild at every phrase does not lose them
@@ -1520,7 +1685,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const h = item && item.plan && (item.plan.harmony || []).find(x => x.from === c.at && x.key);
     return t('steerQ:key', { to: t(`harmKey:${c.to}`), key: h ? h.key : '' });
   };
-  const cmdLabel = (c, item) => c.kind === 'say-live' ? t('svCmdSay', { text: c.text }) : c.kind === 'voice' || c.kind === 'voice-sound' ? t('svCmdVoice', { what: [c.voice && c.voice.preset ? t(`vinstPreset:${c.voice.preset}`) : '', c.sound && c.sound.style ? t(`voiceStyle:${c.sound.style}`) : ''].filter(Boolean).join(', ') || t('vinstLbl') }) : c.kind === 'voicing' || (['progression', 'key'].includes(c.kind) && ((c.chords && c.chords !== 'auto') || (c.to && c.to !== 'auto'))) ? harmLabel(c, item) : ['more', 'less', 'lock-part', 'unlock-part', 'riser', 'pattern'].includes(c.kind) ? arrLabel(c, item) : ['vary', 'swap'].includes(c.kind) && c.target ? varyLabel(c, item) : c.kind === 'extend' ? t('steer:extend', { s: c.s ? `+${c.s} s` : '' }) : ['add', 'remove', 'vary', 'swap'].includes(c.kind) ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type || 'lead'}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: (item && (item.song.tracks.find(x => x.id === c.track) || {}).name) || c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
+  const cmdLabel = (c, item) => c.kind === 'sound' ? cardWhat(item, c) : c.kind === 'say-live' ? t('svCmdSay', { text: c.text }) : c.kind === 'voice' || c.kind === 'voice-sound' ? t('svCmdVoice', { what: [c.voice && c.voice.preset ? t(`vinstPreset:${c.voice.preset}`) : '', c.sound && c.sound.style ? t(`voiceStyle:${c.sound.style}`) : ''].filter(Boolean).join(', ') || t('vinstLbl') }) : c.kind === 'voicing' || (['progression', 'key'].includes(c.kind) && ((c.chords && c.chords !== 'auto') || (c.to && c.to !== 'auto'))) ? harmLabel(c, item) : ['more', 'less', 'lock-part', 'unlock-part', 'riser', 'pattern'].includes(c.kind) ? arrLabel(c, item) : ['vary', 'swap'].includes(c.kind) && c.target ? varyLabel(c, item) : c.kind === 'extend' ? t('steer:extend', { s: c.s ? `+${c.s} s` : '' }) : ['add', 'remove', 'vary', 'swap'].includes(c.kind) ? t(`steer:${c.kind}`, { type: t(`steerType:${c.type || 'lead'}`) }) : c.kind === 'curve' && c.curve ? t('curveCmd', { curve: t('curve:' + c.curve), n: c.d + 1, v: c.curve === 'density' ? c.value : Math.round(c.value * 100) }) : c.kind === 'curve-reset' ? t('curveResetCmd', { curve: t('curve:' + c.curve) }) : c.kind === 'curve' ? t('steerCurveCmd', { n: c.d + 1, v: Math.round(c.value * 100) }) : ['volume', 'mute', 'unmute', 'lock', 'unlock'].includes(c.kind) || (c.kind === 'instrument' && c.track) ? t(`steer:${c.kind}`, { track: (item && (item.song.tracks.find(x => x.id === c.track) || {}).name) || c.track, v: Math.round((c.value || 0) * 100) }) : t(`steer:${c.kind}`);
   // ---------- the console's Voice group (voice-full-controls D10) ----------
   // the voice helper of the dev server (D8): a typed line needs it for its sample
   let voiceHelper = null;
@@ -1740,10 +1905,14 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     const ph = item.plan.phrase;
     const st = stateNow(item.song, rel), on = st.tracks.filter(x => !x.mute && x.type !== 'voice' && x.clips.some(c => c.start <= rel && c.start + c.bars > rel));
     const pending = item.commands.filter(c => c.at > rel || c.scope === 'session');
+    // (the track card closes on another song, and when its track is locked or leaves the Mixer, console-track-card D1)
+    const songK = `${S.recipe.seed}:${item.n}`;
+    if (cardSong !== songK) { cardSong = songK; cardOpen = null; }
+    if (cardOpen && (lockedIds(item.plan).includes(cardOpen) || !on.some(x => x.id === cardOpen))) cardOpen = null;
     // (the use counts of the saved patterns redraw only the panel's body, not the console: an add or a replace counts a
     // use right after its own redraw, #82)
     const pats = userPatterns(), useKey = pats.map(x => `${x.uses || 0}:${x.lastUsed || ''}`).join();
-    const key = [item.n, item.ver || 0, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', pats.map(x => x.id).join(), sv.preset, sv.style, voiceHelper, sayWait.map(w => w.at).join(), typedRows(item).map(x => `${x.text}:${x.saved}`).join('~')].join('|');
+    const key = [item.n, item.ver || 0, Math.floor(rel / ph), on.map(x => x.id).join(), pending.map(c => `${c.id}@${c.at}`).join(), lockedIds(item.plan).join(), (item.plan.lockedParts || []).join(), S.paused !== undefined, opts.scope, varyPart, varyTarget, voicingTreat, harmChords, harmKey, JSON.stringify(riserForm), spCards, spHidden, JSON.stringify(spTarget), player.preview ? player.preview.on : '', pats.map(x => x.id).join(), sv.preset, sv.style, voiceHelper, sayWait.map(w => w.at).join(), typedRows(item).map(x => `${x.text}:${x.saved}`).join('~'), cardOpen, cardOpen ? cardView(item) : ''].join('|');
     if (!force && key === steerKey) { if (useKey !== steerUseKey) { steerUseKey = useKey; spUsesChanged(pats); } return; }
     steerKey = key; steerUseKey = useKey;
     const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-sv-line]') ? document.activeElement.selectionStart : null;
@@ -1841,7 +2010,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       return `<button class="btn steer-btn arr-pm" data-cmd="${kind}" data-inst="${p}" aria-label="${esc(t(`steer:${kind}`, { part: name }))}" title="${esc(tip)}"${why ? ` disabled data-why="${why}"` : ''}>${kind === 'more' ? '+' : '−'}</button>`;
     };
     const pendViews = pendView(item), pendOf = {};
-    for (const v of pendViews) if (!v.lock && !pendOf[v.part]) pendOf[v.part] = v;
+    for (const v of pendViews) if (!v.lock && !v.card && !pendOf[v.part]) pendOf[v.part] = v;
     const instBox = p => { const n = countOf(p), over = n > RECOMMENDED[p]; return `<span class="arr-inst${over ? ' over' : ''}" data-arr="${p}">${instBtn('less', p)}<span class="arr-name">${esc(instName(p))}${n > 1 ? `<span class="arr-count${over ? ' warn' : ''}">×${n}</span>` : ''}</span>${pendOf[p] ? badgeHtml(pendOf[p]) : ''}${instBtn('more', p)}${lockBtn(p)}</span>`; };
     const total = onNext.filter(x => x.type !== 'riser' && x.type !== 'spoken').length;
     const over = order.filter(p => countOf(p) > RECOMMENDED[p]);
@@ -1861,8 +2030,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
         ${group('energy', btn({ kind: 'energy-up' }) + btn({ kind: 'energy-down' }))}
         ${group('arrangement', types)}
         ${group('parts', `<span class="steer-part" role="radiogroup" aria-label="${esc(t('steerPartPick'))}">${VARY_TYPES.map(p => `<button class="chip small" role="radio" data-vary-part="${p}" aria-checked="${varyPart === p}" aria-pressed="${varyPart === p}" title="${esc(t('steerPartPick'))}: ${esc(t(`steerType:${p}`))}">${esc(t(`steerType:${p}`))}</button>`).join('')}</span>${targetSel}${btn({ kind: 'vary', type: varyPart, target: varyTarget, icon: VARY }, t('steerBtn:vary'))}${btn({ kind: 'swap', type: varyPart, target: varyTarget, icon: SWAP }, t('steerBtn:swap'))}${voicingRow}`)}
-        <div class="sp-slot"></div>
-        ${group('sound', ['darker', 'brighter', 'dirtier', 'cleaner', 'more-space', 'instrument'].map(k => btn({ kind: k })).join(''))}
+        ${group('sound', ['darker', 'brighter', 'dirtier', 'cleaner', 'more-space'].map(k => btn({ kind: k })).join(''))}
         ${group('harmony', harmMenu + btn({ kind: 'progression', chords: harmChords }) + btn({ kind: 'key', to: harmKey }))}
         ${voiceGroup(item, rel, btn)}
         ${group('song', btn({ kind: 'drop' }) + btn({ kind: 'stay' }) + (() => { const s = `+${Math.round(extendSeconds(item.plan))} s`; return btn({ kind: 'extend', vars: { s } }, t('steer:extend', { s })); })() + btn({ kind: 'end' }))}
@@ -1870,12 +2038,16 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       <div class="lbl">${esc(t('steerQueue'))}</div>
       <ul class="steer-queue">${pendViews.map(rowHtml).join('')}${sayWait.map(w => `<li><span class="at">${w.at !== null && w.item === item ? esc(t('radioBarShort', { n: w.at + 1 })) : '…'}</span> ${esc(t('svQueueWait', { text: w.text }))}</li>`).join('')}${pending.map(c => `<li><span class="at">${esc(t('radioBarShort', { n: heardAt(item, c) + 1 }))}</span> ${esc(cmdLabel(c, item))}${c.scope === 'session' ? `<span class="muted"> · ${esc(t('steerForSession'))}</span>` : ''} ${['more', 'less', 'lock-part', 'unlock-part', 'lock', 'unlock'].includes(c.kind) && heardAt(item, c) - rel > 0 && heardAt(item, c) - rel <= ADD_MARGIN ? `<button class="mini" disabled aria-label="${esc(t('arrPendEntering'))}" title="${esc(t('arrPendEntering'))}">✕</button>` : `<button class="mini" data-cancel="${c.id}" aria-label="${esc(t('steerCancel'))}" title="${esc(t('steerCancel'))}">✕</button>`}</li>`).join('') || `<li class="muted"${sayWait.length || pendViews.length ? ' hidden' : ''}>${esc(t('steerQueueEmpty'))}</li>`}</ul>${typedHtml(item)}
       <div class="lbl">${esc(t('steerMixer'))}</div>
-      <div class="steer-mixer">${[...on, ...st.tracks.filter(x => x.mute && lk.includes(x.id))].map(x => { const locked = lk.includes(x.id), g = (x.settings || {}).gain ?? 0.5; return `<div class="mix-row"><span class="mix-name">${esc(x.name || x.id)}</span>
-        <input type="range" min="0" max="1.2" step="0.05" value="${g}" data-mix-vol="${esc(x.id)}" data-no-knob aria-label="${esc(t('steerVolume', { track: x.name || x.id }))}" title="${esc(t('steerVolume', { track: x.name || x.id }))}">
+      <div class="steer-mixer">${[...on, ...st.tracks.filter(x => x.mute && lk.includes(x.id))].map(x => { const locked = lk.includes(x.id), g = (x.settings || {}).gain ?? 0.5, nm = x.name || x.id, can = CARD_TYPES.includes(x.type), open = can && cardOpen === x.id;
+        // (the name opens the track's card, console-track-card D1; a locked track's name says why it does not)
+        const name = !can ? `<span class="mix-name">${esc(nm)}</span>` : `<button class="mix-name tc-name" data-card="${esc(x.id)}" aria-expanded="${open}"${open ? ` aria-controls="tc-${esc(x.id)}"` : ''}${locked ? ` disabled title="${esc(t('cardLocked', { track: nm }))}"` : ` title="${esc(t(open ? 'cardClose' : 'cardOpen', { track: nm }))}"`}>${CHEVRON}<span>${esc(nm)}</span></button>`;
+        return `<div class="mix-row${open ? ' open' : ''}">${name}
+        <input type="range" min="0" max="1.2" step="0.05" value="${g}" data-mix-vol="${esc(x.id)}" data-no-knob aria-label="${esc(t('steerVolume', { track: nm }))}" title="${esc(t('steerVolume', { track: nm }))}">
         <button class="mini" data-mix-mute="${esc(x.id)}" aria-pressed="${!!x.mute}" title="${esc(t('steerTip:mute'))}">M</button>
-        <button class="mini" data-mix-lock="${esc(x.id)}" aria-pressed="${locked}" title="${esc(t('steerTip:lock'))}" aria-label="${esc(t('steerTip:lock'))}">${locked ? LOCK : LOCK_OPEN}</button>
-        <button class="mini" data-mix-inst="${esc(x.id)}" title="${esc(t('steerTip:instrument'))}">♪</button></div>`; }).join('') || `<p class="muted">${esc(t('steerMixerEmpty'))}</p>`}</div>`;
+        <button class="mini" data-mix-lock="${esc(x.id)}" aria-pressed="${locked}" title="${esc(t('steerTip:lock'))}" aria-label="${esc(t('steerTip:lock'))}">${locked ? LOCK : LOCK_OPEN}</button></div>${open ? cardHtml(x, item, whyOf, songNow) : ''}`; }).join('') || `<p class="muted">${esc(t('steerMixerEmpty'))}</p>`}</div>
+      <div class="sp-slot"></div>`;
     spMount(box.querySelector('.sp-slot'), spOld, savedPanel, spFocus);
+    cardPaintPv(box);
     if (askRow) askRow.mount(box.querySelector('.ask-slot'), askFocus);
     // (the locks waiting for their boundary keep their ring after a rebuild, D8)
     paintPending();
@@ -2247,6 +2419,39 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (b.id === 'comp-del') { const all = userPresets(); delete all[opts.compPreset]; store.set('coding-misk-comp-presets', all); opts.compPreset = 'custom'; saveOpts(); return render(); }
     if (b.dataset.compKeep !== undefined && S) { const it = S.stream[S.onAir]; if (it.comp && it.comp.artist) { keepArtist(it.comp.artist); toast(t('diceKept')); renderNow(); } return; }
     if (b.dataset.varyPart) { varyPart = b.dataset.varyPart; return renderSteer(true); }
+    // the track card (console-track-card): open and close, Sound row, Pattern row
+    if (b.dataset.card) { const id = b.dataset.card; cardOpen = cardOpen === id ? null : id; renderSteer(true); const f = root.querySelector(`#radio-steer [data-card="${CSS.escape(id)}"]`); if (f) f.focus(); return; }
+    if (b.dataset.cardRoll) return cardRoll(b.dataset.cardRoll);
+    if (b.dataset.cardChip !== undefined) { const el = b.closest('.track-card'); return el && cardChip(el.dataset.cardTrack, +b.dataset.cardChip); }
+    if (b.dataset.cardUndo) return cardUndo(b.dataset.cardUndo);
+    if (b.dataset.cardLock) {
+      const el = b.closest('.track-card'), item = S && S.stream[S.onAir], tr = el && item && item.song.tracks.find(x => x.id === el.dataset.cardTrack);
+      if (!tr) return;
+      const g = b.dataset.cardLock, cur = cardLocks[tr.type] || [];
+      cardLocks = { ...cardLocks, [tr.type]: cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g] };
+      try { store.set('coding-misk-radio-card-locks', cardLocks); } catch (err) {}
+      return renderSteer(true);
+    }
+    if (b.dataset.cardNewpat) return cardNewPattern(b.dataset.cardNewpat);
+    if (b.dataset.cardListen || b.dataset.cardUse || b.dataset.cardSave) {
+      const id = b.dataset.cardListen || b.dataset.cardUse || b.dataset.cardSave, item = S && S.stream[S.onAir], c = item && cardPat.get(cardKey(item, id));
+      if (!c) return;
+      if (b.dataset.cardListen) { const x = c.item.context || {}; if (player.preview) player.preview.toggle(clone(c.item), { key: x.key, chords: x.chords, bpm: x.bpm || item.entry.bpm, meter: x.meter || item.entry.meter, n: item.n }); return renderSteer(true); }
+      if (b.dataset.cardUse) { if (cardUse(id, c.item)) renderSteer(true); return; }
+      if (!savePattern || c.saved) return;
+      const x = c.item, name = `${trackName(item, id)} · ${item.song.title || ''} #${c.n}`.replace(/ · {2}#/, ' #');
+      const out = savePattern(savedFromGenerated({ pattern: x.pattern, seed: `${cardSeed(S.recipe.seed, item.n, id)}:pattern:${c.n}` }, { name, kind: x.kind, type: x.type, sound: x.sound, context: x.context, styles: x.styles || [] }));
+      if (out) { c.saved = true; toast(t('cardSaved', { name })); }
+      return renderSteer(true);
+    }
+    if (b.dataset.cardLibuse) {
+      const id = b.dataset.cardLibuse, sel = root.querySelector(`#radio-steer [data-card-lib="${CSS.escape(id)}"]`), x = sel && userPatterns().find(y => y.id === sel.value);
+      if (!x) return;
+      const item = clone(x);
+      delete item.created; delete item.uses; delete item.lastUsed;
+      if (cardUse(id, item)) { onPatternUsed(x.id); renderSteer(true); }
+      return;
+    }
     if (b.dataset.svApply !== undefined) return voiceApply();
     if (b.dataset.svSay) { sv.line = (root.querySelector('[data-sv-line]') || { value: sv.line }).value; return sayLine(b.dataset.svSay); }
     if (b.dataset.cmd === 'riser') return command({ kind: 'riser', bars: riserForm.bars === 'auto' ? 'auto' : +riserForm.bars, dir: riserForm.dir, sound: riserForm.sound });
@@ -2290,7 +2495,6 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     if (b.id === 'steer-scope') { opts.scope = opts.scope === 'session' ? 'song' : 'session'; saveOpts(); return renderSteer(true); }
     if (b.dataset.mixMute) return command({ kind: b.getAttribute('aria-pressed') === 'true' ? 'unmute' : 'mute', track: b.dataset.mixMute });
     if (b.dataset.mixLock) { const item = S && S.stream[S.onAir]; return pendLock(`t.${b.dataset.mixLock}`, item && lockedIds(item.plan).includes(b.dataset.mixLock) ? 'unlock' : 'lock', { track: b.dataset.mixLock }); }
-    if (b.dataset.mixInst) return command({ kind: 'instrument', track: b.dataset.mixInst });
     // a session into a playlist (#38): a small menu next to the button
     if (b.id === 'radio-pl' || b.dataset.histPl !== undefined) {
       const old = root.querySelector('.radio-pl-menu'); if (old) { const same = old.previousElementSibling === b; old.remove(); if (same) return; }
@@ -2354,6 +2558,13 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   // shortcuts while the Radio tab is open and the radio plays (not while typing in a field)
   // (Enter in the line field: Say now)
   root.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-sv-line]')) { e.preventDefault(); sv.line = e.target.value; sayLine('now'); } });
+  // Escape in a track card closes it, the focus back on its name (console-track-card D1)
+  root.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !cardOpen || !e.target.closest || !e.target.closest('#radio-steer .track-card, #radio-steer [data-card]')) return;
+    e.preventDefault(); e.stopPropagation();
+    const id = cardOpen; cardOpen = null; renderSteer(true);
+    const f = root.querySelector(`#radio-steer [data-card="${CSS.escape(id)}"]`); if (f) f.focus();
+  });
   // the panel's search (saved-patterns-list): Escape clears it, a second Escape leaves it; the down arrow goes to the
   // first pattern's listen button
   root.addEventListener('keydown', e => {
@@ -2382,6 +2593,8 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
       if (q) { e.preventDefault(); q.focus(); if (q.select) q.select(); }
       return;
     }
+    // I: the track card's «New sound», or the lead track's card (console-track-card D8)
+    if (e.key === 'i') { e.preventDefault(); if (!e.repeat) cardKeyI(); return; }
     const kind = Object.keys(KEYS_OF).find(k => KEYS_OF[k] === e.key);
     if (kind === 'extend' && e.repeat) return;
     if (!kind) return;
@@ -2391,6 +2604,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
   });
   root.addEventListener('change', e => {
     if (e.target.dataset.spTarget) { spTarget[e.target.dataset.spTarget] = e.target.value; return renderSteer(true); }
+    if (e.target.dataset.cardLib) { const item = S && S.stream[S.onAir]; if (item) cardLib[cardKey(item, e.target.dataset.cardLib)] = e.target.value; return; }
     if (e.target.dataset.spStyle !== undefined) { spView.style = e.target.value; spSaveView(); return spRenderBody({ top: true }); }
     if (e.target.dataset.spSort !== undefined) { spView.sort = e.target.value; spSaveView(); return spRenderBody({ top: true }); }
     if (e.target.dataset.voicingTreat !== undefined) { voicingTreat = e.target.value; return renderSteer(true); }
@@ -2494,7 +2708,7 @@ export function createRadio({ root, t, tx, esc, store, options, recipes, player,
     // the assistant's row (ai-assistant; tools/check-ai.cjs): send a request, the last prompt sent
     get ask() { return askRow; },
     // the console changes pending (tools/check-add-lag.cjs): per batch its boundary, counts, state and pushes
-    get pendingAdds() { return batches.map(b => ({ id: b.id, at: b.at, at0: b.at0, parts: { ...b.parts }, pats: b.pats.map(x => x.part), locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), state: b.state, pushes: b.pushes, t0: b.t0, q: b.q, times: { ...(b.times || {}) }, moves: b.moves.slice(), presses: b.presses.slice(), head: b.head || null })); },
+    get pendingAdds() { return batches.map(b => ({ id: b.id, at: b.at, at0: b.at0, parts: { ...b.parts }, pats: b.pats.map(x => x.part), locks: Object.fromEntries(Object.entries(b.locks).map(([k, L]) => [k, L.kind])), cards: (b.cards || []).map(x => x.key), state: b.state, pushes: b.pushes, t0: b.t0, q: b.q, times: { ...(b.times || {}) }, moves: b.moves.slice(), presses: b.presses.slice(), head: b.head || null })); },
     // the last batches that entered: boundary planned and taken, pushes, whether under load, ms from the first press
     get addCost() { return { ...addCost }; },
     resetAddCost() { for (const k of Object.keys(addCost)) delete addCost[k]; },

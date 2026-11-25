@@ -1160,10 +1160,41 @@ button.tag-chip:hover { border-color: var(--ink); color: var(--ink); }
 .steer-queue .at { font: 12px var(--mono); color: var(--a1); margin-right: 6px; }
 .steer-queue .mini { margin-left: 6px; }
 .steer-mixer { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px 16px; }
-.mix-row { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto auto auto; align-items: center; gap: 6px; font-size: 13px; }
+.mix-row { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto auto; align-items: center; gap: 6px; font-size: 13px; min-width: 0; }
 .mix-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mix-row .mini[aria-pressed="true"] { color: var(--a1); border-color: var(--a1); }
-@media (max-width: 560px) { .mix-row { grid-template-columns: minmax(0, 1fr) 80px auto auto auto; } }
+@media (max-width: 560px) { .mix-row { grid-template-columns: minmax(0, 1fr) 80px auto auto; } }
+/* the track card (console-track-card): the name opens it under its row, across the whole Mixer */
+.tc-name { display: inline-flex; align-items: center; gap: 4px; min-width: 0; padding: 2px 4px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.tc-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-name svg { width: 10px; height: 10px; flex: none; transform: rotate(0deg); transition: transform .15s; opacity: .7; }
+.tc-name[aria-expanded="true"] { color: var(--a1); font-weight: 600; }
+.tc-name[aria-expanded="true"] svg { transform: rotate(90deg); }
+.tc-name:hover:not(:disabled), .tc-name:focus-visible { border-color: var(--line); }
+.tc-name:disabled { cursor: not-allowed; opacity: .6; }
+.mix-row.open { background: var(--panel2); border-radius: 6px 6px 0 0; }
+.track-card { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 12px; margin: -6px 0 4px; padding: 12px; border: 1px solid var(--a1); border-radius: 0 0 8px 8px; background: var(--panel2); min-width: 0; }
+.tc-row { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tc-row + .tc-row { padding-top: 10px; border-top: 1px solid var(--line); }
+.tc-acts, .tc-locks, .tc-lib, .tc-cand { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.tc-acts .btn, .tc-locks .lbl { display: inline-flex; align-items: center; gap: 5px; }
+.tc-acts .btn svg, .tc-locks .lbl svg { width: 13px; height: 13px; flex: none; }
+.tc-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.tc-chip { display: inline-flex; align-items: baseline; gap: 4px; }
+.tc-chip .tc-st { font-size: 10px; opacity: .85; }
+.tc-chip .tc-st:empty { display: none; }
+.tc-chip[aria-pressed="true"] { border-color: var(--ink); font-weight: 600; }
+.tc-chip[data-wait] { border-style: dashed; border-color: var(--a2); color: var(--a2); }
+.tc-locks .chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.tc-pv { width: 160px; max-width: 100%; height: 32px; border-radius: 4px; background: var(--panel); }
+.tc-cand { padding: 6px; border: 1px dashed var(--a2); border-radius: 8px; }
+.tc-num { color: var(--a2); font-size: 12px; }
+.tc-lib select { max-width: 220px; }
+.tc-help { margin: 0; }
+:root[data-ui="hw"] .track-card { border-color: var(--led); }
+:root[data-ui="hw"] .tc-name[aria-expanded="true"] { color: var(--led); }
+:root[data-ui="hw"] .tc-chip[data-wait] { border: 1px dashed var(--led); color: var(--led); box-shadow: none; }
+@media (max-width: 480px) { .track-card { padding: 10px 8px; } .tc-pv { width: 120px; } .tc-lib select { max-width: 100%; } .tc-lib .arr-sel { flex: 1 1 100%; min-width: 0; } }
 /* curves of the song on air (#40, look #47): neon in the normal theme, oscilloscope in HW */
 .curves { display: grid; gap: 6px; max-width: 380px; font: 12px var(--mono); color: var(--muted); }
 .curves .radio-lane { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 2px 8px; font: 11px var(--mono); }

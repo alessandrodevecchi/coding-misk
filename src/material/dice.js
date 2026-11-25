@@ -6,6 +6,8 @@ import { stream } from '../endless/random.js';
 import { compose } from './index.js';
 import { WAVES, GUITAR_TYPES, KITS } from '../music.js';
 import { TONE_GROUP_IDS, fitToneDrive } from './tone.js';
+import { MOVE_TYPES, MOVE_MAX, GATE_PRESETS, isMove } from '../song/movement.js';
+import { checkRack } from '../song/rack.js';
 
 // the lock groups of each track type
 export const DICE_GROUPS = {
@@ -87,6 +89,46 @@ export function rollSound({ track, recipe, seedBase, n = 1, locks = [], energy =
   // the level is never rolled
   if (track.settings && 'gain' in track.settings) set.gain = track.settings.gain;
   return { settings: set, rack, owned: own, groups: drawn };
+}
+
+// ---------- movement in the roll (console-track-card D4) ----------
+// the movement devices the radio's track card rolls: never Path (its points are song bars and its bus is the song's)
+export const ROLL_MOVES = ['sweep', 'lfo', 'pump', 'gate'];
+const pick = (r, list) => list[Math.floor(r.next() * list.length)];
+const step = (x, st) => Math.round(x / st) * st;
+// one device of a kind, with musical values inside each argument's range
+function moveOf(kind, r) {
+  if (kind === 'sweep') {
+    const target = pick(r, ['filter', 'filter', 'hpf']);
+    const [from, to] = target === 'filter' ? [step(r.range(300, 900), 10), step(r.range(2500, 7000), 10)] : [step(r.range(60, 150), 10), step(r.range(600, 1600), 10)];
+    const up = r.chance(0.7);
+    return { device: 'sweep', target, from: up ? from : to, to: up ? to : from, bars: pick(r, [4, 8, 16]), curve: 'exp', repeat: 'loop' };
+  }
+  if (kind === 'lfo') {
+    const target = pick(r, ['filter', 'filter', 'pan', 'room', 'delay']);
+    return { device: 'lfo', target, rate: pick(r, [0.25, 0.5, 1, 2, 4]), depth: r2(step(r.range(0.2, 0.6), 0.05)), shape: target === 'filter' ? pick(r, ['sine', 'tri', 'saw', 'ramp']) : pick(r, ['sine', 'tri']) };
+  }
+  if (kind === 'pump') return { device: 'pump', depth: r2(step(r.range(0.4, 0.8), 0.05)), recover: r2(step(r.range(0.1, 0.25), 0.01)), rate: 0.25 };
+  return { device: 'gate', pattern: pick(r, Object.keys(GATE_PRESETS)), depth: r2(step(r.range(0.5, 0.9), 0.05)), smooth: pick(r, [0.1, 0.25]) };
+}
+// One movement roll for a track (seed "<seedBase>:<n>", stream sound/move): the movement device the roll owned
+// (`owned`, or null) leaves the rack, then half the rolls bring one device of ROLL_MOVES, the other half none. A device
+// that would pass MOVE_MAX on the track or that the rack validator rejects (an error or a warning) is drawn again, up to 8
+// times, else none. Melodic types only. → { rack, owned } (copies); the rack unchanged for other types
+export function rollMove({ track, seedBase, n = 1, owned = null }) {
+  const rack = clone((track && track.rack) || []), type = track && track.type;
+  if (!MOVE_TYPES.includes(type) || type === 'code') return { rack, owned: null };
+  const at = owned ? rack.findIndex(d => sameDevice(d, owned)) : -1;
+  if (at >= 0) rack.splice(at, 1);
+  const r = stream(`${seedBase}:${n}`, 'sound/move');
+  if (!r.chance(0.5) || rack.filter(isMove).length >= MOVE_MAX) return { rack, owned: null };
+  for (let k = 0; k < 8; k++) {
+    const d = moveOf(pick(r, ROLL_MOVES), r), out = [...rack, d];
+    let bad = false;
+    checkRack(out, 'rack', () => { bad = true; }, () => { bad = true; }, type, track.settings || {});
+    if (!bad) return { rack: out, owned: clone(d) };
+  }
+  return { rack, owned: null };
 }
 
 // ---------- the sound history (random-sound-params D10, owner test r94e) ----------

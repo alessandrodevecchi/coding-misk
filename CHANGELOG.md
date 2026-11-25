@@ -7,6 +7,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Radio console: a track card that opens under a Mixer row from the track's name, with a new sound rolled by the sound dice in the song's style (movement devices too), the track's sounds as chips with Undo, a new pattern to listen to, use or save, and saved patterns of the same instrument from the library.
+- Radio: `sound` steering command for one track's whole sound from the next phrase.
+- `npm run check:track-card` and `tools/check-track-card.cjs`: the track card's roll, commands and console.
 - Compose: "Movement" group in the rack's "+ Add device" menu of bass, arp, lead, pad, guitar and code tracks, with Sweep, LFO and Pump devices and each device's main knob first on its card.
 - Songs: `sweep`, `lfo` and `pump` rack devices that move a track's filter, high-pass, pan or sends, or duck it on every kick, also inside held notes.
 - Example songs 7, 8 and 9: a pumped pad, a swept pad and a swaying pad.
@@ -135,6 +138,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Radio console: the saved patterns panel sits under the Mixer and is hidden at first.
+- Radio console: the I key rolls a new sound in the open track card, or opens the lead track's card.
 - `onnxruntime-web` 1.31.1 is an app dependency instead of a development dependency.
 - Built-in styles give drum tone ranges and variation amounts and targets in their character.
 - Playlists: a session saved with an older composed sound version warns that it may sound different.
@@ -207,6 +212,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Radio console: the code comment of a new sound names the tone's instruments and the variation's targets instead of "[object Object]", and a cleared setting as "-tone" instead of "tone null".
 - Fast export: a bus modulator (`bmod`) connects at its note's start instead of up to a second later.
 - Decode: Full no longer writes a kick on every beat for a track with no drums, where a pad and a bass alone rise on the beat.
 - Fast export: LFO, Pump without a kick and tremolo waves start at the same place of the beat as in playback.
@@ -262,6 +268,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Removed
 
+- Radio console: the Instrument key of the Sound group and the instrument key of each Mixer row.
 - Decode: the `// vox: …` comment at the end of the decoded code.
 - The radio button Apply to the song on air (the console's Voice group replaces it).
 - The speakers Eddy, Flo, Grandma, Grandpa, Reed, Rocko, Sandy and Shelley.
