@@ -297,8 +297,8 @@ The code holds `const bline = "<[3 5@15] [3@12 0@4] [5 7@15] 7>"` once, after th
 | `remove` | track id, or a list: the track stops |
 | `set` | `{ "track", …settings }`: settings of that track from now on |
 | `pattern` | `{ "track", "to" }`: every clip of the track plays pattern `to` from now on. `{ "track", "level": k }`: every clip plays the variant `k` of its own pattern (`A~1`, `A~2`…, made by Crescendo), `0` the written one |
-| `rack` | `{ "track", "device", …values }`: adds a rack device (replaces one of the same kind) |
-| `unrack` | `{ "track", "device" }`: removes a rack device |
+| `rack` | `{ "track", "device", …values }`: adds a rack device (replaces one of the same kind; a movement device replaces the one of its kind on the same target, so a path on the volume and a path on the filter stay two) |
+| `unrack` | `{ "track", "device", "target"? }`: removes the rack devices of that kind; with `target`, only the movement device on that target |
 | `hide` | `{ "track", "keys" }`: leaves out of the track's code the functions of these settings (`cutoff`, `reso`, `drive`, `grit`, `room`, `delay`, `env`), so Strudel's defaults apply (natural growth) |
 | `reveal` | `{ "track", "keys" }`: brings them back |
 | `variant` | `{ "track", "use": k }`: switches on the prepared variant `k` (from 0) of the track's ideas: its line loses the `//` and plays. `"use": null` switches it off |

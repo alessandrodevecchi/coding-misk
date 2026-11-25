@@ -5,6 +5,7 @@ import { directSong, sectionsOf, candidateMoves, ENTRY, tracksOfKind, trackForPa
 import { stream } from './random.js';
 import { memoOn, baseId, contextVersion, caches, keep, work, timed } from './steer-memo.js';
 import { stateAt, buildSteps } from '../song/build.js';
+import { sameDevice, deviceRef } from '../song/movement.js';
 import { playing, curveParts, CURVES } from './energy.js';
 import { WAVES, TEXTURES, GUITAR_TYPES, KITS, KEYS, GROOVES, PROGS, meterSteps, fitSteps } from '../music.js';
 import { airIdea, airGroove, rowsKey, composesOnAir, sessionSource, readyParts, soundOf, toneFor, varyFor } from './material.js';
@@ -427,9 +428,9 @@ function soundOnAir(song, P, O, cmd) {
   const steps = [];
   if (Object.keys(set).length) steps.push({ at: cmd.at, set: { track: tr.id, ...set }, by: 'listener' });
   if (Array.isArray(cmd.rack)) {
-    const old = Array.isArray(now.rack) ? now.rack : [], kinds = new Set(cmd.rack.filter(d => d && d.device).map(d => d.device));
-    for (const d of old) if (d && d.device && !kinds.has(d.device)) steps.push({ at: cmd.at, unrack: { track: tr.id, device: d.device }, by: 'listener' });
-    for (const d of cmd.rack) if (d && d.device && JSON.stringify(old.find(x => x && x.device === d.device)) !== JSON.stringify(d)) steps.push({ at: cmd.at, rack: { track: tr.id, ...clone(d) }, by: 'listener' });
+    const old = Array.isArray(now.rack) ? now.rack : [], kept = cmd.rack.filter(d => d && d.device);
+    for (const d of old) if (d && d.device && !kept.some(x => sameDevice(x, d))) steps.push({ at: cmd.at, unrack: { track: tr.id, ...deviceRef(d) }, by: 'listener' });
+    for (const d of cmd.rack) if (d && d.device && JSON.stringify(old.find(x => sameDevice(x, d))) !== JSON.stringify(d)) steps.push({ at: cmd.at, rack: { track: tr.id, ...clone(d) }, by: 'listener' });
   }
   if (!steps.length) return { song, plan: P, opts: O };
   P.varied = [...(P.varied || []), ...steps];

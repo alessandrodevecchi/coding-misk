@@ -110,7 +110,9 @@ export const CHECKS = [
   } },
   { name: 'every state compiles and uses only functions the compiler emits', protect: true, songs: all, each(s) {
     const c = builtOf(s), known = fns(compileSong(s));
-    ['degradeBy', 'echo', 'off', 'ply', 'rev', 'jux', 'delay', 'delaysync', 'delayfeedback', 'room', 'roomsize', 'distort', 'shape', 'crush', 'coarse', 'phaser', 'phaserdepth', 'tremolosync', 'tremolodepth', 'vowel', 'hpf', 'hpq', 'lpf', 'lpq', 'pan', 'slow', 'add', 'late'].forEach(f => known.add(f));
+    // pick: a Sweep that plays "once" holds its end with .pick() when the section outlasts it (sound-modulation D4),
+    // which the longer sections of the growth can bring where the written song has none
+    ['pick', 'degradeBy', 'echo', 'off', 'ply', 'rev', 'jux', 'delay', 'delaysync', 'delayfeedback', 'room', 'roomsize', 'distort', 'shape', 'crush', 'coarse', 'phaser', 'phaserdepth', 'tremolosync', 'tremolodepth', 'vowel', 'hpf', 'hpq', 'lpf', 'lpq', 'pan', 'slow', 'add', 'late'].forEach(f => known.add(f));
     for (const bar of [...new Set(buildSteps(c).map(x => x.at))]) {
       const code = compileSong(stateAt(c, bar).song);
       assert(code.includes('$:'), `${c.id} bar ${bar}: silent`);

@@ -5,6 +5,7 @@
 // shown in the editor always agree. Tracks named by an "add" step are silent before it; the others play from the start.
 import { SETTING_FIELDS, VOICE_DEFAULT } from './format.js';
 import { DEVICES, checkRack, rackCode } from './rack.js';
+import { sameDevice } from './movement.js';
 import { spokenBars, narratorStyle, poeticLine, movementLine, enteringTrack, placeSpoken, lineTexts, lineSounds, lineBank, lineEntries, withNarratorStyle, sampleSeconds, barSeconds, spokenContext, MAX_WORDS } from './spoken.js';
 import { kindOf, outranks, perBar, applyExclusive } from './speakers.js';
 import { POETIC } from './vocabulary.js';
@@ -60,9 +61,10 @@ export function applyStep(song, step) {
   }
   if (step.rack) {
     const { track: id, ...dev } = step.rack, t = track(id);
-    if (t) { const r = (t.rack || []).filter(d => d.device !== dev.device); t.rack = [...r, dev]; }
+    if (t) { const r = (t.rack || []).filter(d => !sameDevice(d, dev)); t.rack = [...r, dev]; }
   }
-  if (step.unrack) { const t = track(step.unrack.track); if (t) t.rack = (t.rack || []).filter(d => d.device !== step.unrack.device); }
+  // unrack: every device of that kind, or with a target the one movement device on it
+  if (step.unrack) { const u = step.unrack, t = track(u.track); if (t) t.rack = (t.rack || []).filter(d => !(u.target === undefined ? d && d.device === u.device : sameDevice(d, u))); }
   if (step.hide) { const t = track(step.hide.track); if (t) t.hidden = [...new Set([...(t.hidden || []), ...list(step.hide.keys)])]; }
   if (step.reveal) { const t = track(step.reveal.track); if (t) { t.hidden = (t.hidden || []).filter(k => !list(step.reveal.keys).includes(k)); if (!t.hidden.length) delete t.hidden; } }
   // clone: the track plays, with the notes, the settings it shares and the functions shown of the "from" track
