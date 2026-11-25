@@ -202,6 +202,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Decode: Full no longer writes a kick on every beat for a track with no drums, where a pad and a bass alone rise on the beat.
+- Fast export: LFO, Pump without a kick and tremolo waves start at the same place of the beat as in playback.
 - Decode: Full puts the beat grid on the kick when the whole track's kick sits a sixteenth off it, so the drums read `x...x...x...x...`.
 - Decode: Full keeps writing a pad that fades out to the very end of a track, and a quiet pad that fades in before it is heard.
 - Decode: Full keeps writing a pad that fades out after the drums stop, and a quiet outro that holds one note, instead of ending in silence.

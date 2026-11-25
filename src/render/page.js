@@ -191,7 +191,9 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
         // the phase vocoder (stretch) stays silent for a sound that starts in the first tenth of a second of a render: a
         // voice line on bar 0 (the voice opening, voice-instrument) starts that much later, where it is heard
         const at = v.stretch !== undefined && t - from < STRETCH_LEAD ? from + STRETCH_LEAD : t;
-        const ok = await Promise.race([superdough(v, at - from, d, T.cps(b), at - from).then(() => true), new Promise(r => setTimeout(() => r(false), SOUND_WAIT))]);
+        // (the fifth argument is the note's cycle, as the live player passes hap.whole.begin: superdough starts an LFO's
+        // and a tremolo's wave at cycle / cps × rate, and the render's seconds there moved each note's wave by its time)
+        const ok = await Promise.race([superdough(v, at - from, d, T.cps(b), b).then(() => true), new Promise(r => setTimeout(() => r(false), SOUND_WAIT))]);
         if (!ok) { const id = `${v.bank ? `${v.bank}_` : ''}${v.s}${v.n !== undefined ? `:${v.n}` : ''}`; if (!skipped.has(id)) { skipped.add(id); console.warn(`[render] sound ${id} did not load, skipped`); } }
       } catch (e) { console.warn('[render]', e); }
       // onsets once: the lead in of a block belongs to the block before
