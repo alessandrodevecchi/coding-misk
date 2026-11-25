@@ -70,6 +70,8 @@ An engine answers with one JSON object: `note` (required, first: empty when the 
 - **Vague requests.** A request that names no command word, instrument, playing track or saved pattern is shown as a proposal before anything applies.
 - **The pattern the request names.** A `pattern` command is kept when at least 60 % of its name's words appear in the request. Otherwise the app uses the saved pattern the request itself names (in quotes, after or before "pattern", or every word of a name), rejects the request's name when no saved pattern matches it, or shows the answer as a proposal.
 - **The command the request names.** When the request uses a word that belongs to exactly one command and the answer has neither that command nor a close one, or the request names a saved pattern in full and the answer has no pattern, the answer is shown as a proposal.
+- **A "cannot" answer to a named command.** When an engine answers no commands but the request is not vague and its words name exactly one command that takes no arguments, that command is shown as a proposal instead of the note.
+- **The drop.** A request that only asks for the drop ("go to the drop", "skip to the drop", "drop", "vai al drop", "salta al drop", "al drop") becomes `drop` without asking an engine.
 - **Spoken lines.** A request to say, speak or announce a line, with the line after a colon or in quotes, becomes `say-live` with that line without asking an engine.
 
 ## Tools

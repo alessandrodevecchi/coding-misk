@@ -2,8 +2,9 @@
 // loads (canned answers per request, a call counter, a slow answer to cancel): the row at the top of the console, a
 // precise request applied through the queue, a struck command with its reason, "cannot" answered without the model, a
 // vague request shown as a proposal and applied on Apply, Ask before applying from the menu with Dismiss, an answer
-// that is not understood, an unknown saved pattern, Cancel while waiting, What is sent, the Italian hint, Settings → AI,
-// one line at 400 px, no page errors.
+// that is not understood, an unknown saved pattern, a "cannot" answer to "go to the drop part" shown as a proposal of Drop,
+// "go to the drop" and "vai al drop" answered Drop without the model,
+// Cancel while waiting, What is sent, the Italian hint, Settings → AI, one line at 400 px, no page errors.
 // Usage: PLAYWRIGHT_CORE=... [PORT=5173] node tools/check-ai.cjs [shots-dir]   (dev server on PORT, default 5173)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const fs = require('node:fs'), path = require('node:path');
@@ -23,6 +24,8 @@ const FAKE = () => {
     'make it dirtier': '{"note":"","commands":[{"kind":"dirtier"}]}',
     'garbage please darker': 'this is not json',
     'add my saved pattern Sunset Lead': '{"note":"","commands":[{"kind":"pattern","name":"Sunset Lead"}]}',
+    'go to the drop part': '{"note":"The console cannot change the tempo.","commands":[]}',
+    'go to the drop': '{"note":"","commands":[{"kind":"more","part":"pad"},{"kind":"brighter"}]}',
   };
   globalThis.__aiCalls = 0;
   const session = initial => ({
@@ -119,6 +122,19 @@ const FAKE = () => {
   check(/not understood/.test(a) && !!(await page.$('#radio-steer [data-ask-retry]')), 'an answer that is not JSON says so, with Retry', a.replace(/\n/g, ' '));
   a = await ask('add my saved pattern Sunset Lead');
   check(/no saved pattern called “Sunset Lead”/.test(a), 'an unknown saved pattern is refused by name', a.replace(/\n/g, ' '));
+  // a "cannot" answer to a request that names one command (probe v4): a proposal of that command, not the note
+  const q3 = await queue();
+  a = await ask('go to the drop part');
+  check(/may not match/.test(a) && !/tempo/.test(a) && !!(await page.$('#radio-steer .ask-chip')) && (await queue()) === q3, 'a "cannot" answer to "go to the drop part" becomes a proposal of Drop', a.replace(/\n/g, ' '));
+  if (shots) await (await page.$('#radio-steer .ask-row')).screenshot({ path: path.join(shots, 'ai-cannot-drop.png') });
+  await page.click('#radio-steer [data-ask-dismiss]'); await sleep(200);
+  // a request for the drop (#25): Drop without the model (the fake model would answer "+ Pad, Brighter"), applied or
+  // struck with "there is no drop in the rest of the song"
+  for (const q of ['go to the drop', 'vai al drop']) {
+    const n0 = await calls();
+    a = await ask(q);
+    check((await calls()) === n0 && /drop/i.test(a) && !/pad|brighter/i.test(a) && !!(await page.$('#radio-steer .ask-chip')), `"${q}" is Drop without the model`, a.replace(/\n/g, ' '));
+  }
   await page.evaluate(() => { globalThis.codingMiskRadio.ask.send('slow request darker'); });
   await until(() => page.evaluate(() => globalThis.codingMiskRadio.ask.busy), 3000);
   await page.click('#radio-steer [data-ask-menu]');

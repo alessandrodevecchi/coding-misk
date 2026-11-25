@@ -4,7 +4,9 @@
 // requests) and the validator on fixture answers with a fake console (good, partly wrong, unknown kinds, bad tracks,
 // values out of range, invalid JSON, a disabled command, apply through the buttons' paths in order), and the checks after
 // the engine (D4 checks 4 to 6) on the three probe v3 failures with the model's answers from its log, plus the v3 answers
-// that were right (none may turn into a proposal).
+// that were right (none may turn into a proposal); check 7 on the v4 "cannot" answer to "go to the drop" (now asked as "go to the drop part"),
+// with the "cannot" answers that stay and the v4 answers that were right; check 8: requests for the drop answered Drop
+// without the engine (#25), struck with no drop left, and the requests that still reach the engine.
 //   npm run check:ai
 import { ENTRIES, matchPattern, precheck, readAnswer, applyItems, reviewAnswer, directAnswer } from '../src/ai/commands.js';
 import { answerSchema, systemPrompt, initialPrompts, requestText, promptSize, fitPrompt } from '../src/ai/generate.js';
@@ -124,9 +126,11 @@ const flow = (q, json, c = ctx) => {
   calls.length = 0;
   const pre = precheck(q, c);
   if (pre.cannot) return { mode: 'cannot', calls: [], items: [] };
-  if (pre.say) { const r = readAnswer(directAnswer(q), c); applyItems(r.items, api); return { mode: 'direct', calls: [...calls], items: r.items }; }
+  if (pre.say || pre.direct) { const r = readAnswer(directAnswer(q), c); applyItems(r.items, api); return { mode: 'direct', calls: [...calls], items: r.items }; }
+  if (json === 'no-engine') throw new Error(`flow: "${q}" asked the engine`);
   const rv = reviewAnswer(q, json, c), r = readAnswer(rv.json, c);
-  if (pre.vague || rv.check) return { mode: 'ask', check: rv.check, calls: [], items: r.items };
+  if (r.cannot) return { mode: 'model-cannot', note: r.note, calls: [], items: [] };
+  if (pre.vague || rv.check) return { mode: 'ask', check: rv.check, note: r.note, calls: [], items: r.items };
   applyItems(r.items, api);
   return { mode: 'now', calls: [...calls], items: r.items };
 };
@@ -186,7 +190,6 @@ for (const [q, json, want] of [
   ['swap the lead for something else', { note: '', commands: [{ kind: 'swap', type: 'lead' }] }, [['command', 'swap']]],
   ['remove the hats', { note: '', commands: [{ kind: 'mute', track: 'hats' }] }, [['command', 'mute']]],
   ['change the bass line', { note: '', commands: [{ kind: 'vary', type: 'bass' }] }, [['command', 'vary']]],
-  ['vai al drop', { note: '', commands: [{ kind: 'drop' }] }, []], // applied at once, struck by the console's reason (no-drop)
 ]) {
   const f = flow(q, json);
   expect(f.mode === 'now' && same(f.calls, want), `"${q}": ${f.mode}${f.check ? ` (${f.check})` : ''} ${JSON.stringify(f.calls)} instead of applied ${JSON.stringify(want)}`);
@@ -196,6 +199,87 @@ for (const [q, json] of [['più energia e togli un basso', { note: '', commands:
   expect(f.mode === 'ask' && !f.check && f.items.every(x => x.cmd), `Italian "${q}": ${f.mode} ${f.check || ''}`);
 }
 
+// ---------- check 7: a "cannot" answer to a request that names one command (probe v4) ----------
+{ // v4 00:47:37 "go to the drop" -> {"note":"The console cannot change the tempo.","commands":[]}
+  const v4 = { note: 'The console cannot change the tempo.', commands: [] };
+  // (since check 8 "go to the drop" itself never reaches the engine: a request with one word more does)
+  const f = flow('go to the drop part', v4, { ...ctx, why: () => null });
+  expect(f.mode === 'ask' && f.check === 'cannot' && !f.note && f.items.length === 1 && f.items[0].kind === 'drop' && f.items[0].cmd && !f.items[0].why, `"go to the drop part" answered "cannot": ${f.mode} ${f.check || ''} ${JSON.stringify(f.items.map(x => x.kind))} note "${f.note || ''}"`);
+  // the console's own reason still strikes the proposed chip (drop disabled in this fake console)
+  const g = flow('go to the drop part', v4);
+  expect(g.mode === 'ask' && g.items[0].why === 'no-drop', `"go to the drop part" proposed while the drop is disabled: ${g.mode} ${g.items[0] && g.items[0].why}`);
+  expect(reviewAnswer('go to the drop', v4, ctx).json !== v4 && v4.commands.length === 0, 'the model answer is changed in place');
+  for (const [q, c] of [['jump to the drop section now', 'drop'], ['end the song', 'end'], ['change the chords', 'progression'], ['make it darker', 'darker'], ['talk less please', 'talk-less']]) {
+    const h = flow(q, { note: 'The console cannot do that.', commands: [] }, { ...ctx, why: () => null });
+    expect(h.mode === 'ask' && h.check === 'cannot' && h.items.length === 1 && h.items[0].kind === c, `"${q}" answered "cannot": ${h.mode} ${JSON.stringify(h.items.map(x => x.kind))} instead of a proposal of ${c}`);
+  }
+}
+// the "cannot" stays: vague requests (v4 log), two commands named, a command that needs an argument, the list before the
+// engine, Italian (no English command words), a request that names no command
+for (const [q, json, want] of [
+  ['it feels too busy', { note: 'The console cannot directly influence the overall perceived volume or energy of the song.', commands: [] }, 'model-cannot'],
+  ['give it some air', { note: 'Adding air to the existing sound is not possible.', commands: [] }, 'model-cannot'],
+  ['make it darker and go to the drop', { note: 'no', commands: [] }, 'model-cannot'],
+  ['drop one bass', { note: 'no', commands: [] }, 'model-cannot'],
+  ['mute the hats', { note: 'no', commands: [] }, 'model-cannot'],
+  ['add another bass', { note: 'no', commands: [] }, 'model-cannot'],
+  ['new notes for the bass', { note: 'no', commands: [] }, 'model-cannot'],
+  ['play Glass Arp', { note: 'no', commands: [] }, 'model-cannot'],
+  ['rendilo più scuro', { note: 'no', commands: [] }, 'model-cannot'],
+  ['change the tempo to 140 bpm', { note: 'x', commands: [{ kind: 'drop' }] }, 'cannot'],
+  ['play the whole song backwards', { note: 'x', commands: [{ kind: 'drop' }] }, 'cannot'],
+  ['go faster to the drop', { note: 'x', commands: [{ kind: 'drop' }] }, 'cannot'],
+]) {
+  const f = flow(q, json);
+  expect(f.mode === want, `"${q}" answered "cannot": ${f.mode}${f.check ? ` (${f.check})` : ''} instead of ${want}`);
+}
+// no regression: the v4 answers that were right stay applied at once, with no proposal
+for (const [q, json, want] of [
+  ['more energy', { note: '', commands: [{ kind: 'energy-up' }] }, [['command', 'energy-up']]],
+  ['add another bass', { note: '', commands: [{ kind: 'more', part: 'bass' }] }, [['pend', 'more', 'bass']]],
+  ['make it darker', { note: '', commands: [{ kind: 'darker' }] }, [['command', 'darker']]],
+  ['more reverb and delay please', { note: '', commands: [{ kind: 'more-space' }] }, [['command', 'more-space']]],
+  ['I want a dirtier sound', { note: '', commands: [{ kind: 'dirtier' }] }, [['command', 'dirtier']]],
+  ['end the song', { note: 'End of the song.', commands: [{ kind: 'end' }] }, [['command', 'end']]],
+  ['change the chords', { note: '', commands: [{ kind: 'progression' }] }, [['command', 'progression']]],
+  ['move the key up a fifth', { note: '', commands: [{ kind: 'key', to: 'up' }] }, [['command', 'key']]],
+  ['new notes for the bass', { note: 'Adding new notes for the bass', commands: [{ kind: 'vary', type: 'bass' }] }, [['command', 'vary']]],
+  ['mute the hats', { note: '', commands: [{ kind: 'mute', track: 'hats' }] }, [['command', 'mute']]],
+  ['lock the kick so the director leaves it alone', { note: '', commands: [{ kind: 'lock-part', part: 'kick' }] }, []], // kick already locked in this fake console: struck, not a proposal
+  ['talk less please', { note: '', commands: [{ kind: 'talk-less' }] }, [['command', 'talk-less']]],
+  ['more energy and add a second arp', { note: '', commands: [{ kind: 'energy-up' }, { kind: 'more', part: 'arp' }] }, [['command', 'energy-up'], ['pend', 'more', 'arp']]],
+  ['play Glass Arp', { note: '', commands: [{ kind: 'pattern', name: 'Glass Arp' }] }, [['pattern', 'new', 'Glass Arp', '']]],
+  ['add my saved pattern Midnight Groove', { note: '', commands: [{ kind: 'pattern', name: 'Midnight Groove', track: 'bass' }] }, [['pattern', 'replace', 'Midnight Groove', 'bass']]],
+]) {
+  const f = flow(q, json, { ...ctx, why: c => (c.kind === 'less' && c.part === 'guitar' ? 'not-playing' : null) });
+  expect(f.mode === 'now' && same(f.calls, want), `v4 "${q}": ${f.mode}${f.check ? ` (${f.check})` : ''} ${JSON.stringify(f.calls)} instead of applied ${JSON.stringify(want)}`);
+}
+
+// ---------- check 8: a request for the drop is Drop without the engine (#25) ----------
+// in one test "go to the drop" came back as "+ Pad, Brighter": the drop phrases never reach the engine
+for (const q of ['go to the drop', 'Go to the drop!', 'GO TO THE DROP', 'drop', 'the drop', 'Drop!', 'skip to the drop', 'jump to the drop', 'jump straight to the drop please', 'take me to the drop', "let's go to the drop", 'go to the drop now', 'go to the dorp', 'go to the drip', 'vai al drop', 'Vai al drop!', 'salta al drop', 'al drop', 'vai subito al drop', 'dai, salta al drop', 'portaci al drop per favore']) {
+  const pre = precheck(q, ctx);
+  expect(pre.direct === 'drop' && pre.vague === false && !pre.cannot, `"${q}" is not a direct drop request (${JSON.stringify(pre)})`);
+  const d = directAnswer(q);
+  expect(d && same(d.commands, [{ kind: 'drop' }]), `"${q}": the direct answer is ${JSON.stringify(d)}`);
+  // the same command the model's right answer gives: applied through the button's path when a drop is ahead
+  const f = flow(q, 'no-engine', { ...ctx, why: () => null });
+  expect(f.mode === 'direct' && same(f.calls, [['command', 'drop']]) && f.items[0].cmd && f.items[0].cmd.kind === 'drop', `"${q}" with a drop ahead: ${f.mode} ${JSON.stringify(f.calls)}`);
+  // no drop in the rest of the song: the console's own reason (steerWhy:no-drop), nothing applied
+  const g = flow(q, 'no-engine');
+  expect(g.mode === 'direct' && !g.calls.length && g.items[0].why === 'no-drop', `"${q}" with no drop ahead: ${g.mode} ${JSON.stringify(g.calls)} ${g.items[0] && g.items[0].why}`);
+}
+{ // the old "+ Pad, Brighter" answer to "go to the drop" is never read: the engine is not asked
+  const f = flow('go to the drop', { note: '', commands: [{ kind: 'more', part: 'pad' }, { kind: 'brighter' }] }, { ...ctx, why: () => null });
+  expect(f.mode === 'direct' && same(f.calls, [['command', 'drop']]), `"go to the drop" answered "+ Pad, Brighter": ${f.mode} ${JSON.stringify(f.calls)}`);
+}
+// not a request for the drop alone: the engine (or the other guards) decide
+for (const q of ['drop the bass', 'drop one bass', 'drop it', 'make it darker and go to the drop', 'go to the drop part', 'go faster to the drop', 'drip', 'dorp', 'stop', 'say: go to the drop', 'what is a drop', 'no drop please']) {
+  expect(!precheck(q, ctx).direct && !(directAnswer(q) && directAnswer(q).commands[0].kind === 'drop'), `"${q}" is taken as a direct drop request`);
+}
+expect(precheck('go faster to the drop', ctx).cannot, '"go faster to the drop" is no longer answered "cannot" before the engine');
+expect(same(directAnswer('say: go to the drop').commands, [{ kind: 'say-live', text: 'go to the drop' }]), 'a spoken line about the drop is not a spoken line');
+
 for (const p of problems) console.log(`FAIL  ${p}`);
-console.log(problems.length ? `${problems.length} problems` : `ok    ai: prompt ${size} tokens with 8 tracks, schema, pattern names, cannot, vague, validator and apply, checks after the engine`);
+console.log(problems.length ? `${problems.length} problems` : `ok    ai: prompt ${size} tokens with 8 tracks, schema, pattern names, cannot, vague, validator and apply, checks after the engine, the cannot guard, the direct drop`);
 process.exit(problems.length ? 1 : 0);

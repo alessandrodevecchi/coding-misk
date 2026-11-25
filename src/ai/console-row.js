@@ -78,8 +78,8 @@ export function createAskRow({ t, esc, store, getLang, openSettings = () => {}, 
     proposal = null;
     const ctx = radio.ctx(), pre = precheck(text, ctx);
     if (pre.cannot) { last = `<span class="ask-note">${esc(t('aiCannot', { note: pre.cannot }))}</span>`; return paint(); }
-    // a spoken line after a colon or in quotes: the app's own answer, no engine (D4 check 6)
-    if (pre.say) {
+    // a spoken line after a colon or in quotes, or a request for the drop: the app's own answer, no engine (D4 checks 6, 8)
+    if (pre.say || pre.direct) {
       const json = directAnswer(text), r = readAnswer(json, ctx);
       lastSent = '';
       if (settings().apply === 'ask') { proposal = { json, flag: null }; showResult(r, 'ask', null); return; }
