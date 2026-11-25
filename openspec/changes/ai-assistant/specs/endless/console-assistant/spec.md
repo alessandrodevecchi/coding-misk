@@ -111,9 +111,14 @@ After the engine answers, the app SHALL check the answer against the request tex
 - **WHEN** the listener types "add a spoken line: welcome to the night shift"
 - **THEN** the console queues the line "welcome to the night shift" with Say now, without asking the engine, also when the line holds a word like "faster"
 
+#### Scenario: A request for the drop
+
+- **WHEN** the listener types "go to the drop", "skip to the drop", "drop", "vai al drop", "salta al drop" or "al drop", in any case and with punctuation
+- **THEN** the console gives Go to the drop without asking the engine, the same command as its buttons, and when no drop is left in the song the chip is struck with "there is no drop in the rest of the song"
+
 #### Scenario: A "cannot" answer to a request that names one command
 
-- **WHEN** the listener types "go to the drop" and the engine answers no commands with the note "The console cannot change the tempo."
+- **WHEN** the listener types "go to the drop part" and the engine answers no commands with the note "The console cannot change the tempo."
 - **THEN** the answer row shows a proposal with Drop and the line that the answer may not match the request, without the engine's note, and nothing is queued until Apply, also in "Apply at once"
 
 #### Scenario: A "cannot" answer to a request that names several commands or a command with arguments

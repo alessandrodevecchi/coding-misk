@@ -258,6 +258,7 @@ export function precheck(request, ctx = {}) {
   const raw = String(request ?? '').toLowerCase(), text = norm(request);
   const say = sayText(request);
   if (say) return { vague: false, say };
+  if (dropRequest(request)) return { vague: false, direct: 'drop' };
   for (const c of CANNOT) if (c.re.test(raw)) return { cannot: c.note, id: c.id };
   const words = ENTRIES.flatMap(e => e.words).concat(INSTRUMENT_WORDS);
   if (words.some(w => has(text, w))) return { vague: false };
@@ -282,10 +283,29 @@ export function sayText(request) {
   const text = (q && (!c || q.index < c.index) ? q[1] : c ? c[1] : '').trim().replace(/^["“«]+|["”»]+$/g, '').trim();
   return text || null;
 }
+// D4 check 8 (#25): a request that only asks for the drop ("go to the drop", "skip to the drop", "drop", "vai al drop",
+// "salta al drop", "al drop") is Drop without the engine: case, accents, punctuation, a polite or "now" word around
+// it and one typo in "drop" after a lead-in (one letter, or two neighbours swapped) are tolerated; anything more ("drop the bass") goes to the engine
+const DROP_FILL = new Set(['please', 'pls', 'now', 'ok', 'okay', 'right', 'lets', 'let', 's', 'us', 'just', 'straight', 'directly', 'immediately', 'dai', 'ora', 'adesso', 'subito', 'direttamente', 'per', 'favore', 'perfavore', 'grazie', 'andiamo']);
+const DROP_LEAD = /^(?:(?:go|jump|skip|cut|move|get|head|fast forward|take me|take us|bring me|bring us|bring it)(?: right| straight)? (?:to|into)|to|(?:vai|va|salta|passa|andiamo|portaci|porta|portami|vamos)(?: subito| direttamente)? (?:al|nel|sul)|al)$/;
+export function dropRequest(request) {
+  const w = norm(request).split(' ').filter(Boolean);
+  while (w.length && DROP_FILL.has(w[0])) w.shift();
+  while (w.length && DROP_FILL.has(w[w.length - 1])) w.pop();
+  if (!w.length) return false;
+  const last = w.pop();
+  if (w.length && ['the', 'il'].includes(w[w.length - 1])) w.pop();
+  const lead = w.join(' ');
+  if (lead && !DROP_LEAD.test(lead)) return false;
+  return last === 'drop' || (!!lead && last.length >= 3 && (lev(last, 'drop') <= 1 || swapped(last, 'drop')));
+}
+// one pair of neighbouring letters swapped ("dorp")
+const swapped = (a, b) => a.length === b.length && [...a].some((_, i) => i < a.length - 1 && a.slice(0, i) + a[i + 1] + a[i] + a.slice(i + 2) === b);
 // the answer the app gives without the engine, or null
 export function directAnswer(request) {
   const text = sayText(request);
-  return text ? { note: '', commands: [{ kind: 'say-live', text }] } : null;
+  if (text) return { note: '', commands: [{ kind: 'say-live', text }] };
+  return dropRequest(request) ? { note: '', commands: [{ kind: 'drop' }] } : null;
 }
 
 // a word of the request against a word of a name: the per-word score of guard 1 (prefixes count)

@@ -660,10 +660,10 @@ async function runRadioV3() {
     const pre = Reg.precheck(req.q, ctx);
     let row;
     if (pre.cannot) row = { q: req.q, cat: req.cat, expected: req.exp, guard: 'cannot', note: pre.cannot, ms: 0, validJson: true, applied: [], app: 'cannot', ...score({ commands: [] }, req.exp) };
-    else if (pre.say) {
+    else if (pre.say || pre.direct) {
       const json = Reg.directAnswer(req.q), read = Reg.readAnswer(json, ctx), app = applied(read);
       const rejected = read.items.filter(it => it.error).map(it => `${it.kind}: ${it.error} ${JSON.stringify(it.vars || {})}`);
-      row = { q: req.q, cat: req.cat, expected: req.exp, guard: 'say', json, ms: 0, validJson: true, note: '', rejected, applied: app, app: appOutcome(pre, null, read), ...score({ commands: app }, req.exp) };
+      row = { q: req.q, cat: req.cat, expected: req.exp, guard: pre.say ? 'say' : pre.direct, json, ms: 0, validJson: true, note: '', rejected, applied: app, app: appOutcome(pre, null, read), ...score({ commands: app }, req.exp) };
     } else {
       const cl = await timed(() => base.clone());
       const sess = cl.ok ? cl.value : (await create({ initialPrompts: initial }, 'radio')).s;
