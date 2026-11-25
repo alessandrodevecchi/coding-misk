@@ -14,6 +14,7 @@ import { energyOf } from './energy.js';
 import { stream } from './random.js';
 import { memoOn, baseId, contextVersion, caches, keep, work, timed } from './steer-memo.js';
 import { stateAt, buildSteps } from '../song/build.js';
+import { sameDevice, deviceRef } from '../song/movement.js';
 import { waypointPath, choose } from '../song/coder.js';
 import { topTokens } from '../song/ideas.js';
 import { presetIdea, meterSteps } from '../music.js';
@@ -322,8 +323,8 @@ function transitSongNow(prev, W, Wprev, B, off, o) {
       for (const k of (s.hidden || []).filter(k => !(dt.hidden || []).includes(k))) units.push({ kind: 'reveal', device: k, dir: 1, step: { reveal: { track: id, keys: k } } });
       const off2 = (s.commented || []).filter(k => !(dt.commented || []).includes(k));
       if (off2.length) units.push({ kind: 'comment', dir: 1, step: { comment: { track: id, keys: off2, on: false } } });
-      for (const dev of (s.rack || []).filter(x => !(dt.rack || []).some(y => y.device === x.device))) units.push({ kind: 'unrack', device: dev.device, step: { unrack: { track: id, device: dev.device } } });
-      for (const dev of (dt.rack || []).filter(x => !same((s.rack || []).find(y => y.device === x.device), x))) units.push({ kind: 'device', device: dev.device, step: { rack: { track: id, ...clone(dev) } } });
+      for (const dev of (s.rack || []).filter(x => !(dt.rack || []).some(y => sameDevice(y, x)))) units.push({ kind: 'unrack', device: dev.device, step: { unrack: { track: id, ...deviceRef(dev) } } });
+      for (const dev of (dt.rack || []).filter(x => !same((s.rack || []).find(y => sameDevice(y, x)), x))) units.push({ kind: 'device', device: dev.device, step: { rack: { track: id, ...clone(dev) } } });
       if ((s.variant ?? null) !== (dt.variant ?? null)) units.push({ kind: 'variant', step: { variant: { track: id, use: Number.isInteger(dt.variant) ? dt.variant : null } } });
       // the pattern: a growth level on its way down, or the notes a few at a time
       const pat = [], knob = [];
@@ -417,8 +418,8 @@ function transitSongNow(prev, W, Wprev, B, off, o) {
       if (s.alone && !w.alone) step.unsolo = t.id;
       if (s.maskIdea && !w.maskIdea) step.mask = { track: t.id, mask: null };
       if ((s.variant ?? null) !== (w.variant ?? null)) step.variant = { track: t.id, use: Number.isInteger(w.variant) ? w.variant : null };
-      for (const dev of (s.rack || []).filter(x => !(w.rack || []).some(y => y.device === x.device))) fix.push({ at: E, unrack: { track: t.id, device: dev.device } });
-      for (const dev of (w.rack || []).filter(x => !same((s.rack || []).find(y => y.device === x.device), x))) fix.push({ at: E, rack: { track: t.id, ...clone(dev) } });
+      for (const dev of (s.rack || []).filter(x => !(w.rack || []).some(y => sameDevice(y, x)))) fix.push({ at: E, unrack: { track: t.id, ...deviceRef(dev) } });
+      for (const dev of (w.rack || []).filter(x => !same((s.rack || []).find(y => sameDevice(y, x)), x))) fix.push({ at: E, rack: { track: t.id, ...clone(dev) } });
     }
     if ((s.clips || []).some((c, j) => c.start + c.bars > E && c.pattern !== (t.clips[j] || {}).pattern)) step.pattern = { track: t.id, level: 0 };
     if (s.hush && plays && !(w && w.hush)) step.unmute = t.id;

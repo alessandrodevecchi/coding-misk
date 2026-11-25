@@ -83,6 +83,12 @@ export const MOVE_DEVICES = {
 };
 export const isMove = d => !!(d && MOVE_DEVICES[d.device]);
 const argsOf = d => Object.fromEntries(MOVE_DEVICES[d.device].args.map(([k, , def]) => [k, d[k] ?? def]));
+// a device's identity on a track: its kind, and for a movement device also its target (pump and gate: one a track), so
+// a path on the volume and a path on the filter are two devices (build steps, steering, waypoints, the validator)
+export const moveKey = d => (d.device === 'pump' || d.device === 'gate' ? d.device : `${d.device}|${argsOf(d).target}`);
+export const sameDevice = (a, b) => !!a && !!b && a.device === b.device && (!isMove(a) || moveKey(a) === moveKey(b));
+// what an unrack step names to remove one device: its kind, with the target for a movement device that has one
+export const deviceRef = d => (isMove(d) && moveKey(d) !== d.device ? { device: d.device, target: argsOf(d).target } : { device: d.device });
 // the movement devices of a rack that play, in rack order, with their values
 export const movesOf = rack => (Array.isArray(rack) ? rack : []).filter(d => isMove(d) && d.on !== false).map(d => ({ device: d.device, ...argsOf(d) }));
 
@@ -467,7 +473,7 @@ export function checkMoves(rack, p, err, warn, type = null, settings = {}) {
   moves.forEach(([, i], k) => { if (k >= MOVE_MAX) err(`${p}[${i}]`, `at most ${MOVE_MAX} movement devices (${MOVE_NAMES}) on a track`); });
   const seen = new Set();
   for (const [d, i] of moves) {
-    const a = argsOf(d), key = d.device === 'pump' || d.device === 'gate' ? d.device : `${d.device}|${a.target}`;
+    const a = argsOf(d), key = moveKey(d);
     if (seen.has(key)) err(`${p}[${i}]`, d.device === 'pump' || d.device === 'gate' ? `at most one ${d.device} on a track` : `at most one ${d.device} on ${a.target}`);
     if ((d.device === 'gate' && seen.has('pump')) || (d.device === 'pump' && seen.has('gate'))) err(`${p}[${i}]`, 'a gate and a pump both dip the gain: use one of them on a track');
     seen.add(key);

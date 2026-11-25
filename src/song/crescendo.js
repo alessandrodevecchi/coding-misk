@@ -9,6 +9,7 @@ import { PROGS, DEFAULT, presetIdea, meterSteps } from '../music.js';
 import { ideaLadder, expandIdea, ideaRows } from './ideas.js';
 import { coderPath } from './coder.js';
 import { stateAt, applyStep } from './build.js';
+import { deviceRef } from './movement.js';
 import { resolveShape, resolveLead, resolveKick, kickStartHits, KICK_LED, shapeFacts, canPlay, openingLine, SHAPES_VERSION, SHAPES_SEED, DEFAULT_WEIGHTS, RECIPE_KEYS, DEVELOPMENTS, PACES, DETAIL_VARIANTS } from './shapes.js';
 import { placeSpoken } from './spoken.js';
 import { liveCode } from '../live/live-code.js';
@@ -317,7 +318,7 @@ function trackPlan(t, d, rng, clipKeys, rules = {}, ctx = {}) {
   // rack devices come in one at a time, in their written order (only a tail of the chain, so the order stays)
   const grow = d >= 2 ? rack.length : d === 1 ? Math.min(1, rack.length) : 0;
   const devs = rack.slice(rack.length - grow);
-  devs.forEach(dev => plan.setup.unshift({ unrack: { track: t.id, device: dev.device } }));
+  devs.forEach(dev => plan.setup.unshift({ unrack: { track: t.id, ...deviceRef(dev) } }));
   const devUnits = devs.map(dev => ({ kind: 'device', device: dev.device, step: { rack: { track: t.id, ...clone(dev) } } }));
   // colour queue: knobs and devices interleaved, each keeping its own order
   const lanes = [...knobs, ...(devUnits.length ? [devUnits] : [])];
