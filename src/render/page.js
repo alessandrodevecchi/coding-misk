@@ -10,6 +10,7 @@
 // Decode tab does, mix: { orig, code, mutes } the original's gain, the code's bus gain and the orbits of the muted code tracks }
 import { repl, register as strudelRegister, Pattern, noteToMidi } from '@strudel/core';
 import { transpiler } from '@strudel/transpiler';
+import { guardDuck } from '../sounds/duck-guard.js';
 import { samples, superdough, setAudioContext, setSuperdoughAudioController, getSuperdoughAudioController, initAudio, registerSound, soundMap } from '@strudel/webaudio';
 import { guardDecode, guardSounds, createRegister } from '../sounds/sound-guard.js';
 import soundfonts from '@strudel/soundfonts/package.json';
@@ -81,6 +82,7 @@ async function render({ segments, bpm, from = 0, to = null, tail = 3, keepFrom =
   setAudioContext(ctx);
   // a new controller made on first use, from the same superdough copy (a separate import is a separate copy)
   setSuperdoughAudioController(null);
+  guardDuck(getSuperdoughAudioController(), { offline: true });
   // the code tracks a decoded export mutes: their orbit's output starts at zero, as the Decode tab's mute and solo set it
   const muted = new Set(mix && mix.mutes || []);
   if (muted.size) { const C = getSuperdoughAudioController(), make = C.getOrbit.bind(C); C.getOrbit = (n, ch) => { const had = C.nodes[n] != null, o = make(n, ch); if (!had && muted.has(n)) o.output.gain.value = 0; return o; }; }

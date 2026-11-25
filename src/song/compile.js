@@ -4,6 +4,8 @@ import { sceneLayers, sectionLane, uniqueNames, sectionInfo, songHeader, rle, OR
 import { t } from '../i18n.js';
 import { normalizeSong, clipState } from './format.js';
 import { rackCode } from './rack.js';
+import { movesOf, moveFor, applyMove, duckCode, MOVE_TYPES } from './movement.js';
+import { meterSteps } from '../music.js';
 import { isSharedName } from './ideas.js';
 import { placeSpoken, spokenCode, SPOKEN_ORBIT } from './spoken.js';
 
@@ -69,19 +71,28 @@ export function compileSong(input) {
   const solo = song.tracks.some(tr => tr.solo);
   // voice instrument (voice-instrument): the lines of the spoken tracks, placed once for the whole song
   const spoken = song.tracks.some(tr => tr.type === 'spoken') ? placeSpoken(input) : [];
-  for (const tr of song.tracks) {
-    // the bus is chosen before skipping muted tracks, so a track that comes in later (live build) does not move the others
-    // (spoken tracks have their own orbits, 13 and 14: they take no bus from the others)
-    const orbit = tr.type === 'spoken' ? null : !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : nextBus();
-    used.add(tr.type);
+  // the bus is chosen before skipping muted tracks, so a track that comes in later (live build) does not move the others
+  // (spoken tracks have their own orbits, 13 and 14: they take no bus from the others)
+  const orbits = song.tracks.map(tr => { const o = tr.type === 'spoken' ? null : !used.has(tr.type) && ORBIT_OF[tr.type] ? ORBIT_OF[tr.type] : nextBus(); used.add(tr.type); return o; });
+  const plays = tr => !(tr.mute || (solo && !tr.solo) || tr.type === 'voice');
+  const pieces = (tr, i) => tr.clips.some(c => c.start < secs[i].start + secs[i].bars && c.start + c.bars > secs[i].start);
+  // movement devices (sound-modulation D6): per section, the pumped tracks that play in it and whether a kick plays
+  const pumped = song.tracks.map((tr, k) => [tr, k]).filter(([tr]) => plays(tr) && MOVE_TYPES.includes(tr.type) && movesOf(tr.rack).some(m => m.device === 'pump'));
+  const kickIn = pumped.length ? secs.map((sec, i) => song.tracks.some(tr => tr.type === 'drums' && plays(tr) && tr.clips.some(clip => {
+    const a = Math.max(clip.start, sec.start), b = Math.min(clip.start + clip.bars, sec.start + sec.bars);
+    return a < b && sceneLayers(clipState(sec, tr, clip), { start: a, bars: b - a, only: 'drums' }).some(l => /^\$:/.test(l) && l.includes('.analyze("kick")'));
+  }))) : [];
+  const pumpsIn = secs.map((_, i) => pumped.filter(([tr]) => pieces(tr, i)).map(([tr, k]) => { const m = movesOf(tr.rack).find(x => x.device === 'pump'); return { orbit: orbits[k], depth: m.depth, recover: m.recover }; }));
+  song.tracks.forEach((tr, ti) => {
+    const orbit = orbits[ti];
     // voice tracks speak the live build comments: their code comes from the build (build.js), not from clips
-    if (tr.mute || (solo && !tr.solo) || tr.type === 'voice') continue;
+    if (!plays(tr)) return;
     const first = L.length;
     L.push('', `// ========== ${[...new Set([tr.name || tr.id, tr.type])].join(' · ')} ==========`);
     if (tr.type === 'spoken') {
       L.push(...spokenCode(spoken.filter(p => p.track === tr.id), total));
       if (tr.hush || tr.alone || tr.maskIdea) L.splice(first, L.length - first, ...lineMarks(L.slice(first), tr));
-      continue;
+      return;
     }
     const rack = rackCode(tr.rack, tr.type);
     let described = null;
@@ -103,11 +114,15 @@ export function compileSong(input) {
           L.push(`const ${gate} = "${rle(v.map(String))}"`);
         }
         L.push(`// ${names[i]} · ${t('cBars', { from: a + 1, to: b })} · ${t('cPattern', { p: clip.pattern })}`);
-        const opts = { start: a, bars: b - a, gate, crash: sec.crash && a === sec.start, breath: sec.breath && b === sec.start + sec.bars, fill: sec.fill && b === sec.start + sec.bars, only: tr.type, orbit, rack, shared, variant: Number.isInteger(tr.variant) ? tr.variant : null };
-        if (tr.type === 'code') L.push(...codeLayer(tr, clip, gate, orbit, rack));
+        // movement devices (sound-modulation): their code after the other devices, base values and replaced calls after
+        const st = clipState(sec, tr, clip);
+        const mv = moveFor(tr.type, tr.rack, { st, a, b, clipStart: clip.start, clipBars: clip.bars, barSec: 15 * meterSteps(sec.meter) / (sec.bpmEnd ? (sec.bpm + sec.bpmEnd) / 2 : sec.bpm), steps: meterSteps(sec.meter), kick: !!kickIn[i], code: tr.type === 'code' ? ((tr.patterns || {})[clip.pattern] || {}).code : null });
+        const duck = tr.type === 'drums' && pumpsIn[i].length && kickIn[i] ? duckCode(pumpsIn[i]) : '';
+        const opts = { start: a, bars: b - a, gate, crash: sec.crash && a === sec.start, breath: sec.breath && b === sec.start + sec.bars, fill: sec.fill && b === sec.start + sec.bars, only: tr.type, orbit, rack: mv ? rack + mv.code : rack, shared, variant: Number.isInteger(tr.variant) ? tr.variant : null, ...(duck ? { duck } : {}) };
+        if (tr.type === 'code') L.push(...applyMove(codeLayer(tr, clip, gate, orbit, opts.rack), mv, { code: true }));
         else {
           // the instrument comment ("// Bass · Rolling") is repeated per clip only when it changes
-          const lines = sceneLayers(clipState(sec, tr, clip), opts).filter(l => l !== '');
+          const lines = applyMove(sceneLayers(st, opts).filter(l => l !== ''), mv);
           const desc = lines[0] && lines[0].startsWith('//') ? lines.shift() : null;
           if (desc && desc !== described) { L.push(desc); described = desc; }
           const hide = (tr.hidden || []).flatMap(k => HIDDEN_FNS[k] || []), off = (tr.commented || []).filter(k => !(tr.hidden || []).includes(k)).flatMap(k => HIDDEN_FNS[k] || []);
@@ -118,7 +133,7 @@ export function compileSong(input) {
       });
     }
     if (tr.hush || tr.alone || tr.maskIdea) L.splice(first, L.length - first, ...lineMarks(L.slice(first), tr));
-  }
+  });
   return L.join('\n');
 }
 

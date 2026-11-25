@@ -5,6 +5,7 @@
 // the entries from a seed, a style (`<instrument>.material.variation`) and an energy. Pure and seeded.
 import { stream } from '../endless/random.js';
 import { randomCode } from '../song/ideas.js';
+import { deviceWrites } from '../song/writes.js';
 
 // targets: the cap of the amount, and the default function (pan moves smoothly)
 export const VARY_TARGETS = {
@@ -98,8 +99,8 @@ export function varySkips(type, settings = {}, rack = []) {
   if ((s.cutoffEnd !== null && s.cutoffEnd !== undefined && s.cutoffEnd !== s.cutoff) || moving) out.lpf = 'the filter moves (cutoffEnd or a moving filter)';
   if (s.gainEnd !== null && s.gainEnd !== undefined && s.gainEnd !== s.gain) out.gain = 'the gain is automated (gainEnd)';
   // a rack device that writes the same control later on the line wins over the variation
-  const DEV = { delay: 'delay', reverb: 'room', distort: 'distort', crush: 'crush', vowel: 'vowel', hpf: 'hpf', lpf: 'lpf', pan: 'pan' };
-  for (const d of Array.isArray(rack) ? rack : []) if (d && d.on !== false && DEV[d.device] && !out[DEV[d.device]]) out[DEV[d.device]] = `a ${d.device} device writes ${DEV[d.device]} later on the line`;
+  // (each device declares the controls it writes, sound-modulation D2: a Sweep writes its target)
+  for (const d of Array.isArray(rack) ? rack : []) if (d && d.on !== false) for (const c of deviceWrites(d)) if (!out[c]) out[c] = `a ${d.device} device writes ${c} later on the line`;
   if (type === 'drums' && !(s.tone && Object.values(s.tone).some(g => g && typeof g.decay === 'number'))) out.decay = 'a drum row varies its decay only where its tone sets one';
   // (distortvol(.5) halves a line's level: a clean track, drive 0, never varies its distortion)
   if (type !== 'guitar' && !(Number(s.drive) > 0)) out.distort = out.distort || 'the track plays clean (drive 0): its distortion does not vary';

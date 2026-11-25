@@ -1,0 +1,39 @@
+// coding-misk · Example 8 · Sweep
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(124/4)
+
+const SECTIONS = [['Rise', 8], ['Open', 8]]
+const TEMPO = {'Rise': 124, 'Open': 124}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!8 0!8>"  // Rise · 8 bars · 124 BPM · A · Am Em F G
+const section2 = "<0!8 1!8>"  // Open · 8 bars · 124 BPM · A · Am F C G
+
+// ========== drums ==========
+// Open · bars 9-16 · pattern four
+// Drums · RolandTR909
+$: s("bd*4").bank("RolandTR909").gain(0.9).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("[~ hh]*4").bank("RolandTR909").gain(0.45).mask(section2).velocity(section2).orbit(1).analyze("hats")
+
+// ========== pad ==========
+// Rise · bars 1-8 · pattern hold
+// Pad · Sustained
+$: note("<[a2,c3,e3] [g2,b2,e3] [f2,a2,c3] [g2,b2,d3]>")
+  .s("supersaw").attack(.4).release(1.2)
+  .room(.4).gain(0.26).lpf("<400 533 711 949 1265 1687 2249 3000 4000!8>").env({ c: 'lpf', a: 1.935, s: 1, da: "<133 178 237 316 422 563 750 1000 0!8>" }).mask(section1).velocity(section1).orbit(6).analyze("pad")
+// Open · bars 9-16 · pattern hold
+$: note("<[a2,c3,e3] [f2,a2,c3] [g2,c3,e3] [g2,b2,d3]>")
+  .s("supersaw").attack(.4).release(1.2)
+  .room(.4).gain(0.26).lpf("<400 533 711 949 1265 1687 2249 3000 4000!8>").env({ c: 'lpf', a: 1.935, s: 1, da: "<133 178 237 316 422 563 750 1000 0!8>" }).mask(section2).velocity(section2).orbit(6).analyze("pad")
+
+// ========== arp ==========
+// Rise · bars 1-8 · pattern up
+// Arpeggio · Up, 16ths
+$: note("<[a3 c4 e4 a4]*4 [g3 b3 e4 g4]*4 [f3 a3 c4 f4]*4 [g3 b3 d4 g4]*4>")
+  .s("square").lpq(4)
+  .decay(.15).sustain(.15).delay(.35).gain(0.3).lpf(saw.slow(16).rangex(300, 5055)).mask(section1).velocity(section1).orbit(3).analyze("arp")
+// Open · bars 9-16 · pattern up
+$: note("<[a3 c4 e4 a4]*4 [f3 a3 c4 f4]*4 [g3 c4 e4 g4]*4 [g3 b3 d4 g4]*4>")
+  .s("square").lpq(4)
+  .decay(.15).sustain(.15).delay(.35).gain(0.3).lpf(saw.slow(16).rangex(300, 5055)).mask(section2).velocity(section2).orbit(3).analyze("arp")

@@ -102,6 +102,25 @@ Each track gets its own orbit (bus), so its delay and reverb are independent.
 
 Times are fractions of a bar: `0.0625` a 16th, `0.125` an 8th, `0.1875` a dotted 8th, `0.25` a quarter. Devices act after the instrument settings, so a rack `lpf` or `distort` replaces or adds to the track's own filter and drive.
 
+#### Movement devices (`sweep`, `lfo`, `pump`)
+
+Three devices move the sound over time, inside held notes too (sound-modulation, #95). Only on `bass guitar arp hook pad code` tracks; at most two per track, one `pump`, one `sweep` and one `lfo` per target (errors). The compiler writes them after the other devices of the line, with no random value.
+
+```json
+"rack": [
+  { "device": "sweep", "target": "filter", "from": 400, "to": 4000, "bars": 8, "curve": "exp", "repeat": "once" },
+  { "device": "pump", "depth": 0.6, "recover": 0.15 }
+]
+```
+
+| Device | Values (defaults) | Strudel |
+| --- | --- | --- |
+| `sweep` | `target` filter (`filter hpf room delay`), `from` 400 and `to` 4000 (Hz 60 to 18000 for the filters, 0 to 1 for the sends), `bars` 8 (`1 2 4 8 16`), `curve` exp (`exp linear`; the sends are always linear), `repeat` once (`once loop`) | a ramp per onset from the clip's start, `saw.slow(bars).rangex(from, to)`; on a pad holding one chord per bar a value per bar and `.env({ c, a, s: 1, da })` gliding inside the bar; `once` holds `to` after the ramp |
+| `lfo` | `target` filter (`filter pan room delay`), `rate` 0.5 bar (`0.0625 0.125 0.25 0.5 1 2 4`), `depth` 0.4 (0 to 1), `shape` sine (`sine tri saw ramp square`) | filter: `.lpsync(1/rate).lpdepth(depth × 1.8).lpshape()`; others: `.lfo({ c, s: 1/rate, da, sh })` with a base value when the line has none |
+| `pump` | `depth` 0.6 (0 to 1), `recover` 0.15 s (0.05 to 0.5), `rate` 0.25 bar (`0.25 0.125 0.0625`, only where no kick plays) | on every playing kick line of the section: `.duck(orbit).duckdepth(depth).duckattack(recover)`; with no kick: `.lfo({ c: 'gain', s: 1/rate, da: depth × gain, dc: -1, sh: 'ramp' })` on the track's line |
+
+A `sweep` replaces the track's cutoff ramp (`cutoffEnd`, a moving filter) or its own `room` or `delay` on the line (warning), and a `vary` entry on the control it writes is left out (warning). An `lfo` or a `pump` keeps `vary`: the per-hit value is the base and the movement sways around it.
+
 ### Settings per type
 
 Common: `gain` (about 0 to 1), `gainEnd` and `cutoffEnd` (ramp to this value over the section, or `null`), `cutoff` (low-pass in Hz, 18000 or more means open), `drive` (distortion, 0 to about 4), `room` and `delay` (send, 0 to 1), `move` (filter motion: `fisso`, `lento`, `veloce`).

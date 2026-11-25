@@ -1,0 +1,39 @@
+// coding-misk · Example 7 · Pump
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(124/4)
+
+const SECTIONS = [['Drop', 8], ['Break', 8]]
+const TEMPO = {'Drop': 124, 'Break': 124}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!8 0!8>"  // Drop · 8 bars · 124 BPM · A · Am Em F G
+const section2 = "<0!8 1!8>"  // Break · 8 bars · 124 BPM · A · Am F C G
+
+// ========== drums ==========
+// Drop · bars 1-8 · pattern four
+// Drums · RolandTR909
+$: s("bd*4").bank("RolandTR909").gain(0.9).duck(6).duckdepth(0.6).duckattack(0.15).mask(section1).velocity(section1).orbit(1).analyze("kick")
+$: s("[~ hh]*4").bank("RolandTR909").gain(0.45).mask(section1).velocity(section1).orbit(1).analyze("hats")
+
+// ========== bass ==========
+// Drop · bars 1-8 · pattern roll
+// Bass · Rolling
+$: note("<a1 e1 f1 g1>").struct("[~ x x x]*4")
+  .s("sawtooth").lpf(700).lpq(4)
+  .decay(.12).sustain(0).gain(0.8).mask(section1).velocity(section1).orbit(2).analyze("bass")
+// Break · bars 9-16 · pattern roll
+$: note("<a1 f1 c2 g1>").struct("[~ x x x]*4")
+  .s("sawtooth").lpf(700).lpq(4)
+  .decay(.12).sustain(0).gain(0.8).mask(section2).velocity(section2).orbit(2).analyze("bass")
+
+// ========== pad ==========
+// Drop · bars 1-8 · pattern hold
+// Pad · Sustained
+$: note("<[a2,c3,e3] [g2,b2,e3] [f2,a2,c3] [g2,b2,d3]>")
+  .s("supersaw").attack(.4).release(1.2).lpf(2400)
+  .room(.4).gain(0.26).mask(section1).velocity(section1).orbit(6).analyze("pad")
+// Break · bars 9-16 · pattern hold
+$: note("<[a2,c3,e3] [f2,a2,c3] [g2,c3,e3] [g2,b2,d3]>")
+  .s("supersaw").attack(.4).release(1.2).lpf(2400)
+  .room(.4).gain(0.26).lfo({ c: 'gain', s: 4, da: 0.156, dc: -1, sh: 'ramp' }).mask(section2).velocity(section2).orbit(6).analyze("pad")

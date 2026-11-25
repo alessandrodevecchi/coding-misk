@@ -1,0 +1,39 @@
+// coding-misk · Example 9 · Sway
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(124/4)
+
+const SECTIONS = [['Sway', 8], ['Wide', 8]]
+const TEMPO = {'Sway': 124, 'Wide': 124}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!8 0!8>"  // Sway · 8 bars · 124 BPM · A · Am Em F G
+const section2 = "<0!8 1!8>"  // Wide · 8 bars · 124 BPM · A · Am F C G
+
+// ========== drums ==========
+// Wide · bars 9-16 · pattern four
+// Drums · RolandTR909
+$: s("bd*4").bank("RolandTR909").gain(0.9).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("[~ hh]*4").bank("RolandTR909").gain(0.45).mask(section2).velocity(section2).orbit(1).analyze("hats")
+
+// ========== pad ==========
+// Sway · bars 1-8 · pattern hold
+// Pad · Sustained
+$: note("<[a2,c3,e3] [g2,b2,e3] [f2,a2,c3] [g2,b2,d3]>")
+  .s("supersaw").attack(.4).release(1.2).lpf(1800)
+  .room(.4).gain(0.26).lpsync(2).lpdepth(0.9).lpshape("sine").mask(section1).velocity(section1).orbit(6).analyze("pad")
+// Wide · bars 9-16 · pattern hold
+$: note("<[a2,c3,e3] [f2,a2,c3] [g2,c3,e3] [g2,b2,d3]>")
+  .s("supersaw").attack(.4).release(1.2).lpf(1800)
+  .room(.4).gain(0.26).lpsync(2).lpdepth(0.9).lpshape("sine").mask(section2).velocity(section2).orbit(6).analyze("pad")
+
+// ========== arp ==========
+// Sway · bars 1-8 · pattern up
+// Arpeggio · Up, 16ths
+$: note("<[a3 c4 e4 a4]*4 [g3 b3 e4 g4]*4 [f3 a3 c4 f4]*4 [g3 b3 d4 g4]*4>")
+  .s("triangle").lpf(3000).lpq(4)
+  .decay(.15).sustain(.15).delay(.35).gain(0.35).pan(0.5).lfo({ c: 'pan', s: 1, da: 1.6, sh: 'sine' }).mask(section1).velocity(section1).orbit(3).analyze("arp")
+// Wide · bars 9-16 · pattern up
+$: note("<[a3 c4 e4 a4]*4 [f3 a3 c4 f4]*4 [g3 c4 e4 g4]*4 [g3 b3 d4 g4]*4>")
+  .s("triangle").lpf(3000).lpq(4)
+  .decay(.15).sustain(.15).delay(.35).gain(0.35).pan(0.5).lfo({ c: 'pan', s: 1, da: 1.6, sh: 'sine' }).mask(section2).velocity(section2).orbit(3).analyze("arp")

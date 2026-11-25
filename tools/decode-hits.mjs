@@ -120,3 +120,42 @@ export function silentBars(fo, fc, grid, rule = SILENT_RULE) {
   for (let k = lastMusic; k >= 0 && list.includes(k); k--) tail++;
   return { bars: n, music, silent: list.length, share: music ? r3(list.length / music) : null, head, tail, list };
 }
+
+// ---------- envelope error (sound-modulation D9, #95) ----------
+// How a band's level moves inside the beat, original against code: per band (the three of HIT_RULE) the mean power of
+// the frames in each of ENV_RULE.bins phases of the beat, folded over every beat of every bar of the grid, as dB from the
+// band's mean; the error is the mean absolute difference over the phases, in dB. A pumped or gated pad dips after each
+// beat, a held pad stays flat: the band error sees the same energy in both. A band quieter than ENV_RULE.floor dB under
+// the file's loudest band, in either file, is left out (null). fo, fc: decode-similarity features; grid: { downbeat (the
+// original's bar 0, s), barSeconds, bars }; the code's file starts on bar 0. → { low, mid, high, mean }
+export const ENV_RULE = { bins: 32, floor: 40, beats: 4 };
+function phaseLevels(f, band, t0, beatSec, beats, rule) {
+  const s = new Float64Array(rule.bins), c = new Uint32Array(rule.bins);
+  f.fr.forEach((x, i) => {
+    const t = i * f.hop - t0;
+    if (t < 0 || t >= beats * beatSec) return;
+    const k = Math.min(rule.bins - 1, Math.floor(((t / beatSec) % 1) * rule.bins));
+    s[k] += x[band]; c[k]++;
+  });
+  const lv = Array.from(s, (v, k) => (c[k] ? v / c[k] : null)), have = lv.filter(v => v !== null);
+  const mean = have.length ? have.reduce((a, v) => a + v, 0) / have.length : 0;
+  return { lv, mean };
+}
+export function envelopeError(fo, fc, grid, rule = ENV_RULE) {
+  const beatSec = grid.barSeconds / rule.beats, beats = grid.bars * rule.beats, out = {};
+  const loud = f => Math.max(...HIT_RULE.bands.map(b => f.fr.reduce((a, x) => a + x[b], 0) / Math.max(1, f.fr.length)));
+  const topO = loud(fo), topC = loud(fc);
+  for (const band of HIT_RULE.bands) {
+    const o = phaseLevels(fo, band, grid.downbeat, beatSec, beats, rule), c = phaseLevels(fc, band, 0, beatSec, beats, rule);
+    if (!(o.mean > 0 && c.mean > 0) || db(o.mean) < db(topO) - rule.floor || db(c.mean) < db(topC) - rule.floor) { out[band] = null; continue; }
+    let sum = 0, n = 0;
+    for (let k = 0; k < rule.bins; k++) {
+      if (o.lv[k] === null || c.lv[k] === null) continue;
+      sum += Math.abs((db(o.lv[k]) - db(o.mean)) - (db(c.lv[k]) - db(c.mean))); n++;
+    }
+    out[band] = n ? r3(sum / n) : null;
+  }
+  const v = HIT_RULE.bands.map(b => out[b]).filter(x => x !== null);
+  out.mean = v.length ? r3(v.reduce((a, x) => a + x, 0) / v.length) : null;
+  return out;
+}

@@ -370,6 +370,12 @@
   .dev-head code { flex: 1; min-width: 0; font: 11px var(--mono); color: var(--a2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dev-tools { display: flex; gap: 3px; }
   .dev-args { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 14px; }
+  /* the main knob of a movement device (sound-modulation): first, across the card, a larger thumb */
+  .dev-knob { grid-column: 1 / -1; }
+  .dev-knob input[type=range] { height: 22px; }
+  .dev-knob input[type=range]::-webkit-slider-thumb { transform: scale(1.35); }
+  .dev-knob input[type=range]::-moz-range-thumb { transform: scale(1.35); }
+  .dev-knob .lbl { font-weight: 600; }
   .rack-add { display: flex; gap: 6px; flex-wrap: wrap; }
   .rack-add select { width: auto; }
   .tp-top { display: flex; justify-content: flex-start; }

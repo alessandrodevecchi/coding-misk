@@ -1,0 +1,217 @@
+# Design
+
+## Context
+
+What the code and the installed Strudel do today (`@strudel/core` 1.2.6, superdough 1.3.0, read on `develop` with #94's spec on `feat/94-random-sound-params`):
+
+- **Effects are read at the onset.** A held note keeps the value it started with. Only modulators built at the onset move inside a note: ADSR, the filter envelope (`lpenv`, `lpattack`…), the filter LFO (`lprate`, `lpsync`, `lpdepth`, `lpshape`, `lpdc`), `tremolo*`, the phaser, and the generic modulators `.lfo()`, `.env()` and `.bmod()` (`core/controls.mjs:2838-3060`, `superdough/modulators.mjs`).
+- **Generic modulator targets** (`superdoughdata.mjs`): `gain`, `pan`, `cutoff` (`lpf`), `hcutoff` (`hpf`), `room`, `delay`, `distort`, the phaser, `tremolodepth`, and others. A target must exist on the note: `.lfo({ c: 'room' })` on a line without `room` finds no node.
+- **Depth is relative by default.** `.lfo()`, `.env()` and `.bmod()` scale `depth` by the target's value at the onset, and a value of 0 counts as 1 (`connectLFO`, `connectEnvelope`). `.bmod()` also divides its depth by 0.3 (`connectBusModulator`). `depthabs` (`da`) sets an absolute depth instead. Frequency targets are clamped to 20-24000 Hz.
+- **LFO rate in time with the song.** `sync` is cycles per period: the frequency is `sync × cps`. A cycle is a bar in this app (`setcpm(bpm/4)`), so `sync: 4` is a quarter-bar LFO and `sync: 0.25` is a 4-bar one. Shapes: `tri`, `sine`, `ramp`, `saw`, `square`. The LFO starts at each note's onset.
+- **Bus.** `.bmod({ bus: N, c: 'lpf' })` (alias `b`) reads `controller.getBus(N)`, a stereo node made on first use; the second argument is the modulator's `id`, not the bus. `controller.reset()` disconnects and drops every bus (`superdoughoutput.mjs:188-197`).
+- **Sidechain.** `duckorbit` (alias `duck`), `duckdepth`, `duckattack` (the recovery time, at least 2 ms) and `duckonset` are read on the source's note; superdough ducks the target orbit's output (`superdough.mjs:511`). Several orbits: mininotation `"6:9"`, with per-orbit depth `"0.6:0.4"`. A missing target orbit logs an error.
+- **Orbits.** `compile.js:63-75` gives every track its own orbit: the first track of a type keeps `ORBIT_OF[type]` (pad 6), others get 9 and up. A Pump on one pad ducks only that pad.
+- **Rack.** `src/song/rack.js` holds the devices: `{ kind, label, args, extra?, code(args, type) }`, written after the instrument by `rackCode`. Compose draws each device as a `.device` card with an LED, the code preview, ▲▼✕ and one control per argument (`src/main.js:3955-3966`). The FM rise (`riseTop`) and Fold steps are the precedent for movement over bars, sampled at each sixteenth.
+- **Track automation.** A track's `cutoffEnd`, `gainEnd` and the `filter` move (`src/music.js` ~465) are values per onset.
+- **#94** (`random-sound-params`, being implemented): track settings `tone` (drums) and `vary` (per-hit seeded values relative to the track's own value). Its D4 rule: one call per control on a line, and a `vary` target that a rack device writes later on the line is skipped with a warning. Its dice keeps every rack device except the `fm` device it adds. Its session option `sound` (`SOUND_VERSION`) turns generated sound features on.
+- **Radio console.** The Parts group (`src/radio/radio.js:1808`) has a `.steer-part` row of chips (lead, bass, arp, pad), a target menu, then the Vary and Swap keys, in one `.steer-btns` row.
+- **Code editor.** `slider(v, min, max)` draws a slider widget inside the code; moving it changes the next notes only. The app has its own code widgets (`src/widgets/app-widgets.js`, `src/live/widgets.js`).
+- **Fast export** renders in an `OfflineAudioContext` (`src/render/page.js:80`) with its own superdough controller.
+- **Decode bench.** `tools/decode-songs.mjs` holds app songs with known truth (tempo, chords, grids) in TUNING, VALIDATION and FRESH sets; `tools/decode-hits.mjs` measures per bar and band (low 30-150 Hz, mid 150-2000, high 5-16 kHz) the hits and how held each band is; `tools/decode-bench.cjs` reports the band error and the other scores.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- Sweep, LFO and Pump rack devices that move a held note, deterministic, with no random value.
+- Test songs with known modulation and an envelope error at the Decode bench, so step 3 has a baseline.
+- The design and UI placement of the devices' knobs, built in a later phase.
+- Every existing song compiles byte for byte as today.
+
+**Non-Goals:**
+
+- Decode measuring and writing modulation (owner's step 3).
+- Generator, style recipes, Live coder growth and radio console commands that add modulation (owner's step 4).
+- Modulating pitch (`vib`, `penv`), the FM index (the FM rise exists) or drum rows.
+- Changing #94's `vary` or `tone`.
+
+## Decisions
+
+### D1. Rack devices, not a track setting
+
+- **Where.** Sweep, LFO and Pump are ordinary rack devices of a new kind `move`, added from the existing rack menu ("+ Add device") in a new group "Movement" (Italian "Movimento"), on melodic tracks: bass, arp, hook, pad, guitar, code. Not on drums (Pump's source is the kick), voice, spoken, texture and riser tracks in this version.
+- **Why the rack.** The rack is already per track, ordered, bypassable and drawn as cards, which is where the knob goes (D7). Modulation has a shape, a rate and, for Pump, a write on another track: none of that fits `vary`'s entry `{ on, amount, seed, cycles }`.
+- **Limits.** At most one Sweep and one LFO per target and one Pump per track; at most two movement devices per track, so a track shows at most two knobs (D8). The validator reports more.
+- **No randomness.** Every device is a pure function of its arguments and the song time. "Seeded and deterministic" holds without a seed. The future generator (step 4) draws device arguments from a new `material:mod` stream, so it never moves another draw.
+
+### D2. Built on #94, depends on it
+
+The change sits beside `vary` and `tone` and reuses #94's structures:
+
+- **A `writes` list per device.** Each rack device declares the controls it writes as a base value (`lpf: ['cutoff']`, `delay: ['delay']`…). #94's D4 rule "a target a rack device writes later on the line is skipped" reads this list instead of a hard-coded set. Sweep declares its target; LFO and Pump declare nothing, since they move around the base and never replace it.
+- **Vary and movement together.** `vary` on `lpf` with an LFO on the filter: the per-hit value is the base and the LFO sways around it, because depth is absolute (D3). `vary` on `lpf` with a Sweep on the filter: the Sweep writes the base, so `vary` is skipped with #94's warning.
+- **One call per control.** The writer's merge from #94 D4 also merges the base values this change adds (D3), so a line never holds two `.room()` calls.
+- **Dice.** #94's dice keeps the user's rack devices, so it never rolls a movement device. No change to the dice.
+- **Version.** Step 4 will gate generated modulation behind the next `SOUND_VERSION` step of #94's `sound` option, not a new option.
+- **Order.** The implementation branches from `feat/94-random-sound-params` after it merges into `develop`. Task 0.1 rebases if #94 changed its D4 merge.
+
+### D3. Code: absolute depth, a base value always present
+
+- **Absolute depth.** Every `.lfo()`, `.env()` and `.bmod()` the app writes uses `da` (`depthabs`), computed from the device's arguments. This avoids the "0 counts as 1" and the `/0.3` traps (Context).
+- **Base value.** A generic modulator needs its target on the note. When the line has no value for the target, the writer adds one: the track's own setting when it has one (`room`, `delay`), else the device's centre (`pan` 0.5, `room` and `delay` 0.001, so the base is silent but present). Merged per D2.
+- **Order.** Movement devices write after the other rack devices of the line, so an LFO on `room` follows a Reverb device's `room`. The device order inside the movement group is the rack order.
+
+### D4. Sweep ("Apertura")
+
+| Argument | Values | Default |
+| --- | --- | --- |
+| target | `filter` (low-pass), `hpf`, `room`, `delay` | `filter` |
+| from, to | filter and hpf 60-18000 Hz; room and delay 0-1 | 400 → 4000 |
+| bars | 1, 2, 4, 8, 16 | 8 |
+| curve | `exp` (default for filters), `linear` | `exp` |
+| repeat | `once` (holds `to` after the bars), `loop` | `once` |
+
+- **Code across notes.** The base at each onset follows a ramp aligned to the clip's start, like the FM rise: `.lpf(saw.slow(8).rangex(400, 4000))` for `exp`, `.range()` for `linear`, with `riseTop` so the last step reaches `to`. `once` holds the last value after `bars` (the writer splits the clip: ramp, then a plain value).
+- **Glide inside a held note.** For tracks whose notes last a bar or more (pad, held presets, a code track the writer cannot judge: off), the writer adds `.env({ c: 'lpf', a: <bar seconds>, s: 1, da: <step per bar> })`, so the value climbs inside each bar to where the next bar starts. Bar seconds come from the section's tempo (the mean of `bpm` and `bpmEnd` when the tempo moves). Task 1.3 measures it in the browser; if the glide clicks or overshoots, the device keeps the steps per onset only and D4 records it.
+- **A note held over the whole sweep** (one chord for 8 bars): the env alone, `a` = the sweep's length, `da` = `to - from`.
+- **Track automation.** A Sweep on the filter replaces the track's `cutoffEnd` and `filter` move on its line; a Sweep on `room` or `delay` replaces the track's value. The validator warns.
+
+### D5. LFO ("Oscillazione")
+
+| Argument | Values | Default |
+| --- | --- | --- |
+| target | `filter`, `pan`, `room`, `delay` | `filter` |
+| rate | 1/16, 1/8, 1/4, 1/2, 1, 2, 4 bars | 1/2 |
+| depth | 0-1 of the target's range | 0.4 |
+| shape | `sine`, `tri`, `saw`, `ramp`, `square` | `sine` |
+
+- **Code.** Filter: `.lpsync(s).lpdepth(d).lpshape("sine")` with `s = 1 / rate`; `lpdepth` is in octaves-like units of the filter LFO, so the writer maps depth 0-1 to 0-4 and task 1.4 checks it by ear and by spectrum. Pan, room, delay: `.lfo({ c: 'pan', s: 2, da: d, sh: 'sine' })` with `da` = depth × 0.5 for pan, depth × the base's headroom for sends.
+- **Gain is not a target.** The Tremolo device already sways the gain inside the note.
+- **Phase.** The LFO restarts at each onset, so a pad struck on the bar line sways in phase with the bar. Notes struck off the grid start their own phase; the guide says so.
+
+### D6. Pump ("Pompa")
+
+| Argument | Values | Default |
+| --- | --- | --- |
+| depth | 0-1 | 0.6 |
+| recover | 0.05-0.5 s | 0.15 |
+| rate (no kick) | 1/4, 1/8, 1/16 bar | 1/4 |
+
+- **With a kick.** The compiler adds to every kick line (row `bd` of every drums track playing in the section) `.duck("<orbits>").duckdepth("<depths>").duckattack("<recovers>")`, one entry per pumped track. The pumped track's own line gets nothing. The write sits after #94's tone on the row's line.
+- **Without a kick** in a section: the pumped line gets a gain LFO on the beat that only dips: `.lfo({ c: 'gain', s: 4, sh: 'ramp', da: -depth × g, dc: … })`. Task 1.5 picks the shape and offset so the gain never rises above the track's own (falling ramp from the onset, back by the next beat).
+- **Never louder.** Ducking only lowers the orbit. The level rule: each line's peak with Pump is at most its peak without, plus 0.02 of measurement noise (`check-levels.cjs`).
+- **Many pumps.** Two pads with Pump: one `duck("6:9")` on the kick with two depths.
+
+### D7. Knobs (later phase)
+
+- **One main knob per device, always.** Every movement device shows one knob on its card. No mark or toggle turns it on. The knob's parameter per device:
+
+| Device | Knob | Range |
+| --- | --- | --- |
+| Sweep | opening: where the sweep is between `from` and `to` | 0-1 |
+| LFO | depth | 0-1 |
+| Pump | depth | 0-1 |
+
+- **Starts at the set value.** The knob shows the device's own value. Untouched, the device plays exactly as set.
+- **Acts at once, through the bus.** Sweep and LFO: the writer adds `.bmod({ b: N, c: '<control>', da: <range> × 0.3 })`, `N` the song's k-th movement device. The bus carries the knob's offset from the set value, so an undriven bus (0) sounds as set: a page or export that never touches a knob is unchanged. The page drives each bus with a `ConstantSourceNode` and reconnects every bus after each `reset()` (Play, Stop, a new evaluation that resets). A note already sounding moves.
+- **Pump needs no bus.** `duckdepth` is read at each kick, so the Pump knob writes through a `ref()` read at each onset: it acts from the next kick, within a beat.
+- **Tracks without a movement device have no knob.** Their settings change from the next note, as today.
+- **Record dot.** With the card's record dot on, knob moves while the song plays in Compose are recorded on the device as `path: [[bar, value], …]` (sixteenth resolution, at most 256 points, thinned to the moves). On playback the path drives the bus, with `setValueAtTime` and `linearRampToValueAtTime` scheduled a bar ahead. A hand on the knob wins until it is released.
+- **Export.**
+  - Real-time export: the same as playback.
+  - Fast export: the render page builds the same `ConstantSourceNode`s on its own controller and schedules each path as automation from the export's start bar.
+  - Code copied out of the app, or opened in plain Strudel: no bus there. The writer leaves out the `bmod` and writes the path as steps per bar into the base (`.lpf("<800 1200 2000 …>")`), or the set value when no path exists. The copied code's comment line says the knob became steps.
+  - Radio, Live coder growth: a device plays its path, else its set value.
+- **Decode, generator:** never write a path.
+
+### D8. Where the knobs go (later phase; revisit at the UI review)
+
+The owner finds the interface cluttered, so no permanent panel is added:
+
+- **Ordinary rack devices.** Sweep, LFO and Pump are added from the existing rack menu ("+ Add device", Italian "+ Aggiungi modulo") in a new group "Movement" (Italian "Movimento"), next to the Notes and Sound groups. There is no separate panel or menu.
+- **Compose rack card.** The knob is the first row of the device's `.dev-args`, with the record dot next to it. A small drawn mark next to the knob (an arc with a lightning tip, `src/icons.js`) shows that it acts at once; its tooltip says "acts on the notes already sounding". The word "Live" is not used. In the hardware theme the knob is the theme's knob; in neon and light it is the existing range input with a larger thumb. Other cards keep their controls as today.
+- **Knobs per track.** A track holds at most two movement devices (D1), so at most two knobs.
+- **Radio console.** Inside the existing Parts row, after the Vary and Swap keys, only while the selected part (the `.steer-part` chip) plays a movement device: one compact knob per device of that part, at most two, labelled by the device, with the same mark. It acts while the song plays and is never recorded. No knob otherwise, so the row looks as today for almost every song.
+- **Code.** `knob(n)` written by the app in place of the device's `bmod` line, drawn by the editor as the same slider widget `slider()` gets (task 6.5 checks the transpiler's widget hook; else an app code widget). In a code track the user may type `knob(…)` by hand.
+- **Not added:** a mixer strip, a floating knob panel, knobs on the player bar or on the arranger rows.
+
+### D9. Test songs at the Decode bench
+
+- **Songs.** Five new held-out songs in `tools/decode-songs.mjs` (VALIDATION set), each in two takes: the pad alone with bass, and the same with drums, so step 3 can check that a kick is not read as a pump.
+
+| Song | Pad movement | Truth |
+| --- | --- | --- |
+| `mod-pump` | Pump depth 0.6, recover 0.15 s | `{ device: 'pump', depth, recover }` |
+| `mod-gate` | Pump without kick, rate 1/8 | `{ device: 'pump', rate, depth }` |
+| `mod-lfo` | LFO filter, rate 1/2, depth 0.5, sine | `{ device: 'lfo', target, rate, depth, shape }` |
+| `mod-trem` | Tremolo (existing device), rate 8, depth 0.6 | `{ device: 'tremolo', rate, depth }` |
+| `mod-sweep` | Sweep filter 300 → 5000 over 8 bars, loop | `{ device: 'sweep', from, to, bars }` |
+
+- **Truth reader.** `modTruth(song)` returns each track's movement devices with their arguments from the song itself, so the truth always matches the app's code.
+- **Envelope error** (`envelopeError(fo, fc, grid)` in `decode-hits.mjs`): for each band (the three of `decode-hits`), the level per beat phase, 32 bins per beat, folded over every bar of the file and normalized by the band's mean; the error is the mean absolute difference in dB, original against code. Reported per band next to the band error in `decode-bench.cjs`, for every bench file with a known grid, real tracks included.
+- **Parameter score** (`modScore(truth, measured)`): rate right (exact choice) and depth within 0.15. In this change it runs on the truth against itself and against a song without modulation, to fix the scale; step 3 gives it a measurer.
+- **Baseline.** One bench run records the envelope error of the current decoder on every set in the DEVLOG, so step 3 must not make it worse.
+
+### D10. Checks
+
+- `check:code` unchanged; `check:songs`; `check:strudel` (`lpsync`, `lpdepth`, `lpshape`, `lfo`, `env`, `rangex`, `duckorbit`, `duckdepth`, `duckattack` in the catalog) and `catalog:strudel`.
+- New `check:modulation` (Node): device code for every target and argument, base values merged, the kick lines with one and two pumps, `once` and `loop`, the validator's errors and warnings, `vary` skipped or kept per D2, Strudel in Node evaluates every line.
+- New `tools/check-modulation.cjs` (browser): an example song per device plays with no `evalError`; levels with and without each device (Pump never louder; Sweep and LFO peaks at most the open filter's peak plus 0.02); the glide of D4 sampled by spectrum at four points of a held bar; fast export against real time.
+- `check-levels.cjs` on the new example songs; `check:decode` with the new songs; `check:guide`, `check:knowledge`.
+
+## Implementation notes (2026-11-24, steps 1 and 2)
+
+What the code and the measures settled (`src/song/movement.js`, `tools/check-modulation.mjs`, `tools/check-modulation.cjs`):
+
+- **D2.** #94's D4 rule was as read: the writer drops a `vary` target a later call on the line writes, and `varySkips` lists the controls rack devices write. The `writes` lists live in `src/song/writes.js` (no imports), read by the rack and by the variation, because the variation importing the rack would close an import ring with `music.js`.
+- **D3.** Base values follow the rule: the track's own value when the line writes it (it stays the one call), else the track's setting (the filter at the track's cutoff, also when 18000 leaves `.lpf` out), else pan 0.5 and sends 0.001.
+- **D4.** The glide is kept: on a held pad the brightness rises through the bar to the next bar's value with no overshoot, where steps alone stay flat. "Held" is a pad with a legato preset or an idea that holds, no steps, and no rack device that cuts it (`seg`, `ply`, `echo`, `off`, `degrade`); the writer then writes one value per bar and a per-bar `da` list, both rotated to the clip's start. A chord held over several bars is not detected: it glides through its first bar and holds there. On short notes `once` past the sweep picks `to` with `"<0!8 1!…>".pick([ramp, to])` (Strudel has no `min` on patterns). Sends are always linear.
+- **D5.** The LFO's phase follows the song, not the note: superdough starts the wave at `cycle × sync` (the hap's bar), so a note struck off the grid starts mid-wave. `lpdepth` is linear, a share of the cutoff peak to peak (`depth × frequency`, centred, clamped to 30-20000 Hz): the writer maps depth 0-1 to `lpdepth` 0-1.8 (0.1 to 1.9 times the cutoff). Pan: `da` = 2 × depth (the panner runs from -1 to 1). Sends: `dc: 0`, `da` = 0.5 × depth, so a send never goes below its own value.
+- **D6.** The dip without a kick is a rising ramp with `dc: -1` and `da` = depth × gain (the lower end of a gain ramp; 0.8 for the guitar's fixed gain, a code track's own `.gain(n)` or 1): from `gain - da` to `gain` over each beat. Superdough skips a duck while the target orbit has played no note (the first kick of a section, logged as an error) and throws on a duck in the first 10 ms of a render; `src/sounds/duck-guard.js` makes the orbit first and moves such a duck to 10 ms. On the render page the guard also schedules the orbit's dip on the audio clock, since superdough's timer reads the offline context's current time and two renders differed. A section counts as having a kick when a playing drums track has a clip in it with a sounding kick line; a pumped track in a section with a kick only in part of it ducks there and does not dip.
+- **D7, D8 (tonight).** Each movement card shows its main knob (Sweep `to`, LFO and Pump `depth`) as the first, full-width slider with a larger thumb and a tooltip; moving it re-evaluates the song, so it is heard from the next note (Pump: the next kick). The knob that moves a note already sounding (the `bmod` bus, the record dot, the radio knob, `knob()`) stays in tasks 6.x. The add menu blocks a third movement device and a second Pump with a toast.
+
+- **D9 (bench, 2026-11-24).** The envelope error works on the bench's features (frames of 2048 samples every 512, 32 phases a beat folded over every beat). Its scale is weaker than the spec expected: `mod-pump-bare` against its still take is 0.62 dB in the mid band (the scenario asks for at least 1 dB), because the bass fills the same band and the frame smooths the dip; the tremolo song reaches 2.7 dB, the sweep 8.6 dB in the high band. A finer measure on the chords' tonal bins (as the owner's proposal suggests) belongs to step 3. Level B decoded `mod-pump-bare`, which has no drums, with a four-on-the-floor kick: the pump read as a kick, the risk step 3 must avoid.
+
+## Owner tests (checklist)
+
+1. **Pad che si apre (Sweep).** Dove: Compose, un brano con un pad tenuto (per esempio `luci-rosse`), pannello della traccia pad, rack. Cosa fare: aggiungi "Apertura", lascia filtro da 400 a 4000 in 8 battute, premi Play. Cosa deve succedere: il pad parte scuro e diventa brillante in 8 battute, in modo continuo anche dentro ogni accordo tenuto, senza scatti a ogni battuta. Perché: è il movimento dentro la nota che oggi manca.
+2. **Pad che ondeggia (LFO).** Dove: lo stesso pad. Cosa fare: togli Apertura, aggiungi "Oscillazione" sul filtro, velocità 1/2 battuta; poi prova bersaglio Panorama. Cosa deve succedere: il filtro (poi il panorama) va su e giù due volte per battuta, a tempo col brano, anche mentre l'accordo è tenuto. Perché: un movimento ciclico a tempo.
+3. **Pad che pompa (Pump) con la cassa.** Dove: un brano con cassa in quattro e un pad. Cosa fare: aggiungi "Pompa" al pad, profondità 0,6. Cosa deve succedere: il pad si abbassa a ogni colpo di cassa e risale prima del colpo successivo; la cassa e le altre tracce non cambiano; il master non diventa mai rosso. Perché: è il pompaggio da sidechain dei brani house e techno.
+4. **Pompa senza cassa.** Dove: lo stesso brano, una sezione senza batteria (o silenzia la batteria). Cosa fare: ascolta il pad in quella sezione. Cosa deve succedere: il pad pulsa ancora sui quarti, come se ci fosse la cassa, e mai più forte di prima. Perché: Pompa funziona anche nei break.
+5. **Variazione e movimento insieme (#94).** Dove: un pad con la variazione per colpo sul filtro (dado del suono di #94) e Oscillazione sul filtro. Cosa fare: ascolta 4 battute; poi sostituisci Oscillazione con Apertura sul filtro. Cosa deve succedere: con Oscillazione senti entrambe le cose (ogni accordo parte un po' diverso e poi ondeggia); con Apertura la variazione sul filtro sparisce e la validazione mostra un avviso. Perché: le due funzioni si sommano dove ha senso e non litigano sullo stesso valore.
+6. **Brani vecchi uguali.** Dove: scheda Brani, tre brani integrati e uno tuo. Cosa fare: suonali in Classic e Crescendo. Cosa deve succedere: suonano esattamente come ieri. Perché: niente cambia se non aggiungi un dispositivo.
+7. **Stesso suono nell'export.** Dove: il brano del test 3. Cosa fare: esporta veloce in WAV e riascolta. Cosa deve succedere: il pompaggio e l'apertura sono uguali a quelli in riproduzione, negli stessi punti. Perché: i dispositivi sono deterministici.
+8. **Fase successiva, manopola in Compose.** Dove: la scheda di Oscillazione del test 2, nel rack del pad. Cosa fare: guarda la manopola in cima alla scheda, poi girala durante un accordo tenuto; accendi il punto di registrazione, rifai il gesto, spegni il punto e riascolta. Cosa deve succedere: la manopola parte dal valore impostato e senza toccarla il pad suona come nel test 2; girandola il filtro si muove subito, dentro l'accordo che sta suonando; accanto alla manopola c'è solo un piccolo segno (nessuna scritta "Live"); al riascolto la manopola si muove da sola e ripete il gesto; le tracce senza dispositivi di movimento non hanno manopole. Perché: la manopola muove una nota già partita e il gesto resta nel brano.
+9. **Fase successiva, manopola in radio e nel codice.** Dove: Radio, un tuo brano con un dispositivo di movimento in una playlist; poi Copia codice. Cosa fare: nella console scegli la parte con il dispositivo, gira la manopola; poi incolla il codice copiato in Strudel. Cosa deve succedere: la manopola compare solo per quella parte, accanto a Varia e Scambia, e sparisce scegliendo un'altra parte; il gesto in radio non viene registrato; nel codice copiato il gesto registrato in Compose diventa un valore per battuta. Perché: nessun pannello nuovo, e il codice copiato suona anche fuori dall'app.
+
+## Risks / Trade-offs
+
+- **Glide accuracy (D4).** `env` needs the note length in seconds; a tempo ramp makes it approximate. Fallback: steps per onset, as the FM rise.
+- **`lpdepth` units.** The filter LFO's depth scale is not documented; task 1.4 measures it before the range is fixed.
+- **LFO phase per note.** Off-grid notes sway out of phase. Accepted: the bar-aligned case is the common one.
+- **Pump on the kick line.** A write on one track caused by another track's device. The kick line grows by three calls; song functions fold them. A muted kick track still ducks (its notes are not played but the duck is): the compiler leaves `duck` out of muted and soloed-out tracks.
+- **Bus reset (later phase).** A missed reconnect leaves the knob dead until the next Play; the sound stays as set, since an undriven bus is 0. The browser check presses Stop, Play and a re-evaluation and moves the knob after each.
+- **Knob path in copied code** is coarser than the original gesture (steps per bar). Accepted and said in the code's comment.
+
+## Decisions approved by the owner
+
+The six open questions of the first draft, approved as recommended:
+
+1. **Gain is not a Sweep target.** `gainEnd` and Crescendo already fade.
+2. **Pump in a section without a kick** uses the beat gain dip automatically (D6).
+3. **Knob moves in the radio** act while the song plays only and are not recorded (D8).
+4. **A path is recorded** only with the card's record dot on (D7).
+5. **The code helper is `knob(n)`,** distinct from `slider()` because it moves sounding notes (D8).
+6. **Movement devices on drums** come later, with step 4 (D1).
+
+The knob model was also revised: no "Live" mark or toggle; every movement device always shows one main knob (D7, D8).
+
+## Estimate
+
+In agent hours:
+
+- Step 1, devices (D1-D6), validator, Compose cards, guide, knowledge, catalog, example songs, checks: about 6.5.
+- Step 2, test songs, truth reader, envelope error, parameter score, baseline run: about 3.5.
+- Later phase, knobs (D7, D8): about 8 (bus driver and reset 2, Compose card and path 2, fast export and copied code 1.5, radio row 1, code widget 1, checks 0.5).
+
+This change, without the later phase: about 10.
