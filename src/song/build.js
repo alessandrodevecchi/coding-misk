@@ -174,10 +174,20 @@ export function sayStep(steps, upTo) {
 export const nextStep = (song, bar) => buildSteps(song).find(s => s.at > bar) || null;
 
 // compiled code of a state with the comment of its latest step written above the track it changes
+// one setting of a set step in a few words (#82): a value as written, a list as its items' names joined with "+" ("vary
+// pan+lpf"), an object as its keys joined with "/" ("tone kick/snare/hats"), a cleared value as "-tone"; never
+// "[object Object]" or "null"
+const itemName = x => (x && typeof x === 'object' ? x.on ?? x.target ?? x.device ?? x.kind ?? x.id ?? x.name ?? null : x);
+const settingWords = (k, x) => {
+  if (x === null || x === undefined) return `-${k}`;
+  if (Array.isArray(x)) { const n = [...new Set(x.map(itemName).filter(v => v !== null && v !== undefined && typeof v !== 'object').map(String))]; return x.length ? `${k} ${n.length ? n.join('+') : x.length}` : `-${k}`; }
+  if (typeof x === 'object') { const n = Object.keys(x).filter(g => x[g] !== null && x[g] !== undefined); return n.length ? `${k} ${n.join('/')}` : `-${k}`; }
+  return `${k} ${x}`;
+};
 // what a step does, in a few words, for the code comment of a listener's change: "add bass", "set pad cutoff 900"
 const stepWords = s => {
   for (const k of ['add', 'remove']) if (s[k] !== undefined) return `${k} ${list(s[k]).join(' ')}`;
-  if (s.set) { const { track, ...v } = s.set; return `set ${track} ${Object.entries(v).map(([k, x]) => `${k} ${x}`).join(' ')}`; }
+  if (s.set) { const { track, ...v } = s.set; return `set ${track} ${Object.entries(v).map(([k, x]) => settingWords(k, x)).join(' ')}`; }
   if (s.pattern) return `${s.pattern.track} pattern ${s.pattern.to ?? `level ${s.pattern.level}`}`;
   if (s.rack) return `${s.rack.track} + ${s.rack.device}`;
   if (s.unrack) return `${s.unrack.track} - ${s.unrack.device}`;

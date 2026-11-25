@@ -28,6 +28,10 @@ The card's Sound row SHALL offer «New sound», which rolls a sound for that tra
 - **WHEN** sound #3 is waiting in the Queue and the listener presses «Undo»
 - **THEN** sound #3 leaves the Queue and the track keeps the sound on air
 
+#### Scenario: The code comment of a new sound
+- **WHEN** a new drum sound with a tone and a per-hit variation enters, and later the original without them
+- **THEN** the code comments read like "// you: set beat kit RolandTR909 tone kick/snare/hats vary decay+gain+pan" and "// you: set beat kit OberheimDMX -tone -vary", never with "[object Object]" or "null"
+
 ### Requirement: Movement in the sound roll
 For melodic tracks the roll SHALL also draw at most one movement device (Sweep, LFO, Pump or Gate) or none, inside the device's argument ranges, never past two movement devices on the track, and never one the rack validator rejects. A «Movement» lock SHALL keep the track's movement devices out of the roll. Path SHALL NOT be rolled in the radio.
 

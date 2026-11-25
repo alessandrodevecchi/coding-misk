@@ -8,7 +8,7 @@ import { validateRecipe, recipeOrder } from '../src/endless/recipe.js';
 import { loadStyles } from './styles-dir.mjs';
 import { createSession } from '../src/endless/director.js';
 import { steerSong, whyNot, instrumentOf, SOUND_KEYS } from '../src/endless/steering.js';
-import { stateAt } from '../src/song/build.js';
+import { stateAt, buildSteps, annotate } from '../src/song/build.js';
 import { rollMove, ROLL_MOVES } from '../src/material/dice.js';
 import { isMove, MOVE_MAX } from '../src/song/movement.js';
 import { checkRack } from '../src/song/rack.js';
@@ -116,6 +116,44 @@ for (let i = 0; i < SONGS * 3 && songs < SONGS; i++) {
 check(songs >= Math.min(12, SONGS) && sounds >= songs && pats >= songs && drums > 0, `radio songs tested (${songs} songs, ${sounds} sounds, ${pats} patterns, ${drums} drum patterns)`);
 // why not: a track the song does not hold
 { const g = session(0, RECIPES[0].id); check(whyNot({ kind: 'sound', track: 'nope', set: {}, rack: [] }, g.song, g.plan, 1) === 'not-playing', 'why not: a track the song does not hold'); }
+
+// ---------- the code comments of the card's changes (#82) ----------
+// "Nuovo suono" wrote "// you: set s2-kick kit … tone [object Object]" and "vary [object Object],[object Object]", and a
+// cleared setting "tone null": every instrument's new sound, the original back (tone and vary cleared) and the card's
+// new pattern give comments with no "[object Object]", "null" or "undefined"
+{
+  const TYPES = ['drums', 'bass', 'arp', 'hook', 'pad', 'guitar', 'texture'], seen = {}, nested = { tone: 0, vary: 0, cleared: 0 };
+  const youLines = song => {
+    const steps = buildSteps(song), out = [];
+    steps.forEach((st, i) => { if (st.by === 'listener') out.push(...annotate('// ========== x ==========\nx', song, i + 1, 'en').split('\n').filter(l => l.startsWith('// you:'))); });
+    return out;
+  };
+  for (let i = 0; i < RECIPES.length * 4 && TYPES.some(t => (seen[t] || 0) < 2); i++) {
+    const style = RECIPES[i % RECIPES.length].id, seed = `cmt-${i}`, g = createSession(RECIPES, seed).next({ styles: [style], chaos: 0.3, energy: 0.6, complexity: 0.5, talk: 0.5 }), P = g.plan, at = 4 * P.phrase;
+    if (at + 4 * P.phrase >= P.bars) continue;
+    for (const tr0 of stateAt(g.song, at).song.tracks.filter(t => !t.mute && TYPES.includes(t.type))) {
+      if ((seen[tr0.type] || 0) >= 2) continue;
+      const tr = trackAt(g.song, tr0.id, at), sb = cardSeed(seed, 0, tr.id), what = `${style} ${seed} ${tr.id} (${tr.type})`;
+      const a = rollCard({ track: tr, R: P.R, seedBase: sb, n: 1, energy: 0.6 });
+      if (!a) continue;
+      if (a.set.tone && typeof a.set.tone === 'object') nested.tone++;
+      if (Array.isArray(a.set.vary) && a.set.vary.length) nested.vary++;
+      const orig = soundOf(tr), cmds = [{ kind: 'sound', track: tr.id, n: 1, set: a.set, rack: a.rack, at }, { kind: 'sound', track: tr.id, n: 0, set: orig.set, rack: orig.rack, at: at + P.phrase }];
+      const p1 = tr.type === 'texture' ? null : newCardPattern({ track: tr, plan: P, opts: g.opts, song: g.song, at, seedBase: sb, n: 1, styles: [style] });
+      if (p1) cmds.push({ kind: 'pattern', mode: 'replace', target: tr.id, item: p1, at: at + 2 * P.phrase });
+      const r = steerSong({ song: g.song, plan: P, opts: g.opts, commands: cmds, seed, n: 0 });
+      if (buildSteps(r.song).some(st => st.by === 'listener' && st.set && Object.values(st.set).some(v => v === null))) nested.cleared++;
+      const lines = youLines(r.song);
+      check(lines.length > 0, `${what}: the card's changes have comments`);
+      for (const l of lines) check(!/\[object |\bnull\b|\bundefined\b/.test(l), `${what}: comment "${l}"`);
+      if (a.set.tone && typeof a.set.tone === 'object') check(lines.some(l => new RegExp(`tone ${Object.keys(a.set.tone).filter(k => a.set.tone[k]).join('/')}(\\s|$)`).test(l)), `${what}: the tone named by its instruments (${lines.join(' | ')})`);
+      if (Array.isArray(a.set.vary) && a.set.vary.length) check(lines.some(l => / vary [a-z]+(\+[a-z]+)*(\s|$)/i.test(l)), `${what}: vary named by its targets (${lines.join(' | ')})`);
+      seen[tr.type] = (seen[tr.type] || 0) + 1;
+    }
+  }
+  for (const t of TYPES) check(seen[t] > 0, `comments: a ${t} track tested (${J(seen)})`);
+  check(nested.tone > 0 && nested.vary > 0 && nested.cleared > 0, `comments: a tone, a vary and a cleared setting tested (${J(nested)})`);
+}
 
 // ---------- the library list ----------
 {

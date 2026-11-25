@@ -18,6 +18,7 @@ Estimate: 11 to 13 agent hours. Branch `feat/82-console-track-card` from `feat/9
 
 - [x] 3.1 `tools/check-track-card.mjs` (`npm run check:track-card`, D9).
 - [x] 3.2 `tools/check-track-card.cjs` (browser, D9), screenshots in `notes/console-scheda-ascolto/`.
+- [x] 3.4 The code comments of a new sound (#82, after the owner's test): a tone as its instruments, a variation as its targets, a cleared setting as "-tone"; `npm run check:track-card` asserts no "[object Object]" or "null" for drums, bass, arp, hook, pad, guitar and texture.
 - [x] 3.3 The radio chain: steer-memo, endless, radio-profiles, live-code, sound-guard, knowledge, guide, decode, decode-library, stage-video, stage-widgets, strudel, oscilloscope, added-play, line-names, modulation; `npm run build`.
 
 ## 4. Texts and docs

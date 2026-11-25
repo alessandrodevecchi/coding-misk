@@ -210,6 +210,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- Radio console: the code comment of a new sound names the tone's instruments and the variation's targets instead of "[object Object]", and a cleared setting as "-tone" instead of "tone null".
 - Fast export: a bus modulator (`bmod`) connects at its note's start instead of up to a second later.
 - Decode: Full no longer writes a kick on every beat for a track with no drums, where a pad and a bass alone rise on the beat.
 - Fast export: LFO, Pump without a kick and tremolo waves start at the same place of the beat as in playback.
