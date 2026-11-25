@@ -1,6 +1,6 @@
 // Track rack: an ordered chain of devices added after the instrument, each one a Strudel function.
 // A device in a song: { "device": "echo", "count": 3, "time": 0.125, "feedback": 0.5 } (missing values take the defaults; "on": false bypasses it).
-import { MOVE_DEVICES, movePreview, checkMoves } from './movement.js';
+import { MOVE_DEVICES, movePreview, checkMoves, tremoloCode } from './movement.js';
 const f = n => String(Math.round(n * 1000) / 1000);
 const MELODIC = ['bass', 'guitar', 'arp', 'hook', 'pad', 'code'];
 
@@ -26,7 +26,7 @@ export const DEVICES = {
   crush: { kind: 'sound', label: { en: 'Bit crush', it: 'Bit crush' }, args: [['bits', 'num', 6, 1, 16, 1]], code: a => `.crush(${f(a.bits)})` },
   coarse: { kind: 'sound', label: { en: 'Sample rate', it: 'Campionamento basso' }, args: [['amount', 'num', 8, 1, 32, 1]], code: a => `.coarse(${f(a.amount)})` },
   phaser: { kind: 'sound', label: { en: 'Phaser', it: 'Phaser' }, args: [['rate', 'num', 1, 0.1, 8, 0.1], ['depth', 'num', 0.6, 0, 1, 0.05]], code: a => `.phaser(${f(a.rate)}).phaserdepth(${f(a.depth)})` },
-  tremolo: { kind: 'sound', label: { en: 'Tremolo', it: 'Tremolo' }, args: [['rate', 'num', 8, 1, 32, 1], ['depth', 'num', 0.7, 0, 1, 0.05]], code: a => `.tremolosync(${f(a.rate)}).tremolodepth(${f(a.depth)})` },
+  tremolo: { kind: 'sound', label: { en: 'Tremolo', it: 'Tremolo' }, args: [['rate', 'num', 8, 1, 32, 1], ['depth', 'num', 0.7, 0, 1, 0.05]], code: a => tremoloCode(a.rate, a.depth) },
   vowel: { kind: 'sound', label: { en: 'Vowel filter', it: 'Filtro vocale' }, args: [['vowel', 'choice', 'a', ['a', 'e', 'i', 'o', 'u']]], code: a => `.vowel("${a.vowel}")` },
   hpf: { kind: 'sound', label: { en: 'High-pass', it: 'Passa-alto' }, args: [['cutoff', 'num', 400, 20, 8000, 10], ['reso', 'num', 0, 0, 20, 1]], code: a => `.hpf(${f(a.cutoff)})${a.reso ? `.hpq(${f(a.reso)})` : ''}` },
   lpf: { kind: 'sound', label: { en: 'Low-pass', it: 'Passa-basso' }, args: [['cutoff', 'num', 2000, 100, 18000, 10], ['reso', 'num', 0, 0, 20, 1]], code: a => `.lpf(${f(a.cutoff)})${a.reso ? `.lpq(${f(a.reso)})` : ''}` },
@@ -105,6 +105,7 @@ export function checkRack(rack, p, err, warn, type = null, settings = {}) {
       if (!a) { warn(`${dp}.${k}`, `unknown value for ${d.device}; values: ${spec.args.map(x => x[0]).join(', ') || 'none'}`); continue; }
       if (a[1] === 'choice' && !a[3].includes(v)) err(`${dp}.${k}`, `one of ${a[3].join(', ')}`);
       if (a[1] === 'num' && (typeof v !== 'number' || v < a[3] || v > a[4])) err(`${dp}.${k}`, `a number from ${a[3]} to ${a[4]}`);
+      if (a[1] === 'steps' && (typeof v !== 'string' || !/^[x.]{16}$/.test(v) || !v.includes('x') || !v.includes('.'))) err(`${dp}.${k}`, '16 steps, x open and . closed, at least one of each (for example "x.x.x.x.x.x.x.x.")');
     }
   });
   // Fold and Distortion write the same Strudel stage (distort): only the later one is heard (fm-like-effects D2)

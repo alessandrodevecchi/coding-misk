@@ -28,6 +28,12 @@ Decode needs the same words: it cannot write a pumping pad until the app can pla
 - **Test songs at the Decode bench:** held-out app songs with pads modulated by known parameters (pump, filter LFO, tremolo, sweep), a reader of the modulation truth from a song, and a new envelope error per band and per beat phase next to the band error in `tools/decode-bench.cjs`.
 - **Knobs, designed now, built in a later phase:** every movement device always shows one main knob on its card (Sweep opening, LFO depth, Pump depth). It starts at the set value and, turned, acts at once through Strudel's `bmod` bus, also on a note already sounding. A record dot records the movement into the song, and exports replay it. The radio console shows the knob inside the existing Parts row while that part plays a movement device; it acts while the song plays and is not recorded. In code it is `knob(n)`, drawn as a slider widget. Copied code gets the path as steps per bar. Tracks without a movement device have no knob.
 - **Existing songs are unchanged:** no new default setting, no version bump; a song without the new devices compiles byte for byte as today.
+- **Movement parameters (second step, design D11 to D13):**
+  - **Phase** ("Fase") on Oscillazione and on Pompa's beat dip: where the wave starts inside its period, the same in playback, fast export and real-time export, written in the copied code (`phaseoffset`, `tremolophase`).
+  - **Two new Oscillazione targets:** volume (tremolo, the same Strudel calls as the existing Tremolo device) and pitch (vibrato, Strudel's `vib` and `vibmod`).
+  - **Gate ritmico** ("Rhythmic gate"): a fourth movement device that cuts the sound on a pattern of 16 steps per bar (trance gate), with presets, depth, smoothing of the edges and phase.
+  - The rule "at most two movement devices per track" stays. Old songs compile byte for byte as before: every new value is neutral by default.
+- **Path engine (spec only, design D14 and D15):** a Path device ("Percorso") makes a value follow points written per bar, inside held notes, through Strudel's bus and its constant sound `one`, the same in the app, both exports and copied code. It needs no knob, so Decode can write measured fades and filter openings; the knobs later record their gesture into it.
 
 ## Out of scope (future work)
 
@@ -38,9 +44,10 @@ Decode needs the same words: it cannot write a pumping pad until the app can pla
 
 ### New Capabilities
 
-- `app/modulation-devices`: Sweep, LFO and Pump in the rack: arguments, code, level rule, how they meet track settings and #94's `vary`.
+- `app/modulation-devices`: Sweep, LFO, Pump and Gate in the rack: arguments, phase, code, level rule, how they meet track settings and #94's `vary`.
 - `app/device-knobs` (later phase): the main knob of each movement device, the bus, the knob in Compose, radio and code, the recorded path and what export does with it.
 - `app/decode-modulation-bench`: the modulated test songs, the truth reader and the envelope error.
+- `app/movement-paths` (spec only in this step): the path engine, a Path device whose value follows points inside held notes, in both exports and in copied code, without a knob; Decode and the knobs write into it.
 
 ### Modified Capabilities
 
@@ -50,5 +57,6 @@ None. The rack and #94's variation keep their requirements; the meeting points a
 
 - Step 1: `src/song/rack.js` (three devices, a `writes` list per device), `src/song/compile.js` and `src/music.js` (the Pump write on kick lines, target base values), `src/song/validate.js`, `src/main.js` (device cards), `src/i18n.js`, `src/guide.js`, `docs/SONG-FORMAT.md`, `docs/STRUDEL-FUNCTIONS.md` (catalog: written), `docs/knowledge/`, `songs/examples/`.
 - Step 2: `tools/decode-songs.mjs`, `tools/decode-hits.mjs`, `tools/decode-bench.cjs`.
+- Movement parameters: `src/song/movement.js` (phase, the new targets, Gate), `src/song/rack.js` (the Tremolo device's code shared with the volume target), `src/main.js` (the Gate's step row), `src/i18n.js`, `src/guide.js`, `docs/SONG-FORMAT.md`, `docs/knowledge/`, `songs/examples/`, `tools/check-modulation.mjs`, `tools/check-modulation.cjs`.
 - Later phase: `src/sounds/` (bus driver), `src/render/page.js` (path in the fast export), `src/radio/radio.js`, the code editor widgets (`src/live/widgets.js`, `src/widgets/app-widgets.js`), `src/style.css`.
 - Checks: `check:code` unchanged, `check:songs`, `check:strudel`, `check:functions`, `check-levels.cjs`, a new `check:modulation` (Node) and `tools/check-modulation.cjs` (browser), `check:decode`.

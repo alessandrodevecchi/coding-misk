@@ -372,6 +372,7 @@
   .dev-args { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px 14px; }
   /* the main knob of a movement device (sound-modulation): first, across the card, a larger thumb */
   .dev-knob { grid-column: 1 / -1; }
+  .dev-steps { grid-column: 1 / -1; display: grid; gap: 6px; } .dev-steps .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; } .dev-steps .step { aspect-ratio: auto; height: 20px; }
   .dev-knob input[type=range] { height: 22px; }
   .dev-knob input[type=range]::-webkit-slider-thumb { transform: scale(1.35); }
   .dev-knob input[type=range]::-moz-range-thumb { transform: scale(1.35); }

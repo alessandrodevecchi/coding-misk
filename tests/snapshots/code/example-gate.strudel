@@ -1,0 +1,57 @@
+// coding-misk · Example 10 · Gate
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(132/4)
+
+const SECTIONS = [['Gate', 8], ['Drop', 8]]
+const TEMPO = {'Gate': 132, 'Drop': 132}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!8 0!8>"  // Gate · 8 bars · 132 BPM · D · Dm Am A# C
+const section2 = "<0!8 1!8>"  // Drop · 8 bars · 132 BPM · D · Dm A# F C
+
+// ========== drums ==========
+// Drop · bars 9-16 · pattern four
+// Drums · RolandTR909
+$: s("bd*4").bank("RolandTR909").gain(0.9).duck(2).duckdepth(0.5).duckattack(0.15).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("[~ hh]*4").bank("RolandTR909").gain(0.45).mask(section2).velocity(section2).orbit(1).analyze("hats")
+
+// ========== bass ==========
+// Gate · bars 1-8 · pattern roll
+// Bass · Rolling
+$: note("<a1 e1 f1 g1>").transpose(5).struct("[~ x x x]*4")
+  .s("sawtooth").lpf(900).lpq(8)
+  .decay(.12).sustain(0).gain(0.5).lfo({ c: 'gain', s: 4, da: 0.25, dc: -1, sh: 'ramp', phaseoffset: 0.5 }).mask(section1).velocity(section1).orbit(2).analyze("bass")
+// Drop · bars 9-16 · pattern roll
+$: note("<a1 f1 c2 g1>").transpose(5).struct("[~ x x x]*4")
+  .s("sawtooth").lpf(900).lpq(8)
+  .decay(.12).sustain(0).gain(0.5).mask(section2).velocity(section2).orbit(2).analyze("bass")
+
+// ========== pad ==========
+// Gate · bars 1-8 · pattern hold
+// Pad · Sustained
+$: note("<[a2,c3,e3] [g2,b2,e3] [f2,a2,c3] [g2,b2,d3]>").transpose(5)
+  .s("supersaw").attack(.4).release(1.2).lpf(2400)
+  .room(.3).gain(0.26).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -1, sh: 'tri', sk: 0.875, phaseoffset: 0.63125 }).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -0.01429, sh: 'tri', sk: 0.125, phaseoffset: 0.74375 }).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -1, sh: 'tri', sk: 0.875, phaseoffset: 0.25625 }).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -0.01429, sh: 'tri', sk: 0.125, phaseoffset: 0.36875 }).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -1, sh: 'tri', sk: 0.875, phaseoffset: 0.00625 }).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -0.01429, sh: 'tri', sk: 0.125, phaseoffset: 0.11875 }).mask(section1).velocity(section1).orbit(6).analyze("pad")
+// Drop · bars 9-16 · pattern hold
+$: note("<[a2,c3,e3] [f2,a2,c3] [g2,c3,e3] [g2,b2,d3]>").transpose(5)
+  .s("supersaw").attack(.4).release(1.2).lpf(2400)
+  .room(.3).gain(0.26).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -1, sh: 'tri', sk: 0.875, phaseoffset: 0.63125 }).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -0.01429, sh: 'tri', sk: 0.125, phaseoffset: 0.74375 }).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -1, sh: 'tri', sk: 0.875, phaseoffset: 0.25625 }).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -0.01429, sh: 'tri', sk: 0.125, phaseoffset: 0.36875 }).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -1, sh: 'tri', sk: 0.875, phaseoffset: 0.00625 }).lfo({ c: 'gain', s: 2, da: 1.93375, dc: -0.01429, sh: 'tri', sk: 0.125, phaseoffset: 0.11875 }).mask(section2).velocity(section2).orbit(6).analyze("pad")
+
+// ========== arp ==========
+// Drop · bars 9-16 · pattern up
+// Arpeggio · Up, 16ths
+$: note("<[a3 c4 e4 a4]*4 [f3 a3 c4 f4]*4 [g3 c4 e4 g4]*4 [g3 b3 d4 g4]*4>").transpose(5)
+  .s("triangle").lpf(3000).lpq(4)
+  .decay(.15).sustain(.15).delay(.35).gain(0.3).tremolosync(8).tremolodepth(0.5).tremoloshape("tri").tremolophase(0.75).mask(section2).velocity(section2).orbit(3).analyze("arp")
+
+// ========== hook ==========
+// Gate · bars 1-8 · pattern call
+// Hook · Call
+$: n("0 ~ 0 2 ~ 4 ~ 2").scale("D4:minor")
+  .s("square").lpf(3000)
+  .decay(.2).sustain(.3).delay(.4).room(.3).gain(0.3).vib(2.2).vibmod(0.2).mask(section1).velocity(section1).orbit(4).analyze("hook")
+// Drop · bars 9-16 · pattern call
+$: n("0 ~ 0 2 ~ 4 ~ 2").scale("D4:minor")
+  .s("square").lpf(3000)
+  .decay(.2).sustain(.3).delay(.4).room(.3).gain(0.3).vib(2.2).vibmod(0.2).mask(section2).velocity(section2).orbit(4).analyze("hook")

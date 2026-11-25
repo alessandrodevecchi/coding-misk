@@ -36,7 +36,7 @@ With the card's record dot on, knob moves while the song plays in Compose SHALL 
 - **THEN** the knob moves by itself over bars 5 to 8 and the sound follows
 
 ### Requirement: Export of a path
-The real-time export and the fast export SHALL play a device's path as it plays in the page. Code copied out of the app SHALL hold no bus modulation: the path SHALL become values per bar of the target's base, or the set value when there is no path, with a comment that the knob became steps.
+A recorded gesture SHALL be saved as a path of the path engine (`app/movement-paths`, design D15) and SHALL play through it, so the real-time export, the fast export and code copied out of the app play it as the page does. Copied code SHALL hold no knob's live bus: the gesture SHALL be its path line, or the set value when there is no gesture.
 
 #### Scenario: Fast export
 - **WHEN** a song with a recorded path is exported fast and in real time
@@ -44,7 +44,7 @@ The real-time export and the fast export SHALL play a device's path as it plays 
 
 #### Scenario: Copied code
 - **WHEN** the user copies the code of that song and evaluates it in plain Strudel
-- **THEN** it evaluates with no error and the target steps through the path's value per bar
+- **THEN** it evaluates with no error and the target follows the recorded gesture
 
 ### Requirement: Knob placement without a new panel
 No permanent panel SHALL be added for knobs. A knob SHALL appear only:
@@ -65,7 +65,7 @@ No permanent panel SHALL be added for knobs. A knob SHALL appear only:
 - **THEN** Compose and the radio console show no main knob anywhere
 
 ### Requirement: Generated songs hold no path
-Decode, the generator and the director SHALL NOT write a knob path.
+Decode, the generator and the director SHALL NOT write a knob's gesture. They MAY write Path devices of the path engine (`app/movement-paths`).
 
 #### Scenario: Radio session
 - **WHEN** a new radio session is generated
