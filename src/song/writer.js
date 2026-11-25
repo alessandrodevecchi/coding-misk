@@ -12,7 +12,7 @@ import { stripWidgets, installWidgets } from '../live/widgets.js';
 import { installAppWidgets } from '../widgets/app-widgets.js';
 import { EFFECTS, LIBRARY, LIBRARY_NAMES, nameOrder, NAMES } from './functions.js';
 import { hashString } from '../endless/random.js';
-import { LABEL_SPACE, isLine } from './line-names.js';
+import { LABEL_SPACE, isLine, isPathLine } from './line-names.js';
 
 export const FUNCTION_LEVELS = ['full', 'short', 'mixer', 'compact'];
 export const FUNCTION_OPTIONS = ['fnBus', 'fnLevel', 'fnCrunch', 'fnVoice', 'fnSong', 'fnLib', 'fnLanes'];
@@ -458,7 +458,8 @@ export function tail(shown, { table = new Map(), entries = null, voice = '', lik
       else {
         const key = lineKey(l);
         e = table.get(key);
-        if (!e && like && table.size) { let best = 0.5; for (const [x, v] of table) { const s = like(x, key); if (s >= best) { best = s; e = v; } } }
+        // (a Path's line never borrows an instrument's entry by likeness: its haps would light that instrument)
+        if (!e && like && table.size && !isPathLine(l)) { let best = 0.5; for (const [x, v] of table) { const s = like(x, key); if (s >= best) { best = s; e = v; } } }
       }
       const ln = lanes && lanes[k];
       if (ln && ln.length) e = { ...(e || {}), lanes: ln };

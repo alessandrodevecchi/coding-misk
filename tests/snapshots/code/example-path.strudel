@@ -1,0 +1,46 @@
+// coding-misk · Example 11 · Path
+// song composed with sections and tracks: each track plays its clips, switched on by the section lane (1 plays, 0 is silent, values in between fade)
+// each .analyze("…") lights up its instrument in the Stage visual
+setcpm(118/4)
+
+const SECTIONS = [['Dawn', 8], ['Day', 8]]
+const TEMPO = {'Dawn': 118, 'Day': 118}
+
+// section lanes: 1 plays, 0 is silent, values in between fade
+const section1 = "<1!8 0!8>"  // Dawn · 8 bars · 118 BPM · A · Am Em F G
+const section2 = "<0!8 1!8>"  // Day · 8 bars · 118 BPM · A · Am F C G
+
+// ========== drums ==========
+// Day · bars 9-16 · pattern four
+// Drums · RolandTR909
+$: s("bd*4").bank("RolandTR909").gain(0.9).mask(section2).velocity(section2).orbit(1).analyze("kick")
+$: s("[~ hh]*4").bank("RolandTR909").gain(0.45).mask(section2).velocity(section2).orbit(1).analyze("hats")
+
+// ========== pad ==========
+$: stack("<~ .1658:.01:2.0239:0 .3317:.01:2.0239:0 .4975:.01:2.0239:0 .6634:.01:2.0239:0 .8292:.01:2.0239:0 1:.01:0:1!10>", "<.1667:2.0339:0:1 .3333:2.0339:0:1 .5:2.0339:0:1 .6667:2.0339:0:1 .8333:2.0339:0:1 1:2.0339:0:1 ~!10>").as("gain:attack:decay:sustain").s("one").bus(1).dry(0)  // path: volume, 2 points
+$: stack("<~ .0216:.01:2.0239:0 .0433:.01:2.0239:0 .0649:.01:2.0239:0 [.3372:.01:1.0069:0@8 .4736:.01:1.0069:0@8] .3894:.01:2.0239:0 .2163:.01:2.0239:0 .411:.01:2.0239:0 .6057:.01:2.0239:0 .8004:.01:2.0239:0 .9951:.01:2.0239:0 .7734:.01:2.0239:0 .5516:.01:2.0239:0 .3299:.01:2.0239:0 .1087:.01:0:1!2>", "<.0217:2.0339:0:1 .0435:2.0339:0:1 .0652:2.0339:0:1 .3406:2.0339:0:1 [.4783:1.0169:0:1@8 .3913:1.0169:0:1@8] .2174:2.0339:0:1 .413:2.0339:0:1 .6087:2.0339:0:1 .8043:2.0339:0:1 1:2.0339:0:1 .7772:2.0339:0:1 .5543:2.0339:0:1 .3315:2.0339:0:1 .1087:2.0339:0:1 ~!2>").as("gain:attack:decay:sustain").s("one").bus(2).dry(0)  // path: filter, 6 points
+// Dawn · bars 1-8 · pattern hold
+// Pad · Sustained
+$: note("<[a2,c3,e3] [g2,b2,e3] [f2,a2,c3] [g2,b2,d3]>")
+  .s("supersaw").attack(.4).release(1.2)
+  .room(.4).gain(0.26).lpf(400).bmod({ b: 2, c: 'lpf', da: 4600 }).mask(section1).velocity(section1).mul(postgain(.001)).bmod({ b: 1, c: 'postgain', dep: 1000 }).orbit(6).analyze("pad")
+// Day · bars 9-16 · pattern hold
+$: note("<[a2,c3,e3] [f2,a2,c3] [g2,c3,e3] [g2,b2,d3]>")
+  .s("supersaw").attack(.4).release(1.2)
+  .room(.4).gain(0.26).lpf(400).bmod({ b: 2, c: 'lpf', da: 4600 }).mask(section2).velocity(section2).mul(postgain(.001)).bmod({ b: 1, c: 'postgain', dep: 1000 }).orbit(6).analyze("pad")
+
+// ========== arp ==========
+$: "<~!10 .3333:.01:0:1!2 .6667:.01:0:1!2 1:.01:0:1!2>".as("gain:attack:decay:sustain").s("one").bus(3).dry(0)  // path: delay send, 4 points
+// Day · bars 9-16 · pattern up
+// Arpeggio · Up, 16ths
+$: note("<[a3 c4 e4 a4]*4 [f3 a3 c4 f4]*4 [g3 c4 e4 g4]*4 [g3 b3 d4 g4]*4>")
+  .s("square").lpf(3000).lpq(4)
+  .decay(.15).sustain(.15).gain(0.25).delay(0.001).bmod({ b: 3, c: 'delay', da: 0.599 }).mask(section2).velocity(section2).orbit(3).analyze("arp")
+
+// ========== bass ==========
+$: stack("<1:.01:0:1!12 .9951:.01:2.0239:0 .7463:.01:2.0239:0 .4975:.01:2.0239:0 .2488:.01:2.0239:0>", "<~!12 .75:2.0339:0:1 .5:2.0339:0:1 .25:2.0339:0:1 ~>").as("gain:attack:decay:sustain").s("one").bus(4).dry(0)  // path: volume, 2 points
+// Day · bars 9-16 · pattern roll
+// Bass · Rolling
+$: note("<a1 f1 c2 g1>").struct("[~ x x x]*4")
+  .s("sawtooth").lpf(900).lpq(8)
+  .decay(.12).sustain(0).gain(0.5).mask(section2).velocity(section2).mul(postgain(.001)).bmod({ b: 4, c: 'postgain', dep: 1000 }).orbit(2).analyze("bass")

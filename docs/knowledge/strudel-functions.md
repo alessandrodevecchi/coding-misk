@@ -14,7 +14,7 @@ The app ships one exact version of Strudel. The catalog lists every function of 
 The catalog exists because many useful functions were never written: the app kept using the same few. Read this note before adding a move to the generator, a growth shape or a radio command. Pick functions from the list below first.
 
 <!-- generated:summary -->
-Functions in the shipped Strudel: 610. Written by the app: 84. Never written: 526.
+Functions in the shipped Strudel: 610. Written by the app: 89. Never written: 521.
 <!-- /generated -->
 
 ## How it connects
@@ -69,7 +69,7 @@ Useful for variety and not written yet by the app (a function written under any 
 <!-- generated:written -->
 Written by the app today:
 
-`K`, `add`, `all`, `analyze`, `anchor`, `arp`, `attack`, `bank`, `beat`, `chord`, `clip`, `crush`, `decay`, `degradeBy`, `delay`, `delayfeedback`, `delaysync`, `distort`, `distorttype`, `distortvol`, `duckattack`, `duckdepth`, `duckorbit` (as `duck`), `early`, `env`, `fmdecay`, `fmh`, `fmh2`, `fmi` (as `fm`), `fmi2` (as `fm2`), `fmsustain`, `fmwave`, `gain`, `hpf`, `irand`, `jux`, `late`, `lfo`, `lpdepth`, `lpf`, `lpq`, `lpshape`, `lpsync`, `mask`, `mode`, `mul`, `n`, `note`, `orbit`, `pan`, `phaser`, `phaserdepth`, `pick`, `postgain`, `range`, `rangex`, `register`, `release`, `ribbon` (as `rib`), `room`, `roomsize`, `s`, `scale`, `segment` (as `seg`), `setcpm`, `slice`, `slow`, `speed`, `stretch`, `struct`, `sub`, `superimpose`, `sustain`, `swingBy`, `transpose`, `tremolodepth`, `tremolophase`, `tremoloshape`, `tremolosync`, `velocity`, `vib`, `vibmod`, `voicing`, `vowel`
+`K`, `add`, `all`, `analyze`, `anchor`, `arp`, `as`, `attack`, `bank`, `beat`, `bmod`, `bus`, `chord`, `clip`, `crush`, `decay`, `degradeBy`, `delay`, `delayfeedback`, `delaysync`, `distort`, `distorttype`, `distortvol`, `dry`, `duckattack`, `duckdepth`, `duckorbit` (as `duck`), `early`, `env`, `fmdecay`, `fmh`, `fmh2`, `fmi` (as `fm`), `fmi2` (as `fm2`), `fmsustain`, `fmwave`, `gain`, `hpf`, `irand`, `jux`, `late`, `lfo`, `lpdepth`, `lpf`, `lpq`, `lpshape`, `lpsync`, `mask`, `mode`, `mul`, `n`, `note`, `orbit`, `pan`, `phaser`, `phaserdepth`, `pick`, `postgain`, `range`, `rangex`, `register`, `release`, `ribbon` (as `rib`), `room`, `roomsize`, `s`, `scale`, `segment` (as `seg`), `setcpm`, `slice`, `slow`, `speed`, `stack`, `stretch`, `struct`, `sub`, `superimpose`, `sustain`, `swingBy`, `transpose`, `tremolodepth`, `tremolophase`, `tremoloshape`, `tremolosync`, `velocity`, `vib`, `vibmod`, `voicing`, `vowel`
 <!-- /generated -->
 
 ## Where to read more

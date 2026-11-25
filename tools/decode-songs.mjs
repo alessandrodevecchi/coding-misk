@@ -277,6 +277,9 @@ const MOD_KINDS = {
   lfo: { rack: [{ device: 'lfo', target: 'filter', rate: 0.5, depth: 0.5, shape: 'sine' }], rows: FOUR },
   trem: { rack: [{ device: 'tremolo', rate: 8, depth: 0.6 }], rows: FOUR },
   sweep: { rack: [{ device: 'sweep', target: 'filter', from: 300, to: 5000, bars: 8, curve: 'exp', repeat: 'loop' }], rows: FOUR, cutoff: 18000 },
+  // a volume fade-in and a filter that opens unevenly and closes (Path, D14), for the step that teaches Decode to measure
+  // them
+  path: { rack: [{ device: 'path', target: 'volume', points: [[0, 0.1], [8, 1]] }, { device: 'path', target: 'filter', points: [[0, 500], [4, 900], [6, 3000], [12, 1500], [16, 4000]] }], rows: FOUR, cutoff: 18000 },
 };
 export const MOD_SONGS = Object.entries(MOD_KINDS).flatMap(([kind, k]) => [true, false].map(withDrums => {
   const id = `mod-${kind}${withDrums ? '' : '-bare'}`;
@@ -288,11 +291,11 @@ export const MOD_SONGS = Object.entries(MOD_KINDS).flatMap(([kind, k]) => [true,
 }));
 export const MOD = MOD_SONGS.map(s => s.id);
 // the same song with its movement taken out (the still pad the envelope error measures against)
-export const stillOf = s => ({ ...s, id: `${s.id}-still`, tracks: s.tracks.map(t => (t.rack ? { ...t, rack: t.rack.filter(d => !['sweep', 'lfo', 'pump', 'tremolo'].includes(d.device)) } : t)) });
+export const stillOf = s => ({ ...s, id: `${s.id}-still`, tracks: s.tracks.map(t => (t.rack ? { ...t, rack: t.rack.filter(d => !['sweep', 'lfo', 'pump', 'tremolo', 'path'].includes(d.device)) } : t)) });
 
 // The truth of a song's movement, read from the song itself: per track id, its movement devices and its Tremolo with
 // their arguments (defaults filled in). A Pump's rate counts only where no kick plays in the song (the beat dip).
-const MOVE_DEFAULTS = { sweep: { target: 'filter', from: 400, to: 4000, bars: 8, curve: 'exp', repeat: 'once' }, lfo: { target: 'filter', rate: 0.5, depth: 0.4, shape: 'sine' }, pump: { depth: 0.6, recover: 0.15, rate: 0.25 }, tremolo: { rate: 8, depth: 0.7 } };
+const MOVE_DEFAULTS = { sweep: { target: 'filter', from: 400, to: 4000, bars: 8, curve: 'exp', repeat: 'once' }, lfo: { target: 'filter', rate: 0.5, depth: 0.4, shape: 'sine' }, pump: { depth: 0.6, recover: 0.15, rate: 0.25 }, tremolo: { rate: 8, depth: 0.7 }, path: { target: 'filter', points: [], smooth: 'linear' } };
 export function modTruth(s) {
   const kick = s.tracks.some(t => t.type === 'drums' && !t.mute && Object.values(t.patterns || {}).some(p => p.rows && /x/.test(p.rows.bd || '')));
   const out = {};
@@ -304,15 +307,30 @@ export function modTruth(s) {
   }
   return out;
 }
+// a Path's value at bar x (the first point's before it, the last one's after it, straight lines between)
+const pathValue = (pts, x) => { if (!pts.length) return 0; if (x <= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) return pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * (x - pts[i - 1][0]) / ((pts[i][0] - pts[i - 1][0]) || 1); return pts[pts.length - 1][1]; };
+// how far a measured Path is from the true one: the mean distance at the start of every bar the truth spans (and 4 past
+// it), as a share of the true span (filters in octaves)
+export function pathError(t, m) {
+  const tp = t.points || [], mp = (m && m.points) || [];
+  if (!tp.length || !mp.length) return 1;
+  const f = t.target === 'filter' || t.target === 'hpf', v = x => (f ? Math.log2(Math.max(20, x)) : x);
+  const vals = tp.map(p => v(p[1])), span = Math.max(...vals) - Math.min(...vals) || 1, end = Math.ceil(tp[tp.length - 1][0]) + 4;
+  let sum = 0;
+  for (let b = 0; b <= end; b++) sum += Math.abs(v(pathValue(tp, b)) - v(pathValue(mp, b)));
+  return sum / (end + 1) / span;
+}
 // The parameter score (D9): a device counts as recovered when a measured device of the same track has its kind and
-// rate (exact; a Sweep: its bars, a Pump with a kick: no rate) and its depth within 0.15 (a Sweep: no depth).
+// rate (exact; a Sweep: its bars, a Pump with a kick: no rate) and its depth within 0.15 (a Sweep: no depth); a Path:
+// a measured Path on its target within 0.15 of its span (pathError).
 // → { devices, recovered, share }
 export function modScore(truth, measured) {
   let devices = 0, recovered = 0;
   for (const [track, list] of Object.entries(truth || {})) for (const t of list) {
     devices++;
     const ok = ((measured || {})[track] || []).some(m => m.device === t.device
-      && (t.device === 'sweep' ? m.bars === t.bars : (t.rate === undefined || m.rate === t.rate))
+      && (t.device !== 'path' || (m.target === t.target && pathError(t, m) <= 0.15))
+      && (t.device === 'path' || t.device === 'sweep' ? m.bars === t.bars : (t.rate === undefined || m.rate === t.rate))
       && (t.depth === undefined || (typeof m.depth === 'number' && Math.abs(m.depth - t.depth) <= 0.15)));
     if (ok) recovered++;
   }

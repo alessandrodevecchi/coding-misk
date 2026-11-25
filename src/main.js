@@ -34,7 +34,7 @@ import { validateSong } from './song/validate.js';
 import { cropCode } from './song/crop.js';
 import { FORMAT, VERSION, SETTING_FIELDS, SOUND_FIELDS, SECTION_DEFAULTS, VISUALS, VOICE_DEFAULT, VOICE_STYLES, styleOf, fromScenes, clipState } from './song/format.js';
 import { DEVICES, deviceArgs, newDevice, choiceLabel } from './song/rack.js';
-import { MOVE_TYPES, MOVE_MAX, SWEEP_DEFAULTS } from './song/movement.js';
+import { MOVE_TYPES, MOVE_MAX, SWEEP_DEFAULTS, PATH_PRESETS, pathPreset, pathPoints, pathSpan, pathAt } from './song/movement.js';
 import { guardDuck } from './sounds/duck-guard.js';
 import { createRadio, usableRecipes } from './radio/radio.js';
 import { inventStyle } from './endless/style-maker.js';
@@ -3966,12 +3966,29 @@ function deviceHtml(d, i, tr) {
     <div class="dev-head"><button class="led" data-dev-on="${i}" aria-pressed="${d.on !== false}" aria-label="${esc(t('onoff', { name: tx(spec.label) }))}"></button>
       <b>${esc(tx(spec.label))}</b><code data-dev-code="${i}"></code>
       <span class="dev-tools"><button class="mini" data-dev-move="${i}:-1" ${i === 0 ? 'disabled' : ''} aria-label="${esc(t('moveUp'))}">▲</button><button class="mini" data-dev-move="${i}:1" ${i === n - 1 ? 'disabled' : ''} aria-label="${esc(t('moveDown'))}">▼</button><button class="mini" data-dev-del="${i}" aria-label="${esc(t('remove'))}">✕</button></span></div>
-    ${args.length ? `<div class="dev-args">${args.map(([name, kind, , lo, hi, step], k) => kind === 'steps'
+    ${d.device === 'path' ? pathCardHtml(d, i, tr) : args.length ? `<div class="dev-args">${args.map(([name, kind, , lo, hi, step], k) => kind === 'steps'
       // a Gate's pattern (sound-modulation D13): 16 toggles in the pattern editor's step row and a menu of presets
       ? `<div class="ctrl dev-steps"><div class="row"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><select id="dev-${i}-${name}" data-dev-preset="${i}:${name}"><option value="">${esc(t('gatePreset'))}</option>${Object.entries(lo).map(([v, l]) => `<option value="${v}"${v === a[name] ? ' selected' : ''}>${esc(l[getLang()] || l.en)}</option>`).join('')}</select></div><div class="steps">${String(a[name]).split('').map((c, j) => `<button class="step" data-g="${Math.floor(j / 4)}" data-dev-step="${i}:${name}:${j}" aria-pressed="${c === 'x'}" aria-label="${esc(t('gateStep', { n: j + 1 }))}"></button>`).join('')}</div></div>`
       : kind === 'choice'
       ? `<div class="ctrl"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><select id="dev-${i}-${name}" data-dev-arg="${i}:${name}">${lo.map(v => `<option value="${v}"${v === a[name] ? ' selected' : ''}>${esc(args[k][4] ? choiceLabel(args[k], v, getLang()) : devValue(name, v))}</option>`).join('')}</select></div>`
       : `<div class="ctrl${spec.knob === name ? ' dev-knob' : ''}"${spec.knob === name ? ` title="${esc(t('moveKnobTip'))}"` : name === 'phase' ? ` title="${esc(t(d.device === 'pump' ? 'phaseTipPump' : d.device === 'gate' ? 'phaseTipGate' : 'phaseTip'))}"` : ''}><div class="row"><label class="lbl" for="dev-${i}-${name}">${esc(t('arg_' + name))}</label><output data-dev-out="${i}:${name}"></output></div><input type="range" id="dev-${i}-${name}" data-dev-arg="${i}:${name}" min="${lo}" max="${hi}" step="${step}" value="${a[name]}"></div>`).join('')}</div>` : ''}
+  </div>`;
+}
+// a Path's card (sound-modulation D14): read-only, its target, points, bars and a small drawn curve, and presets that
+// replace it; editing the points by hand comes with the knobs
+const trackSpan = tr => { const sp = (tr.clips || []).map(c => spanOf(tr, c)); return sp.length ? [Math.min(...sp.map(x => x.s)), Math.max(...sp.map(x => x.e))] : [0, songBars()]; };
+function pathCardHtml(d, i, tr) {
+  const spec = DEVICES.path, a = deviceArgs(d), pts = pathPoints(a), [lo, hi] = pathSpan(pts), total = Math.max(songBars(), 1);
+  const tgt = choiceLabel(spec.args[0], a.target, getLang()), smooth = choiceLabel(spec.args[2], a.smooth, getLang());
+  const W = 240, H = 40, x = b => (b / total * W).toFixed(1), y = v => (H - 3 - (hi > lo ? (v - lo) / (hi - lo) : 0.5) * (H - 6)).toFixed(1);
+  // the curve over the whole song: the first value before the first point, the last after the last, steps or lines
+  const xs = [...new Set([0, ...pts.flatMap(p => (a.smooth === 'step' ? [p[0] - 1e-6, p[0]] : [p[0]])), total])].filter(b => b >= 0 && b <= total).sort((p, q) => p - q);
+  const line = pts.length ? xs.map(b => `${x(b)},${y(pathAt(pts, b, a.smooth))}`).join(' ') : '';
+  const fmt = v => (a.target === 'filter' || a.target === 'hpf' ? `${Math.round(v)} Hz` : String(Math.round(v * 100) / 100));
+  return `<div class="dev-args dev-path">
+    <div class="ctrl"><label class="lbl" for="dev-${i}-ppreset">${esc(t('pathPresetLbl'))}</label><select id="dev-${i}-ppreset" data-dev-ppreset="${i}"><option value="">${esc(t('gatePreset'))}</option>${Object.entries(PATH_PRESETS).map(([k, l]) => `<option value="${k}">${esc(tx(l))}</option>`).join('')}</select></div>
+    <p class="dev-path-sum" title="${esc(t('pathReadOnly'))}">${esc(t('pathSummary', { target: tgt, n: pts.length, from: pts.length ? Math.floor(pts[0][0]) + 1 : 1, to: pts.length ? Math.ceil(pts[pts.length - 1][0]) : 1, smooth }))}</p>
+    <svg class="dev-path-curve" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(t('pathCurve', { target: tgt, lo: fmt(lo), hi: fmt(hi) }))}"><rect x="0" y="0" width="${W}" height="${H}" rx="3"></rect>${line ? `<polyline points="${line}"></polyline>` : ''}</svg>
   </div>`;
 }
 function syncRack(tr, host = document) {
@@ -4539,6 +4556,13 @@ $('#track-panel').addEventListener('change', e => {
     const start = r === 'clip-start' ? Math.round(+e.target.value) - 1 : sp.s, bars = r === 'clip-bars' ? Math.round(+e.target.value) : sp.e - sp.s;
     setClipSpan(tr, c, start, bars); changed(); renderTrackPanel(); return;
   }
+  if (e.target.matches('select[data-dev-ppreset]')) {
+    // a Path's preset replaces its target and points (D14); a target another path of the track has is refused
+    const i = +e.target.dataset.devPpreset, [s0, e0] = trackSpan(tr), p = pathPreset(e.target.value, s0, e0); if (!p) return;
+    if ((tr.rack || []).some((x, j) => j !== i && x.device === 'path' && (x.target || 'filter') === p.target)) { toast(t('movePathTarget')); renderTrackPanel(); return; }
+    if ((tr.rack || []).some(x => x.device === 'sweep' && (x.target || 'filter') === p.target)) { toast(t('movePathSweep')); renderTrackPanel(); return; }
+    tr.rack[i] = { ...p, ...(tr.rack[i].on === false ? { on: false } : {}) }; changed(); renderTrackPanel(); return;
+  }
   if (e.target.matches('select[data-dev-preset]')) {
     const [i, name] = e.target.dataset.devPreset.split(':'); if (!e.target.value) return;
     tr.rack[+i][name] = e.target.value; changed(); renderTrackPanel(); return;
@@ -4604,6 +4628,13 @@ $('#track-panel').addEventListener('click', e => {
     if (DEVICES[kind] && DEVICES[kind].kind === 'move' && (moves.length >= MOVE_MAX || (kind === 'pump' && moves.some(d => d.device === 'pump')))) { toast(t(kind === 'pump' && moves.some(d => d.device === 'pump') ? 'movePumpOne' : 'moveMax')); return; }
     // a Gate and a Pump both dip the gain: one of them on a track (D13)
     if ((kind === 'gate' || kind === 'pump') && moves.some(d => d.device === 'gate' || d.device === 'pump')) { toast(t(moves.some(d => d.device === kind) ? (kind === 'pump' ? 'movePumpOne' : 'moveGateOne') : 'moveGatePump')); return; }
+    // a new Path starts from a preset on a target the track has free: a fade in, else the filter opening (D14)
+    if (kind === 'path') {
+      const [s0, e0] = trackSpan(tr), taken = new Set((tr.rack || []).filter(x => x.device === 'path' || x.device === 'sweep').map(x => x.target || 'filter'));
+      const name = ['fadein', 'open'].find(k => !taken.has(pathPreset(k, s0, e0).target));
+      if (!name) { toast(t('movePathTarget')); return; }
+      tr.rack = [...(tr.rack || []), pathPreset(name, s0, e0)]; changed(); renderTrackPanel(); return;
+    }
     tr.rack = [...(tr.rack || []), newDevice(kind)]; changed(); renderTrackPanel(); return;
   }
   if (b.dataset.devStep !== undefined) {

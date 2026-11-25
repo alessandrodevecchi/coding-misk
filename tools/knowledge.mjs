@@ -490,7 +490,7 @@ const BLOCKS = {
   },
   'sound-and-levels': {
     'rack-devices'() {
-      const arg = ([n, k, d, a, b]) => (k === 'choice' ? `${n} ${a.join('/')} (${d})` : `${n} ${a}-${b} (${d})`);
+      const arg = ([n, k, d, a, b]) => (k === 'choice' ? `${n} ${a.join('/')} (${d})` : k === 'steps' ? `${n} 16 steps x/. (${d}; presets ${Object.keys(a).join(', ')})` : k === 'points' ? `${n} [bar, value] pairs (none)` : `${n} ${a}-${b} (${d})`);
       return table(['Device', 'Name', 'Kind', 'Arguments: range (default)'], Object.entries(DEVICES).map(([k, d]) => [code(k), nameOf(d.label), d.kind, d.args.map(arg).join('; ')]));
     },
     levels() {

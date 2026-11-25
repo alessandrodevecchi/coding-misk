@@ -63,15 +63,15 @@ Design D11 to D13. Branch `feat/95-movement-params` from `feat/95-decode-round15
 - [x] 7.5 `tools/check-modulation.cjs`: an example song with the new parameters plays, levels with and without, the Gate's and the phased dip's envelope in playback against the fast export.
 - [x] 7.6 Docs: `docs/SONG-FORMAT.md`, guide card, knowledge (`npm run knowledge`), catalog (`vib`, `vibmod`, `tremolophase`, `tremoloshape` written), DEVLOG, owner tests 10-13 in the checklist.
 
-## 8. Path engine (spec only in this step; usable without any knob)
+## 8. Path engine (usable without any knob)
 
 Design D14. The knobs (section 6) come after it.
 
-- [ ] 8.1 Measure in the browser and record in D14: Strudel's `one` into a bus with no dry output, the `bmod` depth factor (the `/ 0.3`) and `dc`, the gain curve `one`'s notes pass, overlapping triangle envelopes summing to straight lines (linear attack and decay), `step` edges, the render page making the bus on first use.
-- [ ] 8.2 `path` device in `src/song/movement.js`: targets, `points`, `smooth`; the path line and the moved line's base and `bmod`; `pathDevice()` and `thinPath()`; the validator's limits (16 points a bar, 256 points, 8 paths a song, one per target, Path with Sweep, volume 0-1, increasing bars) with JSON paths; `docs/SONG-FORMAT.md`.
-- [ ] 8.3 Compiler: bus numbers 1 to 8 in track order, the path line first in its track's block, muted, soloed out and hushed with the track; live build, Crescendo and Live coder growth type it first; the hit grid, tone cloud, level checks and hidden mixer skip `s("one")` lines; songs without a Path compile byte for byte as before (`check:code`).
-- [ ] 8.4 Bus lifetime: Stop, Play and a new evaluation (`controller.reset()`), a held note through a reset; fast export against real time.
-- [ ] 8.5 Compose card: read-only (target, points, bars, a small drawn curve), Italian and English; the guide card.
-- [ ] 8.6 Checks: `check:modulation` (code, limits, `pathDevice`, Strudel in Node), `tools/check-modulation.cjs` (a held pad with a volume and a filter path: level and brightness at four points of each bar, fast against real-time export, copied code in plain Strudel), `check:mixer`, `check:strudel` (`one`, `bus`, `bmod`, `dry` written), `check:stage-widgets`; an example song.
-- [ ] 8.7 Decode hook: `modTruth` reads Path devices; a bench song with a volume fade-in and a filter path, for the step that teaches Decode to measure them.
+- [x] 8.1 Measure in the browser and record in D14: Strudel's `one` into a bus with no dry output, the `bmod` depth factor (the `/ 0.3`) and `dc`, the gain curve `one`'s notes pass, overlapping triangle envelopes summing to straight lines (linear attack and decay), `step` edges, the render page making the bus on first use.
+- [x] 8.2 `path` device in `src/song/movement.js`: targets, `points`, `smooth`; the path line and the moved line's base and `bmod`; `pathDevice()` and `thinPath()`; the validator's limits (16 points a bar, 256 points, 8 paths a song, one per target, Path with Sweep, volume 0-1, increasing bars) with JSON paths; `docs/SONG-FORMAT.md`.
+- [x] 8.3 Compiler: bus numbers 1 to 8 in track order, the path line first in its track's block, muted, soloed out and hushed with the track; live build, Crescendo and Live coder growth type it first; the hit grid, tone cloud, level checks and hidden mixer skip `s("one")` lines; songs without a Path compile byte for byte as before (`check:code`).
+- [x] 8.4 Bus lifetime: Stop, Play and a new evaluation (`controller.reset()`), a held note through a reset; fast export against real time.
+- [x] 8.5 Compose card: read-only (target, points, bars, a small drawn curve), Italian and English; the guide card.
+- [x] 8.6 Checks: `check:modulation` (code, limits, `pathDevice`, Strudel in Node), `tools/check-modulation.cjs` (a held pad with a volume and a filter path: level and brightness at four points of each bar, fast against real-time export, copied code in plain Strudel), `check:mixer`, `check:strudel` (`one`, `bus`, `bmod`, `dry` written), `check:stage-widgets`; an example song.
+- [x] 8.7 Decode hook: `modTruth` reads Path devices; a bench song with a volume fade-in and a filter path, for the step that teaches Decode to measure them.
 

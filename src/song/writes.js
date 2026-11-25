@@ -6,5 +6,7 @@ export const WRITES = {
   delay: ['delay'], reverb: ['room'], distort: ['distort'], crush: ['crush'], vowel: ['vowel'], hpf: ['hpf'], lpf: ['lpf'], pan: ['pan'],
   // a Sweep writes its target; an LFO and a Pump move around the base and never replace it
   sweep: d => [SWEEP_CONTROL[(d && d.target) || 'filter'] || 'lpf'],
+  // a Path writes its base too (D14); on volume it scales the postgain and replaces nothing
+  path: d => { const t = (d && d.target) || 'filter'; return t === 'volume' ? [] : [t === 'pan' ? 'pan' : SWEEP_CONTROL[t] || 'lpf']; },
 };
 export const deviceWrites = d => { const w = d && WRITES[d.device]; return !w ? [] : typeof w === 'function' ? w(d) : w; };

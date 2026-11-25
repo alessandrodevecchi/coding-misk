@@ -13,6 +13,9 @@
 // 7. playback against the fast export (needs ffmpeg; --no-export skips it): example-gate exported fast and in real time
 //    from the Songs tab, aligned on the kick of its second section, the gated pad and the phased bass dip of its first
 //    section folded per bar: the same place within a 32nd of a bar.
+// 8. paths (D14): a held note with a volume and a filter path rendered (level and brightness at four points of each
+//    bar against the drawn path), example 11 in live playback through Stop, Play and a new evaluation (the buses made
+//    again), and example 11 exported fast and in real time (the fades and the filter path at the same bars).
 // Fast export against real time, loudness: tools/check-export.cjs example-pump example-sweep example-gate.
 // Usage: PLAYWRIGHT_CORE=... PORT=5173 node tools/check-modulation.cjs [--json out] [--no-export]   (dev server on PORT)
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
@@ -75,7 +78,7 @@ const r3 = x => Math.round(x * 1000) / 1000;
   const PAD = '$: note("a2").s("sawtooth").attack(.01).release(.05).room(0).gain(.3)';
 
   // ---------- 1. the example songs ----------
-  for (const f of ['07-pump', '08-sweep', '09-sway', '10-gate']) {
+  for (const f of ['07-pump', '08-sweep', '09-sway', '10-gate', '11-path']) {
     const s = JSON.parse(fs.readFileSync(`songs/examples/${f}.json`, 'utf8')), n = errors.length;
     const r = await render(compileSong(s), 16, 124);
     check(errors.length === n && r.peak > 0.05 && r.peak < 0.97, `${f}: renders with no superdough error, peak below 0.97`, `peak ${r3(r.peak)}${errors.length > n ? `; ${errors.slice(n).join(' | ')}` : ''}`);
@@ -226,6 +229,58 @@ const r3 = x => Math.round(x * 1000) / 1000;
     check(a && a.len && a.max <= Math.max(1e-3, 2 * b.max), 'the same song renders the same twice (Pump, no random value)', `largest difference ${a && r3(a.max * 1e4) / 1e4}, without Pump ${b && r3(b.max * 1e4) / 1e4}`);
   }
 
+  // ---------- 8. paths (sound-modulation D14, tasks 8.4 and 8.6) ----------
+  {
+    const M = await import('../src/song/movement.js');
+    // a held saw struck on every bar, a volume path and a filter path over 8 bars at 120 BPM: the level and the
+    // brightness at four points of each bar against the drawn path (the level against the same pad without a path, the
+    // brightness against static cutoffs at two bars' points)
+    const HELD = '$: note("a2").s("sawtooth").attack(.005).release(.01).room(0).gain(.3)';
+    const vp = { device: 'path', target: 'volume', points: [[0, 0], [3, 1], [3.5, 0.4], [6, 0.8], [8, 0.2]] }, fp = { device: 'path', target: 'filter', points: [[0, 400], [2.5, 2600], [4, 900], [8, 3000]] };
+    const vl = M.pathLine(vp, { bus: 1, total: 8, barSec: 2 }), fl = M.pathLine(fp, { bus: 2, total: 8, barSec: 2 }), vm = M.pathMove(vp, 1), fm = M.pathMove(fp, 2);
+    const pts = Array.from({ length: 8 }, (_, b) => [0.2, 0.4, 0.6, 0.8].map(x => b + x)).flat();
+    const n0 = errors.length;
+    await render(head() + HELD + '.lpf(2000)', 8); const ref = await measure(pts.map(x => [x - 0.03, x + 0.03]));
+    const pk = await render(head() + vl + '\n' + HELD + '.lpf(2000)' + vm.post, 8); const got = await measure(pts.map(x => [x - 0.03, x + 0.03]));
+    const want = x => [-0.03, -0.015, 0, 0.015, 0.03].reduce((a, d) => a + M.pathAt(M.pathPoints(vp), x + d), 0) / 5;
+    const lv = pts.map((x, i) => Math.abs(got[i].rms / ref[i].rms - want(x)));
+    check(errors.length === n0 && Math.max(...lv) < 0.02 && pk.peak <= 0.31, 'Path on volume: a held note follows the drawn level at four points of each bar, never above the track', `worst ${r3(Math.max(...lv))} of the gain, peak ${r3(pk.peak)}`);
+    await render(head() + fl + '\n' + HELD + fm.code, 8);
+    const fx = [1.2, 1.4, 1.6, 1.8, 3.2, 3.4, 3.6, 3.8], fb = (await measure(fx.map(x => [x - 0.03, x + 0.03]))).map(x => x.bright);
+    const sb = [];
+    for (const x of fx) { await render(head() + HELD + `.lpf(${Math.round(M.pathAt(M.pathPoints(fp), x))})`, 1); sb.push((await measure([[0.47, 0.53]]))[0].bright); }
+    const fe = fb.map((v, i) => Math.abs(v / sb[i] - 1));
+    check(errors.length === n0 && Math.max(...fe) < 0.05, 'Path on the filter: a held note\'s brightness at four points of two bars is the static cutoff\'s at each', `worst ${r3(100 * Math.max(...fe))} %${errors.length > n0 ? `; ${errors.slice(n0).join(' | ')}` : ''}`);
+    out.path = { level: r3(Math.max(...lv)), bright: fb.map(Math.round), still: sb.map(Math.round) };
+
+    // live playback (task 8.4): example 11 in Compose, Play, Stop and Play again, a new evaluation while it plays; the
+    // pad's level (its analyser) after each reset of the buses keeps following the fade-in, never stuck at the path's base
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    for (let k = 0; k < 20; k++) { await page.locator('#track-pick').selectOption('example-path').catch(() => {}); await sleep(500); if (await page.locator('#sc-name').inputValue().catch(() => '') === 'Dawn') break; }
+    const padLevel = ms => page.evaluate(async ms => {
+      const ed = document.querySelector('strudel-editor').editor, out = [];
+      for (let t = 0; t < ms; t += 100) {
+        const d = window.analysers && window.analysers.pad ? getAnalyzerData('time', 'pad') : [];
+        let m = 0; for (const v of d) m = Math.max(m, Math.abs(v));
+        out.push([+ed.repl.scheduler.now().toFixed(2), +m.toFixed(4)]);
+        await new Promise(r => setTimeout(r, 100));
+      }
+      return { out, err: String(ed.repl.state.evalError || '') };
+    }, ms);
+    const late = r => r.out.filter(([c]) => c % 16 >= 4 && c % 16 < 8).map(([, v]) => v);
+    const n1 = errors.length;
+    await page.click('#play'); await sleep(500);
+    const a = await padLevel(11000);
+    await page.click('#stop'); await sleep(800); await page.click('#play'); await sleep(500);
+    const b = await padLevel(11000);
+    await page.evaluate(() => { const ed = document.querySelector('strudel-editor').editor; return ed.evaluate ? ed.evaluate() : ed.repl.evaluate(ed.code); });
+    const c = await padLevel(5000);
+    await page.click('#stop'); await sleep(300);
+    const peak = r => Math.max(0, ...late(r)), early = r => Math.max(0, ...r.out.filter(([x]) => x % 16 < 0.8).map(([, v]) => v));
+    check(!a.err && !b.err && !c.err && errors.length === n1 && peak(a) > 0.05 && peak(b) > 0.05 && early(a) < 0.5 * peak(a), 'Path in playback: the pad fades in from silence, and after Stop and Play and a new evaluation the path drives it again', `peak in bars 5-8: first play ${r3(peak(a))}, after Stop and Play ${r3(peak(b))}; first bar ${r3(early(a))}; after the evaluation ${r3(Math.max(0, ...c.out.map(([, v]) => v)))} at cycles ${c.out.length ? `${c.out[0][0]}-${c.out[c.out.length - 1][0]}` : '-'}${errors.length > n1 ? `; ${errors.slice(n1).join(' | ')}` : ''}`);
+    out.pathLive = { first: r3(peak(a)), again: r3(peak(b)), firstBar: r3(early(a)) };
+  }
+
   // ---------- 7. playback against the fast export ----------
   if (!process.argv.includes('--no-export')) {
     const { execFileSync } = require('node:child_process'), os = require('node:os'), path = require('node:path');
@@ -234,23 +289,23 @@ const r3 = x => Math.round(x * 1000) / 1000;
     page.on('download', d => downloads.push(d));
     const settings = o => page.evaluate(o => { for (const [k, v] of Object.entries(o)) localStorage.setItem(k, JSON.stringify(v)); }, o);
     const pcm = f => { const b = execFileSync('ffmpeg', ['-v', 'error', '-i', f, '-ac', '1', '-ar', '48000', '-f', 'f32le', '-'], { maxBuffer: 1 << 30 }); return new Float32Array(b.buffer, b.byteOffset, b.length / 4); };
-    const exportAs = async speed => {
+    const exportAs = async (speed, id = 'example-gate', query = 'Example 10') => {
       await settings({ 'coding-misk-export-format': 'wav', 'coding-misk-export-speed': speed });
       await page.reload(); await new Promise(r => setTimeout(r, 3500));
       await page.click('[data-mode="ascolta"]'); await page.click('[data-tab="brani"]'); await new Promise(r => setTimeout(r, 600));
-      if (!(await page.isVisible('#songs [data-song-id="example-gate"] [data-act="export"]'))) { await page.fill('#sv-q', 'Example 10'); await new Promise(r => setTimeout(r, 800)); }
+      if (!(await page.isVisible(`#songs [data-song-id="${id}"] [data-act="export"]`))) { await page.fill('#sv-q', query); await new Promise(r => setTimeout(r, 800)); }
       const n = downloads.length, t0 = Date.now();
-      await page.click('#songs [data-song-id="example-gate"] [data-act="export"]');
+      await page.click(`#songs [data-song-id="${id}"] [data-act="export"]`);
       await new Promise(r => setTimeout(r, 1500));
       while (Date.now() - t0 < 120000) {
-        const busy = await page.evaluate(() => globalThis.codingMiskExport.job) || /REC|●/.test(await page.textContent('#songs [data-song-id="example-gate"] [data-act="export"]'));
+        const busy = await page.evaluate(() => globalThis.codingMiskExport.job) || /REC|●/.test(await page.textContent(`#songs [data-song-id="${id}"] [data-act="export"]`));
         if (!busy) break;
         await new Promise(r => setTimeout(r, 500));
       }
       await new Promise(r => setTimeout(r, 1500));
       const d = downloads.slice(n).find(x => /\.wav$/.test(x.suggestedFilename()));
       if (!d) return null;
-      const f = path.join(TMP, `${speed}.wav`); await d.saveAs(f); return pcm(f);
+      const f = path.join(TMP, `${id}-${speed}.wav`); await d.saveAs(f); return pcm(f);
     };
     const F = await exportAs('fast'), R = await exportAs('real');
     if (!F || !R) check(false, 'example-gate: exported fast and in real time');
@@ -272,6 +327,33 @@ const r3 = x => Math.round(x * 1000) / 1000;
       const [lp, cp] = lag(foldBar(FH, 0), foldBar(RH, off)), [lb, cb] = lag(foldBar(FL, 0), foldBar(RL, off));
       check(Math.abs(lp) <= 2 && cp > 0.9 && Math.abs(lb) <= 2 && cb > 0.9, 'example-gate: the gated pad and the phased bass dip fall at the same place in playback and in the fast export (within a 32nd of a bar)', `real time ${Math.round(off / 48)} ms late; pad lag ${lp}/64 bar (r ${r3(cp)}), bass lag ${lb}/64 bar (r ${r3(cb)})`);
       out.exportPhase = { offMs: Math.round(off / 48), pad: [lp, r3(cp)], bass: [lb, r3(cb)] };
+    }
+    // ---------- 8b. paths: example 11 exported fast and in real time (sound-modulation D14, task 8.4) ----------
+    const PF = await exportAs('fast', 'example-path', 'Example 11'), PR = await exportAs('real', 'example-path', 'Example 11');
+    if (!PF || !PR) check(false, 'example-path: exported fast and in real time');
+    else {
+      const sr = 48000, bar = 240 / 118 * sr;
+      const lowpass = (a, hz) => { const k = 1 - Math.exp(-2 * Math.PI * hz / sr), o = new Float32Array(a.length); let y = 0; for (let i = 0; i < a.length; i++) { y += k * (a[i] - y); o[i] = y; } return o; };
+      const high = a => { const l = lowpass(a, 1500); return a.map((v, i) => v - l[i]); };
+      const env = (a, from, n, w) => Array.from({ length: n }, (_, k) => { let q = 0; const i0 = Math.round(from + k * w); for (let i = i0; i < i0 + w && i < a.length; i++) q += a[i] * a[i]; return Math.sqrt(q / w); });
+      const corr = (x, y) => { const n = Math.min(x.length, y.length); let mx = 0, my = 0; for (let i = 0; i < n; i++) { mx += x[i] / n; my += y[i] / n; } let a = 0, b = 0, c = 0; for (let i = 0; i < n; i++) { a += (x[i] - mx) * (y[i] - my); b += (x[i] - mx) ** 2; c += (y[i] - my) ** 2; } return a / Math.sqrt(b * c || 1); };
+      // the real-time file's offset: the one that best matches the low band of bars 7 to 11, where the drums come in (a
+      // four-on-the-floor kick alone matches every beat), 1 ms steps
+      const FL = lowpass(PF, 150), RL = lowpass(PR, 150), ef = env(FL, 6.5 * bar, Math.round(4 * bar / 48), 48);
+      let off = 0, best = -2;
+      for (let o = 0; o <= 3000; o++) { const c = corr(ef, env(RL, 6.5 * bar + o * 48, ef.length, 48)); if (c > best) { best = c; off = o * 48; } }
+      // the level (the pad's fade-in, the bass's fade-out) and the brightness above 1.5 kHz (the pad's filter path), a
+      // value every quarter bar over 16 bars, in dB where the fast file is above -50 dB
+      const q = bar / 4, n = 64, db = x => 20 * Math.log10(Math.max(1e-6, x));
+      const lf = env(PF, 0, n, q), lr = env(PR, off, n, q), hf = env(high(PF), 0, n, q), hr = env(high(PR), off, n, q);
+      // (per bar: the supersaw pad's detuned voices start at random phases in playback, seeded in the fast export, so a
+      // quarter bar of it differs by a few dB between any two plays; a bar's mean power does not)
+      const perBar = a => Array.from({ length: n / 4 }, (_, b) => Math.sqrt(a.slice(4 * b, 4 * b + 4).reduce((x, v) => x + v * v, 0) / 4));
+      const worst = (a, b) => { const A = perBar(a), B = perBar(b); return Math.max(...A.map((v, i) => (db(v) > -50 ? Math.abs(db(v) - db(B[i])) : 0))); };
+      const ok = corr(lf, lr) > 0.98 && corr(hf, hr) > 0.98 && worst(lf, lr) < 2 && worst(hf, hr) < 2;
+      check(ok, 'example-path: the fade-in, the filter path and the fade-out move the same way in playback and in the fast export', `real time ${Math.round(off / 48)} ms late; level r ${r3(corr(lf, lr))}, worst bar ${r3(worst(lf, lr))} dB; above 1.5 kHz r ${r3(corr(hf, hr))}, worst bar ${r3(worst(hf, hr))} dB`);
+      out.pathExportQ = { fast: lf.map(x => +db(x).toFixed(1)), real: lr.map(x => +db(x).toFixed(1)) };
+      out.pathExport = { offMs: Math.round(off / 48), level: [r3(corr(lf, lr)), r3(worst(lf, lr))], high: [r3(corr(hf, hr)), r3(worst(hf, hr))], fastBars: lf.filter((_, i) => i % 4 === 0).map(x => r3(db(x))) };
     }
     fs.rmSync(TMP, { recursive: true, force: true });
   }

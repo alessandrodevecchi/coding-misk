@@ -1,0 +1,216 @@
+{
+  "format": "coding-misk/song",
+  "version": 2,
+  "id": "example-path",
+  "title": "Example 11 · Path",
+  "created": "2026-11-24",
+  "appVersion": "0.1.0",
+  "look": "tramonto",
+  "style": {
+    "en": "A held pad that fades in while its filter opens unevenly and closes again, an arpeggio whose delay send climbs in steps, and a bass that fades out at the end",
+    "it": "Un pad tenuto che entra in dissolvenza mentre il filtro si apre a scatti irregolari e si richiude, un arpeggio la cui mandata di delay sale a gradini e un basso che sfuma alla fine"
+  },
+  "tags": {
+    "genres": [
+      "ambient"
+    ],
+    "free": [
+      "example",
+      "movement"
+    ]
+  },
+  "sections": [
+    {
+      "name": "Dawn",
+      "bars": 8,
+      "bpm": 118,
+      "key": "A",
+      "chords": "malinconica",
+      "meter": "4/4"
+    },
+    {
+      "name": "Day",
+      "bars": 8,
+      "bpm": 118,
+      "key": "A",
+      "chords": "epica",
+      "meter": "4/4"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "drums",
+      "type": "drums",
+      "settings": {
+        "kit": "RolandTR909",
+        "gain": 0.9
+      },
+      "patterns": {
+        "four": {
+          "rows": {
+            "bd": "x...x...x...x...",
+            "hh": "..x...x...x...x."
+          }
+        }
+      },
+      "clips": [
+        {
+          "section": "Day",
+          "pattern": "four"
+        }
+      ]
+    },
+    {
+      "id": "pad",
+      "type": "pad",
+      "settings": {
+        "wave": "supersaw",
+        "gain": 0.26,
+        "cutoff": 18000,
+        "room": 0.4,
+        "move": "fisso"
+      },
+      "patterns": {
+        "hold": {
+          "preset": "pad"
+        }
+      },
+      "clips": [
+        {
+          "start": 0,
+          "bars": 16,
+          "pattern": "hold"
+        }
+      ],
+      "rack": [
+        {
+          "device": "path",
+          "target": "volume",
+          "points": [
+            [
+              0,
+              0
+            ],
+            [
+              6,
+              1
+            ]
+          ]
+        },
+        {
+          "device": "path",
+          "target": "filter",
+          "points": [
+            [
+              0,
+              400
+            ],
+            [
+              3,
+              700
+            ],
+            [
+              4.5,
+              2600
+            ],
+            [
+              6,
+              1400
+            ],
+            [
+              10,
+              5000
+            ],
+            [
+              14,
+              900
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "arp",
+      "type": "arp",
+      "settings": {
+        "wave": "square",
+        "gain": 0.25,
+        "cutoff": 3000,
+        "move": "fisso"
+      },
+      "patterns": {
+        "up": {
+          "preset": "su"
+        }
+      },
+      "clips": [
+        {
+          "start": 8,
+          "bars": 8,
+          "pattern": "up"
+        }
+      ],
+      "rack": [
+        {
+          "device": "path",
+          "target": "delay",
+          "points": [
+            [
+              8,
+              0
+            ],
+            [
+              10,
+              0.2
+            ],
+            [
+              12,
+              0.4
+            ],
+            [
+              14,
+              0.6
+            ]
+          ],
+          "smooth": "step"
+        }
+      ]
+    },
+    {
+      "id": "bass",
+      "type": "bass",
+      "settings": {
+        "gain": 0.5,
+        "cutoff": 900,
+        "move": "fisso"
+      },
+      "patterns": {
+        "roll": {
+          "preset": "rolling"
+        }
+      },
+      "clips": [
+        {
+          "section": "Day",
+          "pattern": "roll"
+        }
+      ],
+      "rack": [
+        {
+          "device": "path",
+          "target": "volume",
+          "points": [
+            [
+              12,
+              1
+            ],
+            [
+              16,
+              0
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
